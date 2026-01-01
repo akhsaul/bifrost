@@ -1,7 +1,7 @@
 ---
-title: "Supported Providers"
+title: "Overview"
 description: "Bifrost supports multiple AI providers with consistent OpenAI-compatible response formats, enabling seamless provider switching without code changes."
-icon: "bars-progress"
+icon: "circle-info"
 ---
 
 ## Overview
@@ -62,6 +62,7 @@ Notes:
 
 All providers return responses in the OpenAI-compatible format. Bifrost handles the translation between different provider-specific formats automatically.
 
+<Tabs>
 <Tab title="Gateway">
 
 ```bash
@@ -76,7 +77,7 @@ curl -X POST http://localhost:8080/v1/chat/completions \
 # Returns OpenAI-compatible format:
 {
   "id": "chatcmpl-123",
-  "object": "chat.completion", 
+  "object": "chat.completion",
   "choices": [
     {
       "index": 0,
@@ -123,13 +124,14 @@ response, err := client.ChatCompletionRequest(ctx, &schemas.BifrostChatRequest{
 ```
 
 </Tab>
+</Tabs>
 
 
 ## Custom Providers
 
 In addition to the built-in providers, Bifrost supports custom provider configurations. Custom providers allow you to create multiple instances of the same base provider with different configurations, request type restrictions, and access patterns. This is useful for environment-specific configurations, role-based access control, and feature testing.
 
-**Learn more:** [Custom Providers](./custom-providers)
+**Learn more:** [Custom Providers](../custom-providers)
 
 ## Benefits
 
@@ -144,6 +146,49 @@ The consistent interface across providers enables:
 
 Provider information is included in the `extra_fields` section of each response, providing transparency into which provider handled the request and any provider-specific metadata.
 
+### Raw Request/Response Access
+
+Bifrost can optionally return the raw request that was sent to the provider and the raw response received back. This is useful for debugging, auditing, and understanding how Bifrost transforms requests between different provider formats.
+
+**What's included:**
+- **`raw_request`** - The exact request body (JSON/data structure) that was sent to the provider's API endpoint
+- **`raw_response`** - The exact response body received from the provider (before Bifrost's normalization)
+- **Provider transformation details** - Shows exactly how Bifrost converted your input to provider-specific format
+
+**Example**: When you send a Chat Completions request with `max_completion_tokens` to Anthropic, Bifrost converts it to `max_tokens` in the raw request. Enabling raw request/response reveals this transformation.
+
+```json
+{
+  "extra_fields": {
+    "provider": "anthropic",
+    "raw_request": {
+      "model": "claude-3-5-sonnet",
+      "max_tokens": 4096,
+      "messages": [...]
+    },
+    "raw_response": {
+      "id": "msg_...",
+      "type": "message",
+      "content": [...],
+      "usage": {
+        "input_tokens": 123,
+        "output_tokens": 456
+      }
+    }
+  }
+}
+```
+
+**Use cases:**
+- **Debugging** - Verify how your request was transformed for the specific provider
+- **Auditing** - Track exactly what was sent to external APIs
+- **Cost analysis** - See actual token counts before Bifrost's normalization
+- **Integration testing** - Validate provider-specific transformations
+
 **Configuration options:**
-- **[Go SDK Provider Configuration](../quickstart/go-sdk/provider-configuration)** - Configure `SendBackRawResponse` and other provider settings
-- **[Gateway Provider Configuration](../quickstart/gateway/provider-configuration)** - Configure `send_back_raw_response` via API, UI, or config file
+- **[Go SDK Provider Configuration](../../quickstart/go-sdk/provider-configuration)** - Configure `SendBackRawResponse` and other provider settings
+- **[Gateway Provider Configuration](../../quickstart/gateway/provider-configuration)** - Configure `send_back_raw_response` via API, UI, or config file
+
+<Note>
+Enabling raw request/response may increase response payload size and has minimal performance impact. Use it selectively in debugging/testing environments or when you need audit trails.
+</Note>
