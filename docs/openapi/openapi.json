@@ -164,7 +164,8 @@
                 "openrouter",
                 "elevenlabs",
                 "huggingface",
-                "nebius"
+                "nebius",
+                "xai"
               ]
             }
           },
@@ -372,7 +373,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -503,7 +505,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -583,7 +586,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -1786,7 +1790,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -2491,7 +2496,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -2619,7 +2625,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -2699,7 +2706,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -3407,7 +3415,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -4053,7 +4062,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -4181,7 +4191,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -4261,7 +4272,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -5815,7 +5827,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -6815,7 +6828,8 @@
                                 "openrouter",
                                 "elevenlabs",
                                 "huggingface",
-                                "nebius"
+                                "nebius",
+                                "xai"
                               ]
                             },
                             "model_requested": {
@@ -7538,7 +7552,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -7666,7 +7681,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -7746,7 +7762,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -7999,7 +8016,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -8127,7 +8145,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -8207,7 +8226,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -8456,7 +8476,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -8576,7 +8597,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -8704,7 +8726,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -8784,7 +8807,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -9026,7 +9050,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -9189,7 +9214,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -9317,7 +9343,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -9397,7 +9424,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -9999,7 +10027,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -10127,7 +10156,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -10207,7 +10237,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -10425,7 +10456,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -10553,7 +10585,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -10633,7 +10666,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -10685,7 +10719,8 @@
                 "openrouter",
                 "elevenlabs",
                 "huggingface",
-                "nebius"
+                "nebius",
+                "xai"
               ]
             }
           },
@@ -10910,7 +10945,8 @@
                                   "openrouter",
                                   "elevenlabs",
                                   "huggingface",
-                                  "nebius"
+                                  "nebius",
+                                  "xai"
                                 ]
                               },
                               "model_requested": {
@@ -11013,7 +11049,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -11141,7 +11178,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -11221,7 +11259,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -11284,7 +11323,8 @@
                 "openrouter",
                 "elevenlabs",
                 "huggingface",
-                "nebius"
+                "nebius",
+                "xai"
               ]
             }
           }
@@ -11476,7 +11516,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -11604,7 +11645,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -11684,7 +11726,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -11747,7 +11790,8 @@
                 "openrouter",
                 "elevenlabs",
                 "huggingface",
-                "nebius"
+                "nebius",
+                "xai"
               ]
             }
           }
@@ -11843,7 +11887,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -11971,7 +12016,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -12051,7 +12097,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -12114,7 +12161,8 @@
                 "openrouter",
                 "elevenlabs",
                 "huggingface",
-                "nebius"
+                "nebius",
+                "xai"
               ]
             }
           }
@@ -12212,7 +12260,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -12340,7 +12389,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -12420,7 +12470,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -12473,7 +12524,8 @@
                 "openrouter",
                 "elevenlabs",
                 "huggingface",
-                "nebius"
+                "nebius",
+                "xai"
               ]
             }
           }
@@ -12527,7 +12579,8 @@
                       "openrouter",
                       "elevenlabs",
                       "huggingface",
-                      "nebius"
+                      "nebius",
+                      "xai"
                     ]
                   }
                 }
@@ -12625,7 +12678,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -12753,7 +12807,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -12833,7 +12888,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -12885,7 +12941,8 @@
                 "openrouter",
                 "elevenlabs",
                 "huggingface",
-                "nebius"
+                "nebius",
+                "xai"
               ]
             }
           },
@@ -13038,7 +13095,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -13166,7 +13224,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -13246,7 +13305,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -13309,7 +13369,8 @@
                 "openrouter",
                 "elevenlabs",
                 "huggingface",
-                "nebius"
+                "nebius",
+                "xai"
               ]
             }
           }
@@ -13404,7 +13465,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -13532,7 +13594,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -13612,7 +13675,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -13673,7 +13737,8 @@
                 "openrouter",
                 "elevenlabs",
                 "huggingface",
-                "nebius"
+                "nebius",
+                "xai"
               ]
             }
           }
@@ -13724,7 +13789,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -13852,7 +13918,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -13932,7 +13999,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -13995,7 +14063,8 @@
                 "openrouter",
                 "elevenlabs",
                 "huggingface",
-                "nebius"
+                "nebius",
+                "xai"
               ]
             }
           }
@@ -14076,7 +14145,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -14156,7 +14226,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -15300,7 +15371,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -16005,7 +16077,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -16133,7 +16206,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -16213,7 +16287,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -17377,7 +17452,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -18082,7 +18158,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -18210,7 +18287,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -18290,7 +18368,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -19013,7 +19092,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -19659,7 +19739,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -19787,7 +19868,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -19867,7 +19949,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -20608,7 +20691,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -21254,7 +21338,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -21382,7 +21467,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -21462,7 +21548,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -22990,7 +23077,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -23990,7 +24078,8 @@
                                 "openrouter",
                                 "elevenlabs",
                                 "huggingface",
-                                "nebius"
+                                "nebius",
+                                "xai"
                               ]
                             },
                             "model_requested": {
@@ -24713,7 +24802,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -24841,7 +24931,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -24921,7 +25012,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -26467,7 +26559,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -27467,7 +27560,8 @@
                                 "openrouter",
                                 "elevenlabs",
                                 "huggingface",
-                                "nebius"
+                                "nebius",
+                                "xai"
                               ]
                             },
                             "model_requested": {
@@ -28190,7 +28284,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -28318,7 +28413,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -28398,7 +28494,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -29183,7 +29280,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -29311,7 +29409,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -29391,7 +29490,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -29634,7 +29734,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -29762,7 +29863,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -29842,7 +29944,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -30103,7 +30206,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -30231,7 +30335,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -30311,7 +30416,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -30490,7 +30596,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -30618,7 +30725,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -30698,7 +30806,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -30895,7 +31004,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -31023,7 +31133,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -31103,7 +31214,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -31360,7 +31472,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -31523,7 +31636,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -31651,7 +31765,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -31731,7 +31846,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -32006,7 +32122,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -32169,7 +32286,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -32297,7 +32415,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -32377,7 +32496,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -32516,7 +32636,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -32596,7 +32717,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -32753,7 +32875,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -32833,7 +32956,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -33051,7 +33175,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -33179,7 +33304,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -33259,7 +33385,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -33506,7 +33633,8 @@
                                   "openrouter",
                                   "elevenlabs",
                                   "huggingface",
-                                  "nebius"
+                                  "nebius",
+                                  "xai"
                                 ]
                               },
                               "model_requested": {
@@ -33609,7 +33737,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -33737,7 +33866,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -33817,7 +33947,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -34050,7 +34181,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -34178,7 +34310,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -34258,7 +34391,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -34395,7 +34529,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -34523,7 +34658,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -34603,7 +34739,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -34802,7 +34939,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -34930,7 +35068,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -35010,7 +35149,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -35181,7 +35321,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -35309,7 +35450,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -35389,7 +35531,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -35525,7 +35668,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -35653,7 +35797,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -35733,7 +35878,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -35823,7 +35969,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -35951,7 +36098,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -36031,7 +36179,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -36153,7 +36302,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -36233,7 +36383,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -51562,7 +51713,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -52208,7 +52360,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -52336,7 +52489,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -52416,7 +52570,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -53560,7 +53715,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -54265,7 +54421,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -54393,7 +54550,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -54473,7 +54631,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -54716,7 +54875,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -54844,7 +55004,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -54924,7 +55085,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -55063,7 +55225,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -55143,7 +55306,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -56671,7 +56835,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -57671,7 +57836,8 @@
                                 "openrouter",
                                 "elevenlabs",
                                 "huggingface",
-                                "nebius"
+                                "nebius",
+                                "xai"
                               ]
                             },
                             "model_requested": {
@@ -58394,7 +58560,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -58522,7 +58689,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -58602,7 +58770,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -59387,7 +59556,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -59515,7 +59685,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -59595,7 +59766,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -59756,7 +59928,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -59884,7 +60057,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -59964,7 +60138,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -60221,7 +60396,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -60384,7 +60560,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -60512,7 +60689,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -60592,7 +60770,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -69687,7 +69866,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -70333,7 +70513,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -70461,7 +70642,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -70541,7 +70723,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -71685,7 +71868,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -72390,7 +72574,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -72518,7 +72703,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -72598,7 +72784,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -72841,7 +73028,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -72969,7 +73157,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -73049,7 +73238,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -73188,7 +73378,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -73268,7 +73459,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -74796,7 +74988,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -75796,7 +75989,8 @@
                                 "openrouter",
                                 "elevenlabs",
                                 "huggingface",
-                                "nebius"
+                                "nebius",
+                                "xai"
                               ]
                             },
                             "model_requested": {
@@ -76519,7 +76713,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -76647,7 +76842,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -76727,7 +76923,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -77512,7 +77709,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -77640,7 +77838,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -77720,7 +77919,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -77881,7 +78081,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -78009,7 +78210,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -78089,7 +78291,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -78346,7 +78549,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -78509,7 +78713,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -78637,7 +78842,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -78717,7 +78923,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -88435,7 +88642,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -89081,7 +89289,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -89209,7 +89418,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -89289,7 +89499,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -90433,7 +90644,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -91138,7 +91350,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -91266,7 +91479,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -91346,7 +91560,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -91589,7 +91804,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -91717,7 +91933,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -91797,7 +92014,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -91936,7 +92154,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -92016,7 +92235,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -93544,7 +93764,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -94544,7 +94765,8 @@
                                 "openrouter",
                                 "elevenlabs",
                                 "huggingface",
-                                "nebius"
+                                "nebius",
+                                "xai"
                               ]
                             },
                             "model_requested": {
@@ -95267,7 +95489,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -95395,7 +95618,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -95475,7 +95699,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -96260,7 +96485,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -96388,7 +96614,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -96468,7 +96695,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -96629,7 +96857,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -96757,7 +96986,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -96837,7 +97067,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -97094,7 +97325,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -97257,7 +97489,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -97385,7 +97618,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -97465,7 +97699,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -106176,7 +106411,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -106412,7 +106648,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -106492,7 +106729,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -106662,7 +106900,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -106835,7 +107074,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -106915,7 +107155,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -107028,7 +107269,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -107183,7 +107425,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -107380,7 +107623,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -107443,7 +107687,8 @@
                               "openrouter",
                               "elevenlabs",
                               "huggingface",
-                              "nebius"
+                              "nebius",
+                              "xai"
                             ]
                           },
                           "keys": {
@@ -107697,7 +107942,8 @@
                                   "openrouter",
                                   "elevenlabs",
                                   "huggingface",
-                                  "nebius"
+                                  "nebius",
+                                  "xai"
                                 ]
                               },
                               "allowed_requests": {
@@ -107867,7 +108113,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -107924,7 +108171,8 @@
                       "openrouter",
                       "elevenlabs",
                       "huggingface",
-                      "nebius"
+                      "nebius",
+                      "xai"
                     ]
                   },
                   "keys": {
@@ -108178,7 +108426,8 @@
                           "openrouter",
                           "elevenlabs",
                           "huggingface",
-                          "nebius"
+                          "nebius",
+                          "xai"
                         ]
                       },
                       "allowed_requests": {
@@ -108299,7 +108548,8 @@
                         "openrouter",
                         "elevenlabs",
                         "huggingface",
-                        "nebius"
+                        "nebius",
+                        "xai"
                       ]
                     },
                     "keys": {
@@ -108553,7 +108803,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "allowed_requests": {
@@ -108717,7 +108968,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -108816,7 +109068,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -108884,7 +109137,8 @@
                         "openrouter",
                         "elevenlabs",
                         "huggingface",
-                        "nebius"
+                        "nebius",
+                        "xai"
                       ]
                     },
                     "keys": {
@@ -109138,7 +109392,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "allowed_requests": {
@@ -109302,7 +109557,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -109401,7 +109657,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -109696,7 +109953,8 @@
                           "openrouter",
                           "elevenlabs",
                           "huggingface",
-                          "nebius"
+                          "nebius",
+                          "xai"
                         ]
                       },
                       "allowed_requests": {
@@ -109817,7 +110075,8 @@
                         "openrouter",
                         "elevenlabs",
                         "huggingface",
-                        "nebius"
+                        "nebius",
+                        "xai"
                       ]
                     },
                     "keys": {
@@ -110071,7 +110330,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "allowed_requests": {
@@ -110235,7 +110495,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -110315,7 +110576,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -110381,7 +110643,8 @@
                         "openrouter",
                         "elevenlabs",
                         "huggingface",
-                        "nebius"
+                        "nebius",
+                        "xai"
                       ]
                     },
                     "keys": {
@@ -110635,7 +110898,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "allowed_requests": {
@@ -110799,7 +111063,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -110898,7 +111163,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -111138,7 +111404,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -111302,7 +111569,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -111462,7 +111730,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -111646,7 +111915,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -111745,7 +112015,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -111904,7 +112175,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -112003,7 +112275,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -112192,7 +112465,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -112291,7 +112565,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -112408,7 +112683,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -112507,7 +112783,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -112641,7 +112918,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -112721,7 +112999,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -112920,7 +113199,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -113103,7 +113383,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -113183,7 +113464,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -113377,7 +113659,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -113457,7 +113740,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -113579,7 +113863,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -113659,7 +113944,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -113783,7 +114069,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -113863,7 +114150,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -114186,7 +114474,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -114650,7 +114939,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -114730,7 +115020,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -115076,7 +115367,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -115546,7 +115838,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -115645,7 +115938,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -115781,7 +116075,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -115949,7 +116244,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -116140,7 +116436,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -116220,7 +116517,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -116401,7 +116699,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -116596,7 +116895,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -116695,7 +116995,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -116831,7 +117132,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -116986,7 +117288,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -117171,7 +117474,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -117251,7 +117555,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -117429,7 +117734,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -117618,7 +117924,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -117717,7 +118024,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -117853,7 +118161,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -118222,7 +118531,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -118302,7 +118612,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -118430,7 +118741,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -118510,7 +118822,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -118774,7 +119087,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -118854,7 +119168,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -119016,7 +119331,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -119221,7 +119537,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -119301,7 +119618,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -119421,7 +119739,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -119501,7 +119820,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -119621,7 +119941,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -119701,7 +120022,8 @@
                             "openrouter",
                             "elevenlabs",
                             "huggingface",
-                            "nebius"
+                            "nebius",
+                            "xai"
                           ]
                         },
                         "model_requested": {
@@ -119787,7 +120109,8 @@
                         "openrouter",
                         "elevenlabs",
                         "huggingface",
-                        "nebius"
+                        "nebius",
+                        "xai"
                       ]
                     },
                     "model_requested": {
@@ -119867,7 +120190,8 @@
                         "openrouter",
                         "elevenlabs",
                         "huggingface",
-                        "nebius"
+                        "nebius",
+                        "xai"
                       ]
                     },
                     "model_requested": {
@@ -119906,7 +120230,8 @@
           "openrouter",
           "elevenlabs",
           "huggingface",
-          "nebius"
+          "nebius",
+          "xai"
         ]
       },
       "Fallback": {
@@ -119938,7 +120263,8 @@
               "openrouter",
               "elevenlabs",
               "huggingface",
-              "nebius"
+              "nebius",
+              "xai"
             ]
           },
           "model": {
@@ -120007,7 +120333,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "model_requested": {
@@ -120064,7 +120391,8 @@
               "openrouter",
               "elevenlabs",
               "huggingface",
-              "nebius"
+              "nebius",
+              "xai"
             ]
           },
           "model_requested": {
@@ -120104,7 +120432,8 @@
               "openrouter",
               "elevenlabs",
               "huggingface",
-              "nebius"
+              "nebius",
+              "xai"
             ]
           },
           "model_requested": {
@@ -120538,7 +120867,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "model_requested": {
@@ -121912,7 +122242,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "model_requested": {
@@ -122990,7 +123321,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "model_requested": {
@@ -124566,7 +124898,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "model_requested": {
@@ -124897,7 +125230,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "model_requested": {
@@ -125162,7 +125496,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "model_requested": {
@@ -125426,7 +125761,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "model_requested": {
@@ -126050,7 +126386,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "model_requested": {
@@ -126290,7 +126627,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "model_requested": {
@@ -126541,7 +126879,8 @@
                         "openrouter",
                         "elevenlabs",
                         "huggingface",
-                        "nebius"
+                        "nebius",
+                        "xai"
                       ]
                     },
                     "model_requested": {
@@ -126644,7 +126983,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "model_requested": {
@@ -126887,7 +127227,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "model_requested": {
@@ -126993,7 +127334,8 @@
               "openrouter",
               "elevenlabs",
               "huggingface",
-              "nebius"
+              "nebius",
+              "xai"
             ]
           }
         }
@@ -127083,7 +127425,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "model_requested": {
@@ -127240,7 +127583,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "model_requested": {
@@ -135366,7 +135710,8 @@
               "openrouter",
               "elevenlabs",
               "huggingface",
-              "nebius"
+              "nebius",
+              "xai"
             ]
           },
           "keys": {
@@ -135620,7 +135965,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "allowed_requests": {
@@ -135748,7 +136094,8 @@
                     "openrouter",
                     "elevenlabs",
                     "huggingface",
-                    "nebius"
+                    "nebius",
+                    "xai"
                   ]
                 },
                 "keys": {
@@ -136002,7 +136349,8 @@
                         "openrouter",
                         "elevenlabs",
                         "huggingface",
-                        "nebius"
+                        "nebius",
+                        "xai"
                       ]
                     },
                     "allowed_requests": {
@@ -136133,7 +136481,8 @@
               "openrouter",
               "elevenlabs",
               "huggingface",
-              "nebius"
+              "nebius",
+              "xai"
             ]
           },
           "keys": {
@@ -136387,7 +136736,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "allowed_requests": {
@@ -136730,7 +137080,8 @@
                   "openrouter",
                   "elevenlabs",
                   "huggingface",
-                  "nebius"
+                  "nebius",
+                  "xai"
                 ]
               },
               "allowed_requests": {
