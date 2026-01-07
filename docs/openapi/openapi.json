@@ -124611,7 +124611,7 @@
       "get": {
         "operationId": "listPlugins",
         "summary": "List all plugins",
-        "description": "Returns a list of all plugins with their configurations and status.",
+        "description": "Returns a list of all plugins with their configurations and status.\nThe `actualName` field contains the plugin name from `GetName()` (used as the map key),\nwhile `name` contains the display name from the configuration.\nThe `types` array in the status shows which interfaces the plugin implements (llm, mcp, http).\n",
         "tags": [
           "Plugins"
         ],
@@ -124635,7 +124635,12 @@
                             "description": "Plugin ID (auto-generated)"
                           },
                           "name": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "Display name of the plugin (from config)"
+                          },
+                          "actualName": {
+                            "type": "string",
+                            "description": "Actual plugin name from GetName() (used as map key in plugin status). Only populated for active plugins."
                           },
                           "enabled": {
                             "type": "boolean"
@@ -124649,6 +124654,57 @@
                           },
                           "path": {
                             "type": "string"
+                          },
+                          "status": {
+                            "type": "object",
+                            "description": "Current plugin status including types array (only populated for active plugins)",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "description": "Display name of the plugin"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "active",
+                                  "error",
+                                  "disabled",
+                                  "loading",
+                                  "uninitialized",
+                                  "unloaded",
+                                  "loaded"
+                                ]
+                              },
+                              "logs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "types": {
+                                "type": "array",
+                                "description": "Plugin types indicating which interfaces the plugin implements",
+                                "items": {
+                                  "type": "string",
+                                  "enum": [
+                                    "llm",
+                                    "mcp",
+                                    "http"
+                                  ]
+                                }
+                              }
+                            },
+                            "example": {
+                              "name": "my_custom_plugin",
+                              "status": "active",
+                              "logs": [
+                                "plugin my_custom_plugin initialized successfully"
+                              ],
+                              "types": [
+                                "llm",
+                                "http"
+                              ]
+                            }
                           },
                           "created_at": {
                             "type": "string",
@@ -124664,6 +124720,27 @@
                           },
                           "config_hash": {
                             "type": "string"
+                          }
+                        },
+                        "example": {
+                          "name": "my_custom_plugin",
+                          "actualName": "MyCustomPlugin",
+                          "enabled": true,
+                          "config": {
+                            "api_key": "xxx"
+                          },
+                          "isCustom": true,
+                          "path": "/plugins/my_custom_plugin.so",
+                          "status": {
+                            "name": "my_custom_plugin",
+                            "status": "active",
+                            "logs": [
+                              "plugin my_custom_plugin initialized successfully"
+                            ],
+                            "types": [
+                              "llm",
+                              "http"
+                            ]
                           }
                         }
                       }
@@ -124816,7 +124893,12 @@
                           "description": "Plugin ID (auto-generated)"
                         },
                         "name": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Display name of the plugin (from config)"
+                        },
+                        "actualName": {
+                          "type": "string",
+                          "description": "Actual plugin name from GetName() (used as map key in plugin status). Only populated for active plugins."
                         },
                         "enabled": {
                           "type": "boolean"
@@ -124830,6 +124912,57 @@
                         },
                         "path": {
                           "type": "string"
+                        },
+                        "status": {
+                          "type": "object",
+                          "description": "Current plugin status including types array (only populated for active plugins)",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "description": "Display name of the plugin"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "error",
+                                "disabled",
+                                "loading",
+                                "uninitialized",
+                                "unloaded",
+                                "loaded"
+                              ]
+                            },
+                            "logs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "types": {
+                              "type": "array",
+                              "description": "Plugin types indicating which interfaces the plugin implements",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "llm",
+                                  "mcp",
+                                  "http"
+                                ]
+                              }
+                            }
+                          },
+                          "example": {
+                            "name": "my_custom_plugin",
+                            "status": "active",
+                            "logs": [
+                              "plugin my_custom_plugin initialized successfully"
+                            ],
+                            "types": [
+                              "llm",
+                              "http"
+                            ]
+                          }
                         },
                         "created_at": {
                           "type": "string",
@@ -124845,6 +124978,27 @@
                         },
                         "config_hash": {
                           "type": "string"
+                        }
+                      },
+                      "example": {
+                        "name": "my_custom_plugin",
+                        "actualName": "MyCustomPlugin",
+                        "enabled": true,
+                        "config": {
+                          "api_key": "xxx"
+                        },
+                        "isCustom": true,
+                        "path": "/plugins/my_custom_plugin.so",
+                        "status": {
+                          "name": "my_custom_plugin",
+                          "status": "active",
+                          "logs": [
+                            "plugin my_custom_plugin initialized successfully"
+                          ],
+                          "types": [
+                            "llm",
+                            "http"
+                          ]
                         }
                       }
                     }
@@ -125103,7 +125257,7 @@
       "get": {
         "operationId": "getPlugin",
         "summary": "Get a specific plugin",
-        "description": "Returns the configuration for a specific plugin.",
+        "description": "Returns the configuration for a specific plugin.\nThe response includes the plugin status with types array showing which interfaces\nthe plugin implements (llm, mcp, http). The `actualName` field shows the plugin name\nfrom GetName() (used as the map key), which may differ from the display name (`name`).\n",
         "tags": [
           "Plugins"
         ],
@@ -125112,7 +125266,7 @@
             "name": "name",
             "in": "path",
             "required": true,
-            "description": "Plugin name",
+            "description": "Plugin display name (the config field `name`, not the internal `actualName` from GetName())",
             "schema": {
               "type": "string"
             }
@@ -125132,7 +125286,12 @@
                       "description": "Plugin ID (auto-generated)"
                     },
                     "name": {
-                      "type": "string"
+                      "type": "string",
+                      "description": "Display name of the plugin (from config)"
+                    },
+                    "actualName": {
+                      "type": "string",
+                      "description": "Actual plugin name from GetName() (used as map key in plugin status). Only populated for active plugins."
                     },
                     "enabled": {
                       "type": "boolean"
@@ -125146,6 +125305,57 @@
                     },
                     "path": {
                       "type": "string"
+                    },
+                    "status": {
+                      "type": "object",
+                      "description": "Current plugin status including types array (only populated for active plugins)",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "Display name of the plugin"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "active",
+                            "error",
+                            "disabled",
+                            "loading",
+                            "uninitialized",
+                            "unloaded",
+                            "loaded"
+                          ]
+                        },
+                        "logs": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "types": {
+                          "type": "array",
+                          "description": "Plugin types indicating which interfaces the plugin implements",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "llm",
+                              "mcp",
+                              "http"
+                            ]
+                          }
+                        }
+                      },
+                      "example": {
+                        "name": "my_custom_plugin",
+                        "status": "active",
+                        "logs": [
+                          "plugin my_custom_plugin initialized successfully"
+                        ],
+                        "types": [
+                          "llm",
+                          "http"
+                        ]
+                      }
                     },
                     "created_at": {
                       "type": "string",
@@ -125161,6 +125371,27 @@
                     },
                     "config_hash": {
                       "type": "string"
+                    }
+                  },
+                  "example": {
+                    "name": "my_custom_plugin",
+                    "actualName": "MyCustomPlugin",
+                    "enabled": true,
+                    "config": {
+                      "api_key": "xxx"
+                    },
+                    "isCustom": true,
+                    "path": "/plugins/my_custom_plugin.so",
+                    "status": {
+                      "name": "my_custom_plugin",
+                      "status": "active",
+                      "logs": [
+                        "plugin my_custom_plugin initialized successfully"
+                      ],
+                      "types": [
+                        "llm",
+                        "http"
+                      ]
                     }
                   }
                 }
@@ -125415,7 +125646,7 @@
       "put": {
         "operationId": "updatePlugin",
         "summary": "Update a plugin",
-        "description": "Updates a plugin's configuration. Will reload or stop the plugin based on enabled status.",
+        "description": "Updates a plugin's configuration. Will reload or stop the plugin based on enabled status.\nThe response `actualName` field shows the plugin name from GetName() (used as the map key),\nwhich may differ from the display name (`name`).\n",
         "tags": [
           "Plugins"
         ],
@@ -125424,7 +125655,7 @@
             "name": "name",
             "in": "path",
             "required": true,
-            "description": "Plugin name",
+            "description": "Plugin display name (the config field `name`, not the internal `actualName` from GetName())",
             "schema": {
               "type": "string"
             }
@@ -125474,7 +125705,12 @@
                           "description": "Plugin ID (auto-generated)"
                         },
                         "name": {
-                          "type": "string"
+                          "type": "string",
+                          "description": "Display name of the plugin (from config)"
+                        },
+                        "actualName": {
+                          "type": "string",
+                          "description": "Actual plugin name from GetName() (used as map key in plugin status). Only populated for active plugins."
                         },
                         "enabled": {
                           "type": "boolean"
@@ -125488,6 +125724,57 @@
                         },
                         "path": {
                           "type": "string"
+                        },
+                        "status": {
+                          "type": "object",
+                          "description": "Current plugin status including types array (only populated for active plugins)",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "description": "Display name of the plugin"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "error",
+                                "disabled",
+                                "loading",
+                                "uninitialized",
+                                "unloaded",
+                                "loaded"
+                              ]
+                            },
+                            "logs": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "types": {
+                              "type": "array",
+                              "description": "Plugin types indicating which interfaces the plugin implements",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "llm",
+                                  "mcp",
+                                  "http"
+                                ]
+                              }
+                            }
+                          },
+                          "example": {
+                            "name": "my_custom_plugin",
+                            "status": "active",
+                            "logs": [
+                              "plugin my_custom_plugin initialized successfully"
+                            ],
+                            "types": [
+                              "llm",
+                              "http"
+                            ]
+                          }
                         },
                         "created_at": {
                           "type": "string",
@@ -125503,6 +125790,27 @@
                         },
                         "config_hash": {
                           "type": "string"
+                        }
+                      },
+                      "example": {
+                        "name": "my_custom_plugin",
+                        "actualName": "MyCustomPlugin",
+                        "enabled": true,
+                        "config": {
+                          "api_key": "xxx"
+                        },
+                        "isCustom": true,
+                        "path": "/plugins/my_custom_plugin.so",
+                        "status": {
+                          "name": "my_custom_plugin",
+                          "status": "active",
+                          "logs": [
+                            "plugin my_custom_plugin initialized successfully"
+                          ],
+                          "types": [
+                            "llm",
+                            "http"
+                          ]
                         }
                       }
                     }
@@ -125768,7 +126076,7 @@
             "name": "name",
             "in": "path",
             "required": true,
-            "description": "Plugin name",
+            "description": "Plugin display name (the config field `name`, not the internal `actualName` from GetName())",
             "schema": {
               "type": "string"
             }
@@ -126920,16 +127228,19 @@
                     "properties": {
                       "config": {
                         "type": "object",
-                        "description": "MCP client configuration",
+                        "description": "Full MCP client configuration (used in responses)",
                         "properties": {
-                          "id": {
-                            "type": "string"
+                          "client_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the MCP client"
                           },
                           "name": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "Display name for the MCP client"
                           },
                           "is_code_mode_client": {
-                            "type": "boolean"
+                            "type": "boolean",
+                            "description": "Whether this client is available in code mode"
                           },
                           "is_ping_available": {
                             "type": "boolean",
@@ -126978,7 +127289,8 @@
                             "type": "object",
                             "additionalProperties": {
                               "type": "string"
-                            }
+                            },
+                            "description": "Custom headers to include in requests"
                           },
                           "tools_to_execute": {
                             "type": "array",
@@ -126992,7 +127304,15 @@
                             "items": {
                               "type": "string"
                             },
-                            "description": "Auto-execute list for tools.\n[\"*\"] => all tools are included\n[] => no tools are included\n[\"tool1\", \"tool2\"] => auto-execute only the specified tools\n"
+                            "description": "List of tools that can be auto-executed without user approval.\nMust be a subset of tools_to_execute.\n[\"*\"] => all executable tools can be auto-executed\n[] => no tools are auto-executed\n[\"tool1\", \"tool2\"] => only specified tools can be auto-executed\n"
+                          },
+                          "tool_pricing": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "number",
+                              "format": "double"
+                            },
+                            "description": "Per-tool cost in USD for execution.\nKey is the tool name, value is the cost per execution.\nExample: {\"read_file\": 0.001, \"write_file\": 0.002}\n"
                           }
                         }
                       },
@@ -127121,7 +127441,7 @@
       "post": {
         "operationId": "addMCPClient",
         "summary": "Add MCP client",
-        "description": "Adds a new MCP client with the specified configuration.",
+        "description": "Adds a new MCP client with the specified configuration.\nNote: tool_pricing is not available when creating a new client as tools are fetched after client creation.\n",
         "tags": [
           "MCP"
         ],
@@ -127131,16 +127451,19 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "description": "MCP client configuration",
+                "description": "MCP client configuration for creating a new client (tool_pricing not available at creation)",
                 "properties": {
-                  "id": {
-                    "type": "string"
+                  "client_id": {
+                    "type": "string",
+                    "description": "Unique identifier for the MCP client"
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Display name for the MCP client"
                   },
                   "is_code_mode_client": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "description": "Whether this client is available in code mode"
                   },
                   "is_ping_available": {
                     "type": "boolean",
@@ -127189,7 +127512,8 @@
                     "type": "object",
                     "additionalProperties": {
                       "type": "string"
-                    }
+                    },
+                    "description": "Custom headers to include in requests"
                   },
                   "tools_to_execute": {
                     "type": "array",
@@ -127203,7 +127527,7 @@
                     "items": {
                       "type": "string"
                     },
-                    "description": "Auto-execute list for tools.\n[\"*\"] => all tools are included\n[] => no tools are included\n[\"tool1\", \"tool2\"] => auto-execute only the specified tools\n"
+                    "description": "List of tools that can be auto-executed without user approval.\nMust be a subset of tools_to_execute.\n[\"*\"] => all executable tools can be auto-executed\n[] => no tools are auto-executed\n[\"tool1\", \"tool2\"] => only specified tools can be auto-executed\n"
                   }
                 }
               }
@@ -127401,7 +127725,7 @@
       "put": {
         "operationId": "editMCPClient",
         "summary": "Edit MCP client",
-        "description": "Updates an existing MCP client's configuration.",
+        "description": "Updates an existing MCP client's configuration.\nUnlike client creation, tool_pricing can be included to set per-tool execution costs since tools are already fetched.\n",
         "tags": [
           "MCP"
         ],
@@ -127422,16 +127746,19 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "description": "MCP client configuration",
+                "description": "MCP client configuration for updating an existing client (includes tool_pricing)",
                 "properties": {
-                  "id": {
-                    "type": "string"
+                  "client_id": {
+                    "type": "string",
+                    "description": "Unique identifier for the MCP client"
                   },
                   "name": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Display name for the MCP client"
                   },
                   "is_code_mode_client": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "description": "Whether this client is available in code mode"
                   },
                   "is_ping_available": {
                     "type": "boolean",
@@ -127480,7 +127807,8 @@
                     "type": "object",
                     "additionalProperties": {
                       "type": "string"
-                    }
+                    },
+                    "description": "Custom headers to include in requests"
                   },
                   "tools_to_execute": {
                     "type": "array",
@@ -127494,7 +127822,15 @@
                     "items": {
                       "type": "string"
                     },
-                    "description": "Auto-execute list for tools.\n[\"*\"] => all tools are included\n[] => no tools are included\n[\"tool1\", \"tool2\"] => auto-execute only the specified tools\n"
+                    "description": "List of tools that can be auto-executed without user approval.\nMust be a subset of tools_to_execute.\n[\"*\"] => all executable tools can be auto-executed\n[] => no tools are auto-executed\n[\"tool1\", \"tool2\"] => only specified tools can be auto-executed\n"
+                  },
+                  "tool_pricing": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "number",
+                      "format": "double"
+                    },
+                    "description": "Per-tool cost in USD for execution.\nKey is the tool name, value is the cost per execution.\nExample: {\"read_file\": 0.001, \"write_file\": 0.002}\nNote: Only available when updating an existing client after tools have been fetched.\n"
                   }
                 }
               }
@@ -144703,6 +145039,1090 @@
                           "type": "string"
                         }
                       }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mcp-logs": {
+      "get": {
+        "operationId": "getMCPLogs",
+        "summary": "Get MCP tool logs",
+        "description": "Retrieves MCP tool execution logs with filtering, search, and pagination via query parameters.\n",
+        "tags": [
+          "Logging"
+        ],
+        "parameters": [
+          {
+            "name": "tool_names",
+            "in": "query",
+            "description": "Comma-separated list of tool names to filter by",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "server_labels",
+            "in": "query",
+            "description": "Comma-separated list of server labels to filter by",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Comma-separated list of statuses to filter by (processing, success, error)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "processing",
+                "success",
+                "error"
+              ]
+            }
+          },
+          {
+            "name": "virtual_key_ids",
+            "in": "query",
+            "description": "Comma-separated list of virtual key IDs to filter by",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "llm_request_ids",
+            "in": "query",
+            "description": "Comma-separated list of LLM request IDs to filter by",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "start_time",
+            "in": "query",
+            "description": "Start time filter (RFC3339 format)",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "end_time",
+            "in": "query",
+            "description": "End time filter (RFC3339 format)",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "min_latency",
+            "in": "query",
+            "description": "Minimum latency filter (milliseconds)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "max_latency",
+            "in": "query",
+            "description": "Maximum latency filter (milliseconds)",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "content_search",
+            "in": "query",
+            "description": "Search in tool arguments and results",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of logs to return (default 50, max 1000)",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of logs to skip",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "description": "Field to sort by",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "timestamp",
+                "latency",
+                "cost"
+              ],
+              "default": "timestamp"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "Sort order",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Search MCP logs response",
+                  "properties": {
+                    "logs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "description": "MCP tool execution log entry",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the log entry"
+                          },
+                          "llm_request_id": {
+                            "type": "string",
+                            "description": "Links to the LLM request that triggered this tool call"
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "When the tool execution started"
+                          },
+                          "tool_name": {
+                            "type": "string",
+                            "description": "Name of the MCP tool that was executed"
+                          },
+                          "server_label": {
+                            "type": "string",
+                            "description": "Label of the MCP server that provided the tool"
+                          },
+                          "arguments": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "Tool execution arguments"
+                          },
+                          "result": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "Tool execution result"
+                          },
+                          "error_details": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "Error details if execution failed"
+                          },
+                          "latency": {
+                            "type": "number",
+                            "description": "Execution time in milliseconds"
+                          },
+                          "cost": {
+                            "type": "number",
+                            "description": "Cost in dollars for this tool execution"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "processing",
+                              "success",
+                              "error"
+                            ],
+                            "description": "Execution status"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "When the log entry was created"
+                          }
+                        }
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "required": [
+                        "total_count"
+                      ],
+                      "properties": {
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "offset": {
+                          "type": "integer"
+                        },
+                        "sort_by": {
+                          "type": "string"
+                        },
+                        "order": {
+                          "type": "string"
+                        },
+                        "total_count": {
+                          "type": "integer",
+                          "format": "int64",
+                          "description": "Total number of items matching the query"
+                        }
+                      }
+                    },
+                    "stats": {
+                      "type": "object",
+                      "description": "MCP tool log statistics",
+                      "properties": {
+                        "total_executions": {
+                          "type": "integer",
+                          "description": "Total number of tool executions"
+                        },
+                        "success_rate": {
+                          "type": "number",
+                          "description": "Success rate percentage"
+                        },
+                        "average_latency": {
+                          "type": "number",
+                          "description": "Average execution latency in milliseconds"
+                        },
+                        "total_cost": {
+                          "type": "number",
+                          "description": "Total cost in dollars for all executions"
+                        }
+                      }
+                    },
+                    "has_logs": {
+                      "type": "boolean",
+                      "description": "Whether any logs exist in the system"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteMCPLogs",
+        "summary": "Delete MCP tool logs",
+        "description": "Deletes MCP tool logs by their IDs.",
+        "tags": [
+          "Logging"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Delete MCP logs request",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Array of log IDs to delete"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "MCP tool logs deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Simple message response",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mcp-logs/stats": {
+      "get": {
+        "operationId": "getMCPLogsStats",
+        "summary": "Get MCP tool log statistics",
+        "description": "Returns statistics for MCP tool logs matching the specified filters.",
+        "tags": [
+          "Logging"
+        ],
+        "parameters": [
+          {
+            "name": "tool_names",
+            "in": "query",
+            "description": "Comma-separated list of tool names to filter by",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "server_labels",
+            "in": "query",
+            "description": "Comma-separated list of server labels to filter by",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Comma-separated list of statuses to filter by",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "processing",
+                "success",
+                "error"
+              ]
+            }
+          },
+          {
+            "name": "virtual_key_ids",
+            "in": "query",
+            "description": "Comma-separated list of virtual key IDs to filter by",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "llm_request_ids",
+            "in": "query",
+            "description": "Comma-separated list of LLM request IDs to filter by",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "start_time",
+            "in": "query",
+            "description": "Start time filter (RFC3339 format)",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "end_time",
+            "in": "query",
+            "description": "End time filter (RFC3339 format)",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "min_latency",
+            "in": "query",
+            "description": "Minimum latency filter",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "max_latency",
+            "in": "query",
+            "description": "Maximum latency filter",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "content_search",
+            "in": "query",
+            "description": "Search in tool arguments and results",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "MCP tool log statistics",
+                  "properties": {
+                    "total_executions": {
+                      "type": "integer",
+                      "description": "Total number of tool executions"
+                    },
+                    "success_rate": {
+                      "type": "number",
+                      "description": "Success rate percentage"
+                    },
+                    "average_latency": {
+                      "type": "number",
+                      "description": "Average execution latency in milliseconds"
+                    },
+                    "total_cost": {
+                      "type": "number",
+                      "description": "Total cost in dollars for all executions"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mcp-logs/filterdata": {
+      "get": {
+        "operationId": "getMCPLogsFilterData",
+        "summary": "Get available MCP log filter data",
+        "description": "Returns all unique filter data from MCP tool logs (tool names, server labels).",
+        "tags": [
+          "Logging"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Available MCP log filter data",
+                  "properties": {
+                    "tool_names": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "All unique tool names"
+                    },
+                    "server_labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "All unique server labels"
+                    },
+                    "virtual_keys": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Virtual key ID"
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Virtual key name"
+                          },
+                          "value": {
+                            "type": "string",
+                            "description": "Virtual key value (redacted if applicable)"
+                          }
+                        }
+                      },
+                      "description": "All unique virtual keys"
                     }
                   }
                 }
@@ -163584,7 +165004,12 @@
             "description": "Plugin ID (auto-generated)"
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Display name of the plugin (from config)"
+          },
+          "actualName": {
+            "type": "string",
+            "description": "Actual plugin name from GetName() (used as map key in plugin status). Only populated for active plugins."
           },
           "enabled": {
             "type": "boolean"
@@ -163598,6 +165023,57 @@
           },
           "path": {
             "type": "string"
+          },
+          "status": {
+            "type": "object",
+            "description": "Current plugin status including types array (only populated for active plugins)",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Display name of the plugin"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "active",
+                  "error",
+                  "disabled",
+                  "loading",
+                  "uninitialized",
+                  "unloaded",
+                  "loaded"
+                ]
+              },
+              "logs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "types": {
+                "type": "array",
+                "description": "Plugin types indicating which interfaces the plugin implements",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "llm",
+                    "mcp",
+                    "http"
+                  ]
+                }
+              }
+            },
+            "example": {
+              "name": "my_custom_plugin",
+              "status": "active",
+              "logs": [
+                "plugin my_custom_plugin initialized successfully"
+              ],
+              "types": [
+                "llm",
+                "http"
+              ]
+            }
           },
           "created_at": {
             "type": "string",
@@ -163613,6 +165089,27 @@
           },
           "config_hash": {
             "type": "string"
+          }
+        },
+        "example": {
+          "name": "my_custom_plugin",
+          "actualName": "MyCustomPlugin",
+          "enabled": true,
+          "config": {
+            "api_key": "xxx"
+          },
+          "isCustom": true,
+          "path": "/plugins/my_custom_plugin.so",
+          "status": {
+            "name": "my_custom_plugin",
+            "status": "active",
+            "logs": [
+              "plugin my_custom_plugin initialized successfully"
+            ],
+            "types": [
+              "llm",
+              "http"
+            ]
           }
         }
       },
@@ -163631,7 +165128,12 @@
                   "description": "Plugin ID (auto-generated)"
                 },
                 "name": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "Display name of the plugin (from config)"
+                },
+                "actualName": {
+                  "type": "string",
+                  "description": "Actual plugin name from GetName() (used as map key in plugin status). Only populated for active plugins."
                 },
                 "enabled": {
                   "type": "boolean"
@@ -163645,6 +165147,57 @@
                 },
                 "path": {
                   "type": "string"
+                },
+                "status": {
+                  "type": "object",
+                  "description": "Current plugin status including types array (only populated for active plugins)",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Display name of the plugin"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "active",
+                        "error",
+                        "disabled",
+                        "loading",
+                        "uninitialized",
+                        "unloaded",
+                        "loaded"
+                      ]
+                    },
+                    "logs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "types": {
+                      "type": "array",
+                      "description": "Plugin types indicating which interfaces the plugin implements",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "llm",
+                          "mcp",
+                          "http"
+                        ]
+                      }
+                    }
+                  },
+                  "example": {
+                    "name": "my_custom_plugin",
+                    "status": "active",
+                    "logs": [
+                      "plugin my_custom_plugin initialized successfully"
+                    ],
+                    "types": [
+                      "llm",
+                      "http"
+                    ]
+                  }
                 },
                 "created_at": {
                   "type": "string",
@@ -163660,6 +165213,27 @@
                 },
                 "config_hash": {
                   "type": "string"
+                }
+              },
+              "example": {
+                "name": "my_custom_plugin",
+                "actualName": "MyCustomPlugin",
+                "enabled": true,
+                "config": {
+                  "api_key": "xxx"
+                },
+                "isCustom": true,
+                "path": "/plugins/my_custom_plugin.so",
+                "status": {
+                  "name": "my_custom_plugin",
+                  "status": "active",
+                  "logs": [
+                    "plugin my_custom_plugin initialized successfully"
+                  ],
+                  "types": [
+                    "llm",
+                    "http"
+                  ]
                 }
               }
             }
@@ -163713,16 +165287,19 @@
         "properties": {
           "config": {
             "type": "object",
-            "description": "MCP client configuration",
+            "description": "Full MCP client configuration (used in responses)",
             "properties": {
-              "id": {
-                "type": "string"
+              "client_id": {
+                "type": "string",
+                "description": "Unique identifier for the MCP client"
               },
               "name": {
-                "type": "string"
+                "type": "string",
+                "description": "Display name for the MCP client"
               },
               "is_code_mode_client": {
-                "type": "boolean"
+                "type": "boolean",
+                "description": "Whether this client is available in code mode"
               },
               "is_ping_available": {
                 "type": "boolean",
@@ -163771,7 +165348,8 @@
                 "type": "object",
                 "additionalProperties": {
                   "type": "string"
-                }
+                },
+                "description": "Custom headers to include in requests"
               },
               "tools_to_execute": {
                 "type": "array",
@@ -163785,7 +165363,15 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "Auto-execute list for tools.\n[\"*\"] => all tools are included\n[] => no tools are included\n[\"tool1\", \"tool2\"] => auto-execute only the specified tools\n"
+                "description": "List of tools that can be auto-executed without user approval.\nMust be a subset of tools_to_execute.\n[\"*\"] => all executable tools can be auto-executed\n[] => no tools are auto-executed\n[\"tool1\", \"tool2\"] => only specified tools can be auto-executed\n"
+              },
+              "tool_pricing": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number",
+                  "format": "double"
+                },
+                "description": "Per-tool cost in USD for execution.\nKey is the tool name, value is the cost per execution.\nExample: {\"read_file\": 0.001, \"write_file\": 0.002}\n"
               }
             }
           },
@@ -163824,16 +165410,19 @@
       },
       "MCPClientConfig": {
         "type": "object",
-        "description": "MCP client configuration",
+        "description": "Full MCP client configuration (used in responses)",
         "properties": {
-          "id": {
-            "type": "string"
+          "client_id": {
+            "type": "string",
+            "description": "Unique identifier for the MCP client"
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Display name for the MCP client"
           },
           "is_code_mode_client": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Whether this client is available in code mode"
           },
           "is_ping_available": {
             "type": "boolean",
@@ -163882,7 +165471,8 @@
             "type": "object",
             "additionalProperties": {
               "type": "string"
-            }
+            },
+            "description": "Custom headers to include in requests"
           },
           "tools_to_execute": {
             "type": "array",
@@ -163896,7 +165486,177 @@
             "items": {
               "type": "string"
             },
-            "description": "Auto-execute list for tools.\n[\"*\"] => all tools are included\n[] => no tools are included\n[\"tool1\", \"tool2\"] => auto-execute only the specified tools\n"
+            "description": "List of tools that can be auto-executed without user approval.\nMust be a subset of tools_to_execute.\n[\"*\"] => all executable tools can be auto-executed\n[] => no tools are auto-executed\n[\"tool1\", \"tool2\"] => only specified tools can be auto-executed\n"
+          },
+          "tool_pricing": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "format": "double"
+            },
+            "description": "Per-tool cost in USD for execution.\nKey is the tool name, value is the cost per execution.\nExample: {\"read_file\": 0.001, \"write_file\": 0.002}\n"
+          }
+        }
+      },
+      "MCPClientCreateRequest": {
+        "type": "object",
+        "description": "MCP client configuration for creating a new client (tool_pricing not available at creation)",
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "Unique identifier for the MCP client"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name for the MCP client"
+          },
+          "is_code_mode_client": {
+            "type": "boolean",
+            "description": "Whether this client is available in code mode"
+          },
+          "connection_type": {
+            "type": "string",
+            "enum": [
+              "http",
+              "stdio",
+              "sse",
+              "inprocess"
+            ],
+            "description": "Connection type for MCP client"
+          },
+          "connection_string": {
+            "type": "string",
+            "description": "HTTP or SSE URL (required for HTTP or SSE connections)"
+          },
+          "stdio_config": {
+            "type": "object",
+            "description": "STDIO configuration for MCP client",
+            "properties": {
+              "command": {
+                "type": "string",
+                "description": "Executable command to run"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Command line arguments"
+              },
+              "envs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Environment variables required"
+              }
+            }
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Custom headers to include in requests"
+          },
+          "tools_to_execute": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Include-only list for tools.\n[\"*\"] => all tools are included\n[] => no tools are included\n[\"tool1\", \"tool2\"] => include only the specified tools\n"
+          },
+          "tools_to_auto_execute": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of tools that can be auto-executed without user approval.\nMust be a subset of tools_to_execute.\n[\"*\"] => all executable tools can be auto-executed\n[] => no tools are auto-executed\n[\"tool1\", \"tool2\"] => only specified tools can be auto-executed\n"
+          }
+        }
+      },
+      "MCPClientUpdateRequest": {
+        "type": "object",
+        "description": "MCP client configuration for updating an existing client (includes tool_pricing)",
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "Unique identifier for the MCP client"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name for the MCP client"
+          },
+          "is_code_mode_client": {
+            "type": "boolean",
+            "description": "Whether this client is available in code mode"
+          },
+          "connection_type": {
+            "type": "string",
+            "enum": [
+              "http",
+              "stdio",
+              "sse",
+              "inprocess"
+            ],
+            "description": "Connection type for MCP client"
+          },
+          "connection_string": {
+            "type": "string",
+            "description": "HTTP or SSE URL (required for HTTP or SSE connections)"
+          },
+          "stdio_config": {
+            "type": "object",
+            "description": "STDIO configuration for MCP client",
+            "properties": {
+              "command": {
+                "type": "string",
+                "description": "Executable command to run"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Command line arguments"
+              },
+              "envs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Environment variables required"
+              }
+            }
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Custom headers to include in requests"
+          },
+          "tools_to_execute": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Include-only list for tools.\n[\"*\"] => all tools are included\n[] => no tools are included\n[\"tool1\", \"tool2\"] => include only the specified tools\n"
+          },
+          "tools_to_auto_execute": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of tools that can be auto-executed without user approval.\nMust be a subset of tools_to_execute.\n[\"*\"] => all executable tools can be auto-executed\n[] => no tools are auto-executed\n[\"tool1\", \"tool2\"] => only specified tools can be auto-executed\n"
+          },
+          "tool_pricing": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number",
+              "format": "double"
+            },
+            "description": "Per-tool cost in USD for execution.\nKey is the tool name, value is the cost per execution.\nExample: {\"read_file\": 0.001, \"write_file\": 0.002}\nNote: Only available when updating an existing client after tools have been fetched.\n"
           }
         }
       },
@@ -172614,6 +174374,329 @@
           },
           "remaining": {
             "type": "integer"
+          }
+        }
+      },
+      "MCPToolLogEntry": {
+        "type": "object",
+        "description": "MCP tool execution log entry",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the log entry"
+          },
+          "llm_request_id": {
+            "type": "string",
+            "description": "Links to the LLM request that triggered this tool call"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the tool execution started"
+          },
+          "tool_name": {
+            "type": "string",
+            "description": "Name of the MCP tool that was executed"
+          },
+          "server_label": {
+            "type": "string",
+            "description": "Label of the MCP server that provided the tool"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Tool execution arguments"
+          },
+          "result": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Tool execution result"
+          },
+          "error_details": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Error details if execution failed"
+          },
+          "latency": {
+            "type": "number",
+            "description": "Execution time in milliseconds"
+          },
+          "cost": {
+            "type": "number",
+            "description": "Cost in dollars for this tool execution"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "processing",
+              "success",
+              "error"
+            ],
+            "description": "Execution status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the log entry was created"
+          }
+        }
+      },
+      "MCPToolLogSearchFilters": {
+        "type": "object",
+        "description": "MCP tool log search filters",
+        "properties": {
+          "tool_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filter by tool names"
+          },
+          "server_labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filter by server labels"
+          },
+          "status": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filter by execution status"
+          },
+          "llm_request_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Filter by linked LLM request IDs"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Filter by start time (RFC3339 format)"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Filter by end time (RFC3339 format)"
+          },
+          "min_latency": {
+            "type": "number",
+            "description": "Filter by minimum latency"
+          },
+          "max_latency": {
+            "type": "number",
+            "description": "Filter by maximum latency"
+          },
+          "content_search": {
+            "type": "string",
+            "description": "Search in tool arguments and results"
+          }
+        }
+      },
+      "MCPToolLogStats": {
+        "type": "object",
+        "description": "MCP tool log statistics",
+        "properties": {
+          "total_executions": {
+            "type": "integer",
+            "description": "Total number of tool executions"
+          },
+          "success_rate": {
+            "type": "number",
+            "description": "Success rate percentage"
+          },
+          "average_latency": {
+            "type": "number",
+            "description": "Average execution latency in milliseconds"
+          },
+          "total_cost": {
+            "type": "number",
+            "description": "Total cost in dollars for all executions"
+          }
+        }
+      },
+      "SearchMCPLogsResponse": {
+        "type": "object",
+        "description": "Search MCP logs response",
+        "properties": {
+          "logs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "MCP tool execution log entry",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Unique identifier for the log entry"
+                },
+                "llm_request_id": {
+                  "type": "string",
+                  "description": "Links to the LLM request that triggered this tool call"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the tool execution started"
+                },
+                "tool_name": {
+                  "type": "string",
+                  "description": "Name of the MCP tool that was executed"
+                },
+                "server_label": {
+                  "type": "string",
+                  "description": "Label of the MCP server that provided the tool"
+                },
+                "arguments": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Tool execution arguments"
+                },
+                "result": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Tool execution result"
+                },
+                "error_details": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Error details if execution failed"
+                },
+                "latency": {
+                  "type": "number",
+                  "description": "Execution time in milliseconds"
+                },
+                "cost": {
+                  "type": "number",
+                  "description": "Cost in dollars for this tool execution"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "processing",
+                    "success",
+                    "error"
+                  ],
+                  "description": "Execution status"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "When the log entry was created"
+                }
+              }
+            }
+          },
+          "pagination": {
+            "type": "object",
+            "required": [
+              "total_count"
+            ],
+            "properties": {
+              "limit": {
+                "type": "integer"
+              },
+              "offset": {
+                "type": "integer"
+              },
+              "sort_by": {
+                "type": "string"
+              },
+              "order": {
+                "type": "string"
+              },
+              "total_count": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Total number of items matching the query"
+              }
+            }
+          },
+          "stats": {
+            "type": "object",
+            "description": "MCP tool log statistics",
+            "properties": {
+              "total_executions": {
+                "type": "integer",
+                "description": "Total number of tool executions"
+              },
+              "success_rate": {
+                "type": "number",
+                "description": "Success rate percentage"
+              },
+              "average_latency": {
+                "type": "number",
+                "description": "Average execution latency in milliseconds"
+              },
+              "total_cost": {
+                "type": "number",
+                "description": "Total cost in dollars for all executions"
+              }
+            }
+          },
+          "has_logs": {
+            "type": "boolean",
+            "description": "Whether any logs exist in the system"
+          }
+        }
+      },
+      "MCPLogsFilterDataResponse": {
+        "type": "object",
+        "description": "Available MCP log filter data",
+        "properties": {
+          "tool_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "All unique tool names"
+          },
+          "server_labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "All unique server labels"
+          },
+          "virtual_keys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Virtual key ID"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Virtual key name"
+                },
+                "value": {
+                  "type": "string",
+                  "description": "Virtual key value (redacted if applicable)"
+                }
+              }
+            },
+            "description": "All unique virtual keys"
+          }
+        }
+      },
+      "DeleteMCPLogsRequest": {
+        "type": "object",
+        "description": "Delete MCP logs request",
+        "required": [
+          "ids"
+        ],
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of log IDs to delete"
           }
         }
       },
