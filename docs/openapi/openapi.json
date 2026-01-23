@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Bifrost API",
-    "description": "Bifrost HTTP Transport API for AI model inference and gateway management.\n\nThis API provides a unified interface for interacting with multiple AI providers\nincluding OpenAI, Anthropic, Bedrock, Gemini, and more through a single API,\nalong with comprehensive management APIs for configuring and monitoring the gateway.\n\n## API Structure\n\n### Unified Inference API (`/v1/*`)\nThe primary API using Bifrost's unified format. Model parameters use the format\n`provider/model` (e.g., `openai/gpt-4`, `anthropic/claude-3-opus`).\n\n### Provider Integration APIs\nNative provider-format APIs for drop-in compatibility:\n- `/openai/*` - OpenAI-compatible API\n- `/anthropic/*` - Anthropic-compatible API\n- `/genai/*` - Google GenAI (Gemini) compatible API\n- `/bedrock/*` - AWS Bedrock compatible API\n- `/cohere/*` - Cohere compatible API\n\n### Framework Integration APIs\nMulti-provider proxy endpoints for AI frameworks:\n- `/litellm/*` - LiteLLM proxy with all provider formats\n- `/langchain/*` - LangChain compatible endpoints\n- `/pydanticai/*` - PydanticAI compatible endpoints\n\n### Management APIs (`/api/*`)\nAPIs for managing and monitoring the Bifrost gateway:\n- `/api/config` - Configuration management\n- `/api/providers` - Provider and API key management\n- `/api/plugins` - Plugin management\n- `/api/governance/*` - Virtual keys, teams, and customers\n- `/api/logs` - Log search and analytics\n- `/api/mcp/*` - MCP (Model Context Protocol) client management\n- `/api/session/*` - Authentication and session management\n- `/api/cache/*` - Cache management\n- `/health` - Health check endpoint\n\n## Fallbacks\nRequests can include fallback models that will be tried if the primary model fails.\n",
+    "description": "Bifrost HTTP Transport API for AI model inference and gateway management.\n\nThis API provides a unified interface for interacting with multiple AI providers\nincluding OpenAI, Anthropic, Bedrock, Gemini, and more through a single API,\nalong with comprehensive management APIs for configuring and monitoring the gateway.\n\n## API Structure\n\n### Unified Inference API (`/v1/*`)\nThe primary API using Bifrost's unified format. Model parameters use the format\n`provider/model` (e.g., `openai/gpt-4`, `anthropic/claude-3-opus`).\n\n### Provider Integration APIs\nNative provider-format APIs for drop-in compatibility:\n- `/openai/*` - OpenAI-compatible API\n- `/anthropic/*` - Anthropic-compatible API\n- `/genai/*` - Google GenAI (Gemini) compatible API\n- `/bedrock/*` - AWS Bedrock compatible API\n- `/cohere/*` - Cohere compatible API\n\n### Framework Integration APIs\nMulti-provider proxy endpoints for AI frameworks:\n- `/litellm/*` - LiteLLM proxy with all provider formats\n- `/langchain/*` - LangChain compatible endpoints\n- `/pydanticai/*` - PydanticAI compatible endpoints\n\n### Management APIs (`/api/*`)\nAPIs for managing and monitoring the Bifrost gateway:\n- `/api/config` - Configuration management\n- `/api/providers` - Provider and API key management\n- `/api/plugins` - Plugin management\n- `/api/governance/*` - Virtual keys, teams, and customers\n- `/api/logs` - Log search and analytics\n- `/api/mcp/*` - MCP (Model Context Protocol) client management\n- `/api/oauth/*` - OAuth configuration and token management\n- `/api/session/*` - Authentication and session management\n- `/api/cache/*` - Cache management\n- `/health` - Health check endpoint\n\n## Fallbacks\nRequests can include fallback models that will be tried if the primary model fails.\n",
     "version": "1.0.0",
     "contact": {
       "name": "Contact Us",
@@ -123,6 +123,10 @@
     {
       "name": "MCP",
       "description": "Model Context Protocol endpoints"
+    },
+    {
+      "name": "OAuth",
+      "description": "OAuth configuration and token management endpoints"
     },
     {
       "name": "Governance",
@@ -127285,12 +127289,25 @@
                               }
                             }
                           },
+                          "auth_type": {
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "headers",
+                              "oauth"
+                            ],
+                            "description": "Authentication type for the MCP connection"
+                          },
+                          "oauth_config_id": {
+                            "type": "string",
+                            "description": "OAuth config ID for OAuth authentication.\nReferences the oauth_configs table.\nOnly set when auth_type is \"oauth\".\n"
+                          },
                           "headers": {
                             "type": "object",
                             "additionalProperties": {
                               "type": "string"
                             },
-                            "description": "Custom headers to include in requests"
+                            "description": "Custom headers to include in requests.\nOnly used when auth_type is \"headers\".\n"
                           },
                           "tools_to_execute": {
                             "type": "array",
@@ -127450,86 +127467,397 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "description": "MCP client configuration for creating a new client (tool_pricing not available at creation)",
-                "properties": {
-                  "client_id": {
-                    "type": "string",
-                    "description": "Unique identifier for the MCP client"
-                  },
-                  "name": {
-                    "type": "string",
-                    "description": "Display name for the MCP client"
-                  },
-                  "is_code_mode_client": {
-                    "type": "boolean",
-                    "description": "Whether this client is available in code mode"
-                  },
-                  "is_ping_available": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Whether the MCP server supports ping for health checks.\nIf true, uses lightweight ping method for health checks.\nIf false, uses listTools method for health checks instead.\n"
-                  },
-                  "connection_type": {
-                    "type": "string",
-                    "enum": [
-                      "http",
-                      "stdio",
-                      "sse",
-                      "inprocess"
-                    ],
-                    "description": "Connection type for MCP client"
-                  },
-                  "connection_string": {
-                    "type": "string",
-                    "description": "HTTP or SSE URL (required for HTTP or SSE connections)"
-                  },
-                  "stdio_config": {
-                    "type": "object",
-                    "description": "STDIO configuration for MCP client",
-                    "properties": {
-                      "command": {
-                        "type": "string",
-                        "description": "Executable command to run"
+                "oneOf": [
+                  {
+                    "allOf": [
+                      {
+                        "type": "object",
+                        "required": [
+                          "name",
+                          "connection_type"
+                        ],
+                        "properties": {
+                          "client_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the MCP client (optional, auto-generated if not provided)"
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Display name for the MCP client"
+                          },
+                          "is_code_mode_client": {
+                            "type": "boolean",
+                            "description": "Whether this client is available in code mode"
+                          },
+                          "connection_type": {
+                            "type": "string",
+                            "enum": [
+                              "http",
+                              "stdio",
+                              "sse",
+                              "inprocess"
+                            ],
+                            "description": "Connection type for MCP client"
+                          },
+                          "auth_type": {
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "headers",
+                              "oauth"
+                            ],
+                            "description": "Authentication type for the MCP connection"
+                          },
+                          "oauth_config_id": {
+                            "type": "string",
+                            "description": "OAuth config ID for OAuth authentication.\nSet after OAuth flow is completed. References the oauth_configs table.\nOnly relevant when auth_type is \"oauth\".\n"
+                          },
+                          "headers": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Custom headers to include in requests.\nOnly used when auth_type is \"headers\".\n"
+                          },
+                          "oauth_config": {
+                            "type": "object",
+                            "description": "OAuth configuration for initiating OAuth flow.\nOnly include this when creating a client with auth_type \"oauth\".\nThis will trigger the OAuth flow and return an authorization URL.\n",
+                            "properties": {
+                              "client_id": {
+                                "type": "string",
+                                "description": "OAuth client ID. Optional if client supports dynamic client registration (RFC 7591).\nIf not provided, the server_url must be set for OAuth discovery and dynamic registration.\n"
+                              },
+                              "client_secret": {
+                                "type": "string",
+                                "description": "OAuth client secret. Optional for public clients using PKCE or clients obtained via dynamic registration.\n"
+                              },
+                              "authorize_url": {
+                                "type": "string",
+                                "description": "OAuth authorization endpoint URL. Optional - will be discovered from server_url if not provided.\n"
+                              },
+                              "token_url": {
+                                "type": "string",
+                                "description": "OAuth token endpoint URL. Optional - will be discovered from server_url if not provided.\n"
+                              },
+                              "registration_url": {
+                                "type": "string",
+                                "description": "Dynamic client registration endpoint URL (RFC 7591). Optional - will be discovered from server_url if not provided.\n"
+                              },
+                              "scopes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "OAuth scopes requested. Optional - can be discovered from server_url if not provided.\nExample: [\"read\", \"write\"]\n"
+                              }
+                            }
+                          },
+                          "tools_to_execute": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Include-only list for tools.\n[\"*\"] => all tools are included\n[] => no tools are included\n[\"tool1\", \"tool2\"] => include only the specified tools\n"
+                          },
+                          "tools_to_auto_execute": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "List of tools that can be auto-executed without user approval.\nMust be a subset of tools_to_execute.\n[\"*\"] => all executable tools can be auto-executed\n[] => no tools are auto-executed\n[\"tool1\", \"tool2\"] => only specified tools can be auto-executed\n"
+                          }
+                        }
                       },
-                      "args": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        },
-                        "description": "Command line arguments"
-                      },
-                      "envs": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        },
-                        "description": "Environment variables required"
+                      {
+                        "type": "object",
+                        "required": [
+                          "connection_string"
+                        ],
+                        "properties": {
+                          "connection_type": {
+                            "type": "string",
+                            "enum": [
+                              "http"
+                            ]
+                          },
+                          "connection_string": {
+                            "type": "string",
+                            "description": "HTTP URL (required for HTTP connection type)"
+                          }
+                        }
                       }
-                    }
+                    ]
                   },
-                  "headers": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "string"
-                    },
-                    "description": "Custom headers to include in requests"
+                  {
+                    "allOf": [
+                      {
+                        "type": "object",
+                        "required": [
+                          "name",
+                          "connection_type"
+                        ],
+                        "properties": {
+                          "client_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the MCP client (optional, auto-generated if not provided)"
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Display name for the MCP client"
+                          },
+                          "is_code_mode_client": {
+                            "type": "boolean",
+                            "description": "Whether this client is available in code mode"
+                          },
+                          "connection_type": {
+                            "type": "string",
+                            "enum": [
+                              "http",
+                              "stdio",
+                              "sse",
+                              "inprocess"
+                            ],
+                            "description": "Connection type for MCP client"
+                          },
+                          "auth_type": {
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "headers",
+                              "oauth"
+                            ],
+                            "description": "Authentication type for the MCP connection"
+                          },
+                          "oauth_config_id": {
+                            "type": "string",
+                            "description": "OAuth config ID for OAuth authentication.\nSet after OAuth flow is completed. References the oauth_configs table.\nOnly relevant when auth_type is \"oauth\".\n"
+                          },
+                          "headers": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Custom headers to include in requests.\nOnly used when auth_type is \"headers\".\n"
+                          },
+                          "oauth_config": {
+                            "type": "object",
+                            "description": "OAuth configuration for initiating OAuth flow.\nOnly include this when creating a client with auth_type \"oauth\".\nThis will trigger the OAuth flow and return an authorization URL.\n",
+                            "properties": {
+                              "client_id": {
+                                "type": "string",
+                                "description": "OAuth client ID. Optional if client supports dynamic client registration (RFC 7591).\nIf not provided, the server_url must be set for OAuth discovery and dynamic registration.\n"
+                              },
+                              "client_secret": {
+                                "type": "string",
+                                "description": "OAuth client secret. Optional for public clients using PKCE or clients obtained via dynamic registration.\n"
+                              },
+                              "authorize_url": {
+                                "type": "string",
+                                "description": "OAuth authorization endpoint URL. Optional - will be discovered from server_url if not provided.\n"
+                              },
+                              "token_url": {
+                                "type": "string",
+                                "description": "OAuth token endpoint URL. Optional - will be discovered from server_url if not provided.\n"
+                              },
+                              "registration_url": {
+                                "type": "string",
+                                "description": "Dynamic client registration endpoint URL (RFC 7591). Optional - will be discovered from server_url if not provided.\n"
+                              },
+                              "scopes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "OAuth scopes requested. Optional - can be discovered from server_url if not provided.\nExample: [\"read\", \"write\"]\n"
+                              }
+                            }
+                          },
+                          "tools_to_execute": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Include-only list for tools.\n[\"*\"] => all tools are included\n[] => no tools are included\n[\"tool1\", \"tool2\"] => include only the specified tools\n"
+                          },
+                          "tools_to_auto_execute": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "List of tools that can be auto-executed without user approval.\nMust be a subset of tools_to_execute.\n[\"*\"] => all executable tools can be auto-executed\n[] => no tools are auto-executed\n[\"tool1\", \"tool2\"] => only specified tools can be auto-executed\n"
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "connection_string"
+                        ],
+                        "properties": {
+                          "connection_type": {
+                            "type": "string",
+                            "enum": [
+                              "sse"
+                            ]
+                          },
+                          "connection_string": {
+                            "type": "string",
+                            "description": "SSE URL (required for SSE connection type)"
+                          }
+                        }
+                      }
+                    ]
                   },
-                  "tools_to_execute": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "Include-only list for tools.\n[\"*\"] => all tools are included\n[] => no tools are included\n[\"tool1\", \"tool2\"] => include only the specified tools\n"
-                  },
-                  "tools_to_auto_execute": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "List of tools that can be auto-executed without user approval.\nMust be a subset of tools_to_execute.\n[\"*\"] => all executable tools can be auto-executed\n[] => no tools are auto-executed\n[\"tool1\", \"tool2\"] => only specified tools can be auto-executed\n"
+                  {
+                    "allOf": [
+                      {
+                        "type": "object",
+                        "required": [
+                          "name",
+                          "connection_type"
+                        ],
+                        "properties": {
+                          "client_id": {
+                            "type": "string",
+                            "description": "Unique identifier for the MCP client (optional, auto-generated if not provided)"
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Display name for the MCP client"
+                          },
+                          "is_code_mode_client": {
+                            "type": "boolean",
+                            "description": "Whether this client is available in code mode"
+                          },
+                          "connection_type": {
+                            "type": "string",
+                            "enum": [
+                              "http",
+                              "stdio",
+                              "sse",
+                              "inprocess"
+                            ],
+                            "description": "Connection type for MCP client"
+                          },
+                          "auth_type": {
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "headers",
+                              "oauth"
+                            ],
+                            "description": "Authentication type for the MCP connection"
+                          },
+                          "oauth_config_id": {
+                            "type": "string",
+                            "description": "OAuth config ID for OAuth authentication.\nSet after OAuth flow is completed. References the oauth_configs table.\nOnly relevant when auth_type is \"oauth\".\n"
+                          },
+                          "headers": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Custom headers to include in requests.\nOnly used when auth_type is \"headers\".\n"
+                          },
+                          "oauth_config": {
+                            "type": "object",
+                            "description": "OAuth configuration for initiating OAuth flow.\nOnly include this when creating a client with auth_type \"oauth\".\nThis will trigger the OAuth flow and return an authorization URL.\n",
+                            "properties": {
+                              "client_id": {
+                                "type": "string",
+                                "description": "OAuth client ID. Optional if client supports dynamic client registration (RFC 7591).\nIf not provided, the server_url must be set for OAuth discovery and dynamic registration.\n"
+                              },
+                              "client_secret": {
+                                "type": "string",
+                                "description": "OAuth client secret. Optional for public clients using PKCE or clients obtained via dynamic registration.\n"
+                              },
+                              "authorize_url": {
+                                "type": "string",
+                                "description": "OAuth authorization endpoint URL. Optional - will be discovered from server_url if not provided.\n"
+                              },
+                              "token_url": {
+                                "type": "string",
+                                "description": "OAuth token endpoint URL. Optional - will be discovered from server_url if not provided.\n"
+                              },
+                              "registration_url": {
+                                "type": "string",
+                                "description": "Dynamic client registration endpoint URL (RFC 7591). Optional - will be discovered from server_url if not provided.\n"
+                              },
+                              "scopes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "OAuth scopes requested. Optional - can be discovered from server_url if not provided.\nExample: [\"read\", \"write\"]\n"
+                              }
+                            }
+                          },
+                          "tools_to_execute": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Include-only list for tools.\n[\"*\"] => all tools are included\n[] => no tools are included\n[\"tool1\", \"tool2\"] => include only the specified tools\n"
+                          },
+                          "tools_to_auto_execute": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "List of tools that can be auto-executed without user approval.\nMust be a subset of tools_to_execute.\n[\"*\"] => all executable tools can be auto-executed\n[] => no tools are auto-executed\n[\"tool1\", \"tool2\"] => only specified tools can be auto-executed\n"
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "stdio_config"
+                        ],
+                        "properties": {
+                          "connection_type": {
+                            "type": "string",
+                            "enum": [
+                              "stdio"
+                            ]
+                          },
+                          "stdio_config": {
+                            "type": "object",
+                            "description": "STDIO configuration (required for STDIO connection type)",
+                            "properties": {
+                              "command": {
+                                "type": "string",
+                                "description": "Executable command to run"
+                              },
+                              "args": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "Command line arguments"
+                              },
+                              "envs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "Environment variables required"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
                   }
-                }
+                ],
+                "discriminator": {
+                  "propertyName": "connection_type",
+                  "mapping": {
+                    "http": "#/MCPClientCreateRequestHTTP",
+                    "sse": "#/MCPClientCreateRequestSSE",
+                    "stdio": "#/MCPClientCreateRequestSTDIO"
+                  }
+                },
+                "description": "MCP client configuration for creating a new client (tool_pricing not available at creation).\nThe schema varies based on connection_type:\n- HTTP/SSE: connection_string is required\n- STDIO: stdio_config is required\n- InProcess: server instance must be provided programmatically (Go package only)\n"
               }
             }
           }
@@ -127803,12 +128131,25 @@
                       }
                     }
                   },
+                  "auth_type": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "headers",
+                      "oauth"
+                    ],
+                    "description": "Authentication type for the MCP connection"
+                  },
+                  "oauth_config_id": {
+                    "type": "string",
+                    "description": "OAuth config ID for OAuth authentication.\nReferences the oauth_configs table.\nOnly relevant when auth_type is \"oauth\".\n"
+                  },
                   "headers": {
                     "type": "object",
                     "additionalProperties": {
                       "type": "string"
                     },
-                    "description": "Custom headers to include in requests"
+                    "description": "Custom headers to include in requests.\nOnly used when auth_type is \"headers\".\n"
                   },
                   "tools_to_execute": {
                     "type": "array",
@@ -128344,6 +128685,731 @@
                           "type": "string"
                         }
                       }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mcp/client/{id}/complete-oauth": {
+      "post": {
+        "operationId": "completeMCPClientOAuth",
+        "summary": "Complete MCP client OAuth flow",
+        "description": "Completes the OAuth flow for an MCP client after the user has authorized the request.\nThis endpoint should be called after the OAuth provider redirects back to the callback endpoint\nand the OAuth token has been stored. It retrieves the pending MCP client configuration and\nestablishes the connection with the OAuth-provided credentials.\n",
+        "tags": [
+          "MCP",
+          "OAuth"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "MCP client ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "MCP client connected successfully with OAuth",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Generic success response",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Operation completed successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "OAuth not authorized yet or MCP client not found in pending OAuth clients",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "MCP client not found in pending OAuth clients or OAuth config not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/oauth/callback": {
+      "get": {
+        "operationId": "handleOAuthCallback",
+        "summary": "OAuth callback endpoint",
+        "description": "Handles the OAuth provider callback after user authorization.\nThis endpoint processes the authorization code and exchanges it for an access token.\nOn success, displays an HTML page that closes the authorization window.\n",
+        "tags": [
+          "OAuth"
+        ],
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "description": "State parameter for OAuth security (CSRF protection)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "description": "Authorization code from the OAuth provider",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "description": "Error code if authorization failed",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "error_description",
+            "in": "query",
+            "required": false,
+            "description": "Error description if authorization failed",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth authorization successful. Returns HTML page that closes the authorization window.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "OAuth authorization failed or missing required parameters",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/oauth/config/{id}/status": {
+      "get": {
+        "operationId": "getOAuthConfigStatus",
+        "summary": "Get OAuth config status",
+        "description": "Retrieves the current status of an OAuth configuration.\nShows whether the OAuth flow is pending, authorized, or failed,\nand includes token expiration and scopes if authorized.\n",
+        "tags": [
+          "OAuth"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "OAuth config ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth config status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Status of an OAuth configuration",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "OAuth config ID"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "authorized",
+                        "failed"
+                      ],
+                      "description": "Current status of the OAuth flow:\n- pending: User has not yet authorized\n- authorized: User authorized and token is stored\n- failed: Authorization failed\n"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "When this OAuth config was created"
+                    },
+                    "expires_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "When this OAuth config expires (becomes invalid if not completed)"
+                    },
+                    "token_id": {
+                      "type": "string",
+                      "description": "ID of the associated OAuth token (only present if status is authorized)"
+                    },
+                    "token_expires_at": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "When the OAuth access token expires (only present if status is authorized)"
+                    },
+                    "token_scopes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Scopes granted in the OAuth token (only present if status is authorized)"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "OAuth config not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Resource not found",
+                  "content": {
+                    "application/json": {
+                      "schema": {
+                        "type": "object",
+                        "description": "Error response from Bifrost",
+                        "properties": {
+                          "event_id": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "is_bifrost_error": {
+                            "type": "boolean"
+                          },
+                          "status_code": {
+                            "type": "integer"
+                          },
+                          "error": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "param": {
+                                "type": "string"
+                              },
+                              "event_id": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "extra_fields": {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "description": "AI model provider identifier",
+                                "enum": [
+                                  "openai",
+                                  "azure",
+                                  "anthropic",
+                                  "bedrock",
+                                  "cohere",
+                                  "vertex",
+                                  "mistral",
+                                  "ollama",
+                                  "groq",
+                                  "sgl",
+                                  "parasail",
+                                  "perplexity",
+                                  "cerebras",
+                                  "gemini",
+                                  "openrouter",
+                                  "elevenlabs",
+                                  "huggingface",
+                                  "nebius",
+                                  "xai"
+                                ]
+                              },
+                              "model_requested": {
+                                "type": "string"
+                              },
+                              "request_type": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "revokeOAuthConfig",
+        "summary": "Revoke OAuth config",
+        "description": "Revokes an OAuth configuration and its associated access token.\nAfter revocation, the MCP client will no longer be able to use this OAuth token.\n",
+        "tags": [
+          "OAuth"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "OAuth config ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth token revoked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Generic success response",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Operation completed successfully"
                     }
                   }
                 }
@@ -146622,6 +147688,87 @@
     "responses": {
       "BadRequest": {
         "description": "Bad request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "description": "Error response from Bifrost",
+              "properties": {
+                "event_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "is_bifrost_error": {
+                  "type": "boolean"
+                },
+                "status_code": {
+                  "type": "integer"
+                },
+                "error": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "param": {
+                      "type": "string"
+                    },
+                    "event_id": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "extra_fields": {
+                  "type": "object",
+                  "properties": {
+                    "provider": {
+                      "type": "string",
+                      "description": "AI model provider identifier",
+                      "enum": [
+                        "openai",
+                        "azure",
+                        "anthropic",
+                        "bedrock",
+                        "cohere",
+                        "vertex",
+                        "mistral",
+                        "ollama",
+                        "groq",
+                        "sgl",
+                        "parasail",
+                        "perplexity",
+                        "cerebras",
+                        "gemini",
+                        "openrouter",
+                        "elevenlabs",
+                        "huggingface",
+                        "nebius",
+                        "xai"
+                      ]
+                    },
+                    "model_requested": {
+                      "type": "string"
+                    },
+                    "request_type": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
         "content": {
           "application/json": {
             "schema": {
@@ -165344,12 +166491,25 @@
                   }
                 }
               },
+              "auth_type": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "headers",
+                  "oauth"
+                ],
+                "description": "Authentication type for the MCP connection"
+              },
+              "oauth_config_id": {
+                "type": "string",
+                "description": "OAuth config ID for OAuth authentication.\nReferences the oauth_configs table.\nOnly set when auth_type is \"oauth\".\n"
+              },
               "headers": {
                 "type": "object",
                 "additionalProperties": {
                   "type": "string"
                 },
-                "description": "Custom headers to include in requests"
+                "description": "Custom headers to include in requests.\nOnly used when auth_type is \"headers\".\n"
               },
               "tools_to_execute": {
                 "type": "array",
@@ -165467,12 +166627,25 @@
               }
             }
           },
+          "auth_type": {
+            "type": "string",
+            "enum": [
+              "none",
+              "headers",
+              "oauth"
+            ],
+            "description": "Authentication type for the MCP connection"
+          },
+          "oauth_config_id": {
+            "type": "string",
+            "description": "OAuth config ID for OAuth authentication.\nReferences the oauth_configs table.\nOnly set when auth_type is \"oauth\".\n"
+          },
           "headers": {
             "type": "object",
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Custom headers to include in requests"
+            "description": "Custom headers to include in requests.\nOnly used when auth_type is \"headers\".\n"
           },
           "tools_to_execute": {
             "type": "array",
@@ -165499,81 +166672,397 @@
         }
       },
       "MCPClientCreateRequest": {
-        "type": "object",
-        "description": "MCP client configuration for creating a new client (tool_pricing not available at creation)",
-        "properties": {
-          "client_id": {
-            "type": "string",
-            "description": "Unique identifier for the MCP client"
-          },
-          "name": {
-            "type": "string",
-            "description": "Display name for the MCP client"
-          },
-          "is_code_mode_client": {
-            "type": "boolean",
-            "description": "Whether this client is available in code mode"
-          },
-          "connection_type": {
-            "type": "string",
-            "enum": [
-              "http",
-              "stdio",
-              "sse",
-              "inprocess"
-            ],
-            "description": "Connection type for MCP client"
-          },
-          "connection_string": {
-            "type": "string",
-            "description": "HTTP or SSE URL (required for HTTP or SSE connections)"
-          },
-          "stdio_config": {
-            "type": "object",
-            "description": "STDIO configuration for MCP client",
-            "properties": {
-              "command": {
-                "type": "string",
-                "description": "Executable command to run"
+        "oneOf": [
+          {
+            "allOf": [
+              {
+                "type": "object",
+                "required": [
+                  "name",
+                  "connection_type"
+                ],
+                "properties": {
+                  "client_id": {
+                    "type": "string",
+                    "description": "Unique identifier for the MCP client (optional, auto-generated if not provided)"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Display name for the MCP client"
+                  },
+                  "is_code_mode_client": {
+                    "type": "boolean",
+                    "description": "Whether this client is available in code mode"
+                  },
+                  "connection_type": {
+                    "type": "string",
+                    "enum": [
+                      "http",
+                      "stdio",
+                      "sse",
+                      "inprocess"
+                    ],
+                    "description": "Connection type for MCP client"
+                  },
+                  "auth_type": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "headers",
+                      "oauth"
+                    ],
+                    "description": "Authentication type for the MCP connection"
+                  },
+                  "oauth_config_id": {
+                    "type": "string",
+                    "description": "OAuth config ID for OAuth authentication.\nSet after OAuth flow is completed. References the oauth_configs table.\nOnly relevant when auth_type is \"oauth\".\n"
+                  },
+                  "headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Custom headers to include in requests.\nOnly used when auth_type is \"headers\".\n"
+                  },
+                  "oauth_config": {
+                    "type": "object",
+                    "description": "OAuth configuration for initiating OAuth flow.\nOnly include this when creating a client with auth_type \"oauth\".\nThis will trigger the OAuth flow and return an authorization URL.\n",
+                    "properties": {
+                      "client_id": {
+                        "type": "string",
+                        "description": "OAuth client ID. Optional if client supports dynamic client registration (RFC 7591).\nIf not provided, the server_url must be set for OAuth discovery and dynamic registration.\n"
+                      },
+                      "client_secret": {
+                        "type": "string",
+                        "description": "OAuth client secret. Optional for public clients using PKCE or clients obtained via dynamic registration.\n"
+                      },
+                      "authorize_url": {
+                        "type": "string",
+                        "description": "OAuth authorization endpoint URL. Optional - will be discovered from server_url if not provided.\n"
+                      },
+                      "token_url": {
+                        "type": "string",
+                        "description": "OAuth token endpoint URL. Optional - will be discovered from server_url if not provided.\n"
+                      },
+                      "registration_url": {
+                        "type": "string",
+                        "description": "Dynamic client registration endpoint URL (RFC 7591). Optional - will be discovered from server_url if not provided.\n"
+                      },
+                      "scopes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "OAuth scopes requested. Optional - can be discovered from server_url if not provided.\nExample: [\"read\", \"write\"]\n"
+                      }
+                    }
+                  },
+                  "tools_to_execute": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Include-only list for tools.\n[\"*\"] => all tools are included\n[] => no tools are included\n[\"tool1\", \"tool2\"] => include only the specified tools\n"
+                  },
+                  "tools_to_auto_execute": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "List of tools that can be auto-executed without user approval.\nMust be a subset of tools_to_execute.\n[\"*\"] => all executable tools can be auto-executed\n[] => no tools are auto-executed\n[\"tool1\", \"tool2\"] => only specified tools can be auto-executed\n"
+                  }
+                }
               },
-              "args": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "description": "Command line arguments"
-              },
-              "envs": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "description": "Environment variables required"
+              {
+                "type": "object",
+                "required": [
+                  "connection_string"
+                ],
+                "properties": {
+                  "connection_type": {
+                    "type": "string",
+                    "enum": [
+                      "http"
+                    ]
+                  },
+                  "connection_string": {
+                    "type": "string",
+                    "description": "HTTP URL (required for HTTP connection type)"
+                  }
+                }
               }
-            }
+            ]
           },
-          "headers": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            },
-            "description": "Custom headers to include in requests"
+          {
+            "allOf": [
+              {
+                "type": "object",
+                "required": [
+                  "name",
+                  "connection_type"
+                ],
+                "properties": {
+                  "client_id": {
+                    "type": "string",
+                    "description": "Unique identifier for the MCP client (optional, auto-generated if not provided)"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Display name for the MCP client"
+                  },
+                  "is_code_mode_client": {
+                    "type": "boolean",
+                    "description": "Whether this client is available in code mode"
+                  },
+                  "connection_type": {
+                    "type": "string",
+                    "enum": [
+                      "http",
+                      "stdio",
+                      "sse",
+                      "inprocess"
+                    ],
+                    "description": "Connection type for MCP client"
+                  },
+                  "auth_type": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "headers",
+                      "oauth"
+                    ],
+                    "description": "Authentication type for the MCP connection"
+                  },
+                  "oauth_config_id": {
+                    "type": "string",
+                    "description": "OAuth config ID for OAuth authentication.\nSet after OAuth flow is completed. References the oauth_configs table.\nOnly relevant when auth_type is \"oauth\".\n"
+                  },
+                  "headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Custom headers to include in requests.\nOnly used when auth_type is \"headers\".\n"
+                  },
+                  "oauth_config": {
+                    "type": "object",
+                    "description": "OAuth configuration for initiating OAuth flow.\nOnly include this when creating a client with auth_type \"oauth\".\nThis will trigger the OAuth flow and return an authorization URL.\n",
+                    "properties": {
+                      "client_id": {
+                        "type": "string",
+                        "description": "OAuth client ID. Optional if client supports dynamic client registration (RFC 7591).\nIf not provided, the server_url must be set for OAuth discovery and dynamic registration.\n"
+                      },
+                      "client_secret": {
+                        "type": "string",
+                        "description": "OAuth client secret. Optional for public clients using PKCE or clients obtained via dynamic registration.\n"
+                      },
+                      "authorize_url": {
+                        "type": "string",
+                        "description": "OAuth authorization endpoint URL. Optional - will be discovered from server_url if not provided.\n"
+                      },
+                      "token_url": {
+                        "type": "string",
+                        "description": "OAuth token endpoint URL. Optional - will be discovered from server_url if not provided.\n"
+                      },
+                      "registration_url": {
+                        "type": "string",
+                        "description": "Dynamic client registration endpoint URL (RFC 7591). Optional - will be discovered from server_url if not provided.\n"
+                      },
+                      "scopes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "OAuth scopes requested. Optional - can be discovered from server_url if not provided.\nExample: [\"read\", \"write\"]\n"
+                      }
+                    }
+                  },
+                  "tools_to_execute": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Include-only list for tools.\n[\"*\"] => all tools are included\n[] => no tools are included\n[\"tool1\", \"tool2\"] => include only the specified tools\n"
+                  },
+                  "tools_to_auto_execute": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "List of tools that can be auto-executed without user approval.\nMust be a subset of tools_to_execute.\n[\"*\"] => all executable tools can be auto-executed\n[] => no tools are auto-executed\n[\"tool1\", \"tool2\"] => only specified tools can be auto-executed\n"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "connection_string"
+                ],
+                "properties": {
+                  "connection_type": {
+                    "type": "string",
+                    "enum": [
+                      "sse"
+                    ]
+                  },
+                  "connection_string": {
+                    "type": "string",
+                    "description": "SSE URL (required for SSE connection type)"
+                  }
+                }
+              }
+            ]
           },
-          "tools_to_execute": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "Include-only list for tools.\n[\"*\"] => all tools are included\n[] => no tools are included\n[\"tool1\", \"tool2\"] => include only the specified tools\n"
-          },
-          "tools_to_auto_execute": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "List of tools that can be auto-executed without user approval.\nMust be a subset of tools_to_execute.\n[\"*\"] => all executable tools can be auto-executed\n[] => no tools are auto-executed\n[\"tool1\", \"tool2\"] => only specified tools can be auto-executed\n"
+          {
+            "allOf": [
+              {
+                "type": "object",
+                "required": [
+                  "name",
+                  "connection_type"
+                ],
+                "properties": {
+                  "client_id": {
+                    "type": "string",
+                    "description": "Unique identifier for the MCP client (optional, auto-generated if not provided)"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Display name for the MCP client"
+                  },
+                  "is_code_mode_client": {
+                    "type": "boolean",
+                    "description": "Whether this client is available in code mode"
+                  },
+                  "connection_type": {
+                    "type": "string",
+                    "enum": [
+                      "http",
+                      "stdio",
+                      "sse",
+                      "inprocess"
+                    ],
+                    "description": "Connection type for MCP client"
+                  },
+                  "auth_type": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "headers",
+                      "oauth"
+                    ],
+                    "description": "Authentication type for the MCP connection"
+                  },
+                  "oauth_config_id": {
+                    "type": "string",
+                    "description": "OAuth config ID for OAuth authentication.\nSet after OAuth flow is completed. References the oauth_configs table.\nOnly relevant when auth_type is \"oauth\".\n"
+                  },
+                  "headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Custom headers to include in requests.\nOnly used when auth_type is \"headers\".\n"
+                  },
+                  "oauth_config": {
+                    "type": "object",
+                    "description": "OAuth configuration for initiating OAuth flow.\nOnly include this when creating a client with auth_type \"oauth\".\nThis will trigger the OAuth flow and return an authorization URL.\n",
+                    "properties": {
+                      "client_id": {
+                        "type": "string",
+                        "description": "OAuth client ID. Optional if client supports dynamic client registration (RFC 7591).\nIf not provided, the server_url must be set for OAuth discovery and dynamic registration.\n"
+                      },
+                      "client_secret": {
+                        "type": "string",
+                        "description": "OAuth client secret. Optional for public clients using PKCE or clients obtained via dynamic registration.\n"
+                      },
+                      "authorize_url": {
+                        "type": "string",
+                        "description": "OAuth authorization endpoint URL. Optional - will be discovered from server_url if not provided.\n"
+                      },
+                      "token_url": {
+                        "type": "string",
+                        "description": "OAuth token endpoint URL. Optional - will be discovered from server_url if not provided.\n"
+                      },
+                      "registration_url": {
+                        "type": "string",
+                        "description": "Dynamic client registration endpoint URL (RFC 7591). Optional - will be discovered from server_url if not provided.\n"
+                      },
+                      "scopes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "OAuth scopes requested. Optional - can be discovered from server_url if not provided.\nExample: [\"read\", \"write\"]\n"
+                      }
+                    }
+                  },
+                  "tools_to_execute": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Include-only list for tools.\n[\"*\"] => all tools are included\n[] => no tools are included\n[\"tool1\", \"tool2\"] => include only the specified tools\n"
+                  },
+                  "tools_to_auto_execute": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "List of tools that can be auto-executed without user approval.\nMust be a subset of tools_to_execute.\n[\"*\"] => all executable tools can be auto-executed\n[] => no tools are auto-executed\n[\"tool1\", \"tool2\"] => only specified tools can be auto-executed\n"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "stdio_config"
+                ],
+                "properties": {
+                  "connection_type": {
+                    "type": "string",
+                    "enum": [
+                      "stdio"
+                    ]
+                  },
+                  "stdio_config": {
+                    "type": "object",
+                    "description": "STDIO configuration (required for STDIO connection type)",
+                    "properties": {
+                      "command": {
+                        "type": "string",
+                        "description": "Executable command to run"
+                      },
+                      "args": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Command line arguments"
+                      },
+                      "envs": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Environment variables required"
+                      }
+                    }
+                  }
+                }
+              }
+            ]
           }
-        }
+        ],
+        "discriminator": {
+          "propertyName": "connection_type",
+          "mapping": {
+            "http": "#/MCPClientCreateRequestHTTP",
+            "sse": "#/MCPClientCreateRequestSSE",
+            "stdio": "#/MCPClientCreateRequestSTDIO"
+          }
+        },
+        "description": "MCP client configuration for creating a new client (tool_pricing not available at creation).\nThe schema varies based on connection_type:\n- HTTP/SSE: connection_string is required\n- STDIO: stdio_config is required\n- InProcess: server instance must be provided programmatically (Go package only)\n"
       },
       "MCPClientUpdateRequest": {
         "type": "object",
@@ -165629,12 +167118,25 @@
               }
             }
           },
+          "auth_type": {
+            "type": "string",
+            "enum": [
+              "none",
+              "headers",
+              "oauth"
+            ],
+            "description": "Authentication type for the MCP connection"
+          },
+          "oauth_config_id": {
+            "type": "string",
+            "description": "OAuth config ID for OAuth authentication.\nReferences the oauth_configs table.\nOnly relevant when auth_type is \"oauth\".\n"
+          },
           "headers": {
             "type": "object",
             "additionalProperties": {
               "type": "string"
             },
-            "description": "Custom headers to include in requests"
+            "description": "Custom headers to include in requests.\nOnly used when auth_type is \"headers\".\n"
           },
           "tools_to_execute": {
             "type": "array",
@@ -165730,6 +167232,164 @@
           }
         ],
         "description": "MCP tool execution request. The schema depends on the `format` query parameter:\n- `format=chat` or empty (default): Use `ChatAssistantMessageToolCall` schema\n- `format=responses`: Use `ResponsesToolMessage` schema\n"
+      },
+      "MCPAuthType": {
+        "type": "string",
+        "enum": [
+          "none",
+          "headers",
+          "oauth"
+        ],
+        "description": "Authentication type for MCP connections:\n- none: No authentication\n- headers: Header-based authentication (API keys, custom headers, etc.)\n- oauth: OAuth 2.0 authentication\n"
+      },
+      "OAuthConfigRequest": {
+        "type": "object",
+        "description": "OAuth configuration for MCP client creation",
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "OAuth client ID. Optional if client supports dynamic client registration (RFC 7591).\nIf not provided, the server_url must be set for OAuth discovery and dynamic registration.\n"
+          },
+          "client_secret": {
+            "type": "string",
+            "description": "OAuth client secret. Optional for public clients using PKCE or clients obtained via dynamic registration.\n"
+          },
+          "authorize_url": {
+            "type": "string",
+            "description": "OAuth authorization endpoint URL. Optional - will be discovered from server_url if not provided.\n"
+          },
+          "token_url": {
+            "type": "string",
+            "description": "OAuth token endpoint URL. Optional - will be discovered from server_url if not provided.\n"
+          },
+          "registration_url": {
+            "type": "string",
+            "description": "Dynamic client registration endpoint URL (RFC 7591). Optional - will be discovered from server_url if not provided.\n"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "OAuth scopes requested. Optional - can be discovered from server_url if not provided.\nExample: [\"read\", \"write\"]\n"
+          }
+        }
+      },
+      "OAuthFlowInitiation": {
+        "type": "object",
+        "description": "Response when initiating an OAuth flow",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_oauth"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "oauth_config_id": {
+            "type": "string",
+            "description": "ID of the OAuth config created for this flow"
+          },
+          "authorize_url": {
+            "type": "string",
+            "description": "URL to redirect the user to for authorization"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the OAuth authorization request expires"
+          },
+          "mcp_client_id": {
+            "type": "string",
+            "description": "The MCP client ID that initiated this OAuth flow"
+          }
+        }
+      },
+      "OAuthConfigStatus": {
+        "type": "object",
+        "description": "Status of an OAuth configuration",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "OAuth config ID"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "authorized",
+              "failed"
+            ],
+            "description": "Current status of the OAuth flow:\n- pending: User has not yet authorized\n- authorized: User authorized and token is stored\n- failed: Authorization failed\n"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this OAuth config was created"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this OAuth config expires (becomes invalid if not completed)"
+          },
+          "token_id": {
+            "type": "string",
+            "description": "ID of the associated OAuth token (only present if status is authorized)"
+          },
+          "token_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the OAuth access token expires (only present if status is authorized)"
+          },
+          "token_scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Scopes granted in the OAuth token (only present if status is authorized)"
+          }
+        }
+      },
+      "OAuthToken": {
+        "type": "object",
+        "description": "OAuth access and refresh tokens",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique token identifier"
+          },
+          "access_token": {
+            "type": "string",
+            "description": "OAuth access token"
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "OAuth refresh token for obtaining new access tokens"
+          },
+          "token_type": {
+            "type": "string",
+            "description": "Token type (typically \"Bearer\")"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the access token expires"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Scopes granted in this token"
+          },
+          "last_refreshed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the token was last refreshed"
+          }
+        }
       },
       "VirtualKey": {
         "type": "object",
