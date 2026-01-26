@@ -126931,6 +126931,11 @@
                           "is_code_mode_client": {
                             "type": "boolean"
                           },
+                          "is_ping_available": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "Whether the MCP server supports ping for health checks.\nIf true, uses lightweight ping method for health checks.\nIf false, uses listTools method for health checks instead.\n"
+                          },
                           "connection_type": {
                             "type": "string",
                             "enum": [
@@ -127136,6 +127141,11 @@
                   },
                   "is_code_mode_client": {
                     "type": "boolean"
+                  },
+                  "is_ping_available": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Whether the MCP server supports ping for health checks.\nIf true, uses lightweight ping method for health checks.\nIf false, uses listTools method for health checks instead.\n"
                   },
                   "connection_type": {
                     "type": "string",
@@ -127422,6 +127432,11 @@
                   },
                   "is_code_mode_client": {
                     "type": "boolean"
+                  },
+                  "is_ping_available": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Whether the MCP server supports ping for health checks.\nIf true, uses lightweight ping method for health checks.\nIf false, uses listTools method for health checks instead.\n"
                   },
                   "connection_type": {
                     "type": "string",
@@ -163709,6 +163724,11 @@
               "is_code_mode_client": {
                 "type": "boolean"
               },
+              "is_ping_available": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether the MCP server supports ping for health checks.\nIf true, uses lightweight ping method for health checks.\nIf false, uses listTools method for health checks instead.\n"
+              },
               "connection_type": {
                 "type": "string",
                 "enum": [
@@ -163814,6 +163834,11 @@
           },
           "is_code_mode_client": {
             "type": "boolean"
+          },
+          "is_ping_available": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether the MCP server supports ping for health checks.\nIf true, uses lightweight ping method for health checks.\nIf false, uses listTools method for health checks instead.\n"
           },
           "connection_type": {
             "type": "string",
