@@ -119081,6 +119081,13 @@
                                           "type": "boolean"
                                         }
                                       }
+                                    },
+                                    "scopes": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "description": "List of scopes to use for authentication"
                                     }
                                   }
                                 },
@@ -119763,6 +119770,13 @@
                                   "type": "boolean"
                                 }
                               }
+                            },
+                            "scopes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              },
+                              "description": "List of scopes to use for authentication"
                             }
                           }
                         },
@@ -120334,6 +120348,13 @@
                                     "type": "boolean"
                                   }
                                 }
+                              },
+                              "scopes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "List of scopes to use for authentication"
                               }
                             }
                           },
@@ -121183,6 +121204,13 @@
                                     "type": "boolean"
                                   }
                                 }
+                              },
+                              "scopes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "List of scopes to use for authentication"
                               }
                             }
                           },
@@ -122004,6 +122032,13 @@
                                   "type": "boolean"
                                 }
                               }
+                            },
+                            "scopes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              },
+                              "description": "List of scopes to use for authentication"
                             }
                           }
                         },
@@ -122575,6 +122610,13 @@
                                     "type": "boolean"
                                   }
                                 }
+                              },
+                              "scopes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "List of scopes to use for authentication"
                               }
                             }
                           },
@@ -123341,6 +123383,13 @@
                                     "type": "boolean"
                                   }
                                 }
+                              },
+                              "scopes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "List of scopes to use for authentication"
                               }
                             }
                           },
@@ -124150,6 +124199,13 @@
                                 "type": "boolean"
                               }
                             }
+                          },
+                          "scopes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "List of scopes to use for authentication"
                           }
                         }
                       },
@@ -148865,6 +148921,13 @@
                                     "type": "boolean"
                                   }
                                 }
+                              },
+                              "scopes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "List of scopes to use for authentication"
                               }
                             }
                           },
@@ -166203,6 +166266,13 @@
                           "type": "boolean"
                         }
                       }
+                    },
+                    "scopes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "List of scopes to use for authentication"
                     }
                   }
                 },
@@ -166785,6 +166855,13 @@
                                 "type": "boolean"
                               }
                             }
+                          },
+                          "scopes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "List of scopes to use for authentication"
                           }
                         }
                       },
@@ -167370,6 +167447,13 @@
                           "type": "boolean"
                         }
                       }
+                    },
+                    "scopes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "List of scopes to use for authentication"
                     }
                   }
                 },
@@ -167908,6 +167992,13 @@
                           "type": "boolean"
                         }
                       }
+                    },
+                    "scopes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "List of scopes to use for authentication"
                     }
                   }
                 },
@@ -168440,6 +168531,13 @@
                     "type": "boolean"
                   }
                 }
+              },
+              "scopes": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "List of scopes to use for authentication"
               }
             }
           },
