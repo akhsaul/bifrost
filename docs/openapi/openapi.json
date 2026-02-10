@@ -146375,6 +146375,14 @@
             }
           },
           {
+            "name": "routing_engine_used",
+            "in": "query",
+            "description": "Comma-separated list of routing engines to filter by (routing-rule, governance, or loadbalancing)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "start_time",
             "in": "query",
             "description": "Start time filter (RFC3339 format)",
@@ -146568,6 +146576,19 @@
                             "type": "string"
                           },
                           "virtual_key_name": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "routing_engine_used": {
+                            "type": "string",
+                            "description": "The routing engine used for this request (routing-rule, governance, or loadbalancing)",
+                            "nullable": true
+                          },
+                          "routing_rule_id": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "routing_rule_name": {
                             "type": "string",
                             "nullable": true
                           },
@@ -148469,6 +148490,14 @@
             }
           },
           {
+            "name": "routing_engine_used",
+            "in": "query",
+            "description": "Comma-separated list of routing engines to filter by (routing-rule, governance, or loadbalancing)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "start_time",
             "in": "query",
             "description": "Start time filter (RFC3339 format)",
@@ -149594,6 +149623,130 @@
                           }
                         }
                       }
+                    },
+                    "routing_rules": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "description": "CEL-based routing rule for intelligent request routing",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Unique identifier for the routing rule"
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Name of the routing rule"
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Description of what the rule does"
+                          },
+                          "enabled": {
+                            "type": "boolean",
+                            "description": "Whether the rule is enabled and active"
+                          },
+                          "cel_expression": {
+                            "type": "string",
+                            "description": "CEL (Common Expression Language) expression for matching"
+                          },
+                          "provider": {
+                            "type": "string",
+                            "description": "Target provider (empty string uses incoming request provider)",
+                            "nullable": true
+                          },
+                          "model": {
+                            "type": "string",
+                            "description": "Target model (empty string uses incoming request model)",
+                            "nullable": true
+                          },
+                          "fallbacks": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Fallback providers in format \"provider/model\""
+                          },
+                          "scope": {
+                            "type": "string",
+                            "enum": [
+                              "global",
+                              "team",
+                              "customer",
+                              "virtual_key"
+                            ],
+                            "description": "Scope level for the rule"
+                          },
+                          "scope_id": {
+                            "type": "string",
+                            "description": "ID for the scope (empty for global scope)",
+                            "nullable": true
+                          },
+                          "priority": {
+                            "type": "integer",
+                            "description": "Priority for rule evaluation (lower number = higher priority)"
+                          },
+                          "query": {
+                            "type": "object",
+                            "description": "Visual rule tree structure from query builder",
+                            "nullable": true
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updated_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "scope": {
+                                "type": "string",
+                                "enum": [
+                                  "global"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "scope"
+                            ],
+                            "description": "Global scope routing rule"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "scope": {
+                                "type": "string",
+                                "enum": [
+                                  "team",
+                                  "customer",
+                                  "virtual_key"
+                                ]
+                              },
+                              "scope_id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "scope",
+                              "scope_id"
+                            ],
+                            "description": "Scoped routing rule (requires scope_id)"
+                          }
+                        ]
+                      },
+                      "description": "Available routing rules for filtering"
+                    },
+                    "routing_engines": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Available routing engine types (routing-rule, governance, loadbalancing)"
                     }
                   }
                 }
@@ -149739,6 +149892,19 @@
                         "items": {
                           "type": "string"
                         }
+                      },
+                      "routing_rule_ids": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "routing_engine_used": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Filter by routing engine (routing-rule, governance, or loadbalancing)"
                       },
                       "start_time": {
                         "type": "string",
@@ -179602,6 +179768,19 @@
             "type": "string",
             "nullable": true
           },
+          "routing_engine_used": {
+            "type": "string",
+            "description": "The routing engine used for this request (routing-rule, governance, or loadbalancing)",
+            "nullable": true
+          },
+          "routing_rule_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "routing_rule_name": {
+            "type": "string",
+            "nullable": true
+          },
           "stream": {
             "type": "boolean"
           },
@@ -181103,6 +181282,19 @@
                   "type": "string"
                 },
                 "virtual_key_name": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "routing_engine_used": {
+                  "type": "string",
+                  "description": "The routing engine used for this request (routing-rule, governance, or loadbalancing)",
+                  "nullable": true
+                },
+                "routing_rule_id": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "routing_rule_name": {
                   "type": "string",
                   "nullable": true
                 },
@@ -182639,6 +182831,19 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "routing_rule_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "routing_engine_used": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Filter by routing engine (routing-rule, governance, or loadbalancing)"
               },
               "start_time": {
                 "type": "string",
