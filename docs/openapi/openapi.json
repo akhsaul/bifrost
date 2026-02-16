@@ -41,8 +41,8 @@
       "description": "Text embedding generation"
     },
     {
-      "name": "Image Generations",
-      "description": "Image generation from text prompts"
+      "name": "Images",
+      "description": "Image generations, editing, and variations"
     },
     {
       "name": "Audio",
@@ -167,6 +167,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -376,6 +377,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -508,6 +510,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -589,6 +592,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -1793,6 +1797,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -2499,6 +2504,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -2628,6 +2634,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -2709,6 +2716,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -3418,6 +3426,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -4065,6 +4074,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -4194,6 +4204,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -4275,6 +4286,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -5830,6 +5842,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -6831,6 +6844,7 @@
                                 "sgl",
                                 "parasail",
                                 "perplexity",
+                                "replicate",
                                 "cerebras",
                                 "gemini",
                                 "openrouter",
@@ -7555,6 +7569,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -7684,6 +7699,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -7765,6 +7781,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -8019,6 +8036,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -8148,6 +8166,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -8229,6 +8248,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -8479,6 +8499,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -8600,6 +8621,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -8729,6 +8751,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -8810,6 +8833,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -9053,6 +9077,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -9217,6 +9242,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -9346,6 +9372,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -9427,6 +9454,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -9455,10 +9483,10 @@
     "/v1/images/generations": {
       "post": {
         "operationId": "imageGeneration",
-        "summary": "Generate image",
+        "summary": "Generate an image",
         "description": "Generates images from text prompts using the specified model.\n",
         "tags": [
-          "Image Generations"
+          "Images"
         ],
         "requestBody": {
           "required": true,
@@ -9615,6 +9643,7 @@
                                 "sgl",
                                 "parasail",
                                 "perplexity",
+                                "replicate",
                                 "cerebras",
                                 "gemini",
                                 "openrouter",
@@ -9784,6 +9813,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -10026,6 +10056,7 @@
                                 "sgl",
                                 "parasail",
                                 "perplexity",
+                                "replicate",
                                 "cerebras",
                                 "gemini",
                                 "openrouter",
@@ -10069,6 +10100,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -10198,6 +10230,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -10279,6 +10312,1352 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/images/edits": {
+      "post": {
+        "operationId": "imageEdit",
+        "summary": "Edit an image",
+        "description": "Edits an image using a text prompt and optional mask. Request must be sent as multipart/form-data\nwith at least `model`, `prompt` (unless `type` is `background_removal`), and `image` (or `image[]`).\n",
+        "tags": [
+          "Images"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "model",
+                  "image"
+                ],
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "description": "Model identifier in format `provider/model`"
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "description": "Text prompt describing the edit. Required unless `type` is `background_removal`.\n"
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Image file to edit. Use field name `image` for a single file or `image[]` for multiple files.\n"
+                  },
+                  "mask": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Optional mask image for inpainting (transparent areas indicate regions to edit)"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "inpainting",
+                      "outpainting",
+                      "background_removal"
+                    ],
+                    "description": "Type of edit operation"
+                  },
+                  "n": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "description": "Number of images to generate"
+                  },
+                  "size": {
+                    "type": "string",
+                    "enum": [
+                      "256x256",
+                      "512x512",
+                      "1024x1024",
+                      "1536x1024",
+                      "1024x1536",
+                      "auto"
+                    ],
+                    "description": "Size of the output image"
+                  },
+                  "response_format": {
+                    "type": "string",
+                    "enum": [
+                      "url",
+                      "b64_json"
+                    ],
+                    "default": "url",
+                    "description": "Format of the response"
+                  },
+                  "stream": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "When true, stream the response via Server-Sent Events"
+                  },
+                  "background": {
+                    "type": "string",
+                    "enum": [
+                      "transparent",
+                      "opaque",
+                      "auto"
+                    ],
+                    "description": "Background type for the image"
+                  },
+                  "input_fidelity": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "high"
+                    ],
+                    "description": "How closely to follow the original image"
+                  },
+                  "partial_images": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3,
+                    "description": "Number of partial images to generate when streaming"
+                  },
+                  "quality": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "high",
+                      "medium",
+                      "low",
+                      "standard"
+                    ],
+                    "description": "Quality of the output image"
+                  },
+                  "output_format": {
+                    "type": "string",
+                    "enum": [
+                      "png",
+                      "webp",
+                      "jpeg"
+                    ],
+                    "description": "Output image format"
+                  },
+                  "num_inference_steps": {
+                    "type": "integer",
+                    "description": "Number of inference steps"
+                  },
+                  "seed": {
+                    "type": "integer",
+                    "description": "Seed for reproducible editing"
+                  },
+                  "output_compression": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Compression level (0-100%)"
+                  },
+                  "negative_prompt": {
+                    "type": "string",
+                    "description": "What to avoid in the edit"
+                  },
+                  "user": {
+                    "type": "string",
+                    "description": "User identifier for tracking"
+                  },
+                  "fallbacks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "description": "Fallback model configuration",
+                      "required": [
+                        "provider",
+                        "model"
+                      ],
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "description": "Model name"
+                        }
+                      }
+                    },
+                    "description": "Fallback models to try if primary model fails"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response. Returns JSON for non-streaming requests, or Server-Sent Events (SSE) stream when `stream=true`.\nWhen streaming, events are sent with the following event types:\n- `image_edit.partial_image`: Intermediate image chunks with base64-encoded image data\n- `image_edit.completed`: Final event for each image with usage information\n- `error`: Error events with error details\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier for the generation request"
+                    },
+                    "created": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Unix timestamp when the image was created"
+                    },
+                    "model": {
+                      "type": "string",
+                      "description": "Model used for generation"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "URL of the generated image"
+                          },
+                          "b64_json": {
+                            "type": "string",
+                            "description": "Base64-encoded image data"
+                          },
+                          "revised_prompt": {
+                            "type": "string",
+                            "description": "Revised prompt used for generation"
+                          },
+                          "index": {
+                            "type": "integer",
+                            "description": "Index of this image"
+                          }
+                        }
+                      },
+                      "description": "Array of generated images"
+                    },
+                    "background": {
+                      "type": "string",
+                      "description": "Background type for the image"
+                    },
+                    "output_format": {
+                      "type": "string",
+                      "enum": [
+                        "png",
+                        "webp",
+                        "jpeg"
+                      ],
+                      "description": "Output image format"
+                    },
+                    "quality": {
+                      "type": "string",
+                      "description": "Quality of the generated image"
+                    },
+                    "size": {
+                      "type": "string",
+                      "enum": [
+                        "256x256",
+                        "512x512",
+                        "1024x1024",
+                        "1792x1024",
+                        "1024x1792",
+                        "1536x1024",
+                        "1024x1536",
+                        "auto"
+                      ],
+                      "description": "Size of the generated image"
+                    },
+                    "usage": {
+                      "type": "object",
+                      "properties": {
+                        "input_tokens": {
+                          "type": "integer",
+                          "description": "Number of input tokens"
+                        },
+                        "input_tokens_details": {
+                          "type": "object",
+                          "properties": {
+                            "image_tokens": {
+                              "type": "integer",
+                              "description": "Tokens used for images"
+                            },
+                            "text_tokens": {
+                              "type": "integer",
+                              "description": "Tokens used for text"
+                            }
+                          }
+                        },
+                        "total_tokens": {
+                          "type": "integer",
+                          "description": "Total tokens used"
+                        },
+                        "output_tokens": {
+                          "type": "integer",
+                          "description": "Number of output tokens"
+                        },
+                        "output_tokens_details": {
+                          "type": "object",
+                          "properties": {
+                            "image_tokens": {
+                              "type": "integer",
+                              "description": "Tokens used for images"
+                            },
+                            "text_tokens": {
+                              "type": "integer",
+                              "description": "Tokens used for text"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "description": "Additional fields included in responses",
+                      "properties": {
+                        "request_type": {
+                          "type": "string",
+                          "description": "Type of request that was made"
+                        },
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string",
+                          "description": "The model that was requested"
+                        },
+                        "model_deployment": {
+                          "type": "string",
+                          "description": "The actual model deployment used"
+                        },
+                        "latency": {
+                          "type": "integer",
+                          "format": "int64",
+                          "description": "Request latency in milliseconds"
+                        },
+                        "chunk_index": {
+                          "type": "integer",
+                          "description": "Index of the chunk for streaming responses"
+                        },
+                        "raw_request": {
+                          "type": "object",
+                          "description": "Raw request if enabled"
+                        },
+                        "raw_response": {
+                          "type": "object",
+                          "description": "Raw response if enabled"
+                        },
+                        "cache_debug": {
+                          "type": "object",
+                          "properties": {
+                            "cache_hit": {
+                              "type": "boolean"
+                            },
+                            "cache_id": {
+                              "type": "string"
+                            },
+                            "hit_type": {
+                              "type": "string"
+                            },
+                            "provider_used": {
+                              "type": "string"
+                            },
+                            "model_used": {
+                              "type": "string"
+                            },
+                            "input_tokens": {
+                              "type": "integer"
+                            },
+                            "threshold": {
+                              "type": "number"
+                            },
+                            "similarity": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "object",
+                  "description": "Streaming response chunk for image edit.\nSent via Server-Sent Events (SSE) when `stream=true`.\n",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Request identifier"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "image_edit.partial_image",
+                        "image_edit.completed",
+                        "error"
+                      ],
+                      "description": "Type of stream event"
+                    },
+                    "partial_image_index": {
+                      "type": "integer",
+                      "description": "Index of the partial image chunk"
+                    },
+                    "sequence_number": {
+                      "type": "integer",
+                      "description": "Sequence number for event ordering within the stream"
+                    },
+                    "b64_json": {
+                      "type": "string",
+                      "description": "Base64-encoded chunk of image data; optional"
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Optional public URL to the image chunk"
+                    },
+                    "created_at": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Timestamp when chunk was created"
+                    },
+                    "size": {
+                      "type": "string",
+                      "description": "Size of the image"
+                    },
+                    "quality": {
+                      "type": "string",
+                      "description": "Quality setting used"
+                    },
+                    "background": {
+                      "type": "string",
+                      "description": "Background type used"
+                    },
+                    "output_format": {
+                      "type": "string",
+                      "enum": [
+                        "png",
+                        "webp",
+                        "jpeg"
+                      ],
+                      "description": "Output format used"
+                    },
+                    "revised_prompt": {
+                      "type": "string",
+                      "description": "Revised prompt"
+                    },
+                    "usage": {
+                      "type": "object",
+                      "properties": {
+                        "input_tokens": {
+                          "type": "integer",
+                          "description": "Number of input tokens"
+                        },
+                        "input_tokens_details": {
+                          "type": "object",
+                          "properties": {
+                            "image_tokens": {
+                              "type": "integer",
+                              "description": "Tokens used for images"
+                            },
+                            "text_tokens": {
+                              "type": "integer",
+                              "description": "Tokens used for text"
+                            }
+                          }
+                        },
+                        "total_tokens": {
+                          "type": "integer",
+                          "description": "Total tokens used"
+                        },
+                        "output_tokens": {
+                          "type": "integer",
+                          "description": "Number of output tokens"
+                        },
+                        "output_tokens_details": {
+                          "type": "object",
+                          "properties": {
+                            "image_tokens": {
+                              "type": "integer",
+                              "description": "Tokens used for images"
+                            },
+                            "text_tokens": {
+                              "type": "integer",
+                              "description": "Tokens used for text"
+                            }
+                          }
+                        }
+                      },
+                      "description": "Token usage"
+                    },
+                    "error": {
+                      "type": "object",
+                      "description": "Error information if edit failed",
+                      "properties": {
+                        "event_id": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "is_bifrost_error": {
+                          "type": "boolean"
+                        },
+                        "status_code": {
+                          "type": "integer"
+                        },
+                        "error": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string"
+                            },
+                            "code": {
+                              "type": "string"
+                            },
+                            "message": {
+                              "type": "string"
+                            },
+                            "param": {
+                              "type": "string"
+                            },
+                            "event_id": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "extra_fields": {
+                          "type": "object",
+                          "properties": {
+                            "provider": {
+                              "type": "string",
+                              "description": "AI model provider identifier",
+                              "enum": [
+                                "openai",
+                                "azure",
+                                "anthropic",
+                                "bedrock",
+                                "cohere",
+                                "vertex",
+                                "mistral",
+                                "ollama",
+                                "groq",
+                                "sgl",
+                                "parasail",
+                                "perplexity",
+                                "replicate",
+                                "cerebras",
+                                "gemini",
+                                "openrouter",
+                                "elevenlabs",
+                                "huggingface",
+                                "nebius",
+                                "xai"
+                              ]
+                            },
+                            "model_requested": {
+                              "type": "string"
+                            },
+                            "request_type": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "description": "Additional fields included in responses",
+                      "properties": {
+                        "request_type": {
+                          "type": "string",
+                          "description": "Type of request that was made"
+                        },
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string",
+                          "description": "The model that was requested"
+                        },
+                        "model_deployment": {
+                          "type": "string",
+                          "description": "The actual model deployment used"
+                        },
+                        "latency": {
+                          "type": "integer",
+                          "format": "int64",
+                          "description": "Request latency in milliseconds"
+                        },
+                        "chunk_index": {
+                          "type": "integer",
+                          "description": "Index of the chunk for streaming responses"
+                        },
+                        "raw_request": {
+                          "type": "object",
+                          "description": "Raw request if enabled"
+                        },
+                        "raw_response": {
+                          "type": "object",
+                          "description": "Raw response if enabled"
+                        },
+                        "cache_debug": {
+                          "type": "object",
+                          "properties": {
+                            "cache_hit": {
+                              "type": "boolean"
+                            },
+                            "cache_id": {
+                              "type": "string"
+                            },
+                            "hit_type": {
+                              "type": "string"
+                            },
+                            "provider_used": {
+                              "type": "string"
+                            },
+                            "model_used": {
+                              "type": "string"
+                            },
+                            "input_tokens": {
+                              "type": "integer"
+                            },
+                            "threshold": {
+                              "type": "number"
+                            },
+                            "similarity": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/images/variations": {
+      "post": {
+        "operationId": "imageVariation",
+        "summary": "Create Variation",
+        "description": "Creates variations of an image. Request must be sent as multipart/form-data with `model` and `image` (or `image[]`).\nDoes not support streaming.\n",
+        "tags": [
+          "Images"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "model",
+                  "image"
+                ],
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "description": "Model identifier in format `provider/model`"
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Image file to create variations of. Use field name `image` for a single file or `image[]` for multiple (first image is used).\n"
+                  },
+                  "n": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "description": "Number of variations to generate"
+                  },
+                  "size": {
+                    "type": "string",
+                    "enum": [
+                      "256x256",
+                      "512x512",
+                      "1024x1024",
+                      "1792x1024",
+                      "1024x1792",
+                      "1536x1024",
+                      "1024x1536",
+                      "auto"
+                    ],
+                    "description": "Size of the output images"
+                  },
+                  "response_format": {
+                    "type": "string",
+                    "enum": [
+                      "url",
+                      "b64_json"
+                    ],
+                    "default": "url",
+                    "description": "Format of the response"
+                  },
+                  "user": {
+                    "type": "string",
+                    "description": "User identifier for tracking"
+                  },
+                  "fallbacks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "description": "Fallback model configuration",
+                      "required": [
+                        "provider",
+                        "model"
+                      ],
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "description": "Model name"
+                        }
+                      }
+                    },
+                    "description": "Fallback models to try if primary model fails"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response. Returns JSON with generated image variation(s).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Unique identifier for the generation request"
+                    },
+                    "created": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Unix timestamp when the image was created"
+                    },
+                    "model": {
+                      "type": "string",
+                      "description": "Model used for generation"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "URL of the generated image"
+                          },
+                          "b64_json": {
+                            "type": "string",
+                            "description": "Base64-encoded image data"
+                          },
+                          "revised_prompt": {
+                            "type": "string",
+                            "description": "Revised prompt used for generation"
+                          },
+                          "index": {
+                            "type": "integer",
+                            "description": "Index of this image"
+                          }
+                        }
+                      },
+                      "description": "Array of generated images"
+                    },
+                    "background": {
+                      "type": "string",
+                      "description": "Background type for the image"
+                    },
+                    "output_format": {
+                      "type": "string",
+                      "enum": [
+                        "png",
+                        "webp",
+                        "jpeg"
+                      ],
+                      "description": "Output image format"
+                    },
+                    "quality": {
+                      "type": "string",
+                      "description": "Quality of the generated image"
+                    },
+                    "size": {
+                      "type": "string",
+                      "enum": [
+                        "256x256",
+                        "512x512",
+                        "1024x1024",
+                        "1792x1024",
+                        "1024x1792",
+                        "1536x1024",
+                        "1024x1536",
+                        "auto"
+                      ],
+                      "description": "Size of the generated image"
+                    },
+                    "usage": {
+                      "type": "object",
+                      "properties": {
+                        "input_tokens": {
+                          "type": "integer",
+                          "description": "Number of input tokens"
+                        },
+                        "input_tokens_details": {
+                          "type": "object",
+                          "properties": {
+                            "image_tokens": {
+                              "type": "integer",
+                              "description": "Tokens used for images"
+                            },
+                            "text_tokens": {
+                              "type": "integer",
+                              "description": "Tokens used for text"
+                            }
+                          }
+                        },
+                        "total_tokens": {
+                          "type": "integer",
+                          "description": "Total tokens used"
+                        },
+                        "output_tokens": {
+                          "type": "integer",
+                          "description": "Number of output tokens"
+                        },
+                        "output_tokens_details": {
+                          "type": "object",
+                          "properties": {
+                            "image_tokens": {
+                              "type": "integer",
+                              "description": "Tokens used for images"
+                            },
+                            "text_tokens": {
+                              "type": "integer",
+                              "description": "Tokens used for text"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "description": "Additional fields included in responses",
+                      "properties": {
+                        "request_type": {
+                          "type": "string",
+                          "description": "Type of request that was made"
+                        },
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string",
+                          "description": "The model that was requested"
+                        },
+                        "model_deployment": {
+                          "type": "string",
+                          "description": "The actual model deployment used"
+                        },
+                        "latency": {
+                          "type": "integer",
+                          "format": "int64",
+                          "description": "Request latency in milliseconds"
+                        },
+                        "chunk_index": {
+                          "type": "integer",
+                          "description": "Index of the chunk for streaming responses"
+                        },
+                        "raw_request": {
+                          "type": "object",
+                          "description": "Raw request if enabled"
+                        },
+                        "raw_response": {
+                          "type": "object",
+                          "description": "Raw response if enabled"
+                        },
+                        "cache_debug": {
+                          "type": "object",
+                          "properties": {
+                            "cache_hit": {
+                              "type": "boolean"
+                            },
+                            "cache_id": {
+                              "type": "string"
+                            },
+                            "hit_type": {
+                              "type": "string"
+                            },
+                            "provider_used": {
+                              "type": "string"
+                            },
+                            "model_used": {
+                              "type": "string"
+                            },
+                            "input_tokens": {
+                              "type": "integer"
+                            },
+                            "threshold": {
+                              "type": "number"
+                            },
+                            "similarity": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -10882,6 +12261,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -11011,6 +12391,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -11092,6 +12473,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -11311,6 +12693,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -11440,6 +12823,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -11521,6 +12905,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -11574,6 +12959,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -11800,6 +13186,7 @@
                                   "sgl",
                                   "parasail",
                                   "perplexity",
+                                  "replicate",
                                   "cerebras",
                                   "gemini",
                                   "openrouter",
@@ -11904,6 +13291,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -12033,6 +13421,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -12114,6 +13503,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -12178,6 +13568,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -12371,6 +13762,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -12500,6 +13892,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -12581,6 +13974,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -12645,6 +14039,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -12742,6 +14137,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -12871,6 +14267,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -12952,6 +14349,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -13016,6 +14414,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -13115,6 +14514,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -13244,6 +14644,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -13325,6 +14726,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -13379,6 +14781,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -13434,6 +14837,7 @@
                       "sgl",
                       "parasail",
                       "perplexity",
+                      "replicate",
                       "cerebras",
                       "gemini",
                       "openrouter",
@@ -13533,6 +14937,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -13662,6 +15067,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -13743,6 +15149,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -13796,6 +15203,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -13950,6 +15358,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -14079,6 +15488,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -14160,6 +15570,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -14224,6 +15635,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -14320,6 +15732,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -14449,6 +15862,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -14530,6 +15944,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -14592,6 +16007,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -14644,6 +16060,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -14773,6 +16190,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -14854,6 +16272,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -14918,6 +16337,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -15000,6 +16420,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -15081,6 +16502,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -15141,6 +16563,7 @@
                       "sgl",
                       "parasail",
                       "perplexity",
+                      "replicate",
                       "cerebras",
                       "gemini",
                       "openrouter",
@@ -15277,6 +16700,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -15406,6 +16830,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -15487,6 +16912,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -15540,6 +16966,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -15694,6 +17121,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -15823,6 +17251,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -15904,6 +17333,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -15968,6 +17398,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -16065,6 +17496,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -16194,6 +17626,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -16275,6 +17708,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -16337,6 +17771,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -16392,6 +17827,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -16521,6 +17957,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -16602,6 +18039,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -16666,6 +18104,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -16781,6 +18220,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -16910,6 +18350,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -16991,6 +18432,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -17053,6 +18495,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -17183,6 +18626,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -17312,6 +18756,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -17393,6 +18838,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -17466,6 +18912,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -17540,6 +18987,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -17669,6 +19117,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -17750,6 +19199,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -17821,6 +19271,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -17877,6 +19328,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -18006,6 +19458,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -18087,6 +19540,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -18160,6 +19614,7 @@
                 "sgl",
                 "parasail",
                 "perplexity",
+                "replicate",
                 "cerebras",
                 "gemini",
                 "openrouter",
@@ -18242,6 +19697,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -18323,6 +19779,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -19468,6 +20925,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -20174,6 +21632,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -20303,6 +21762,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -20384,6 +21844,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -21549,6 +23010,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -22255,6 +23717,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -22384,6 +23847,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -22465,6 +23929,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -23189,6 +24654,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -23836,6 +25302,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -23965,6 +25432,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -24046,6 +25514,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -24788,6 +26257,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -25435,6 +26905,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -25564,6 +27035,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -25645,6 +27117,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -27174,6 +28647,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -28175,6 +29649,7 @@
                                 "sgl",
                                 "parasail",
                                 "perplexity",
+                                "replicate",
                                 "cerebras",
                                 "gemini",
                                 "openrouter",
@@ -28899,6 +30374,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -29028,6 +30504,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -29109,6 +30586,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -30656,6 +32134,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -31657,6 +33136,7 @@
                                 "sgl",
                                 "parasail",
                                 "perplexity",
+                                "replicate",
                                 "cerebras",
                                 "gemini",
                                 "openrouter",
@@ -32381,6 +33861,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -32510,6 +33991,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -32591,6 +34073,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -33377,6 +34860,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -33506,6 +34990,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -33587,6 +35072,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -33831,6 +35317,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -33960,6 +35447,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -34041,6 +35529,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -34303,6 +35792,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -34432,6 +35922,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -34513,6 +36004,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -34693,6 +36185,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -34822,6 +36315,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -34903,6 +36397,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -35101,6 +36596,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -35230,6 +36726,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -35311,6 +36808,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -35569,6 +37067,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -35733,6 +37232,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -35862,6 +37362,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -35943,6 +37444,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -36219,6 +37721,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -36383,6 +37886,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -36512,6 +38016,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -36593,6 +38098,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -36733,6 +38239,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -36814,6 +38321,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -36972,6 +38480,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -37053,6 +38562,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -37272,6 +38782,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -37401,6 +38912,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -37482,6 +38994,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -37730,6 +39243,7 @@
                                   "sgl",
                                   "parasail",
                                   "perplexity",
+                                  "replicate",
                                   "cerebras",
                                   "gemini",
                                   "openrouter",
@@ -37834,6 +39348,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -37963,6 +39478,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -38044,6 +39560,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -38278,6 +39795,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -38407,6 +39925,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -38488,6 +40007,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -38626,6 +40146,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -38755,6 +40276,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -38836,6 +40358,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -39211,6 +40734,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -39292,6 +40816,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -39687,6 +41212,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -39768,6 +41294,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -39968,6 +41495,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -40097,6 +41625,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -40178,6 +41707,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -40350,6 +41880,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -40479,6 +42010,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -40560,6 +42092,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -40697,6 +42230,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -40826,6 +42360,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -40907,6 +42442,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -40998,6 +42534,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -41127,6 +42664,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -41208,6 +42746,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -41331,6 +42870,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -41412,6 +42952,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -41472,6 +43013,7 @@
                       "sgl",
                       "parasail",
                       "perplexity",
+                      "replicate",
                       "cerebras",
                       "gemini",
                       "openrouter",
@@ -41608,6 +43150,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -41737,6 +43280,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -41818,6 +43362,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -41999,6 +43544,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -42128,6 +43674,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -42209,6 +43756,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -42347,6 +43895,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -42476,6 +44025,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -42557,6 +44107,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -42651,6 +44202,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -42780,6 +44332,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -42861,6 +44414,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -43017,6 +44571,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -43146,6 +44701,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -43227,6 +44783,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -43394,6 +44951,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -43523,6 +45081,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -43604,6 +45163,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -43728,6 +45288,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -43857,6 +45418,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -43938,6 +45500,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -44042,6 +45605,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -44171,6 +45735,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -44252,6 +45817,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -44384,6 +45950,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -44465,6 +46032,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -62473,6 +64041,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -63120,6 +64689,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -63249,6 +64819,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -63330,6 +64901,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -64475,6 +66047,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -65181,6 +66754,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -65310,6 +66884,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -65391,6 +66966,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -65635,6 +67211,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -65764,6 +67341,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -65845,6 +67423,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -65985,6 +67564,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -66066,6 +67646,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -67595,6 +69176,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -68596,6 +70178,7 @@
                                 "sgl",
                                 "parasail",
                                 "perplexity",
+                                "replicate",
                                 "cerebras",
                                 "gemini",
                                 "openrouter",
@@ -69320,6 +70903,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -69449,6 +71033,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -69530,6 +71115,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -70316,6 +71902,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -70445,6 +72032,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -70526,6 +72114,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -70688,6 +72277,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -70817,6 +72407,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -70898,6 +72489,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -71156,6 +72748,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -71320,6 +72913,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -71449,6 +73043,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -71530,6 +73125,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -80626,6 +82222,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -81273,6 +82870,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -81402,6 +83000,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -81483,6 +83082,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -82628,6 +84228,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -83334,6 +84935,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -83463,6 +85065,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -83544,6 +85147,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -83788,6 +85392,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -83917,6 +85522,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -83998,6 +85604,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -84138,6 +85745,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -84219,6 +85827,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -85748,6 +87357,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -86749,6 +88359,7 @@
                                 "sgl",
                                 "parasail",
                                 "perplexity",
+                                "replicate",
                                 "cerebras",
                                 "gemini",
                                 "openrouter",
@@ -87473,6 +89084,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -87602,6 +89214,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -87683,6 +89296,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -88469,6 +90083,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -88598,6 +90213,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -88679,6 +90295,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -88841,6 +90458,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -88970,6 +90588,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -89051,6 +90670,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -89309,6 +90929,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -89473,6 +91094,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -89602,6 +91224,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -89683,6 +91306,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -99402,6 +101026,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -100049,6 +101674,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -100178,6 +101804,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -100259,6 +101886,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -101404,6 +103032,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -102110,6 +103739,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -102239,6 +103869,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -102320,6 +103951,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -102564,6 +104196,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -102693,6 +104326,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -102774,6 +104408,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -102914,6 +104549,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -102995,6 +104631,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -104524,6 +106161,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -105525,6 +107163,7 @@
                                 "sgl",
                                 "parasail",
                                 "perplexity",
+                                "replicate",
                                 "cerebras",
                                 "gemini",
                                 "openrouter",
@@ -106249,6 +107888,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -106378,6 +108018,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -106459,6 +108100,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -107245,6 +108887,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -107374,6 +109017,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -107455,6 +109099,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -107617,6 +109262,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -107746,6 +109392,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -107827,6 +109474,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -108085,6 +109733,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -108249,6 +109898,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -108378,6 +110028,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -108459,6 +110110,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -116944,6 +118596,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -117258,6 +118911,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -117511,6 +119165,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -117592,6 +119247,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -117761,6 +119417,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -117842,6 +119499,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -118006,6 +119664,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -118087,6 +119746,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -118201,6 +119861,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -118282,6 +119943,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -118419,6 +120081,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -118500,6 +120163,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -118581,6 +120245,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -118662,6 +120327,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -118772,6 +120438,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -118884,6 +120551,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -118948,6 +120616,7 @@
                               "sgl",
                               "parasail",
                               "perplexity",
+                              "replicate",
                               "cerebras",
                               "gemini",
                               "openrouter",
@@ -119398,6 +121067,7 @@
                                   "sgl",
                                   "parasail",
                                   "perplexity",
+                                  "replicate",
                                   "cerebras",
                                   "gemini",
                                   "openrouter",
@@ -119579,6 +121249,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -119637,6 +121308,7 @@
                       "sgl",
                       "parasail",
                       "perplexity",
+                      "replicate",
                       "cerebras",
                       "gemini",
                       "openrouter",
@@ -120087,6 +121759,7 @@
                           "sgl",
                           "parasail",
                           "perplexity",
+                          "replicate",
                           "cerebras",
                           "gemini",
                           "openrouter",
@@ -120215,6 +121888,7 @@
                         "sgl",
                         "parasail",
                         "perplexity",
+                        "replicate",
                         "cerebras",
                         "gemini",
                         "openrouter",
@@ -120665,6 +122339,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -120840,6 +122515,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -120921,6 +122597,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -121002,6 +122679,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -121071,6 +122749,7 @@
                         "sgl",
                         "parasail",
                         "perplexity",
+                        "replicate",
                         "cerebras",
                         "gemini",
                         "openrouter",
@@ -121521,6 +123200,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -121696,6 +123376,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -121777,6 +123458,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -121858,6 +123540,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -122349,6 +124032,7 @@
                           "sgl",
                           "parasail",
                           "perplexity",
+                          "replicate",
                           "cerebras",
                           "gemini",
                           "openrouter",
@@ -122477,6 +124161,7 @@
                         "sgl",
                         "parasail",
                         "perplexity",
+                        "replicate",
                         "cerebras",
                         "gemini",
                         "openrouter",
@@ -122927,6 +124612,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -123102,6 +124788,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -123183,6 +124870,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -123250,6 +124938,7 @@
                         "sgl",
                         "parasail",
                         "perplexity",
+                        "replicate",
                         "cerebras",
                         "gemini",
                         "openrouter",
@@ -123700,6 +125389,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -123875,6 +125565,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -123956,6 +125647,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -124037,6 +125729,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -124473,6 +126166,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -124638,6 +126332,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -124869,6 +126564,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -125124,6 +126820,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -125205,6 +126902,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -125286,6 +126984,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -125516,6 +127215,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -125597,6 +127297,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -125678,6 +127379,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -125938,6 +127640,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -126019,6 +127722,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -126100,6 +127804,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -126218,6 +127923,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -126299,6 +128005,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -126380,6 +128087,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -127161,6 +128869,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -127242,6 +128951,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -127480,6 +129190,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -128006,6 +129717,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -128087,6 +129799,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -128317,6 +130030,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -128398,6 +130112,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -128521,6 +130236,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -128602,6 +130318,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -128727,6 +130444,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -128808,6 +130526,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -129034,6 +130753,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -129115,6 +130835,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -129238,6 +130959,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -129820,6 +131542,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -130532,6 +132255,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -130613,6 +132337,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -131197,6 +132922,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -131278,6 +133004,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -131996,6 +133723,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -132077,6 +133805,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -132158,6 +133887,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -132276,6 +134006,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -132357,6 +134088,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -133558,6 +135290,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -134773,6 +136506,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -134854,6 +136588,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -136049,6 +137784,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -136130,6 +137866,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -137349,6 +139086,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -137430,6 +139168,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -137511,6 +139250,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -137629,6 +139369,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -137710,6 +139451,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -138363,6 +140105,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -139035,6 +140778,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -139116,6 +140860,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -140838,6 +142583,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -140919,6 +142665,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -141595,6 +143342,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -141676,6 +143424,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -141757,6 +143506,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -141875,6 +143625,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -141956,6 +143707,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -142115,6 +143867,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -142291,6 +144044,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -142535,6 +144289,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -142869,6 +144624,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -142950,6 +144706,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -143179,6 +144936,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -143260,6 +145018,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -143537,6 +145296,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -143618,6 +145378,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -143699,6 +145460,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -143817,6 +145579,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -143898,6 +145661,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -144128,6 +145892,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -144412,6 +146177,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -144493,6 +146259,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -144726,6 +146493,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -144807,6 +146575,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -145095,6 +146864,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -145176,6 +146946,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -145257,6 +147028,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -145375,6 +147147,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -145456,6 +147229,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -145668,6 +147442,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -145923,6 +147698,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -146004,6 +147780,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -146085,6 +147862,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -146203,6 +147981,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -146284,6 +148063,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -146742,6 +148522,7 @@
                                       "sgl",
                                       "parasail",
                                       "perplexity",
+                                      "replicate",
                                       "cerebras",
                                       "gemini",
                                       "openrouter",
@@ -148108,6 +149889,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -148189,6 +149971,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -148318,6 +150101,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -148399,6 +150183,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -148668,6 +150453,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -148749,6 +150535,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -149812,6 +151599,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -150034,6 +151822,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -150115,6 +151904,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -150236,6 +152026,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -150317,6 +152108,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -150438,6 +152230,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -150519,6 +152312,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
@@ -150606,6 +152400,7 @@
                         "sgl",
                         "parasail",
                         "perplexity",
+                        "replicate",
                         "cerebras",
                         "gemini",
                         "openrouter",
@@ -150687,6 +152482,7 @@
                         "sgl",
                         "parasail",
                         "perplexity",
+                        "replicate",
                         "cerebras",
                         "gemini",
                         "openrouter",
@@ -150727,6 +152523,7 @@
           "sgl",
           "parasail",
           "perplexity",
+          "replicate",
           "cerebras",
           "gemini",
           "openrouter",
@@ -150760,6 +152557,7 @@
               "sgl",
               "parasail",
               "perplexity",
+              "replicate",
               "cerebras",
               "gemini",
               "openrouter",
@@ -150830,6 +152628,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -150888,6 +152687,7 @@
               "sgl",
               "parasail",
               "perplexity",
+              "replicate",
               "cerebras",
               "gemini",
               "openrouter",
@@ -150929,6 +152729,7 @@
               "sgl",
               "parasail",
               "perplexity",
+              "replicate",
               "cerebras",
               "gemini",
               "openrouter",
@@ -151364,6 +153165,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -152739,6 +154541,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -153818,6 +155621,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -155395,6 +157199,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -155727,6 +157532,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -155993,6 +157799,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -156258,6 +158065,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -156883,6 +158691,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -157124,6 +158933,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -157376,6 +159186,7 @@
                         "sgl",
                         "parasail",
                         "perplexity",
+                        "replicate",
                         "cerebras",
                         "gemini",
                         "openrouter",
@@ -157480,6 +159291,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -157724,6 +159536,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -157831,6 +159644,7 @@
               "sgl",
               "parasail",
               "perplexity",
+              "replicate",
               "cerebras",
               "gemini",
               "openrouter",
@@ -157922,6 +159736,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -158080,6 +159895,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -165857,6 +167673,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -166299,6 +168116,7 @@
               "sgl",
               "parasail",
               "perplexity",
+              "replicate",
               "cerebras",
               "gemini",
               "openrouter",
@@ -166749,6 +168567,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -166888,6 +168707,7 @@
                     "sgl",
                     "parasail",
                     "perplexity",
+                    "replicate",
                     "cerebras",
                     "gemini",
                     "openrouter",
@@ -167338,6 +169158,7 @@
                         "sgl",
                         "parasail",
                         "perplexity",
+                        "replicate",
                         "cerebras",
                         "gemini",
                         "openrouter",
@@ -167480,6 +169301,7 @@
               "sgl",
               "parasail",
               "perplexity",
+              "replicate",
               "cerebras",
               "gemini",
               "openrouter",
@@ -167930,6 +169752,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -168475,6 +170298,7 @@
                   "sgl",
                   "parasail",
                   "perplexity",
+                  "replicate",
                   "cerebras",
                   "gemini",
                   "openrouter",
@@ -179931,6 +181755,7 @@
                       "sgl",
                       "parasail",
                       "perplexity",
+                      "replicate",
                       "cerebras",
                       "gemini",
                       "openrouter",
@@ -181448,6 +183273,7 @@
                             "sgl",
                             "parasail",
                             "perplexity",
+                            "replicate",
                             "cerebras",
                             "gemini",
                             "openrouter",
