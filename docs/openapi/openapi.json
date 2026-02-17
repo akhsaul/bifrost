@@ -148359,9 +148359,12 @@
                             "type": "string",
                             "nullable": true
                           },
-                          "routing_engine_used": {
-                            "type": "string",
-                            "description": "The routing engine used for this request (routing-rule, governance, or loadbalancing)",
+                          "routing_engines_used": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Array of routing engines used for this request (routing-rule, governance, or loadbalancing)",
                             "nullable": true
                           },
                           "routing_rule_id": {
@@ -181592,9 +181595,12 @@
             "type": "string",
             "nullable": true
           },
-          "routing_engine_used": {
-            "type": "string",
-            "description": "The routing engine used for this request (routing-rule, governance, or loadbalancing)",
+          "routing_engines_used": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of routing engines used for this request (routing-rule, governance, or loadbalancing)",
             "nullable": true
           },
           "routing_rule_id": {
@@ -183110,9 +183116,12 @@
                   "type": "string",
                   "nullable": true
                 },
-                "routing_engine_used": {
-                  "type": "string",
-                  "description": "The routing engine used for this request (routing-rule, governance, or loadbalancing)",
+                "routing_engines_used": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Array of routing engines used for this request (routing-rule, governance, or loadbalancing)",
                   "nullable": true
                 },
                 "routing_rule_id": {
