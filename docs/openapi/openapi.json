@@ -127918,6 +127918,13 @@
                             "type": "string"
                           },
                           "description": "Headers that must be present on every request. Requests missing any of these headers are rejected with 400. Case-insensitive matching."
+                        },
+                        "logging_headers": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Headers to capture in log metadata. Values are extracted from incoming requests and stored in the metadata field of log entries. Case-insensitive matching. No restart required."
                         }
                       }
                     },
@@ -128224,6 +128231,13 @@
                           "type": "string"
                         },
                         "description": "Headers that must be present on every request. Requests missing any of these headers are rejected with 400. Case-insensitive matching."
+                      },
+                      "logging_headers": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Headers to capture in log metadata. Values are extracted from incoming requests and stored in the metadata field of log entries. Case-insensitive matching. No restart required."
                       }
                     }
                   },
@@ -159121,6 +159135,11 @@
                             "type": "object",
                             "additionalProperties": true
                           },
+                          "metadata": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "description": "Custom metadata captured from request headers (configured via logging_headers or x-bf-lh-* prefix)"
+                          },
                           "selected_key": {
                             "type": "object",
                             "additionalProperties": true
@@ -177670,6 +177689,13 @@
                   "type": "string"
                 },
                 "description": "Headers that must be present on every request. Requests missing any of these headers are rejected with 400. Case-insensitive matching."
+              },
+              "logging_headers": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Headers to capture in log metadata. Values are extracted from incoming requests and stored in the metadata field of log entries. Case-insensitive matching. No restart required."
               }
             }
           },
@@ -177877,6 +177903,13 @@
                   "type": "string"
                 },
                 "description": "Headers that must be present on every request. Requests missing any of these headers are rejected with 400. Case-insensitive matching."
+              },
+              "logging_headers": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Headers to capture in log metadata. Values are extracted from incoming requests and stored in the metadata field of log entries. Case-insensitive matching. No restart required."
               }
             }
           },
@@ -192920,6 +192953,11 @@
             "type": "object",
             "additionalProperties": true
           },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Custom metadata captured from request headers (configured via logging_headers or x-bf-lh-* prefix)"
+          },
           "selected_key": {
             "type": "object",
             "additionalProperties": true
@@ -194441,6 +194479,11 @@
                 "cache_debug": {
                   "type": "object",
                   "additionalProperties": true
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Custom metadata captured from request headers (configured via logging_headers or x-bf-lh-* prefix)"
                 },
                 "selected_key": {
                   "type": "object",
