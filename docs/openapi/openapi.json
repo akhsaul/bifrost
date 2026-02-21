@@ -139186,7 +139186,7 @@
         }
       }
     },
-    "/api/mcp/oauth/callback": {
+    "/api/oauth/callback": {
       "get": {
         "operationId": "handleOAuthCallback",
         "summary": "OAuth callback endpoint",
@@ -139256,7 +139256,7 @@
         }
       }
     },
-    "/api/mcp/oauth/{id}": {
+    "/api/oauth/config/{id}/status": {
       "get": {
         "operationId": "getOAuthConfigStatus",
         "summary": "Get OAuth config status",
