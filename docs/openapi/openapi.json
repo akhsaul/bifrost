@@ -28685,9 +28685,42 @@
       "post": {
         "operationId": "openaiCreateChatCompletion",
         "summary": "Create chat completion (OpenAI format)",
-        "description": "Creates a chat completion using OpenAI-compatible format.\nSupports streaming via SSE.\n\n**Note:** This endpoint also works without the `/v1` prefix (e.g., `/openai/chat/completions`).\n",
+        "description": "Creates a chat completion using OpenAI-compatible format.\nSupports streaming via SSE.\n\n**Async inference:** Send `x-bf-async: true` to submit the request as a background job and receive a job ID immediately. Poll with `x-bf-async-id: <job-id>` to retrieve the result. When the job is still processing, the response will have an empty `choices` array. When completed, `choices` will contain the full result. See [Async Inference](/features/async-inference) for details.\n\n**Note:** This endpoint also works without the `/v1` prefix (e.g., `/openai/chat/completions`).\n",
         "tags": [
           "OpenAI Integration"
+        ],
+        "parameters": [
+          {
+            "name": "x-bf-async",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ]
+            },
+            "description": "Set to `true` to submit this request as an async job. Returns immediately with a job ID. Not compatible with streaming."
+          },
+          {
+            "name": "x-bf-async-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Poll for results of a previously submitted async job by providing the job ID returned from the initial async request."
+          },
+          {
+            "name": "x-bf-async-job-result-ttl",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 3600
+            },
+            "description": "Override the default result TTL in seconds. Results expire after this duration from completion time."
+          }
         ],
         "requestBody": {
           "required": true,
@@ -36039,9 +36072,42 @@
       "post": {
         "operationId": "openaiCreateResponse",
         "summary": "Create response (OpenAI Responses API)",
-        "description": "Creates a response using OpenAI Responses API format.\nSupports streaming via SSE.\n\n**Note:** This endpoint also works without the `/v1` prefix (e.g., `/openai/responses`).\n",
+        "description": "Creates a response using OpenAI Responses API format.\nSupports streaming via SSE.\n\n**Async inference:** Send `x-bf-async: true` to submit the request as a background job and receive a job ID immediately. Poll with `x-bf-async-id: <job-id>` to retrieve the result. When the job is still processing, the response `status` will not be `completed`. When completed, the full response with `output_text` will be returned. See [Async Inference](/features/async-inference) for details.\n\n**Note:** This endpoint also works without the `/v1` prefix (e.g., `/openai/responses`).\n",
         "tags": [
           "OpenAI Integration"
+        ],
+        "parameters": [
+          {
+            "name": "x-bf-async",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ]
+            },
+            "description": "Set to `true` to submit this request as an async job. Returns immediately with a job ID. Not compatible with streaming."
+          },
+          {
+            "name": "x-bf-async-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Poll for results of a previously submitted async job by providing the job ID returned from the initial async request."
+          },
+          {
+            "name": "x-bf-async-job-result-ttl",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 3600
+            },
+            "description": "Override the default result TTL in seconds. Results expire after this duration from completion time."
+          }
         ],
         "requestBody": {
           "required": true,
@@ -55049,9 +55115,42 @@
       "post": {
         "operationId": "anthropicCreateMessage",
         "summary": "Create message (Anthropic format)",
-        "description": "Creates a message using Anthropic Messages API format.\nSupports streaming via SSE.\n",
+        "description": "Creates a message using Anthropic Messages API format.\nSupports streaming via SSE.\n\n**Async inference:** Send `x-bf-async: true` to submit the request as a background job and receive a job ID immediately. Poll with `x-bf-async-id: <job-id>` to retrieve the result. When the job is still processing, the response will have an empty `content` array. When completed, `content` will contain the full result. See [Async Inference](/features/async-inference) for details.\n",
         "tags": [
           "Anthropic Integration"
+        ],
+        "parameters": [
+          {
+            "name": "x-bf-async",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true"
+              ]
+            },
+            "description": "Set to `true` to submit this request as an async job. Returns immediately with a job ID. Not compatible with streaming."
+          },
+          {
+            "name": "x-bf-async-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Poll for results of a previously submitted async job by providing the job ID returned from the initial async request."
+          },
+          {
+            "name": "x-bf-async-job-result-ttl",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 3600
+            },
+            "description": "Override the default result TTL in seconds. Results expire after this duration from completion time."
+          }
         ],
         "requestBody": {
           "required": true,
