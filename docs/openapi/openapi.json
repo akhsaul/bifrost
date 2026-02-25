@@ -49,6 +49,10 @@
       "description": "Image generations, editing, and variations"
     },
     {
+      "name": "Videos",
+      "description": "Video generation and management"
+    },
+    {
       "name": "Audio",
       "description": "Speech synthesis and transcription"
     },
@@ -12068,6 +12072,2642 @@
           },
           "400": {
             "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/videos": {
+      "post": {
+        "operationId": "videoGeneration",
+        "summary": "Generate a video",
+        "description": "Creates a video generation job from a text prompt. This is an asynchronous operation\nthat returns immediately with a job ID. Use the retrieve endpoint to check the status\nand get the video URL when generation is complete.\n",
+        "tags": [
+          "Videos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "model",
+                  "prompt"
+                ],
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "description": "Model identifier in format `provider/model`"
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "description": "Text prompt describing the video to generate"
+                  },
+                  "input_reference": {
+                    "type": "string",
+                    "description": "Optional reference image for image-to-video. OpenAI and Gemini require a base64 data URL (e.g., `data:image/png;base64,...`). Runway and Replicate accept both data URLs and plain URLs."
+                  },
+                  "seconds": {
+                    "type": "string",
+                    "description": "Duration of the video in seconds as a string (e.g., \"4\")"
+                  },
+                  "size": {
+                    "type": "string",
+                    "description": "Resolution of the generated video (e.g., `1280x720`, `720x1280`, `1920x1080`)"
+                  },
+                  "negative_prompt": {
+                    "type": "string",
+                    "description": "Text describing what to avoid in the generated video"
+                  },
+                  "seed": {
+                    "type": "integer",
+                    "description": "Seed for reproducible generation"
+                  },
+                  "video_uri": {
+                    "type": "string",
+                    "description": "Source video URI for video-to-video generation (provider-specific, e.g. GCS URI)"
+                  },
+                  "audio": {
+                    "type": "boolean",
+                    "description": "Enable audio generation in the video (supported by select providers/models)"
+                  },
+                  "fallbacks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "description": "Fallback model configuration",
+                      "required": [
+                        "provider",
+                        "model"
+                      ],
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model": {
+                          "type": "string",
+                          "description": "Model name"
+                        }
+                      }
+                    },
+                    "description": "Fallback models to try if primary model fails"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response. Returns a video generation job object with status information.\nPoll the retrieve endpoint to check completion status.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Provider-native job ID. To use in path parameters (retrieve/delete/download), combine as `{id}:{provider}` (e.g., `task_abc123:runway`)"
+                    },
+                    "object": {
+                      "type": "string",
+                      "enum": [
+                        "video"
+                      ],
+                      "description": "Object type, always \"video\""
+                    },
+                    "model": {
+                      "type": "string",
+                      "description": "Model used for video generation"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "in_progress",
+                        "completed",
+                        "failed"
+                      ],
+                      "description": "Current lifecycle status of the video generation job:\n- `queued`: Job is waiting to be processed\n- `in_progress`: Video is currently being generated\n- `completed`: Video generation completed successfully\n- `failed`: Video generation failed\n"
+                    },
+                    "progress": {
+                      "type": "number",
+                      "format": "float",
+                      "minimum": 0,
+                      "maximum": 100,
+                      "description": "Approximate completion percentage (0-100)"
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "description": "Prompt used to generate the video"
+                    },
+                    "remixed_from_video_id": {
+                      "type": "string",
+                      "description": "Source video ID if this is a remix"
+                    },
+                    "seconds": {
+                      "type": "string",
+                      "description": "Duration of the generated video in seconds as a string (e.g., \"4\")"
+                    },
+                    "size": {
+                      "type": "string",
+                      "description": "Resolution of the generated video (e.g., \"1920x1080\")"
+                    },
+                    "created_at": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Unix timestamp (seconds) when the job was created"
+                    },
+                    "completed_at": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Unix timestamp (seconds) when the job completed"
+                    },
+                    "expires_at": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Unix timestamp (seconds) when downloadable assets expire"
+                    },
+                    "videos": {
+                      "type": "array",
+                      "description": "Generated video outputs (only present when status is \"completed\")",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "url",
+                              "base64"
+                            ],
+                            "description": "Output format of this video"
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "URL to the generated video (present when type is \"url\")"
+                          },
+                          "base64": {
+                            "type": "string",
+                            "description": "Base64-encoded video content (present when type is \"base64\")"
+                          },
+                          "content_type": {
+                            "type": "string",
+                            "description": "MIME type of the video (e.g., \"video/mp4\")"
+                          }
+                        }
+                      }
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Error code"
+                        },
+                        "message": {
+                          "type": "string",
+                          "description": "Human-readable error message"
+                        }
+                      }
+                    },
+                    "content_filter": {
+                      "type": "object",
+                      "description": "Information about content that was filtered due to safety policies",
+                      "properties": {
+                        "filtered_count": {
+                          "type": "integer",
+                          "description": "Number of items filtered"
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Human-readable reasons for filtering"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "description": "Additional fields included in responses",
+                      "properties": {
+                        "request_type": {
+                          "type": "string",
+                          "description": "Type of request that was made"
+                        },
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string",
+                          "description": "The model that was requested"
+                        },
+                        "model_deployment": {
+                          "type": "string",
+                          "description": "The actual model deployment used"
+                        },
+                        "latency": {
+                          "type": "integer",
+                          "format": "int64",
+                          "description": "Request latency in milliseconds"
+                        },
+                        "chunk_index": {
+                          "type": "integer",
+                          "description": "Index of the chunk for streaming responses"
+                        },
+                        "raw_request": {
+                          "type": "object",
+                          "description": "Raw request if enabled"
+                        },
+                        "raw_response": {
+                          "type": "object",
+                          "description": "Raw response if enabled"
+                        },
+                        "cache_debug": {
+                          "type": "object",
+                          "properties": {
+                            "cache_hit": {
+                              "type": "boolean"
+                            },
+                            "cache_id": {
+                              "type": "string"
+                            },
+                            "hit_type": {
+                              "type": "string"
+                            },
+                            "provider_used": {
+                              "type": "string"
+                            },
+                            "model_used": {
+                              "type": "string"
+                            },
+                            "input_tokens": {
+                              "type": "integer"
+                            },
+                            "threshold": {
+                              "type": "number"
+                            },
+                            "similarity": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "videoList",
+        "summary": "List video generation jobs",
+        "description": "Lists video generation jobs for a specific provider. Results are paginated\nand can be filtered using query parameters.\n",
+        "tags": [
+          "Videos"
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Provider name (e.g., \"openai\", \"gemini\")"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Cursor for pagination - ID of the last item from the previous page"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "description": "Maximum number of results to return"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            },
+            "description": "Sort order by creation time"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response. Returns a paginated list of video generation jobs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "enum": [
+                        "list"
+                      ],
+                      "description": "Object type, always \"list\""
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "Provider-native video ID. To use in path parameters (retrieve/delete/download), combine as `{id}:{provider}` (e.g., `task_abc123:runway`)"
+                          },
+                          "object": {
+                            "type": "string",
+                            "enum": [
+                              "video"
+                            ],
+                            "description": "Object type, always \"video\""
+                          },
+                          "model": {
+                            "type": "string",
+                            "description": "Model used for generation"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "in_progress",
+                              "completed",
+                              "failed"
+                            ],
+                            "description": "Current lifecycle status of the video generation job:\n- `queued`: Job is waiting to be processed\n- `in_progress`: Video is currently being generated\n- `completed`: Video generation completed successfully\n- `failed`: Video generation failed\n"
+                          },
+                          "progress": {
+                            "type": "number",
+                            "format": "float",
+                            "minimum": 0,
+                            "maximum": 100,
+                            "description": "Approximate completion percentage (0-100)"
+                          },
+                          "prompt": {
+                            "type": "string",
+                            "description": "Prompt used to generate the video"
+                          },
+                          "remixed_from_video_id": {
+                            "type": "string",
+                            "description": "Source video ID if this is a remix"
+                          },
+                          "seconds": {
+                            "type": "string",
+                            "description": "Duration of the video in seconds as a string (e.g., \"4\")"
+                          },
+                          "size": {
+                            "type": "string",
+                            "description": "Resolution of the generated video (e.g., \"1920x1080\")"
+                          },
+                          "created_at": {
+                            "type": "integer",
+                            "format": "int64",
+                            "description": "Unix timestamp (seconds) when the job was created"
+                          },
+                          "completed_at": {
+                            "type": "integer",
+                            "format": "int64",
+                            "description": "Unix timestamp (seconds) when the job completed"
+                          },
+                          "expires_at": {
+                            "type": "integer",
+                            "format": "int64",
+                            "description": "Unix timestamp (seconds) when downloadable assets expire"
+                          },
+                          "error": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                                "description": "Error code"
+                              },
+                              "message": {
+                                "type": "string",
+                                "description": "Human-readable error message"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "description": "Array of video generation jobs"
+                    },
+                    "first_id": {
+                      "type": "string",
+                      "description": "ID of the first item in the list"
+                    },
+                    "last_id": {
+                      "type": "string",
+                      "description": "ID of the last item in the list"
+                    },
+                    "has_more": {
+                      "type": "boolean",
+                      "description": "Whether there are more results available"
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "description": "Additional fields included in responses",
+                      "properties": {
+                        "request_type": {
+                          "type": "string",
+                          "description": "Type of request that was made"
+                        },
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string",
+                          "description": "The model that was requested"
+                        },
+                        "model_deployment": {
+                          "type": "string",
+                          "description": "The actual model deployment used"
+                        },
+                        "latency": {
+                          "type": "integer",
+                          "format": "int64",
+                          "description": "Request latency in milliseconds"
+                        },
+                        "chunk_index": {
+                          "type": "integer",
+                          "description": "Index of the chunk for streaming responses"
+                        },
+                        "raw_request": {
+                          "type": "object",
+                          "description": "Raw request if enabled"
+                        },
+                        "raw_response": {
+                          "type": "object",
+                          "description": "Raw response if enabled"
+                        },
+                        "cache_debug": {
+                          "type": "object",
+                          "properties": {
+                            "cache_hit": {
+                              "type": "boolean"
+                            },
+                            "cache_id": {
+                              "type": "string"
+                            },
+                            "hit_type": {
+                              "type": "string"
+                            },
+                            "provider_used": {
+                              "type": "string"
+                            },
+                            "model_used": {
+                              "type": "string"
+                            },
+                            "input_tokens": {
+                              "type": "integer"
+                            },
+                            "threshold": {
+                              "type": "number"
+                            },
+                            "similarity": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/videos/{video_id}": {
+      "get": {
+        "operationId": "videoRetrieve",
+        "summary": "Retrieve a video generation job",
+        "description": "Retrieves the status and metadata for a video generation job.\nUse this endpoint to poll for completion status after creating a video generation job.\nWhen the status is \"completed\", the response will include a URL to download the video.\n",
+        "tags": [
+          "Videos"
+        ],
+        "parameters": [
+          {
+            "name": "video_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Video ID in format `id:provider` (e.g., `video_abc123:openai`)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response. Returns the video generation job details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Provider-native job ID. To use in path parameters (retrieve/delete/download), combine as `{id}:{provider}` (e.g., `task_abc123:runway`)"
+                    },
+                    "object": {
+                      "type": "string",
+                      "enum": [
+                        "video"
+                      ],
+                      "description": "Object type, always \"video\""
+                    },
+                    "model": {
+                      "type": "string",
+                      "description": "Model used for video generation"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "in_progress",
+                        "completed",
+                        "failed"
+                      ],
+                      "description": "Current lifecycle status of the video generation job:\n- `queued`: Job is waiting to be processed\n- `in_progress`: Video is currently being generated\n- `completed`: Video generation completed successfully\n- `failed`: Video generation failed\n"
+                    },
+                    "progress": {
+                      "type": "number",
+                      "format": "float",
+                      "minimum": 0,
+                      "maximum": 100,
+                      "description": "Approximate completion percentage (0-100)"
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "description": "Prompt used to generate the video"
+                    },
+                    "remixed_from_video_id": {
+                      "type": "string",
+                      "description": "Source video ID if this is a remix"
+                    },
+                    "seconds": {
+                      "type": "string",
+                      "description": "Duration of the generated video in seconds as a string (e.g., \"4\")"
+                    },
+                    "size": {
+                      "type": "string",
+                      "description": "Resolution of the generated video (e.g., \"1920x1080\")"
+                    },
+                    "created_at": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Unix timestamp (seconds) when the job was created"
+                    },
+                    "completed_at": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Unix timestamp (seconds) when the job completed"
+                    },
+                    "expires_at": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Unix timestamp (seconds) when downloadable assets expire"
+                    },
+                    "videos": {
+                      "type": "array",
+                      "description": "Generated video outputs (only present when status is \"completed\")",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "url",
+                              "base64"
+                            ],
+                            "description": "Output format of this video"
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "URL to the generated video (present when type is \"url\")"
+                          },
+                          "base64": {
+                            "type": "string",
+                            "description": "Base64-encoded video content (present when type is \"base64\")"
+                          },
+                          "content_type": {
+                            "type": "string",
+                            "description": "MIME type of the video (e.g., \"video/mp4\")"
+                          }
+                        }
+                      }
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Error code"
+                        },
+                        "message": {
+                          "type": "string",
+                          "description": "Human-readable error message"
+                        }
+                      }
+                    },
+                    "content_filter": {
+                      "type": "object",
+                      "description": "Information about content that was filtered due to safety policies",
+                      "properties": {
+                        "filtered_count": {
+                          "type": "integer",
+                          "description": "Number of items filtered"
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Human-readable reasons for filtering"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "description": "Additional fields included in responses",
+                      "properties": {
+                        "request_type": {
+                          "type": "string",
+                          "description": "Type of request that was made"
+                        },
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string",
+                          "description": "The model that was requested"
+                        },
+                        "model_deployment": {
+                          "type": "string",
+                          "description": "The actual model deployment used"
+                        },
+                        "latency": {
+                          "type": "integer",
+                          "format": "int64",
+                          "description": "Request latency in milliseconds"
+                        },
+                        "chunk_index": {
+                          "type": "integer",
+                          "description": "Index of the chunk for streaming responses"
+                        },
+                        "raw_request": {
+                          "type": "object",
+                          "description": "Raw request if enabled"
+                        },
+                        "raw_response": {
+                          "type": "object",
+                          "description": "Raw response if enabled"
+                        },
+                        "cache_debug": {
+                          "type": "object",
+                          "properties": {
+                            "cache_hit": {
+                              "type": "boolean"
+                            },
+                            "cache_id": {
+                              "type": "string"
+                            },
+                            "hit_type": {
+                              "type": "string"
+                            },
+                            "provider_used": {
+                              "type": "string"
+                            },
+                            "model_used": {
+                              "type": "string"
+                            },
+                            "input_tokens": {
+                              "type": "integer"
+                            },
+                            "threshold": {
+                              "type": "number"
+                            },
+                            "similarity": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Video not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "videoDelete",
+        "summary": "Delete a video generation job",
+        "description": "Deletes a video generation job and its associated assets.\nThis operation cannot be undone.\n",
+        "tags": [
+          "Videos"
+        ],
+        "parameters": [
+          {
+            "name": "video_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Video ID in format `id:provider` (e.g., `video_abc123:openai`)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response. Returns deletion confirmation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "ID of the deleted video"
+                    },
+                    "object": {
+                      "type": "string",
+                      "enum": [
+                        "video.deleted"
+                      ],
+                      "description": "Object type, always \"video.deleted\""
+                    },
+                    "deleted": {
+                      "type": "boolean",
+                      "description": "Whether the video was successfully deleted"
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "description": "Additional fields included in responses",
+                      "properties": {
+                        "request_type": {
+                          "type": "string",
+                          "description": "Type of request that was made"
+                        },
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string",
+                          "description": "The model that was requested"
+                        },
+                        "model_deployment": {
+                          "type": "string",
+                          "description": "The actual model deployment used"
+                        },
+                        "latency": {
+                          "type": "integer",
+                          "format": "int64",
+                          "description": "Request latency in milliseconds"
+                        },
+                        "chunk_index": {
+                          "type": "integer",
+                          "description": "Index of the chunk for streaming responses"
+                        },
+                        "raw_request": {
+                          "type": "object",
+                          "description": "Raw request if enabled"
+                        },
+                        "raw_response": {
+                          "type": "object",
+                          "description": "Raw response if enabled"
+                        },
+                        "cache_debug": {
+                          "type": "object",
+                          "properties": {
+                            "cache_hit": {
+                              "type": "boolean"
+                            },
+                            "cache_id": {
+                              "type": "string"
+                            },
+                            "hit_type": {
+                              "type": "string"
+                            },
+                            "provider_used": {
+                              "type": "string"
+                            },
+                            "model_used": {
+                              "type": "string"
+                            },
+                            "input_tokens": {
+                              "type": "integer"
+                            },
+                            "threshold": {
+                              "type": "number"
+                            },
+                            "similarity": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Video not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/videos/{video_id}/content": {
+      "get": {
+        "operationId": "videoDownload",
+        "summary": "Download video content",
+        "description": "Downloads the binary content of a generated video.\nThe video must have a status of \"completed\" to be downloadable.\nReturns the raw video file (typically MP4 format).\n",
+        "tags": [
+          "Videos"
+        ],
+        "parameters": [
+          {
+            "name": "video_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Video ID in format `id:provider` (e.g., `video_abc123:openai`)"
+          },
+          {
+            "name": "variant",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "video",
+                "thumbnail",
+                "spritesheet"
+              ]
+            },
+            "description": "Variant of the video content to download (provider-specific)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response. Returns the video file as binary content.",
+            "content": {
+              "video/mp4": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Video not found or not yet available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/videos/{video_id}/remix": {
+      "post": {
+        "operationId": "videoRemix",
+        "summary": "Remix a video",
+        "description": "Creates a new video generation job by remixing an existing video with a new prompt.\nThe source video must have a status of \"completed\" to be remixed.\nReturns a new video generation job that can be polled for completion.\n",
+        "tags": [
+          "Videos"
+        ],
+        "parameters": [
+          {
+            "name": "video_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Video ID in format `id:provider` (e.g., `video_abc123:openai`)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "prompt"
+                ],
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "description": "Text prompt describing how to remix the video"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response. Returns a new video generation job object.\nPoll the retrieve endpoint to check completion status.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "Provider-native job ID. To use in path parameters (retrieve/delete/download), combine as `{id}:{provider}` (e.g., `task_abc123:runway`)"
+                    },
+                    "object": {
+                      "type": "string",
+                      "enum": [
+                        "video"
+                      ],
+                      "description": "Object type, always \"video\""
+                    },
+                    "model": {
+                      "type": "string",
+                      "description": "Model used for video generation"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "in_progress",
+                        "completed",
+                        "failed"
+                      ],
+                      "description": "Current lifecycle status of the video generation job:\n- `queued`: Job is waiting to be processed\n- `in_progress`: Video is currently being generated\n- `completed`: Video generation completed successfully\n- `failed`: Video generation failed\n"
+                    },
+                    "progress": {
+                      "type": "number",
+                      "format": "float",
+                      "minimum": 0,
+                      "maximum": 100,
+                      "description": "Approximate completion percentage (0-100)"
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "description": "Prompt used to generate the video"
+                    },
+                    "remixed_from_video_id": {
+                      "type": "string",
+                      "description": "Source video ID if this is a remix"
+                    },
+                    "seconds": {
+                      "type": "string",
+                      "description": "Duration of the generated video in seconds as a string (e.g., \"4\")"
+                    },
+                    "size": {
+                      "type": "string",
+                      "description": "Resolution of the generated video (e.g., \"1920x1080\")"
+                    },
+                    "created_at": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Unix timestamp (seconds) when the job was created"
+                    },
+                    "completed_at": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Unix timestamp (seconds) when the job completed"
+                    },
+                    "expires_at": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Unix timestamp (seconds) when downloadable assets expire"
+                    },
+                    "videos": {
+                      "type": "array",
+                      "description": "Generated video outputs (only present when status is \"completed\")",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "url",
+                              "base64"
+                            ],
+                            "description": "Output format of this video"
+                          },
+                          "url": {
+                            "type": "string",
+                            "format": "uri",
+                            "description": "URL to the generated video (present when type is \"url\")"
+                          },
+                          "base64": {
+                            "type": "string",
+                            "description": "Base64-encoded video content (present when type is \"base64\")"
+                          },
+                          "content_type": {
+                            "type": "string",
+                            "description": "MIME type of the video (e.g., \"video/mp4\")"
+                          }
+                        }
+                      }
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "description": "Error code"
+                        },
+                        "message": {
+                          "type": "string",
+                          "description": "Human-readable error message"
+                        }
+                      }
+                    },
+                    "content_filter": {
+                      "type": "object",
+                      "description": "Information about content that was filtered due to safety policies",
+                      "properties": {
+                        "filtered_count": {
+                          "type": "integer",
+                          "description": "Number of items filtered"
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Human-readable reasons for filtering"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "description": "Additional fields included in responses",
+                      "properties": {
+                        "request_type": {
+                          "type": "string",
+                          "description": "Type of request that was made"
+                        },
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string",
+                          "description": "The model that was requested"
+                        },
+                        "model_deployment": {
+                          "type": "string",
+                          "description": "The actual model deployment used"
+                        },
+                        "latency": {
+                          "type": "integer",
+                          "format": "int64",
+                          "description": "Request latency in milliseconds"
+                        },
+                        "chunk_index": {
+                          "type": "integer",
+                          "description": "Index of the chunk for streaming responses"
+                        },
+                        "raw_request": {
+                          "type": "object",
+                          "description": "Raw request if enabled"
+                        },
+                        "raw_response": {
+                          "type": "object",
+                          "description": "Raw response if enabled"
+                        },
+                        "cache_debug": {
+                          "type": "object",
+                          "properties": {
+                            "cache_hit": {
+                              "type": "boolean"
+                            },
+                            "cache_id": {
+                              "type": "string"
+                            },
+                            "hit_type": {
+                              "type": "string"
+                            },
+                            "provider_used": {
+                              "type": "string"
+                            },
+                            "model_used": {
+                              "type": "string"
+                            },
+                            "input_tokens": {
+                              "type": "integer"
+                            },
+                            "threshold": {
+                              "type": "number"
+                            },
+                            "similarity": {
+                              "type": "number"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Error response from Bifrost",
+                  "properties": {
+                    "event_id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "is_bifrost_error": {
+                      "type": "boolean"
+                    },
+                    "status_code": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "param": {
+                          "type": "string"
+                        },
+                        "event_id": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "extra_fields": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string",
+                          "description": "AI model provider identifier",
+                          "enum": [
+                            "openai",
+                            "azure",
+                            "anthropic",
+                            "bedrock",
+                            "cohere",
+                            "vertex",
+                            "vllm",
+                            "mistral",
+                            "ollama",
+                            "groq",
+                            "sgl",
+                            "parasail",
+                            "perplexity",
+                            "replicate",
+                            "cerebras",
+                            "gemini",
+                            "openrouter",
+                            "elevenlabs",
+                            "huggingface",
+                            "nebius",
+                            "xai"
+                          ]
+                        },
+                        "model_requested": {
+                          "type": "string"
+                        },
+                        "request_type": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Source video not found",
             "content": {
               "application/json": {
                 "schema": {
