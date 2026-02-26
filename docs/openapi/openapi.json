@@ -58109,6 +58109,22 @@
                     ],
                     "description": "System prompt"
                   },
+                  "cache_control": {
+                    "type": "object",
+                    "description": "Automatic caching directives for the whole request",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "ephemeral"
+                        ]
+                      },
+                      "ttl": {
+                        "type": "string",
+                        "description": "Time to live (e.g., \"1m\", \"1h\")"
+                      }
+                    }
+                  },
                   "metadata": {
                     "type": "object",
                     "properties": {
@@ -59684,6 +59700,22 @@
                           }
                         ],
                         "description": "System prompt"
+                      },
+                      "cache_control": {
+                        "type": "object",
+                        "description": "Automatic caching directives for the whole request",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "ephemeral"
+                            ]
+                          },
+                          "ttl": {
+                            "type": "string",
+                            "description": "Time to live (e.g., \"1m\", \"1h\")"
+                          }
+                        }
                       },
                       "metadata": {
                         "type": "object",
@@ -85230,6 +85262,22 @@
                     ],
                     "description": "System prompt"
                   },
+                  "cache_control": {
+                    "type": "object",
+                    "description": "Automatic caching directives for the whole request",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "ephemeral"
+                        ]
+                      },
+                      "ttl": {
+                        "type": "string",
+                        "description": "Time to live (e.g., \"1m\", \"1h\")"
+                      }
+                    }
+                  },
                   "metadata": {
                     "type": "object",
                     "properties": {
@@ -103439,6 +103487,22 @@
                     ],
                     "description": "System prompt"
                   },
+                  "cache_control": {
+                    "type": "object",
+                    "description": "Automatic caching directives for the whole request",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "ephemeral"
+                        ]
+                      },
+                      "ttl": {
+                        "type": "string",
+                        "description": "Time to live (e.g., \"1m\", \"1h\")"
+                      }
+                    }
+                  },
                   "metadata": {
                     "type": "object",
                     "properties": {
@@ -104662,6 +104726,22 @@
                           }
                         ],
                         "description": "System prompt"
+                      },
+                      "cache_control": {
+                        "type": "object",
+                        "description": "Automatic caching directives for the whole request",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "ephemeral"
+                            ]
+                          },
+                          "ttl": {
+                            "type": "string",
+                            "description": "Time to live (e.g., \"1m\", \"1h\")"
+                          }
+                        }
                       },
                       "metadata": {
                         "type": "object",
@@ -122270,6 +122350,22 @@
                       }
                     ],
                     "description": "System prompt"
+                  },
+                  "cache_control": {
+                    "type": "object",
+                    "description": "Automatic caching directives for the whole request",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "ephemeral"
+                        ]
+                      },
+                      "ttl": {
+                        "type": "string",
+                        "description": "Time to live (e.g., \"1m\", \"1h\")"
+                      }
+                    }
                   },
                   "metadata": {
                     "type": "object",
@@ -174472,8 +174568,20 @@
             "description": "System prompt"
           },
           "cache_control": {
-            "$ref": "#/components/schemas/CacheControl",
-            "description": "Automatic caching directives for the whole request"
+            "type": "object",
+            "description": "Automatic caching directives for the whole request",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "ephemeral"
+                ]
+              },
+              "ttl": {
+                "type": "string",
+                "description": "Time to live (e.g., \"1m\", \"1h\")"
+              }
+            }
           },
           "metadata": {
             "type": "object",
