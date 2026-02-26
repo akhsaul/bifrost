@@ -174471,6 +174471,10 @@
             ],
             "description": "System prompt"
           },
+          "cache_control": {
+            "$ref": "#/components/schemas/CacheControl",
+            "description": "Automatic caching directives for the whole request"
+          },
           "metadata": {
             "type": "object",
             "properties": {
