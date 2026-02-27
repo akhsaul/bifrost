@@ -14875,7 +14875,7 @@
         }
       }
     },
-    "/v1/count_tokens": {
+    "/v1/responses/input_tokens": {
       "post": {
         "operationId": "countTokens",
         "summary": "Count tokens",
