@@ -1712,7 +1712,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -1726,13 +1727,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -1759,9 +1766,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -2420,7 +2424,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -2434,13 +2439,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -2467,9 +2478,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -3345,7 +3353,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -3359,13 +3368,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -3392,9 +3407,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -3994,7 +4006,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -4008,13 +4021,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -4041,9 +4060,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -5782,8 +5798,13 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
@@ -5812,9 +5833,6 @@
                               "type": "integer"
                             },
                             "num_search_queries": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -6785,8 +6803,13 @@
                                 "image_tokens": {
                                   "type": "integer"
                                 },
-                                "cached_tokens": {
-                                  "type": "integer"
+                                "cached_read_tokens": {
+                                  "type": "integer",
+                                  "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                                },
+                                "cached_write_tokens": {
+                                  "type": "integer",
+                                  "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                                 }
                               }
                             },
@@ -6815,9 +6838,6 @@
                                   "type": "integer"
                                 },
                                 "num_search_queries": {
-                                  "type": "integer"
-                                },
-                                "cached_tokens": {
                                   "type": "integer"
                                 }
                               }
@@ -7994,7 +8014,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -8008,13 +8029,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -8041,9 +8068,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -8464,7 +8488,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -8478,13 +8503,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -8511,9 +8542,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -15406,8 +15434,13 @@
                         "image_tokens": {
                           "type": "integer"
                         },
-                        "cached_tokens": {
-                          "type": "integer"
+                        "cached_read_tokens": {
+                          "type": "integer",
+                          "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                        },
+                        "cached_write_tokens": {
+                          "type": "integer",
+                          "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                         }
                       }
                     },
@@ -32373,7 +32406,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -32387,13 +32421,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -32420,9 +32460,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -33081,7 +33118,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -33095,13 +33133,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -33128,9 +33172,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -34462,7 +34503,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -34476,13 +34518,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -34509,9 +34557,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -35170,7 +35215,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -35184,13 +35230,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -35217,9 +35269,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -36110,7 +36159,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -36124,13 +36174,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -36157,9 +36213,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -36759,7 +36812,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -36773,13 +36827,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -36806,9 +36866,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -37717,7 +37774,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -37731,13 +37789,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -37764,9 +37828,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -38366,7 +38427,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -38380,13 +38442,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -38413,9 +38481,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -40161,8 +40226,13 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
@@ -40191,9 +40261,6 @@
                               "type": "integer"
                             },
                             "num_search_queries": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -41164,8 +41231,13 @@
                                 "image_tokens": {
                                   "type": "integer"
                                 },
-                                "cached_tokens": {
-                                  "type": "integer"
+                                "cached_read_tokens": {
+                                  "type": "integer",
+                                  "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                                },
+                                "cached_write_tokens": {
+                                  "type": "integer",
+                                  "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                                 }
                               }
                             },
@@ -41194,9 +41266,6 @@
                                   "type": "integer"
                                 },
                                 "num_search_queries": {
-                                  "type": "integer"
-                                },
-                                "cached_tokens": {
                                   "type": "integer"
                                 }
                               }
@@ -43653,8 +43722,13 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
@@ -43683,9 +43757,6 @@
                               "type": "integer"
                             },
                             "num_search_queries": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -44656,8 +44727,13 @@
                                 "image_tokens": {
                                   "type": "integer"
                                 },
-                                "cached_tokens": {
-                                  "type": "integer"
+                                "cached_read_tokens": {
+                                  "type": "integer",
+                                  "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                                },
+                                "cached_write_tokens": {
+                                  "type": "integer",
+                                  "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                                 }
                               }
                             },
@@ -44686,9 +44762,6 @@
                                   "type": "integer"
                                 },
                                 "num_search_queries": {
-                                  "type": "integer"
-                                },
-                                "cached_tokens": {
                                   "type": "integer"
                                 }
                               }
@@ -46421,8 +46494,13 @@
                         "image_tokens": {
                           "type": "integer"
                         },
-                        "cached_tokens": {
-                          "type": "integer"
+                        "cached_read_tokens": {
+                          "type": "integer",
+                          "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                        },
+                        "cached_write_tokens": {
+                          "type": "integer",
+                          "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                         }
                       }
                     },
@@ -46827,7 +46905,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -46841,13 +46920,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -46874,9 +46959,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -47305,7 +47387,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -47319,13 +47402,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -47352,9 +47441,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -75698,7 +75784,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -75712,13 +75799,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -75745,9 +75838,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -76347,7 +76437,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -76361,13 +76452,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -76394,9 +76491,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -77708,7 +77802,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -77722,13 +77817,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -77755,9 +77856,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -78416,7 +78514,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -78430,13 +78529,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -78463,9 +78568,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -78876,7 +78978,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -78890,13 +78993,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -78923,9 +79032,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -80863,8 +80969,13 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
@@ -80893,9 +81004,6 @@
                               "type": "integer"
                             },
                             "num_search_queries": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -81866,8 +81974,13 @@
                                 "image_tokens": {
                                   "type": "integer"
                                 },
-                                "cached_tokens": {
-                                  "type": "integer"
+                                "cached_read_tokens": {
+                                  "type": "integer",
+                                  "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                                },
+                                "cached_write_tokens": {
+                                  "type": "integer",
+                                  "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                                 }
                               }
                             },
@@ -81896,9 +82009,6 @@
                                   "type": "integer"
                                 },
                                 "num_search_queries": {
-                                  "type": "integer"
-                                },
-                                "cached_tokens": {
                                   "type": "integer"
                                 }
                               }
@@ -83631,8 +83741,13 @@
                         "image_tokens": {
                           "type": "integer"
                         },
-                        "cached_tokens": {
-                          "type": "integer"
+                        "cached_read_tokens": {
+                          "type": "integer",
+                          "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                        },
+                        "cached_write_tokens": {
+                          "type": "integer",
+                          "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                         }
                       }
                     },
@@ -93923,7 +94038,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -93937,13 +94053,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -93970,9 +94092,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -94572,7 +94691,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -94586,13 +94706,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -94619,9 +94745,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -95933,7 +96056,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -95947,13 +96071,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -95980,9 +96110,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -96641,7 +96768,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -96655,13 +96783,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -96688,9 +96822,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -97101,7 +97232,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -97115,13 +97247,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -97148,9 +97286,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -99088,8 +99223,13 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
@@ -99118,9 +99258,6 @@
                               "type": "integer"
                             },
                             "num_search_queries": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -100091,8 +100228,13 @@
                                 "image_tokens": {
                                   "type": "integer"
                                 },
-                                "cached_tokens": {
-                                  "type": "integer"
+                                "cached_read_tokens": {
+                                  "type": "integer",
+                                  "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                                },
+                                "cached_write_tokens": {
+                                  "type": "integer",
+                                  "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                                 }
                               }
                             },
@@ -100121,9 +100263,6 @@
                                   "type": "integer"
                                 },
                                 "num_search_queries": {
-                                  "type": "integer"
-                                },
-                                "cached_tokens": {
                                   "type": "integer"
                                 }
                               }
@@ -101856,8 +101995,13 @@
                         "image_tokens": {
                           "type": "integer"
                         },
-                        "cached_tokens": {
-                          "type": "integer"
+                        "cached_read_tokens": {
+                          "type": "integer",
+                          "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                        },
+                        "cached_write_tokens": {
+                          "type": "integer",
+                          "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                         }
                       }
                     },
@@ -112787,7 +112931,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -112801,13 +112946,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -112834,9 +112985,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -113436,7 +113584,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -113450,13 +113599,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -113483,9 +113638,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -114797,7 +114949,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -114811,13 +114964,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -114844,9 +115003,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -115505,7 +115661,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -115519,13 +115676,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -115552,9 +115715,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -115965,7 +116125,8 @@
                       "description": "Token usage information",
                       "properties": {
                         "prompt_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                         },
                         "prompt_tokens_details": {
                           "type": "object",
@@ -115979,13 +116140,19 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
                         "completion_tokens": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Number of output/completion tokens generated."
                         },
                         "completion_tokens_details": {
                           "type": "object",
@@ -116012,9 +116179,6 @@
                               "type": "integer"
                             },
                             "rejected_prediction_tokens": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -117952,8 +118116,13 @@
                             "image_tokens": {
                               "type": "integer"
                             },
-                            "cached_tokens": {
-                              "type": "integer"
+                            "cached_read_tokens": {
+                              "type": "integer",
+                              "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                            },
+                            "cached_write_tokens": {
+                              "type": "integer",
+                              "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                             }
                           }
                         },
@@ -117982,9 +118151,6 @@
                               "type": "integer"
                             },
                             "num_search_queries": {
-                              "type": "integer"
-                            },
-                            "cached_tokens": {
                               "type": "integer"
                             }
                           }
@@ -118955,8 +119121,13 @@
                                 "image_tokens": {
                                   "type": "integer"
                                 },
-                                "cached_tokens": {
-                                  "type": "integer"
+                                "cached_read_tokens": {
+                                  "type": "integer",
+                                  "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                                },
+                                "cached_write_tokens": {
+                                  "type": "integer",
+                                  "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                                 }
                               }
                             },
@@ -118985,9 +119156,6 @@
                                   "type": "integer"
                                 },
                                 "num_search_queries": {
-                                  "type": "integer"
-                                },
-                                "cached_tokens": {
                                   "type": "integer"
                                 }
                               }
@@ -120720,8 +120888,13 @@
                         "image_tokens": {
                           "type": "integer"
                         },
-                        "cached_tokens": {
-                          "type": "integer"
+                        "cached_read_tokens": {
+                          "type": "integer",
+                          "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                        },
+                        "cached_write_tokens": {
+                          "type": "integer",
+                          "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                         }
                       }
                     },
@@ -160447,7 +160620,8 @@
                             "description": "Token usage information",
                             "properties": {
                               "prompt_tokens": {
-                                "type": "integer"
+                                "type": "integer",
+                                "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                               },
                               "prompt_tokens_details": {
                                 "type": "object",
@@ -160461,13 +160635,19 @@
                                   "image_tokens": {
                                     "type": "integer"
                                   },
-                                  "cached_tokens": {
-                                    "type": "integer"
+                                  "cached_read_tokens": {
+                                    "type": "integer",
+                                    "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                                  },
+                                  "cached_write_tokens": {
+                                    "type": "integer",
+                                    "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                                   }
                                 }
                               },
                               "completion_tokens": {
-                                "type": "integer"
+                                "type": "integer",
+                                "description": "Number of output/completion tokens generated."
                               },
                               "completion_tokens_details": {
                                 "type": "object",
@@ -160494,9 +160674,6 @@
                                     "type": "integer"
                                   },
                                   "rejected_prediction_tokens": {
-                                    "type": "integer"
-                                  },
-                                  "cached_tokens": {
                                     "type": "integer"
                                   }
                                 }
@@ -165061,7 +165238,8 @@
         "description": "Token usage information",
         "properties": {
           "prompt_tokens": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
           },
           "prompt_tokens_details": {
             "type": "object",
@@ -165075,13 +165253,19 @@
               "image_tokens": {
                 "type": "integer"
               },
-              "cached_tokens": {
-                "type": "integer"
+              "cached_read_tokens": {
+                "type": "integer",
+                "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+              },
+              "cached_write_tokens": {
+                "type": "integer",
+                "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
               }
             }
           },
           "completion_tokens": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Number of output/completion tokens generated."
           },
           "completion_tokens_details": {
             "type": "object",
@@ -165108,9 +165292,6 @@
                 "type": "integer"
               },
               "rejected_prediction_tokens": {
-                "type": "integer"
-              },
-              "cached_tokens": {
                 "type": "integer"
               }
             }
@@ -165150,8 +165331,13 @@
           "image_tokens": {
             "type": "integer"
           },
-          "cached_tokens": {
-            "type": "integer"
+          "cached_read_tokens": {
+            "type": "integer",
+            "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+          },
+          "cached_write_tokens": {
+            "type": "integer",
+            "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
           }
         }
       },
@@ -165180,9 +165366,6 @@
             "type": "integer"
           },
           "rejected_prediction_tokens": {
-            "type": "integer"
-          },
-          "cached_tokens": {
             "type": "integer"
           }
         }
@@ -166657,7 +166840,8 @@
             "description": "Token usage information",
             "properties": {
               "prompt_tokens": {
-                "type": "integer"
+                "type": "integer",
+                "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
               },
               "prompt_tokens_details": {
                 "type": "object",
@@ -166671,13 +166855,19 @@
                   "image_tokens": {
                     "type": "integer"
                   },
-                  "cached_tokens": {
-                    "type": "integer"
+                  "cached_read_tokens": {
+                    "type": "integer",
+                    "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                  },
+                  "cached_write_tokens": {
+                    "type": "integer",
+                    "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                   }
                 }
               },
               "completion_tokens": {
-                "type": "integer"
+                "type": "integer",
+                "description": "Number of output/completion tokens generated."
               },
               "completion_tokens_details": {
                 "type": "object",
@@ -166704,9 +166894,6 @@
                     "type": "integer"
                   },
                   "rejected_prediction_tokens": {
-                    "type": "integer"
-                  },
-                  "cached_tokens": {
                     "type": "integer"
                   }
                 }
@@ -167738,7 +167925,8 @@
             "description": "Token usage information",
             "properties": {
               "prompt_tokens": {
-                "type": "integer"
+                "type": "integer",
+                "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
               },
               "prompt_tokens_details": {
                 "type": "object",
@@ -167752,13 +167940,19 @@
                   "image_tokens": {
                     "type": "integer"
                   },
-                  "cached_tokens": {
-                    "type": "integer"
+                  "cached_read_tokens": {
+                    "type": "integer",
+                    "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                  },
+                  "cached_write_tokens": {
+                    "type": "integer",
+                    "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                   }
                 }
               },
               "completion_tokens": {
-                "type": "integer"
+                "type": "integer",
+                "description": "Number of output/completion tokens generated."
               },
               "completion_tokens_details": {
                 "type": "object",
@@ -167785,9 +167979,6 @@
                     "type": "integer"
                   },
                   "rejected_prediction_tokens": {
-                    "type": "integer"
-                  },
-                  "cached_tokens": {
                     "type": "integer"
                   }
                 }
@@ -169334,8 +169525,13 @@
                   "image_tokens": {
                     "type": "integer"
                   },
-                  "cached_tokens": {
-                    "type": "integer"
+                  "cached_read_tokens": {
+                    "type": "integer",
+                    "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+                  },
+                  "cached_write_tokens": {
+                    "type": "integer",
+                    "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                   }
                 }
               },
@@ -169364,9 +169560,6 @@
                     "type": "integer"
                   },
                   "num_search_queries": {
-                    "type": "integer"
-                  },
-                  "cached_tokens": {
                     "type": "integer"
                   }
                 }
@@ -169681,7 +169874,8 @@
             "description": "Token usage information",
             "properties": {
               "prompt_tokens": {
-                "type": "integer"
+                "type": "integer",
+                "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
               },
               "prompt_tokens_details": {
                 "type": "object",
@@ -169695,13 +169889,19 @@
                   "image_tokens": {
                     "type": "integer"
                   },
-                  "cached_tokens": {
-                    "type": "integer"
+                  "cached_read_tokens": {
+                    "type": "integer",
+                    "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                  },
+                  "cached_write_tokens": {
+                    "type": "integer",
+                    "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                   }
                 }
               },
               "completion_tokens": {
-                "type": "integer"
+                "type": "integer",
+                "description": "Number of output/completion tokens generated."
               },
               "completion_tokens_details": {
                 "type": "object",
@@ -169728,9 +169928,6 @@
                     "type": "integer"
                   },
                   "rejected_prediction_tokens": {
-                    "type": "integer"
-                  },
-                  "cached_tokens": {
                     "type": "integer"
                   }
                 }
@@ -170023,7 +170220,8 @@
             "description": "Token usage information",
             "properties": {
               "prompt_tokens": {
-                "type": "integer"
+                "type": "integer",
+                "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
               },
               "prompt_tokens_details": {
                 "type": "object",
@@ -170037,13 +170235,19 @@
                   "image_tokens": {
                     "type": "integer"
                   },
-                  "cached_tokens": {
-                    "type": "integer"
+                  "cached_read_tokens": {
+                    "type": "integer",
+                    "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                  },
+                  "cached_write_tokens": {
+                    "type": "integer",
+                    "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                   }
                 }
               },
               "completion_tokens": {
-                "type": "integer"
+                "type": "integer",
+                "description": "Number of output/completion tokens generated."
               },
               "completion_tokens_details": {
                 "type": "object",
@@ -170070,9 +170274,6 @@
                     "type": "integer"
                   },
                   "rejected_prediction_tokens": {
-                    "type": "integer"
-                  },
-                  "cached_tokens": {
                     "type": "integer"
                   }
                 }
@@ -171239,8 +171440,13 @@
               "image_tokens": {
                 "type": "integer"
               },
-              "cached_tokens": {
-                "type": "integer"
+              "cached_read_tokens": {
+                "type": "integer",
+                "description": "Tokens served from the prompt cache (cache hit), billed at the reduced cache-read rate. Already included in the parent input_tokens total.\n"
+              },
+              "cached_write_tokens": {
+                "type": "integer",
+                "description": "Tokens written to the prompt cache on this request, billed at the cache-creation rate. Already included in the parent input_tokens total. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
               }
             }
           },
@@ -194273,7 +194479,8 @@
             "description": "Token usage information",
             "properties": {
               "prompt_tokens": {
-                "type": "integer"
+                "type": "integer",
+                "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
               },
               "prompt_tokens_details": {
                 "type": "object",
@@ -194287,13 +194494,19 @@
                   "image_tokens": {
                     "type": "integer"
                   },
-                  "cached_tokens": {
-                    "type": "integer"
+                  "cached_read_tokens": {
+                    "type": "integer",
+                    "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                  },
+                  "cached_write_tokens": {
+                    "type": "integer",
+                    "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                   }
                 }
               },
               "completion_tokens": {
-                "type": "integer"
+                "type": "integer",
+                "description": "Number of output/completion tokens generated."
               },
               "completion_tokens_details": {
                 "type": "object",
@@ -194320,9 +194533,6 @@
                     "type": "integer"
                   },
                   "rejected_prediction_tokens": {
-                    "type": "integer"
-                  },
-                  "cached_tokens": {
                     "type": "integer"
                   }
                 }
@@ -195800,7 +196010,8 @@
                   "description": "Token usage information",
                   "properties": {
                     "prompt_tokens": {
-                      "type": "integer"
+                      "type": "integer",
+                      "description": "Total input tokens including any prompt-cache tokens (read + write). Subtract prompt_tokens_details.cached_read_tokens and prompt_tokens_details.cached_write_tokens to get the non-cached portion.\n"
                     },
                     "prompt_tokens_details": {
                       "type": "object",
@@ -195814,13 +196025,19 @@
                         "image_tokens": {
                           "type": "integer"
                         },
-                        "cached_tokens": {
-                          "type": "integer"
+                        "cached_read_tokens": {
+                          "type": "integer",
+                          "description": "Tokens served from the prompt cache (cache hit). These tokens are already included in prompt_tokens and are billed at the reduced cache-read rate. Populated for all providers that support prompt caching (Anthropic, Bedrock, OpenAI, Gemini, xAI, etc.).\n"
+                        },
+                        "cached_write_tokens": {
+                          "type": "integer",
+                          "description": "Tokens written to the prompt cache on this request (cache creation / write). These tokens are already included in prompt_tokens and are billed at the cache-creation rate. Populated for providers that separately report cache write tokens (Anthropic, Bedrock).\n"
                         }
                       }
                     },
                     "completion_tokens": {
-                      "type": "integer"
+                      "type": "integer",
+                      "description": "Number of output/completion tokens generated."
                     },
                     "completion_tokens_details": {
                       "type": "object",
@@ -195847,9 +196064,6 @@
                           "type": "integer"
                         },
                         "rejected_prediction_tokens": {
-                          "type": "integer"
-                        },
-                        "cached_tokens": {
                           "type": "integer"
                         }
                       }
