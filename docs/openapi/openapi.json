@@ -130830,6 +130830,11 @@
                             "type": "string"
                           },
                           "description": "Headers to capture in log metadata. Values are extracted from incoming requests and stored in the metadata field of log entries. Case-insensitive matching. No restart required."
+                        },
+                        "hide_deleted_virtual_keys_in_filters": {
+                          "type": "boolean",
+                          "default": false,
+                          "description": "When true, deleted virtual keys are omitted from Logs, MCP Logs filter data, and Dashboard filter views."
                         }
                       }
                     },
@@ -131139,6 +131144,11 @@
                           "type": "string"
                         },
                         "description": "Headers to capture in log metadata. Values are extracted from incoming requests and stored in the metadata field of log entries. Case-insensitive matching. No restart required."
+                      },
+                      "hide_deleted_virtual_keys_in_filters": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "When true, deleted virtual keys are omitted from Logs, MCP Logs filter data, and Dashboard filter views."
                       }
                     }
                   },
@@ -180642,6 +180652,11 @@
                   "type": "string"
                 },
                 "description": "Headers to capture in log metadata. Values are extracted from incoming requests and stored in the metadata field of log entries. Case-insensitive matching. No restart required."
+              },
+              "hide_deleted_virtual_keys_in_filters": {
+                "type": "boolean",
+                "default": false,
+                "description": "When true, deleted virtual keys are omitted from Logs, MCP Logs filter data, and Dashboard filter views."
               }
             }
           },
@@ -180852,6 +180867,11 @@
                   "type": "string"
                 },
                 "description": "Headers to capture in log metadata. Values are extracted from incoming requests and stored in the metadata field of log entries. Case-insensitive matching. No restart required."
+              },
+              "hide_deleted_virtual_keys_in_filters": {
+                "type": "boolean",
+                "default": false,
+                "description": "When true, deleted virtual keys are omitted from Logs, MCP Logs filter data, and Dashboard filter views."
               }
             }
           },
