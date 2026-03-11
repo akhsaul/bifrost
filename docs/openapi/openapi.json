@@ -130830,11 +130830,6 @@
                             "type": "string"
                           },
                           "description": "Headers to capture in log metadata. Values are extracted from incoming requests and stored in the metadata field of log entries. Case-insensitive matching. No restart required."
-                        },
-                        "hide_deleted_virtual_keys_in_filters": {
-                          "type": "boolean",
-                          "default": false,
-                          "description": "When true, deleted virtual keys are omitted from Logs, MCP Logs filter data, and Dashboard filter views."
                         }
                       }
                     },
@@ -131144,11 +131139,6 @@
                           "type": "string"
                         },
                         "description": "Headers to capture in log metadata. Values are extracted from incoming requests and stored in the metadata field of log entries. Case-insensitive matching. No restart required."
-                      },
-                      "hide_deleted_virtual_keys_in_filters": {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "When true, deleted virtual keys are omitted from Logs, MCP Logs filter data, and Dashboard filter views."
                       }
                     }
                   },
@@ -133120,6 +133110,14 @@
                                 "type": "integer",
                                 "format": "int64",
                                 "description": "Maximum backoff duration in milliseconds"
+                              },
+                              "insecure_skip_verify": {
+                                "type": "boolean",
+                                "description": "Disable TLS certificate verification for provider connections. This bypasses server certificate validation and should be used only as a last resort when a trusted CA chain cannot be configured. Prefer ca_cert_pem for self-signed or private CA deployments."
+                              },
+                              "ca_cert_pem": {
+                                "type": "string",
+                                "description": "PEM-encoded CA certificate to trust for provider endpoint connections (e.g. self-signed or internal CA)"
                               }
                             }
                           },
@@ -133815,6 +133813,14 @@
                         "type": "integer",
                         "format": "int64",
                         "description": "Maximum backoff duration in milliseconds"
+                      },
+                      "insecure_skip_verify": {
+                        "type": "boolean",
+                        "description": "Disable TLS certificate verification for provider connections. This bypasses server certificate validation and should be used only as a last resort when a trusted CA chain cannot be configured. Prefer ca_cert_pem for self-signed or private CA deployments."
+                      },
+                      "ca_cert_pem": {
+                        "type": "string",
+                        "description": "PEM-encoded CA certificate to trust for provider endpoint connections (e.g. self-signed or internal CA)"
                       }
                     }
                   },
@@ -134397,6 +134403,14 @@
                           "type": "integer",
                           "format": "int64",
                           "description": "Maximum backoff duration in milliseconds"
+                        },
+                        "insecure_skip_verify": {
+                          "type": "boolean",
+                          "description": "Disable TLS certificate verification for provider connections. This bypasses server certificate validation and should be used only as a last resort when a trusted CA chain cannot be configured. Prefer ca_cert_pem for self-signed or private CA deployments."
+                        },
+                        "ca_cert_pem": {
+                          "type": "string",
+                          "description": "PEM-encoded CA certificate to trust for provider endpoint connections (e.g. self-signed or internal CA)"
                         }
                       }
                     },
@@ -135263,6 +135277,14 @@
                           "type": "integer",
                           "format": "int64",
                           "description": "Maximum backoff duration in milliseconds"
+                        },
+                        "insecure_skip_verify": {
+                          "type": "boolean",
+                          "description": "Disable TLS certificate verification for provider connections. This bypasses server certificate validation and should be used only as a last resort when a trusted CA chain cannot be configured. Prefer ca_cert_pem for self-signed or private CA deployments."
+                        },
+                        "ca_cert_pem": {
+                          "type": "string",
+                          "description": "PEM-encoded CA certificate to trust for provider endpoint connections (e.g. self-signed or internal CA)"
                         }
                       }
                     },
@@ -136099,6 +136121,14 @@
                         "type": "integer",
                         "format": "int64",
                         "description": "Maximum backoff duration in milliseconds"
+                      },
+                      "insecure_skip_verify": {
+                        "type": "boolean",
+                        "description": "Disable TLS certificate verification for provider connections. This bypasses server certificate validation and should be used only as a last resort when a trusted CA chain cannot be configured. Prefer ca_cert_pem for self-signed or private CA deployments."
+                      },
+                      "ca_cert_pem": {
+                        "type": "string",
+                        "description": "PEM-encoded CA certificate to trust for provider endpoint connections (e.g. self-signed or internal CA)"
                       }
                     }
                   },
@@ -136681,6 +136711,14 @@
                           "type": "integer",
                           "format": "int64",
                           "description": "Maximum backoff duration in milliseconds"
+                        },
+                        "insecure_skip_verify": {
+                          "type": "boolean",
+                          "description": "Disable TLS certificate verification for provider connections. This bypasses server certificate validation and should be used only as a last resort when a trusted CA chain cannot be configured. Prefer ca_cert_pem for self-signed or private CA deployments."
+                        },
+                        "ca_cert_pem": {
+                          "type": "string",
+                          "description": "PEM-encoded CA certificate to trust for provider endpoint connections (e.g. self-signed or internal CA)"
                         }
                       }
                     },
@@ -137462,6 +137500,14 @@
                           "type": "integer",
                           "format": "int64",
                           "description": "Maximum backoff duration in milliseconds"
+                        },
+                        "insecure_skip_verify": {
+                          "type": "boolean",
+                          "description": "Disable TLS certificate verification for provider connections. This bypasses server certificate validation and should be used only as a last resort when a trusted CA chain cannot be configured. Prefer ca_cert_pem for self-signed or private CA deployments."
+                        },
+                        "ca_cert_pem": {
+                          "type": "string",
+                          "description": "PEM-encoded CA certificate to trust for provider endpoint connections (e.g. self-signed or internal CA)"
                         }
                       }
                     },
@@ -180652,11 +180698,6 @@
                   "type": "string"
                 },
                 "description": "Headers to capture in log metadata. Values are extracted from incoming requests and stored in the metadata field of log entries. Case-insensitive matching. No restart required."
-              },
-              "hide_deleted_virtual_keys_in_filters": {
-                "type": "boolean",
-                "default": false,
-                "description": "When true, deleted virtual keys are omitted from Logs, MCP Logs filter data, and Dashboard filter views."
               }
             }
           },
@@ -180867,11 +180908,6 @@
                   "type": "string"
                 },
                 "description": "Headers to capture in log metadata. Values are extracted from incoming requests and stored in the metadata field of log entries. Case-insensitive matching. No restart required."
-              },
-              "hide_deleted_virtual_keys_in_filters": {
-                "type": "boolean",
-                "default": false,
-                "description": "When true, deleted virtual keys are omitted from Logs, MCP Logs filter data, and Dashboard filter views."
               }
             }
           },
@@ -181361,6 +181397,14 @@
                 "type": "integer",
                 "format": "int64",
                 "description": "Maximum backoff duration in milliseconds"
+              },
+              "insecure_skip_verify": {
+                "type": "boolean",
+                "description": "Disable TLS certificate verification for provider connections. This bypasses server certificate validation and should be used only as a last resort when a trusted CA chain cannot be configured. Prefer ca_cert_pem for self-signed or private CA deployments."
+              },
+              "ca_cert_pem": {
+                "type": "string",
+                "description": "PEM-encoded CA certificate to trust for provider endpoint connections (e.g. self-signed or internal CA)"
               }
             }
           },
@@ -181954,6 +181998,14 @@
                       "type": "integer",
                       "format": "int64",
                       "description": "Maximum backoff duration in milliseconds"
+                    },
+                    "insecure_skip_verify": {
+                      "type": "boolean",
+                      "description": "Disable TLS certificate verification for provider connections. This bypasses server certificate validation and should be used only as a last resort when a trusted CA chain cannot be configured. Prefer ca_cert_pem for self-signed or private CA deployments."
+                    },
+                    "ca_cert_pem": {
+                      "type": "string",
+                      "description": "PEM-encoded CA certificate to trust for provider endpoint connections (e.g. self-signed or internal CA)"
                     }
                   }
                 },
@@ -182550,6 +182602,14 @@
                 "type": "integer",
                 "format": "int64",
                 "description": "Maximum backoff duration in milliseconds"
+              },
+              "insecure_skip_verify": {
+                "type": "boolean",
+                "description": "Disable TLS certificate verification for provider connections. This bypasses server certificate validation and should be used only as a last resort when a trusted CA chain cannot be configured. Prefer ca_cert_pem for self-signed or private CA deployments."
+              },
+              "ca_cert_pem": {
+                "type": "string",
+                "description": "PEM-encoded CA certificate to trust for provider endpoint connections (e.g. self-signed or internal CA)"
               }
             }
           },
@@ -183097,6 +183157,14 @@
                 "type": "integer",
                 "format": "int64",
                 "description": "Maximum backoff duration in milliseconds"
+              },
+              "insecure_skip_verify": {
+                "type": "boolean",
+                "description": "Disable TLS certificate verification for provider connections. This bypasses server certificate validation and should be used only as a last resort when a trusted CA chain cannot be configured. Prefer ca_cert_pem for self-signed or private CA deployments."
+              },
+              "ca_cert_pem": {
+                "type": "string",
+                "description": "PEM-encoded CA certificate to trust for provider endpoint connections (e.g. self-signed or internal CA)"
               }
             }
           },
@@ -183637,6 +183705,14 @@
             "type": "integer",
             "format": "int64",
             "description": "Maximum backoff duration in milliseconds"
+          },
+          "insecure_skip_verify": {
+            "type": "boolean",
+            "description": "Disable TLS certificate verification for provider connections. This bypasses server certificate validation and should be used only as a last resort when a trusted CA chain cannot be configured. Prefer ca_cert_pem for self-signed or private CA deployments."
+          },
+          "ca_cert_pem": {
+            "type": "string",
+            "description": "PEM-encoded CA certificate to trust for provider endpoint connections (e.g. self-signed or internal CA)"
           }
         }
       },
