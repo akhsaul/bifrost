@@ -192900,6 +192900,11 @@
             "description": "Target model (empty string uses incoming request model)",
             "nullable": true
           },
+          "key_id": {
+            "type": "string",
+            "description": "UUID of the API key to pin for this rule (omit or empty for load-balanced key selection)",
+            "nullable": true
+          },
           "fallbacks": {
             "type": "array",
             "items": {
@@ -193263,6 +193268,11 @@
             "description": "Target model (optional, empty uses incoming)",
             "nullable": true
           },
+          "key_id": {
+            "type": "string",
+            "description": "UUID of the API key to pin for this rule (optional, omit for load-balanced key selection)",
+            "nullable": true
+          },
           "fallbacks": {
             "type": "array",
             "items": {
@@ -193356,6 +193366,11 @@
           },
           "model": {
             "type": "string",
+            "nullable": true
+          },
+          "key_id": {
+            "type": "string",
+            "description": "UUID of the API key to pin (send empty string to clear)",
             "nullable": true
           },
           "fallbacks": {
