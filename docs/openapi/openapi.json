@@ -145133,6 +145133,11 @@
                                       "type": "string",
                                       "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                                     },
+                                    "calendar_aligned": {
+                                      "type": "boolean",
+                                      "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                      "default": false
+                                    },
                                     "last_reset": {
                                       "type": "string",
                                       "format": "date-time"
@@ -145677,6 +145682,11 @@
                             },
                             "reset_duration": {
                               "type": "string"
+                            },
+                            "calendar_aligned": {
+                              "type": "boolean",
+                              "default": false,
+                              "description": "When true, usage resets at the start of each calendar period in UTC instead of on a rolling window from last reset. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`). For example `1d` resets at midnight UTC; `1w` at Monday 00:00 UTC; `1M` on the first day of each month; `1Y` on January 1. Sub-day durations (e.g. `1h`) cannot use calendar alignment.\n"
                             }
                           }
                         },
@@ -145745,6 +145755,11 @@
                       },
                       "reset_duration": {
                         "type": "string"
+                      },
+                      "calendar_aligned": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "When true, usage resets at the start of each calendar period in UTC instead of on a rolling window from last reset. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`). For example `1d` resets at midnight UTC; `1w` at Monday 00:00 UTC; `1M` on the first day of each month; `1Y` on January 1. Sub-day durations (e.g. `1h`) cannot use calendar alignment.\n"
                       }
                     }
                   },
@@ -145851,6 +145866,11 @@
                                   "reset_duration": {
                                     "type": "string",
                                     "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                  },
+                                  "calendar_aligned": {
+                                    "type": "boolean",
+                                    "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                    "default": false
                                   },
                                   "last_reset": {
                                     "type": "string",
@@ -146523,6 +146543,11 @@
                                     "type": "string",
                                     "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                                   },
+                                  "calendar_aligned": {
+                                    "type": "boolean",
+                                    "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                    "default": false
+                                  },
                                   "last_reset": {
                                     "type": "string",
                                     "format": "date-time"
@@ -147154,6 +147179,11 @@
                             },
                             "reset_duration": {
                               "type": "string"
+                            },
+                            "calendar_aligned": {
+                              "type": "boolean",
+                              "nullable": true,
+                              "description": "Set to true or false to enable or disable calendar-aligned resets. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`); sub-day durations (e.g. `1h`, `30m`) are invalid with calendar alignment and the API rejects that combination. When enabling on an existing budget, current usage is reset to zero and last_reset snaps to the current period start.\n"
                             }
                           }
                         },
@@ -147221,6 +147251,11 @@
                       },
                       "reset_duration": {
                         "type": "string"
+                      },
+                      "calendar_aligned": {
+                        "type": "boolean",
+                        "nullable": true,
+                        "description": "Set to true or false to enable or disable calendar-aligned resets. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`); sub-day durations (e.g. `1h`, `30m`) are invalid with calendar alignment and the API rejects that combination. When enabling on an existing budget, current usage is reset to zero and last_reset snaps to the current period start.\n"
                       }
                     }
                   },
@@ -147327,6 +147362,11 @@
                                   "reset_duration": {
                                     "type": "string",
                                     "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                  },
+                                  "calendar_aligned": {
+                                    "type": "boolean",
+                                    "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                    "default": false
                                   },
                                   "last_reset": {
                                     "type": "string",
@@ -148270,6 +148310,11 @@
                                     "type": "string",
                                     "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                                   },
+                                  "calendar_aligned": {
+                                    "type": "boolean",
+                                    "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                    "default": false
+                                  },
                                   "last_reset": {
                                     "type": "string",
                                     "format": "date-time"
@@ -148362,6 +148407,11 @@
                                               "reset_duration": {
                                                 "type": "string",
                                                 "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                              },
+                                              "calendar_aligned": {
+                                                "type": "boolean",
+                                                "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                                "default": false
                                               },
                                               "last_reset": {
                                                 "type": "string",
@@ -148787,6 +148837,11 @@
                                 "type": "string",
                                 "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                               },
+                              "calendar_aligned": {
+                                "type": "boolean",
+                                "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                "default": false
+                              },
                               "last_reset": {
                                 "type": "string",
                                 "format": "date-time"
@@ -148873,6 +148928,11 @@
                                           "reset_duration": {
                                             "type": "string",
                                             "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                          },
+                                          "calendar_aligned": {
+                                            "type": "boolean",
+                                            "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                            "default": false
                                           },
                                           "last_reset": {
                                             "type": "string",
@@ -149428,6 +149488,11 @@
                       },
                       "reset_duration": {
                         "type": "string"
+                      },
+                      "calendar_aligned": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "When true, usage resets at the start of each calendar period in UTC instead of on a rolling window from last reset. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`). For example `1d` resets at midnight UTC; `1w` at Monday 00:00 UTC; `1M` on the first day of each month; `1Y` on January 1. Sub-day durations (e.g. `1h`) cannot use calendar alignment.\n"
                       }
                     }
                   }
@@ -149491,6 +149556,11 @@
                                 "reset_duration": {
                                   "type": "string",
                                   "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                },
+                                "calendar_aligned": {
+                                  "type": "boolean",
+                                  "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                  "default": false
                                 },
                                 "last_reset": {
                                   "type": "string",
@@ -149584,6 +149654,11 @@
                                             "reset_duration": {
                                               "type": "string",
                                               "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                            },
+                                            "calendar_aligned": {
+                                              "type": "boolean",
+                                              "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                              "default": false
                                             },
                                             "last_reset": {
                                               "type": "string",
@@ -150009,6 +150084,11 @@
                               "type": "string",
                               "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                             },
+                            "calendar_aligned": {
+                              "type": "boolean",
+                              "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                              "default": false
+                            },
                             "last_reset": {
                               "type": "string",
                               "format": "date-time"
@@ -150095,6 +150175,11 @@
                                         "reset_duration": {
                                           "type": "string",
                                           "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                        },
+                                        "calendar_aligned": {
+                                          "type": "boolean",
+                                          "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                          "default": false
                                         },
                                         "last_reset": {
                                           "type": "string",
@@ -150774,6 +150859,11 @@
                                   "type": "string",
                                   "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                                 },
+                                "calendar_aligned": {
+                                  "type": "boolean",
+                                  "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                  "default": false
+                                },
                                 "last_reset": {
                                   "type": "string",
                                   "format": "date-time"
@@ -150866,6 +150956,11 @@
                                             "reset_duration": {
                                               "type": "string",
                                               "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                            },
+                                            "calendar_aligned": {
+                                              "type": "boolean",
+                                              "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                              "default": false
                                             },
                                             "last_reset": {
                                               "type": "string",
@@ -151291,6 +151386,11 @@
                               "type": "string",
                               "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                             },
+                            "calendar_aligned": {
+                              "type": "boolean",
+                              "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                              "default": false
+                            },
                             "last_reset": {
                               "type": "string",
                               "format": "date-time"
@@ -151377,6 +151477,11 @@
                                         "reset_duration": {
                                           "type": "string",
                                           "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                        },
+                                        "calendar_aligned": {
+                                          "type": "boolean",
+                                          "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                          "default": false
                                         },
                                         "last_reset": {
                                           "type": "string",
@@ -152016,6 +152121,11 @@
                       },
                       "reset_duration": {
                         "type": "string"
+                      },
+                      "calendar_aligned": {
+                        "type": "boolean",
+                        "nullable": true,
+                        "description": "Set to true or false to enable or disable calendar-aligned resets. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`); sub-day durations (e.g. `1h`, `30m`) are invalid with calendar alignment and the API rejects that combination. When enabling on an existing budget, current usage is reset to zero and last_reset snaps to the current period start.\n"
                       }
                     }
                   }
@@ -152079,6 +152189,11 @@
                                 "reset_duration": {
                                   "type": "string",
                                   "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                },
+                                "calendar_aligned": {
+                                  "type": "boolean",
+                                  "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                  "default": false
                                 },
                                 "last_reset": {
                                   "type": "string",
@@ -152172,6 +152287,11 @@
                                             "reset_duration": {
                                               "type": "string",
                                               "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                            },
+                                            "calendar_aligned": {
+                                              "type": "boolean",
+                                              "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                              "default": false
                                             },
                                             "last_reset": {
                                               "type": "string",
@@ -152597,6 +152717,11 @@
                               "type": "string",
                               "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                             },
+                            "calendar_aligned": {
+                              "type": "boolean",
+                              "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                              "default": false
+                            },
                             "last_reset": {
                               "type": "string",
                               "format": "date-time"
@@ -152683,6 +152808,11 @@
                                         "reset_duration": {
                                           "type": "string",
                                           "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                        },
+                                        "calendar_aligned": {
+                                          "type": "boolean",
+                                          "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                          "default": false
                                         },
                                         "last_reset": {
                                           "type": "string",
@@ -153629,6 +153759,11 @@
                                 "type": "string",
                                 "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                               },
+                              "calendar_aligned": {
+                                "type": "boolean",
+                                "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                "default": false
+                              },
                               "last_reset": {
                                 "type": "string",
                                 "format": "date-time"
@@ -153721,6 +153856,11 @@
                                           "reset_duration": {
                                             "type": "string",
                                             "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                          },
+                                          "calendar_aligned": {
+                                            "type": "boolean",
+                                            "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                            "default": false
                                           },
                                           "last_reset": {
                                             "type": "string",
@@ -154260,6 +154400,11 @@
                       },
                       "reset_duration": {
                         "type": "string"
+                      },
+                      "calendar_aligned": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "When true, usage resets at the start of each calendar period in UTC instead of on a rolling window from last reset. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`). For example `1d` resets at midnight UTC; `1w` at Monday 00:00 UTC; `1M` on the first day of each month; `1Y` on January 1. Sub-day durations (e.g. `1h`) cannot use calendar alignment.\n"
                       }
                     }
                   }
@@ -154307,6 +154452,11 @@
                             "reset_duration": {
                               "type": "string",
                               "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                            },
+                            "calendar_aligned": {
+                              "type": "boolean",
+                              "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                              "default": false
                             },
                             "last_reset": {
                               "type": "string",
@@ -154400,6 +154550,11 @@
                                         "reset_duration": {
                                           "type": "string",
                                           "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                        },
+                                        "calendar_aligned": {
+                                          "type": "boolean",
+                                          "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                          "default": false
                                         },
                                         "last_reset": {
                                           "type": "string",
@@ -155050,6 +155205,11 @@
                               "type": "string",
                               "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                             },
+                            "calendar_aligned": {
+                              "type": "boolean",
+                              "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                              "default": false
+                            },
                             "last_reset": {
                               "type": "string",
                               "format": "date-time"
@@ -155116,6 +155276,11 @@
                                       "reset_duration": {
                                         "type": "string",
                                         "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                      },
+                                      "calendar_aligned": {
+                                        "type": "boolean",
+                                        "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                        "default": false
                                       },
                                       "last_reset": {
                                         "type": "string",
@@ -155209,6 +155374,11 @@
                                                   "reset_duration": {
                                                     "type": "string",
                                                     "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                                  },
+                                                  "calendar_aligned": {
+                                                    "type": "boolean",
+                                                    "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                                    "default": false
                                                   },
                                                   "last_reset": {
                                                     "type": "string",
@@ -155634,6 +155804,11 @@
                                     "type": "string",
                                     "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                                   },
+                                  "calendar_aligned": {
+                                    "type": "boolean",
+                                    "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                    "default": false
+                                  },
                                   "last_reset": {
                                     "type": "string",
                                     "format": "date-time"
@@ -155720,6 +155895,11 @@
                                               "reset_duration": {
                                                 "type": "string",
                                                 "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                              },
+                                              "calendar_aligned": {
+                                                "type": "boolean",
+                                                "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                                "default": false
                                               },
                                               "last_reset": {
                                                 "type": "string",
@@ -156209,6 +156389,11 @@
                                         "reset_duration": {
                                           "type": "string",
                                           "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                        },
+                                        "calendar_aligned": {
+                                          "type": "boolean",
+                                          "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                          "default": false
                                         },
                                         "last_reset": {
                                           "type": "string",
@@ -156832,6 +157017,11 @@
                       },
                       "reset_duration": {
                         "type": "string"
+                      },
+                      "calendar_aligned": {
+                        "type": "boolean",
+                        "nullable": true,
+                        "description": "Set to true or false to enable or disable calendar-aligned resets. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`); sub-day durations (e.g. `1h`, `30m`) are invalid with calendar alignment and the API rejects that combination. When enabling on an existing budget, current usage is reset to zero and last_reset snaps to the current period start.\n"
                       }
                     }
                   }
@@ -156879,6 +157069,11 @@
                             "reset_duration": {
                               "type": "string",
                               "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                            },
+                            "calendar_aligned": {
+                              "type": "boolean",
+                              "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                              "default": false
                             },
                             "last_reset": {
                               "type": "string",
@@ -156972,6 +157167,11 @@
                                         "reset_duration": {
                                           "type": "string",
                                           "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                        },
+                                        "calendar_aligned": {
+                                          "type": "boolean",
+                                          "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                          "default": false
                                         },
                                         "last_reset": {
                                           "type": "string",
@@ -157891,6 +158091,11 @@
                           "reset_duration": {
                             "type": "string",
                             "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                          },
+                          "calendar_aligned": {
+                            "type": "boolean",
+                            "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                            "default": false
                           },
                           "last_reset": {
                             "type": "string",
@@ -160060,6 +160265,11 @@
                                 "type": "string",
                                 "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                               },
+                              "calendar_aligned": {
+                                "type": "boolean",
+                                "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                "default": false
+                              },
                               "last_reset": {
                                 "type": "string",
                                 "format": "date-time"
@@ -160281,6 +160491,11 @@
                       },
                       "reset_duration": {
                         "type": "string"
+                      },
+                      "calendar_aligned": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "When true, usage resets at the start of each calendar period in UTC instead of on a rolling window from last reset. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`). For example `1d` resets at midnight UTC; `1w` at Monday 00:00 UTC; `1M` on the first day of each month; `1Y` on January 1. Sub-day durations (e.g. `1h`) cannot use calendar alignment.\n"
                       }
                     }
                   },
@@ -160351,6 +160566,11 @@
                             "reset_duration": {
                               "type": "string",
                               "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                            },
+                            "calendar_aligned": {
+                              "type": "boolean",
+                              "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                              "default": false
                             },
                             "last_reset": {
                               "type": "string",
@@ -160672,6 +160892,11 @@
                               "type": "string",
                               "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                             },
+                            "calendar_aligned": {
+                              "type": "boolean",
+                              "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                              "default": false
+                            },
                             "last_reset": {
                               "type": "string",
                               "format": "date-time"
@@ -160976,6 +161201,11 @@
                       },
                       "reset_duration": {
                         "type": "string"
+                      },
+                      "calendar_aligned": {
+                        "type": "boolean",
+                        "nullable": true,
+                        "description": "Set to true or false to enable or disable calendar-aligned resets. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`); sub-day durations (e.g. `1h`, `30m`) are invalid with calendar alignment and the API rejects that combination. When enabling on an existing budget, current usage is reset to zero and last_reset snaps to the current period start.\n"
                       }
                     }
                   },
@@ -161046,6 +161276,11 @@
                             "reset_duration": {
                               "type": "string",
                               "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                            },
+                            "calendar_aligned": {
+                              "type": "boolean",
+                              "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                              "default": false
                             },
                             "last_reset": {
                               "type": "string",
@@ -161640,6 +161875,11 @@
                                 "type": "string",
                                 "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                               },
+                              "calendar_aligned": {
+                                "type": "boolean",
+                                "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                "default": false
+                              },
                               "last_reset": {
                                 "type": "string",
                                 "format": "date-time"
@@ -161849,6 +162089,11 @@
                       },
                       "reset_duration": {
                         "type": "string"
+                      },
+                      "calendar_aligned": {
+                        "type": "boolean",
+                        "nullable": true,
+                        "description": "Set to true or false to enable or disable calendar-aligned resets. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`); sub-day durations (e.g. `1h`, `30m`) are invalid with calendar alignment and the API rejects that combination. When enabling on an existing budget, current usage is reset to zero and last_reset snaps to the current period start.\n"
                       }
                     }
                   },
@@ -161904,6 +162149,11 @@
                         "reset_duration": {
                           "type": "string",
                           "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                        },
+                        "calendar_aligned": {
+                          "type": "boolean",
+                          "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                          "default": false
                         },
                         "last_reset": {
                           "type": "string",
@@ -170343,6 +170593,11 @@
                                     "reset_duration": {
                                       "type": "string",
                                       "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                    },
+                                    "calendar_aligned": {
+                                      "type": "boolean",
+                                      "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                      "default": false
                                     },
                                     "last_reset": {
                                       "type": "string",
@@ -199000,6 +199255,11 @@
                       "type": "string",
                       "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                     },
+                    "calendar_aligned": {
+                      "type": "boolean",
+                      "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                      "default": false
+                    },
                     "last_reset": {
                       "type": "string",
                       "format": "date-time"
@@ -199466,6 +199726,11 @@
                           "type": "string",
                           "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                         },
+                        "calendar_aligned": {
+                          "type": "boolean",
+                          "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                          "default": false
+                        },
                         "last_reset": {
                           "type": "string",
                           "format": "date-time"
@@ -199905,6 +200170,11 @@
               "reset_duration": {
                 "type": "string",
                 "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+              },
+              "calendar_aligned": {
+                "type": "boolean",
+                "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                "default": false
               },
               "last_reset": {
                 "type": "string",
@@ -200365,6 +200635,11 @@
                             "type": "string",
                             "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                           },
+                          "calendar_aligned": {
+                            "type": "boolean",
+                            "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                            "default": false
+                          },
                           "last_reset": {
                             "type": "string",
                             "format": "date-time"
@@ -200809,6 +201084,11 @@
                     },
                     "reset_duration": {
                       "type": "string"
+                    },
+                    "calendar_aligned": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "When true, usage resets at the start of each calendar period in UTC instead of on a rolling window from last reset. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`). For example `1d` resets at midnight UTC; `1w` at Monday 00:00 UTC; `1M` on the first day of each month; `1Y` on January 1. Sub-day durations (e.g. `1h`) cannot use calendar alignment.\n"
                     }
                   }
                 },
@@ -200877,6 +201157,11 @@
               },
               "reset_duration": {
                 "type": "string"
+              },
+              "calendar_aligned": {
+                "type": "boolean",
+                "default": false,
+                "description": "When true, usage resets at the start of each calendar period in UTC instead of on a rolling window from last reset. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`). For example `1d` resets at midnight UTC; `1w` at Monday 00:00 UTC; `1M` on the first day of each month; `1Y` on January 1. Sub-day durations (e.g. `1h`) cannot use calendar alignment.\n"
               }
             }
           },
@@ -200944,6 +201229,11 @@
                     },
                     "reset_duration": {
                       "type": "string"
+                    },
+                    "calendar_aligned": {
+                      "type": "boolean",
+                      "nullable": true,
+                      "description": "Set to true or false to enable or disable calendar-aligned resets. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`); sub-day durations (e.g. `1h`, `30m`) are invalid with calendar alignment and the API rejects that combination. When enabling on an existing budget, current usage is reset to zero and last_reset snaps to the current period start.\n"
                     }
                   }
                 },
@@ -201011,6 +201301,11 @@
               },
               "reset_duration": {
                 "type": "string"
+              },
+              "calendar_aligned": {
+                "type": "boolean",
+                "nullable": true,
+                "description": "Set to true or false to enable or disable calendar-aligned resets. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`); sub-day durations (e.g. `1h`, `30m`) are invalid with calendar alignment and the API rejects that combination. When enabling on an existing budget, current usage is reset to zero and last_reset snaps to the current period start.\n"
               }
             }
           },
@@ -201082,6 +201377,11 @@
                   "reset_duration": {
                     "type": "string",
                     "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                  },
+                  "calendar_aligned": {
+                    "type": "boolean",
+                    "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                    "default": false
                   },
                   "last_reset": {
                     "type": "string",
@@ -201175,6 +201475,11 @@
                               "reset_duration": {
                                 "type": "string",
                                 "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                              },
+                              "calendar_aligned": {
+                                "type": "boolean",
+                                "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                "default": false
                               },
                               "last_reset": {
                                 "type": "string",
@@ -201600,6 +201905,11 @@
                 "type": "string",
                 "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
               },
+              "calendar_aligned": {
+                "type": "boolean",
+                "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                "default": false
+              },
               "last_reset": {
                 "type": "string",
                 "format": "date-time"
@@ -201686,6 +201996,11 @@
                           "reset_duration": {
                             "type": "string",
                             "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                          },
+                          "calendar_aligned": {
+                            "type": "boolean",
+                            "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                            "default": false
                           },
                           "last_reset": {
                             "type": "string",
@@ -202160,6 +202475,11 @@
                         "type": "string",
                         "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                       },
+                      "calendar_aligned": {
+                        "type": "boolean",
+                        "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                        "default": false
+                      },
                       "last_reset": {
                         "type": "string",
                         "format": "date-time"
@@ -202252,6 +202572,11 @@
                                   "reset_duration": {
                                     "type": "string",
                                     "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                  },
+                                  "calendar_aligned": {
+                                    "type": "boolean",
+                                    "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                    "default": false
                                   },
                                   "last_reset": {
                                     "type": "string",
@@ -202677,6 +203002,11 @@
                     "type": "string",
                     "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                   },
+                  "calendar_aligned": {
+                    "type": "boolean",
+                    "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                    "default": false
+                  },
                   "last_reset": {
                     "type": "string",
                     "format": "date-time"
@@ -202763,6 +203093,11 @@
                               "reset_duration": {
                                 "type": "string",
                                 "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                              },
+                              "calendar_aligned": {
+                                "type": "boolean",
+                                "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                "default": false
                               },
                               "last_reset": {
                                 "type": "string",
@@ -203238,6 +203573,11 @@
                           "type": "string",
                           "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                         },
+                        "calendar_aligned": {
+                          "type": "boolean",
+                          "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                          "default": false
+                        },
                         "last_reset": {
                           "type": "string",
                           "format": "date-time"
@@ -203330,6 +203670,11 @@
                                     "reset_duration": {
                                       "type": "string",
                                       "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                    },
+                                    "calendar_aligned": {
+                                      "type": "boolean",
+                                      "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                      "default": false
                                     },
                                     "last_reset": {
                                       "type": "string",
@@ -203755,6 +204100,11 @@
                       "type": "string",
                       "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                     },
+                    "calendar_aligned": {
+                      "type": "boolean",
+                      "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                      "default": false
+                    },
                     "last_reset": {
                       "type": "string",
                       "format": "date-time"
@@ -203841,6 +204191,11 @@
                                 "reset_duration": {
                                   "type": "string",
                                   "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                },
+                                "calendar_aligned": {
+                                  "type": "boolean",
+                                  "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                  "default": false
                                 },
                                 "last_reset": {
                                   "type": "string",
@@ -204296,6 +204651,11 @@
               },
               "reset_duration": {
                 "type": "string"
+              },
+              "calendar_aligned": {
+                "type": "boolean",
+                "default": false,
+                "description": "When true, usage resets at the start of each calendar period in UTC instead of on a rolling window from last reset. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`). For example `1d` resets at midnight UTC; `1w` at Monday 00:00 UTC; `1M` on the first day of each month; `1Y` on January 1. Sub-day durations (e.g. `1h`) cannot use calendar alignment.\n"
               }
             }
           }
@@ -204320,6 +204680,11 @@
               },
               "reset_duration": {
                 "type": "string"
+              },
+              "calendar_aligned": {
+                "type": "boolean",
+                "nullable": true,
+                "description": "Set to true or false to enable or disable calendar-aligned resets. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`); sub-day durations (e.g. `1h`, `30m`) are invalid with calendar alignment and the API rejects that combination. When enabling on an existing budget, current usage is reset to zero and last_reset snaps to the current period start.\n"
               }
             }
           }
@@ -204352,6 +204717,11 @@
               "reset_duration": {
                 "type": "string",
                 "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+              },
+              "calendar_aligned": {
+                "type": "boolean",
+                "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                "default": false
               },
               "last_reset": {
                 "type": "string",
@@ -204419,6 +204789,11 @@
                         "reset_duration": {
                           "type": "string",
                           "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                        },
+                        "calendar_aligned": {
+                          "type": "boolean",
+                          "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                          "default": false
                         },
                         "last_reset": {
                           "type": "string",
@@ -204512,6 +204887,11 @@
                                     "reset_duration": {
                                       "type": "string",
                                       "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                    },
+                                    "calendar_aligned": {
+                                      "type": "boolean",
+                                      "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                      "default": false
                                     },
                                     "last_reset": {
                                       "type": "string",
@@ -204937,6 +205317,11 @@
                       "type": "string",
                       "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                     },
+                    "calendar_aligned": {
+                      "type": "boolean",
+                      "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                      "default": false
+                    },
                     "last_reset": {
                       "type": "string",
                       "format": "date-time"
@@ -205023,6 +205408,11 @@
                                 "reset_duration": {
                                   "type": "string",
                                   "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                },
+                                "calendar_aligned": {
+                                  "type": "boolean",
+                                  "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                  "default": false
                                 },
                                 "last_reset": {
                                   "type": "string",
@@ -205513,6 +205903,11 @@
                             "type": "string",
                             "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                           },
+                          "calendar_aligned": {
+                            "type": "boolean",
+                            "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                            "default": false
+                          },
                           "last_reset": {
                             "type": "string",
                             "format": "date-time"
@@ -205957,6 +206352,11 @@
                     "type": "string",
                     "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                   },
+                  "calendar_aligned": {
+                    "type": "boolean",
+                    "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                    "default": false
+                  },
                   "last_reset": {
                     "type": "string",
                     "format": "date-time"
@@ -206049,6 +206449,11 @@
                               "reset_duration": {
                                 "type": "string",
                                 "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                              },
+                              "calendar_aligned": {
+                                "type": "boolean",
+                                "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                "default": false
                               },
                               "last_reset": {
                                 "type": "string",
@@ -206495,6 +206900,11 @@
                       "type": "string",
                       "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                     },
+                    "calendar_aligned": {
+                      "type": "boolean",
+                      "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                      "default": false
+                    },
                     "last_reset": {
                       "type": "string",
                       "format": "date-time"
@@ -206587,6 +206997,11 @@
                                 "reset_duration": {
                                   "type": "string",
                                   "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                                },
+                                "calendar_aligned": {
+                                  "type": "boolean",
+                                  "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                                  "default": false
                                 },
                                 "last_reset": {
                                   "type": "string",
@@ -207026,6 +207441,11 @@
               },
               "reset_duration": {
                 "type": "string"
+              },
+              "calendar_aligned": {
+                "type": "boolean",
+                "default": false,
+                "description": "When true, usage resets at the start of each calendar period in UTC instead of on a rolling window from last reset. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`). For example `1d` resets at midnight UTC; `1w` at Monday 00:00 UTC; `1M` on the first day of each month; `1Y` on January 1. Sub-day durations (e.g. `1h`) cannot use calendar alignment.\n"
               }
             }
           }
@@ -207047,6 +207467,11 @@
               },
               "reset_duration": {
                 "type": "string"
+              },
+              "calendar_aligned": {
+                "type": "boolean",
+                "nullable": true,
+                "description": "Set to true or false to enable or disable calendar-aligned resets. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`); sub-day durations (e.g. `1h`, `30m`) are invalid with calendar alignment and the API rejects that combination. When enabling on an existing budget, current usage is reset to zero and last_reset snaps to the current period start.\n"
               }
             }
           }
@@ -207066,6 +207491,11 @@
           "reset_duration": {
             "type": "string",
             "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+          },
+          "calendar_aligned": {
+            "type": "boolean",
+            "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+            "default": false
           },
           "last_reset": {
             "type": "string",
@@ -207161,6 +207591,11 @@
                 "reset_duration": {
                   "type": "string",
                   "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                },
+                "calendar_aligned": {
+                  "type": "boolean",
+                  "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                  "default": false
                 },
                 "last_reset": {
                   "type": "string",
@@ -207267,6 +207702,11 @@
           },
           "reset_duration": {
             "type": "string"
+          },
+          "calendar_aligned": {
+            "type": "boolean",
+            "default": false,
+            "description": "When true, usage resets at the start of each calendar period in UTC instead of on a rolling window from last reset. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`). For example `1d` resets at midnight UTC; `1w` at Monday 00:00 UTC; `1M` on the first day of each month; `1Y` on January 1. Sub-day durations (e.g. `1h`) cannot use calendar alignment.\n"
           }
         }
       },
@@ -207279,6 +207719,11 @@
           },
           "reset_duration": {
             "type": "string"
+          },
+          "calendar_aligned": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Set to true or false to enable or disable calendar-aligned resets. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`); sub-day durations (e.g. `1h`, `30m`) are invalid with calendar alignment and the API rejects that combination. When enabling on an existing budget, current usage is reset to zero and last_reset snaps to the current period start.\n"
           }
         }
       },
@@ -208307,6 +208752,11 @@
                 "type": "string",
                 "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
               },
+              "calendar_aligned": {
+                "type": "boolean",
+                "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                "default": false
+              },
               "last_reset": {
                 "type": "string",
                 "format": "date-time"
@@ -208430,6 +208880,11 @@
                   "reset_duration": {
                     "type": "string",
                     "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+                  },
+                  "calendar_aligned": {
+                    "type": "boolean",
+                    "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                    "default": false
                   },
                   "last_reset": {
                     "type": "string",
@@ -208556,6 +209011,11 @@
                       "type": "string",
                       "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                     },
+                    "calendar_aligned": {
+                      "type": "boolean",
+                      "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                      "default": false
+                    },
                     "last_reset": {
                       "type": "string",
                       "format": "date-time"
@@ -208677,6 +209137,11 @@
               },
               "reset_duration": {
                 "type": "string"
+              },
+              "calendar_aligned": {
+                "type": "boolean",
+                "default": false,
+                "description": "When true, usage resets at the start of each calendar period in UTC instead of on a rolling window from last reset. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`). For example `1d` resets at midnight UTC; `1w` at Monday 00:00 UTC; `1M` on the first day of each month; `1Y` on January 1. Sub-day durations (e.g. `1h`) cannot use calendar alignment.\n"
               }
             }
           },
@@ -208723,6 +209188,11 @@
               },
               "reset_duration": {
                 "type": "string"
+              },
+              "calendar_aligned": {
+                "type": "boolean",
+                "nullable": true,
+                "description": "Set to true or false to enable or disable calendar-aligned resets. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`); sub-day durations (e.g. `1h`, `30m`) are invalid with calendar alignment and the API rejects that combination. When enabling on an existing budget, current usage is reset to zero and last_reset snaps to the current period start.\n"
               }
             }
           },
@@ -208770,6 +209240,11 @@
               "reset_duration": {
                 "type": "string",
                 "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+              },
+              "calendar_aligned": {
+                "type": "boolean",
+                "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                "default": false
               },
               "last_reset": {
                 "type": "string",
@@ -208869,6 +209344,11 @@
               "reset_duration": {
                 "type": "string",
                 "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
+              },
+              "calendar_aligned": {
+                "type": "boolean",
+                "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                "default": false
               },
               "last_reset": {
                 "type": "string",
@@ -208975,6 +209455,11 @@
                       "type": "string",
                       "description": "Reset duration (e.g., \"30s\", \"5m\", \"1h\", \"1d\", \"1w\", \"1M\")"
                     },
+                    "calendar_aligned": {
+                      "type": "boolean",
+                      "description": "When true, resets align to calendar period boundaries in UTC (not rolling from last reset)",
+                      "default": false
+                    },
                     "last_reset": {
                       "type": "string",
                       "format": "date-time"
@@ -209071,6 +209556,11 @@
               },
               "reset_duration": {
                 "type": "string"
+              },
+              "calendar_aligned": {
+                "type": "boolean",
+                "nullable": true,
+                "description": "Set to true or false to enable or disable calendar-aligned resets. Only valid with reset durations that use day, week, month, or year suffixes (`d`, `w`, `M`, `Y`); sub-day durations (e.g. `1h`, `30m`) are invalid with calendar alignment and the API rejects that combination. When enabling on an existing budget, current usage is reset to zero and last_reset snaps to the current period start.\n"
               }
             }
           },
