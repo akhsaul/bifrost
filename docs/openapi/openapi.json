@@ -440,6 +440,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -1989,6 +1995,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -2712,6 +2724,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -3658,6 +3676,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -4322,6 +4346,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -6120,6 +6150,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -7145,6 +7181,12 @@
                                 "hit_type": {
                                   "type": "string"
                                 },
+                                "requested_provider": {
+                                  "type": "string"
+                                },
+                                "requested_model": {
+                                  "type": "string"
+                                },
                                 "provider_used": {
                                   "type": "string"
                                 },
@@ -7873,6 +7915,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -8392,6 +8440,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -8881,6 +8935,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -9350,6 +9410,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -9472,6 +9538,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -9936,6 +10008,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -10101,6 +10179,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -10682,6 +10766,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -10971,6 +11061,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -11556,6 +11652,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -11835,6 +11937,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -12336,6 +12444,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -12843,6 +12957,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -13275,6 +13395,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -13693,6 +13819,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -14083,6 +14215,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -14910,6 +15048,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -15827,6 +15971,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -16263,6 +16413,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -16766,6 +16922,12 @@
                                   "hit_type": {
                                     "type": "string"
                                   },
+                                  "requested_provider": {
+                                    "type": "string"
+                                  },
+                                  "requested_model": {
+                                    "type": "string"
+                                  },
                                   "provider_used": {
                                     "type": "string"
                                   },
@@ -16871,6 +17033,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -17352,6 +17520,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -17733,6 +17907,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -18118,6 +18298,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -18553,6 +18739,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -18982,6 +19174,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -19364,6 +19562,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -19698,6 +19902,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -20354,6 +20564,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -20783,6 +20999,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -21166,6 +21388,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -21503,6 +21731,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -21904,6 +22138,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -22320,6 +22560,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -22689,6 +22935,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -23036,6 +23288,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -33110,6 +33368,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -33833,6 +34097,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -35235,6 +35505,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -35958,6 +36234,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -36919,6 +37201,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -37583,6 +37871,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -38562,6 +38856,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -39226,6 +39526,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -41031,6 +41337,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -42056,6 +42368,12 @@
                                 "hit_type": {
                                   "type": "string"
                                 },
+                                "requested_provider": {
+                                  "type": "string"
+                                },
+                                "requested_model": {
+                                  "type": "string"
+                                },
                                 "provider_used": {
                                   "type": "string"
                                 },
@@ -42782,6 +43100,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -44572,6 +44896,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -45597,6 +45927,12 @@
                                 "hit_type": {
                                   "type": "string"
                                 },
+                                "requested_provider": {
+                                  "type": "string"
+                                },
+                                "requested_model": {
+                                  "type": "string"
+                                },
                                 "provider_used": {
                                   "type": "string"
                                 },
@@ -46323,6 +46659,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -47339,6 +47681,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -47816,6 +48164,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -48315,6 +48669,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -48712,6 +49072,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -49129,6 +49495,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -49608,6 +49980,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -49773,6 +50151,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -50270,6 +50654,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -50435,6 +50825,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -51347,6 +51743,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -51814,6 +52216,12 @@
                                   "hit_type": {
                                     "type": "string"
                                   },
+                                  "requested_provider": {
+                                    "type": "string"
+                                  },
+                                  "requested_model": {
+                                    "type": "string"
+                                  },
                                   "provider_used": {
                                     "type": "string"
                                   },
@@ -51919,6 +52327,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -52374,6 +52788,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -52729,6 +53149,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -54094,6 +54520,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -54485,6 +54917,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -54841,6 +55279,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -55149,6 +55593,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -55779,6 +56229,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -56179,6 +56635,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -56536,6 +56998,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -56847,6 +57315,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -57222,6 +57696,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -57610,6 +58090,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -57953,6 +58439,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -58274,6 +58766,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -76825,6 +77323,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -77489,6 +77993,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -78871,6 +79381,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -79596,6 +80112,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -80073,6 +80595,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -82072,6 +82600,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -83097,6 +83631,12 @@
                                 "hit_type": {
                                   "type": "string"
                                 },
+                                "requested_provider": {
+                                  "type": "string"
+                                },
+                                "requested_model": {
+                                  "type": "string"
+                                },
                                 "provider_used": {
                                   "type": "string"
                                 },
@@ -83823,6 +84363,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -84839,6 +85385,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -85218,6 +85770,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -85697,6 +86255,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -85862,6 +86426,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -95222,6 +95792,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -95886,6 +96462,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -97268,6 +97850,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -97993,6 +98581,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -98470,6 +99064,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -100469,6 +101069,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -101494,6 +102100,12 @@
                                 "hit_type": {
                                   "type": "string"
                                 },
+                                "requested_provider": {
+                                  "type": "string"
+                                },
+                                "requested_model": {
+                                  "type": "string"
+                                },
                                 "provider_used": {
                                   "type": "string"
                                 },
@@ -102220,6 +102832,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -103236,6 +103854,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -103615,6 +104239,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -104094,6 +104724,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -104259,6 +104895,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -114269,6 +114911,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -114933,6 +115581,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -116315,6 +116969,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -117040,6 +117700,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -117517,6 +118183,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -119516,6 +120188,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -120541,6 +121219,12 @@
                                 "hit_type": {
                                   "type": "string"
                                 },
+                                "requested_provider": {
+                                  "type": "string"
+                                },
+                                "requested_model": {
+                                  "type": "string"
+                                },
                                 "provider_used": {
                                   "type": "string"
                                 },
@@ -121267,6 +121951,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -122283,6 +122973,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -122662,6 +123358,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -123141,6 +123843,12 @@
                             "hit_type": {
                               "type": "string"
                             },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
+                              "type": "string"
+                            },
                             "provider_used": {
                               "type": "string"
                             },
@@ -123306,6 +124014,12 @@
                               "type": "string"
                             },
                             "hit_type": {
+                              "type": "string"
+                            },
+                            "requested_provider": {
+                              "type": "string"
+                            },
+                            "requested_model": {
                               "type": "string"
                             },
                             "provider_used": {
@@ -179784,6 +180498,12 @@
               "hit_type": {
                 "type": "string"
               },
+              "requested_provider": {
+                "type": "string"
+              },
+              "requested_model": {
+                "type": "string"
+              },
               "provider_used": {
                 "type": "string"
               },
@@ -179813,6 +180533,12 @@
             "type": "string"
           },
           "hit_type": {
+            "type": "string"
+          },
+          "requested_provider": {
+            "type": "string"
+          },
+          "requested_model": {
             "type": "string"
           },
           "provider_used": {
@@ -180384,6 +181110,12 @@
                     "type": "string"
                   },
                   "hit_type": {
+                    "type": "string"
+                  },
+                  "requested_provider": {
+                    "type": "string"
+                  },
+                  "requested_model": {
                     "type": "string"
                   },
                   "provider_used": {
@@ -181887,6 +182619,12 @@
                   "hit_type": {
                     "type": "string"
                   },
+                  "requested_provider": {
+                    "type": "string"
+                  },
+                  "requested_model": {
+                    "type": "string"
+                  },
                   "provider_used": {
                     "type": "string"
                   },
@@ -182983,6 +183721,12 @@
                     "type": "string"
                   },
                   "hit_type": {
+                    "type": "string"
+                  },
+                  "requested_provider": {
+                    "type": "string"
+                  },
+                  "requested_model": {
                     "type": "string"
                   },
                   "provider_used": {
@@ -184587,6 +185331,12 @@
                   "hit_type": {
                     "type": "string"
                   },
+                  "requested_provider": {
+                    "type": "string"
+                  },
+                  "requested_model": {
+                    "type": "string"
+                  },
                   "provider_used": {
                     "type": "string"
                   },
@@ -184968,6 +185718,12 @@
                   "hit_type": {
                     "type": "string"
                   },
+                  "requested_provider": {
+                    "type": "string"
+                  },
+                  "requested_model": {
+                    "type": "string"
+                  },
                   "provider_used": {
                     "type": "string"
                   },
@@ -185327,6 +186083,12 @@
                   "hit_type": {
                     "type": "string"
                   },
+                  "requested_provider": {
+                    "type": "string"
+                  },
+                  "requested_model": {
+                    "type": "string"
+                  },
                   "provider_used": {
                     "type": "string"
                   },
@@ -185596,6 +186358,12 @@
                   "hit_type": {
                     "type": "string"
                   },
+                  "requested_provider": {
+                    "type": "string"
+                  },
+                  "requested_model": {
+                    "type": "string"
+                  },
                   "provider_used": {
                     "type": "string"
                   },
@@ -185862,6 +186630,12 @@
                     "type": "string"
                   },
                   "hit_type": {
+                    "type": "string"
+                  },
+                  "requested_provider": {
+                    "type": "string"
+                  },
+                  "requested_model": {
                     "type": "string"
                   },
                   "provider_used": {
@@ -186501,6 +187275,12 @@
                   "hit_type": {
                     "type": "string"
                   },
+                  "requested_provider": {
+                    "type": "string"
+                  },
+                  "requested_model": {
+                    "type": "string"
+                  },
                   "provider_used": {
                     "type": "string"
                   },
@@ -186743,6 +187523,12 @@
                     "type": "string"
                   },
                   "hit_type": {
+                    "type": "string"
+                  },
+                  "requested_provider": {
+                    "type": "string"
+                  },
+                  "requested_model": {
                     "type": "string"
                   },
                   "provider_used": {
@@ -187000,6 +187786,12 @@
                         "hit_type": {
                           "type": "string"
                         },
+                        "requested_provider": {
+                          "type": "string"
+                        },
+                        "requested_model": {
+                          "type": "string"
+                        },
                         "provider_used": {
                           "type": "string"
                         },
@@ -187105,6 +187897,12 @@
                     "type": "string"
                   },
                   "hit_type": {
+                    "type": "string"
+                  },
+                  "requested_provider": {
+                    "type": "string"
+                  },
+                  "requested_model": {
                     "type": "string"
                   },
                   "provider_used": {
@@ -187354,6 +188152,12 @@
                   "hit_type": {
                     "type": "string"
                   },
+                  "requested_provider": {
+                    "type": "string"
+                  },
+                  "requested_model": {
+                    "type": "string"
+                  },
                   "provider_used": {
                     "type": "string"
                   },
@@ -187558,6 +188362,12 @@
                   "hit_type": {
                     "type": "string"
                   },
+                  "requested_provider": {
+                    "type": "string"
+                  },
+                  "requested_model": {
+                    "type": "string"
+                  },
                   "provider_used": {
                     "type": "string"
                   },
@@ -187717,6 +188527,12 @@
                     "type": "string"
                   },
                   "hit_type": {
+                    "type": "string"
+                  },
+                  "requested_provider": {
+                    "type": "string"
+                  },
+                  "requested_model": {
                     "type": "string"
                   },
                   "provider_used": {
