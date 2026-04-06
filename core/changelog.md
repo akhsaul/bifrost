@@ -1,8 +1,0 @@
-- feat: add Fireworks AI as a first-class provider (thanks [@ivanetchart](https://github.com/ivanetchart)!)
-- feat: allow path whitelisting from security config
-- fix: bedrock streaming - retry retryable AWS exceptions (thanks [@KTS-o7](https://github.com/KTS-o7)!)
-- fix: bedrock streaming - retry stale/closed-connection errors (thanks [@KTS-o7](https://github.com/KTS-o7)!)
-- fix: thinking budget validation for Gemini models
-- fix: add empty arguments guard in Bedrock utils
-- fix: case-insensitive lookup in merge beta headers
-- fix: LLM validation fixes

@@ -1,1 +1,0 @@
-- feat: add image generation request support
