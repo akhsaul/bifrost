@@ -1,3 +1,0 @@
-- feat: add end-to-end support for /v1/ocr endpoint with Mistral OCR (thanks [@Vaibhav701161](https://github.com/Vaibhav701161)!)
-- feat: add Azure passthrough support
-- feat: add embeddings support for OpenRouter provider (thanks [@dennypradipta](https://github.com/dennypradipta)!)
