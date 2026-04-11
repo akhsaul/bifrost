@@ -5,8 +5,8 @@ go 1.26.2
 require (
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/google/uuid v1.6.0
-	github.com/maximhq/bifrost/core v1.4.18
-	github.com/maximhq/bifrost/framework v1.2.37
+	github.com/maximhq/bifrost/core v1.4.19
+	github.com/maximhq/bifrost/framework v1.2.38
 	github.com/maximhq/bifrost/plugins/mocker v1.4.17
 )
 
