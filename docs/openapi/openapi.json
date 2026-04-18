@@ -41612,12 +41612,6 @@
         "in": "header",
         "name": "x-api-key",
         "description": "API key authentication via the `x-api-key` header.\nVirtual keys (prefixed with `sk-bf-`) can also be passed here.\n"
-      },
-      "GoogleApiKeyAuth": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "x-goog-api-key",
-        "description": "Google API key authentication via the `x-goog-api-key` header.\nVirtual keys (prefixed with `sk-bf-`) can also be passed here.\n"
       }
     },
     "parameters": {
