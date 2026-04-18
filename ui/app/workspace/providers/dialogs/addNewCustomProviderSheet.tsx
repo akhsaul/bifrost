@@ -100,7 +100,6 @@ export function AddCustomProviderSheetContent({ show = true, onClose, onSave }: 
 				retry_backoff_initial: 500,
 				retry_backoff_max: 5000,
 			},
-			keys: [],
 		};
 
 		addProvider(payload)
@@ -203,7 +202,13 @@ export function AddCustomProviderSheetContent({ show = true, onClose, onSave }: 
 												</label>
 												<p className="text-muted-foreground text-sm">Whether the custom provider requires a key</p>
 											</div>
-											<Switch id="drop-excess-requests" size="md" checked={field.value} onCheckedChange={field.onChange} data-testid="custom-provider-keyless-switch" />
+											<Switch
+												id="drop-excess-requests"
+												size="md"
+												checked={field.value}
+												onCheckedChange={field.onChange}
+												data-testid="custom-provider-keyless-switch"
+											/>
 										</div>
 									</FormItem>
 								)}

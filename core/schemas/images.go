@@ -112,6 +112,22 @@ func (r *BifrostImageGenerationResponse) BackfillParams(req *BifrostRequest) {
 	}
 }
 
+// getModelFromRequest extracts the model from any image-related request.
+func getModelFromRequest(req *BifrostRequest) string {
+	if req == nil {
+		return ""
+	}
+	switch {
+	case req.ImageGenerationRequest != nil:
+		return req.ImageGenerationRequest.Model
+	case req.ImageEditRequest != nil:
+		return req.ImageEditRequest.Model
+	case req.ImageVariationRequest != nil:
+		return req.ImageVariationRequest.Model
+	}
+	return ""
+}
+
 // getNumInputImagesSizeAndQualityFromRequest extracts request params for cost calculation.
 // Quality is only returned when it is one of low, medium, high, auto.
 func getNumInputImagesSizeAndQualityFromRequest(req *BifrostRequest) (numInputImages int, size string, quality string) {
@@ -167,10 +183,12 @@ func normalizeImageQuality(q string) string {
 }
 
 type ImageGenerationResponseParameters struct {
-	Background   string `json:"background,omitempty"`
-	OutputFormat string `json:"output_format,omitempty"`
-	Quality      string `json:"quality,omitempty"`
-	Size         string `json:"size,omitempty"`
+	Background    string    `json:"background,omitempty"`
+	OutputFormat  string    `json:"output_format,omitempty"`
+	Quality       string    `json:"quality,omitempty"`
+	Size          string    `json:"size,omitempty"`
+	FinishReasons []*string `json:"finish_reasons,omitempty"`
+	Seeds         []int     `json:"seeds,omitempty"`
 }
 
 type ImageData struct {
@@ -270,7 +288,7 @@ type ImageInput struct {
 }
 
 type ImageEditParameters struct {
-	Type              *string                `json:"type,omitempty"`           // "inpainting", "outpainting", "background_removal",
+	Type              *string                `json:"type,omitempty"`           // "inpainting", "outpainting", "background_removal", "remove_background", "erase_object", "recolor", "search_replace", "control_sketch", "control_structure", "style_guide", "style_transfer", "upscale_fast", "upscale_creative", "upscale_conservative"
 	Background        *string                `json:"background,omitempty"`     // "transparent", "opaque", "auto"
 	InputFidelity     *string                `json:"input_fidelity,omitempty"` // "low", "high"
 	Mask              []byte                 `json:"mask,omitempty"`

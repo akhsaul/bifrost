@@ -586,13 +586,12 @@ func categorizeGoroutine(g *GoroutineGroup) {
 		"PostMCPHook",
 		"HTTPTransportPreHook",
 		"HTTPTransportPostHook",
-		"completeAndFlushTrace",
+		"CompleteAndFlushTrace",
 		"ProcessAndSend",
 		"handleProvider",
 		"Inject",                // Observability plugin inject
 		"insertInitialLogEntry", // Logging
 		"updateLogEntry",        // Logging
-		"updateStreamingLogEntry",
 		"retryOnNotFound",
 		"BroadcastLogUpdate",
 	}

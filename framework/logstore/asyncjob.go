@@ -126,6 +126,7 @@ func (e *AsyncJobExecutor) executeJob(jobID string, resultTTL int, operation Asy
 		ctx.SetValue(k, v)
 	}
 
+	// Clear trace context inherited from the original HTTP request.
 	ctx.ClearValue(schemas.BifrostContextKeyTraceID)
 	ctx.ClearValue(schemas.BifrostContextKeyParentSpanID)
 	ctx.ClearValue(schemas.BifrostContextKeySpanID)

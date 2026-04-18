@@ -196,7 +196,7 @@ else
   echo "✅ VLLM key config required fields match: [$HELM_VLLM_REQUIRED]"
 fi
 
-# Check concurrency_config required fields (config calls this def concurrency_and_buffer_size)
+# Check concurrency_and_buffer_size required fields (renamed from concurrency_config)
 CONFIG_CONCURRENCY_REQUIRED=$(jq -r '."$defs".concurrency_and_buffer_size.required // [] | sort | join(",")' "$CONFIG_SCHEMA" 2>/dev/null || echo "")
 HELM_CONCURRENCY_REQUIRED=$(jq -r '."$defs".concurrencyConfig.required // [] | sort | join(",")' "$HELM_SCHEMA" 2>/dev/null || echo "")
 
@@ -433,8 +433,10 @@ else
   echo "✅ MCP stdio config required fields match: [$CONFIG_MCP_STDIO_REQUIRED]"
 fi
 
-# MCP websocket_config / http_config are Helm-only sub-structures; config.schema.json uses
-# a flat connection_type + connection_string instead, so there is nothing to compare here.
+# MCP websocket_config and http_config were removed from config.schema.json
+# because the corresponding Go fields don't exist (MCP rendering uses
+# connection_type + connection_string directly, not sub-object configs).
+# Helm still declares them for user convenience — not a schema sync concern.
 
 echo ""
 echo "🔍 Checking required fields in SAML/SCIM config..."

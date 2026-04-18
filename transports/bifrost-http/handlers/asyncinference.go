@@ -111,7 +111,7 @@ func (h *AsyncHandler) asyncTextCompletion(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher())
+	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher(), h.config.GetMCPHeaderCombinedAllowlist())
 	if bifrostCtx == nil {
 		SendError(ctx, fasthttp.StatusBadRequest, "Failed to convert context")
 		return
@@ -127,6 +127,7 @@ func (h *AsyncHandler) asyncTextCompletion(ctx *fasthttp.RequestCtx) {
 			return h.client.TextCompletionRequest(bgCtx, bifrostTextReq)
 		},
 		schemas.TextCompletionRequest,
+		bifrostCtx.GetUserValues(),
 	)
 	if err != nil {
 		SendError(ctx, fasthttp.StatusInternalServerError, err.Error())
@@ -148,7 +149,7 @@ func (h *AsyncHandler) asyncChatCompletion(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher())
+	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher(), h.config.GetMCPHeaderCombinedAllowlist())
 	if bifrostCtx == nil {
 		SendError(ctx, fasthttp.StatusBadRequest, "Failed to convert context")
 		return
@@ -164,6 +165,7 @@ func (h *AsyncHandler) asyncChatCompletion(ctx *fasthttp.RequestCtx) {
 			return h.client.ChatCompletionRequest(bgCtx, bifrostChatReq)
 		},
 		schemas.ChatCompletionRequest,
+		bifrostCtx.GetUserValues(),
 	)
 	if err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
@@ -185,7 +187,7 @@ func (h *AsyncHandler) asyncResponses(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher())
+	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher(), h.config.GetMCPHeaderCombinedAllowlist())
 	if bifrostCtx == nil {
 		SendError(ctx, fasthttp.StatusBadRequest, "Failed to convert context")
 		return
@@ -201,6 +203,7 @@ func (h *AsyncHandler) asyncResponses(ctx *fasthttp.RequestCtx) {
 			return h.client.ResponsesRequest(bgCtx, bifrostResponsesReq)
 		},
 		schemas.ResponsesRequest,
+		bifrostCtx.GetUserValues(),
 	)
 	if err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Failed to create async job: %v", err))
@@ -218,7 +221,7 @@ func (h *AsyncHandler) asyncEmbeddings(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher())
+	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher(), h.config.GetMCPHeaderCombinedAllowlist())
 	if bifrostCtx == nil {
 		SendError(ctx, fasthttp.StatusBadRequest, "Failed to convert context")
 		return
@@ -234,6 +237,7 @@ func (h *AsyncHandler) asyncEmbeddings(ctx *fasthttp.RequestCtx) {
 			return h.client.EmbeddingRequest(bgCtx, bifrostEmbeddingReq)
 		},
 		schemas.EmbeddingRequest,
+		bifrostCtx.GetUserValues(),
 	)
 	if err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
@@ -255,7 +259,7 @@ func (h *AsyncHandler) asyncSpeech(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher())
+	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher(), h.config.GetMCPHeaderCombinedAllowlist())
 	if bifrostCtx == nil {
 		SendError(ctx, fasthttp.StatusBadRequest, "Failed to convert context")
 		return
@@ -271,6 +275,7 @@ func (h *AsyncHandler) asyncSpeech(ctx *fasthttp.RequestCtx) {
 			return h.client.SpeechRequest(bgCtx, bifrostSpeechReq)
 		},
 		schemas.SpeechRequest,
+		bifrostCtx.GetUserValues(),
 	)
 	if err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
@@ -292,7 +297,7 @@ func (h *AsyncHandler) asyncTranscription(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher())
+	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher(), h.config.GetMCPHeaderCombinedAllowlist())
 	if bifrostCtx == nil {
 		SendError(ctx, fasthttp.StatusBadRequest, "Failed to convert context")
 		return
@@ -308,6 +313,7 @@ func (h *AsyncHandler) asyncTranscription(ctx *fasthttp.RequestCtx) {
 			return h.client.TranscriptionRequest(bgCtx, bifrostTranscriptionReq)
 		},
 		schemas.TranscriptionRequest,
+		bifrostCtx.GetUserValues(),
 	)
 	if err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
@@ -329,7 +335,7 @@ func (h *AsyncHandler) asyncImageGeneration(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher())
+	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher(), h.config.GetMCPHeaderCombinedAllowlist())
 	if bifrostCtx == nil {
 		SendError(ctx, fasthttp.StatusBadRequest, "Failed to convert context")
 		return
@@ -345,6 +351,7 @@ func (h *AsyncHandler) asyncImageGeneration(ctx *fasthttp.RequestCtx) {
 			return h.client.ImageGenerationRequest(bgCtx, bifrostReq)
 		},
 		schemas.ImageGenerationRequest,
+		bifrostCtx.GetUserValues(),
 	)
 	if err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
@@ -366,7 +373,7 @@ func (h *AsyncHandler) asyncImageEdit(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher())
+	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher(), h.config.GetMCPHeaderCombinedAllowlist())
 	if bifrostCtx == nil {
 		SendError(ctx, fasthttp.StatusBadRequest, "Failed to convert context")
 		return
@@ -382,6 +389,7 @@ func (h *AsyncHandler) asyncImageEdit(ctx *fasthttp.RequestCtx) {
 			return h.client.ImageEditRequest(bgCtx, bifrostReq)
 		},
 		schemas.ImageEditRequest,
+		bifrostCtx.GetUserValues(),
 	)
 	if err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
@@ -398,7 +406,7 @@ func (h *AsyncHandler) asyncImageVariation(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher())
+	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher(), h.config.GetMCPHeaderCombinedAllowlist())
 	if bifrostCtx == nil {
 		SendError(ctx, fasthttp.StatusBadRequest, "Failed to convert context")
 		return
@@ -414,6 +422,7 @@ func (h *AsyncHandler) asyncImageVariation(ctx *fasthttp.RequestCtx) {
 			return h.client.ImageVariationRequest(bgCtx, bifrostReq)
 		},
 		schemas.ImageVariationRequest,
+		bifrostCtx.GetUserValues(),
 	)
 	if err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
@@ -430,7 +439,7 @@ func (h *AsyncHandler) asyncRerank(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher())
+	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher(), h.config.GetMCPHeaderCombinedAllowlist())
 	if bifrostCtx == nil {
 		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to convert context")
 		return
@@ -446,6 +455,7 @@ func (h *AsyncHandler) asyncRerank(ctx *fasthttp.RequestCtx) {
 			return h.client.RerankRequest(bgCtx, bifrostReq)
 		},
 		schemas.RerankRequest,
+		bifrostCtx.GetUserValues(),
 	)
 	if err != nil {
 		SendError(ctx, fasthttp.StatusInternalServerError, err.Error())
@@ -462,7 +472,7 @@ func (h *AsyncHandler) asyncOCR(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher())
+	bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher(), h.config.GetMCPHeaderCombinedAllowlist())
 	if bifrostCtx == nil {
 		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to convert context")
 		return
@@ -478,6 +488,7 @@ func (h *AsyncHandler) asyncOCR(ctx *fasthttp.RequestCtx) {
 			return h.client.OCRRequest(bgCtx, bifrostReq)
 		},
 		schemas.OCRRequest,
+		bifrostCtx.GetUserValues(),
 	)
 	if err != nil {
 		SendError(ctx, fasthttp.StatusInternalServerError, err.Error())
@@ -498,7 +509,7 @@ func (h *AsyncHandler) getJob(operationType schemas.RequestType) fasthttp.Reques
 		}
 
 		// Get the requesting user's VK for auth check
-		bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher())
+		bifrostCtx, cancel := lib.ConvertToBifrostContext(ctx, h.handlerStore.ShouldAllowDirectKeys(), h.config.GetHeaderMatcher(), h.config.GetMCPHeaderCombinedAllowlist())
 		if bifrostCtx == nil {
 			SendError(ctx, fasthttp.StatusBadRequest, "Failed to convert context")
 			return

@@ -108,23 +108,6 @@ bifrost:
 ```
 
 </Tab>
-<Tab title="Patronus AI">
-
-```yaml
-bifrost:
-  guardrails:
-    providers:
-      - id: 5
-        provider_name: "patronus-ai"
-        policy_name: "patronus-safety"
-        enabled: true
-        timeout: 20
-        config:
-          api_key: "env.PATRONUS_API_KEY"
-          environment: "production"       # production | development
-```
-
-</Tab>
 </Tabs>
 
 ---

@@ -1564,7 +1564,7 @@ type AnthropicFileDeleteResponse struct {
 }
 
 // ToBifrostFileUploadResponse converts an Anthropic file response to Bifrost file upload response.
-func (r *AnthropicFileResponse) ToBifrostFileUploadResponse(providerName schemas.ModelProvider, latency time.Duration, sendBackRawRequest bool, sendBackRawResponse bool, rawRequest interface{}, rawResponse interface{}) *schemas.BifrostFileUploadResponse {
+func (r *AnthropicFileResponse) ToBifrostFileUploadResponse(latency time.Duration, sendBackRawRequest bool, sendBackRawResponse bool, rawRequest interface{}, rawResponse interface{}) *schemas.BifrostFileUploadResponse {
 	resp := &schemas.BifrostFileUploadResponse{
 		ID:             r.ID,
 		Object:         r.Type,
@@ -1575,9 +1575,7 @@ func (r *AnthropicFileResponse) ToBifrostFileUploadResponse(providerName schemas
 		Status:         schemas.FileStatusProcessed,
 		StorageBackend: schemas.FileStorageAPI,
 		ExtraFields: schemas.BifrostResponseExtraFields{
-			RequestType: schemas.FileUploadRequest,
-			Provider:    providerName,
-			Latency:     latency.Milliseconds(),
+			Latency: latency.Milliseconds(),
 		},
 	}
 
@@ -1593,7 +1591,7 @@ func (r *AnthropicFileResponse) ToBifrostFileUploadResponse(providerName schemas
 }
 
 // ToBifrostFileRetrieveResponse converts an Anthropic file response to Bifrost file retrieve response.
-func (r *AnthropicFileResponse) ToBifrostFileRetrieveResponse(providerName schemas.ModelProvider, latency time.Duration, sendBackRawRequest bool, sendBackRawResponse bool, rawRequest interface{}, rawResponse interface{}) *schemas.BifrostFileRetrieveResponse {
+func (r *AnthropicFileResponse) ToBifrostFileRetrieveResponse(latency time.Duration, sendBackRawRequest bool, sendBackRawResponse bool, rawRequest interface{}, rawResponse interface{}) *schemas.BifrostFileRetrieveResponse {
 	resp := &schemas.BifrostFileRetrieveResponse{
 		ID:             r.ID,
 		Object:         r.Type,
@@ -1604,9 +1602,7 @@ func (r *AnthropicFileResponse) ToBifrostFileRetrieveResponse(providerName schem
 		Status:         schemas.FileStatusProcessed,
 		StorageBackend: schemas.FileStorageAPI,
 		ExtraFields: schemas.BifrostResponseExtraFields{
-			RequestType: schemas.FileRetrieveRequest,
-			Provider:    providerName,
-			Latency:     latency.Milliseconds(),
+			Latency: latency.Milliseconds(),
 		},
 	}
 

@@ -1,6 +1,4 @@
-"use client";
-
-import { CheckIcon, ChevronDown, PlusCircle, PlusIcon, XIcon } from "lucide-react";
+import { CheckIcon, ChevronDown, PlusIcon, XIcon } from "lucide-react";
 import React, { KeyboardEventHandler, useCallback, useEffect, useRef, useState } from "react";
 import {
 	ClearIndicatorProps,
@@ -27,7 +25,6 @@ import {
 } from "react-select";
 import AsyncCreatableSelect from "react-select/async-creatable";
 import { useDebouncedFunction } from "../../hooks/useDebounce";
-import { Checkbox } from "./checkbox";
 import { Icons } from "./icons";
 import { Label } from "./label";
 import {
@@ -36,8 +33,6 @@ import {
 	CustomDropdownIndicatorProps,
 	CustomOptionProps,
 	CustomPlaceholderProps,
-	EvaluatorGroup,
-	EvaluatorOption,
 	Option,
 	OptionGroup,
 } from "./multiselectUtils";
@@ -149,6 +144,8 @@ interface AsyncMultiSelectProps<T> {
 	reload?: (query: string, callback: (options: Option<T>[] | OptionGroup<T>[]) => void) => void;
 
 	menuPosition?: "absolute" | "fixed";
+	/** Target element for the menu portal. When set, the menu renders inside this element instead of document.body. */
+	menuPortalTarget?: HTMLElement | null;
 
 	/** enable dynamic option creation from the input */
 	dynamicOptionCreation?: boolean;
@@ -204,6 +201,8 @@ interface AsyncMultiSelectProps<T> {
 	inputId?: string;
 	/** id of element that labels this control (accessibility) */
 	ariaLabelledBy?: string;
+	/** test selector for the container element */
+	"data-testid"?: string;
 	views?: {
 		clearIndicator?: (props: ClearIndicatorProps<T>) => React.ReactNode;
 		control?: (props: ControlProps<T>) => React.ReactNode;
@@ -349,7 +348,7 @@ export function AsyncMultiSelect<T>(props: AsyncMultiSelectProps<T>) {
 	};
 
 	return (
-		<div ref={containerRef}>
+		<div ref={containerRef} data-testid={props["data-testid"]}>
 			<AsyncCreatableSelect
 				isDisabled={props.disabled}
 				autoFocus={props.autoFocus}
@@ -394,13 +393,16 @@ export function AsyncMultiSelect<T>(props: AsyncMultiSelectProps<T>) {
 				menuPlacement={props.menuPlacement}
 				blurInputOnSelect={false}
 				menuPosition={props.menuPosition ?? "fixed"}
+				menuPortalTarget={props.menuPortalTarget}
 				onInputChange={(newValue, actionMeta) => {
 					if (props.onInputChange) {
 						props.onInputChange(newValue, { action: actionMeta.action });
 					}
 				}}
 				onBlur={(e) => {
-					radixDialogOnBlurWorkaround(e);
+					if (!props.menuPortalTarget) {
+						radixDialogOnBlurWorkaround(e);
+					}
 					if (props.onBlur) props.onBlur();
 				}}
 				onMenuOpen={() => {
@@ -417,6 +419,7 @@ export function AsyncMultiSelect<T>(props: AsyncMultiSelectProps<T>) {
 				}
 				inputValue={props.inputValue}
 				styles={{
+					menuPortal: (base) => ({ ...base, zIndex: 9999 }),
 					control: (base) => ({ ...base, boxShadow: "none", minHeight: "32px" }),
 					multiValue: () => ({}),
 					multiValueLabel: () => ({}),
@@ -436,7 +439,7 @@ export function AsyncMultiSelect<T>(props: AsyncMultiSelectProps<T>) {
 				defaultMenuIsOpen={props.defaultMenuIsOpen}
 				classNames={{
 					container: () => cn("min-h-8 border-none", props.className),
-					control: ({ isFocused }) =>
+					control: () =>
 						cn(
 							"border-border! multiselect-control dark:!bg-accent flex flex-wrap items-start justify-between rounded-md border bg-white",
 							props.triggerClassName,
@@ -457,7 +460,7 @@ export function AsyncMultiSelect<T>(props: AsyncMultiSelectProps<T>) {
 					noOptionsMessage: () => cn("text-content-disabled flex items-center justify-center text-sm", props.noOptionsMessageClassName),
 					indicatorsContainer: () => "h-8",
 				}}
-				minMenuHeight={400}
+				minMenuHeight={160}
 				components={{
 					ClearIndicator: CustomClearIndicator,
 					Control: CustomControl,
@@ -531,129 +534,6 @@ export function MultiSelectInput<T>(props: AsyncMultiSelectProps<T>) {
 	);
 }
 
-interface EvaluatorMultiSelectProps<V> extends Omit<AsyncMultiSelectProps<EvaluatorOption<V>>, "onChange"> {
-	keepTags?: string[];
-	filterTags?: string[];
-	typeFilter?: string[];
-	filter?: (options: (EvaluatorOption<V> | EvaluatorGroup<V>)[]) => (EvaluatorOption<V> | EvaluatorGroup<V>)[];
-	options?: any;
-	onChange?: (items: EvaluatorOption<V>[]) => void;
-}
-
-export function EvaluatorMultiSelect<V>(props: EvaluatorMultiSelectProps<V>) {
-	const shouldFilterEvaluatorOnTags = (option: EvaluatorOption<V>) => {
-		const tags = (option as any)?.tags || [];
-		const type = (option as any)?.type;
-
-		if (props.keepTags?.length) {
-			for (const tag of props.keepTags) {
-				if (tags.some((t: any) => t.label === tag)) {
-					return true;
-				}
-			}
-			return false;
-		}
-
-		if (props.filterTags?.length || props.typeFilter?.length) {
-			if (props.typeFilter?.includes(type)) {
-				return false;
-			}
-
-			for (const tag of props.filterTags || []) {
-				if (tags.some((t: any) => t.label === tag)) {
-					return false;
-				}
-			}
-		}
-		return true;
-	};
-
-	const processedOptions = props.options
-		? Array.isArray(props.options)
-			? props.options.map((group) => ({
-					...group,
-					options: group.options.filter(shouldFilterEvaluatorOnTags),
-				}))
-			: props.options
-		: undefined;
-
-	const filteredOptions = props.filter ? props.filter(processedOptions as (EvaluatorOption<V> | EvaluatorGroup<V>)[]) : processedOptions;
-
-	return (
-		<AsyncMultiSelect
-			{...props}
-			onChange={(items) => {
-				props.onChange?.(items as EvaluatorOption<V>[]);
-			}}
-			isNonAsync
-			defaultOptions={filteredOptions}
-			value={props.value}
-			views={{
-				option: (optionProps) => {
-					return (
-						<OptionWrapper
-							{...optionProps}
-							className={cn(
-								optionProps.className,
-								"text-content-primary hover:bg-background-highlight-primary/60",
-								optionProps.isSelected ? "text-content-primary bg-transparent" : "",
-							)}
-						>
-							<div className="flex w-full items-start justify-between">
-								<div className="flex grow flex-col">
-									<div className="flex">
-										<span className="text-content-primary grow truncate text-sm font-medium">{optionProps.data.label}</span>
-									</div>
-									{optionProps.data.meta?.description && (
-										<span className="text-content-tertiary max-w-[70%] text-sm">{optionProps.data.meta.description}</span>
-									)}
-								</div>
-								<button className="flex items-center pt-0.5" type="button">
-									{optionProps.isSelected ? (
-										<Checkbox
-											checked={optionProps.isSelected}
-											className="h-4 w-4"
-											onCheckedChange={(e) => {
-												optionProps.selectOption(optionProps.data);
-											}}
-										/>
-									) : (
-										<PlusCircle className="h-4 w-4" strokeWidth={1.5} />
-									)}
-								</button>
-							</div>
-						</OptionWrapper>
-					);
-				},
-				groupHeading: (groupProps) => {
-					const data = groupProps.data as unknown as EvaluatorGroup<V>;
-					return (
-						<GroupHeadingWrapper {...groupProps} className={cn(groupProps.className, "bg-content-inverse sticky z-[1] m-0 !px-2 py-2")}>
-							<div className="text-content-secondary flex items-center gap-1 capitalize">
-								{data.icon && <div className="flex shrink-0 items-center">{data.icon}</div>}
-								{data.label}
-							</div>
-						</GroupHeadingWrapper>
-					);
-				},
-				group: (groupProps) => {
-					return <GroupWrapper {...groupProps} className={cn(groupProps.className, "py-0!")} />;
-				},
-				multiValue: (multiValueProps) => {
-					return (
-						<MultiValueWrapper {...multiValueProps}>
-							<div className="mr-1 flex items-center gap-1">
-								{multiValueProps.data.meta?.icon && <div className="flex shrink-0 items-center">{multiValueProps.data.meta.icon}</div>}
-								<span className="text-content-tertiary grow truncate text-sm font-medium">{multiValueProps.data.label}</span>
-							</div>
-						</MultiValueWrapper>
-					);
-				},
-			}}
-		/>
-	);
-}
-
 function CustomOption<T>(props: OptionProps<Option<T>> & { selectProps: CustomOptionProps & CustomComponentsProps }) {
 	const { Option } = components;
 
@@ -699,8 +579,6 @@ function CustomOption<T>(props: OptionProps<Option<T>> & { selectProps: CustomOp
 }
 
 function CustomControl<T>(props: ControlProps<Option<T>> & { selectProps: CustomComponentsProps }) {
-	const { Control } = components;
-
 	if (props.selectProps.controlView) {
 		return props.selectProps.controlView(props);
 	}
@@ -744,8 +622,6 @@ function CustomMultiValueLabel<T>(props: MultiValueGenericProps<Option<T>> & { s
 }
 
 function CustomMultiValue<T>(props: MultiValueProps<Option<T>> & { selectProps: CustomComponentsProps }) {
-	const { MultiValue } = components;
-
 	if (props.selectProps.multiValueView) {
 		return props.selectProps.multiValueView(props);
 	}
@@ -754,8 +630,6 @@ function CustomMultiValue<T>(props: MultiValueProps<Option<T>> & { selectProps: 
 }
 
 function CustomGroupHeading<T>(props: GroupHeadingProps<Option<T>> & { selectProps: CustomComponentsProps }) {
-	const { GroupHeading } = components;
-
 	if (props.selectProps.groupHeadingView) {
 		return props.selectProps.groupHeadingView(props);
 	}
@@ -774,8 +648,6 @@ function CustomGroup<T>(props: GroupProps<Option<T>> & { selectProps: CustomComp
 }
 
 function CustomClearIndicator<T>(props: ClearIndicatorProps<Option<T>> & { selectProps: CustomComponentsProps }) {
-	const { ClearIndicator } = components;
-
 	if (props.selectProps.clearIndicatorView) {
 		return props.selectProps.clearIndicatorView(props);
 	}
@@ -784,8 +656,6 @@ function CustomClearIndicator<T>(props: ClearIndicatorProps<Option<T>> & { selec
 }
 
 function CustomIndicatorSeparator<T>(props: IndicatorSeparatorProps<Option<T>> & { selectProps: CustomComponentsProps }) {
-	const { IndicatorSeparator } = components;
-
 	if (props.selectProps.indicatorSeparatorView) {
 		return props.selectProps.indicatorSeparatorView(props);
 	}
@@ -794,8 +664,6 @@ function CustomIndicatorSeparator<T>(props: IndicatorSeparatorProps<Option<T>> &
 }
 
 function CustomInput<T>(props: InputProps<Option<T>> & { selectProps: CustomComponentsProps }) {
-	const { Input } = components;
-
 	if (props.selectProps.inputView) {
 		return props.selectProps.inputView(props);
 	}
@@ -804,8 +672,6 @@ function CustomInput<T>(props: InputProps<Option<T>> & { selectProps: CustomComp
 }
 
 function CustomLoadingIndicator<T>(props: LoadingIndicatorProps<Option<T>> & { selectProps: CustomComponentsProps }) {
-	const { LoadingIndicator } = components;
-
 	if (props.selectProps.loadingIndicatorView) {
 		return props.selectProps.loadingIndicatorView(props);
 	}
@@ -814,8 +680,6 @@ function CustomLoadingIndicator<T>(props: LoadingIndicatorProps<Option<T>> & { s
 }
 
 function CustomMenu<T>(props: MenuProps<Option<T>> & { selectProps: CustomComponentsProps }) {
-	const { Menu } = components;
-
 	if (props.selectProps.menuView) {
 		return props.selectProps.menuView(props);
 	}
@@ -824,8 +688,6 @@ function CustomMenu<T>(props: MenuProps<Option<T>> & { selectProps: CustomCompon
 }
 
 function CustomMenuList<T>(props: MenuListProps<Option<T>> & { selectProps: CustomComponentsProps }) {
-	const { MenuList } = components;
-
 	if (props.selectProps.menuListView) {
 		return props.selectProps.menuListView(props);
 	}
@@ -834,8 +696,6 @@ function CustomMenuList<T>(props: MenuListProps<Option<T>> & { selectProps: Cust
 }
 
 function CustomMultiValueContainer<T>(props: MultiValueGenericProps<Option<T>> & { selectProps: CustomComponentsProps }) {
-	const { MultiValueContainer } = components;
-
 	if (props.selectProps.multiValueContainerView) {
 		return props.selectProps.multiValueContainerView(props);
 	}
@@ -844,8 +704,6 @@ function CustomMultiValueContainer<T>(props: MultiValueGenericProps<Option<T>> &
 }
 
 function CustomNoOptionsMessage<T>(props: NoticeProps<Option<T>> & { selectProps: CustomComponentsProps }) {
-	const { NoOptionsMessage } = components;
-
 	if (props.selectProps.noOptionsMessageView) {
 		return props.selectProps.noOptionsMessageView(props);
 	}
@@ -854,8 +712,6 @@ function CustomNoOptionsMessage<T>(props: NoticeProps<Option<T>> & { selectProps
 }
 
 function CustomPlaceholder<T>(props: PlaceholderProps<Option<T>> & { selectProps: CustomPlaceholderProps & CustomComponentsProps }) {
-	const { Placeholder } = components;
-
 	if (props.selectProps.placeholderView) {
 		return props.selectProps.placeholderView(props);
 	}
@@ -869,8 +725,6 @@ function CustomPlaceholder<T>(props: PlaceholderProps<Option<T>> & { selectProps
 }
 
 function CustomSingleValue<T>(props: SingleValueProps<Option<T>> & { selectProps: CustomComponentsProps }) {
-	const { SingleValue } = components;
-
 	if (props.selectProps.singleValueView) {
 		return props.selectProps.singleValueView(props);
 	}
@@ -879,8 +733,6 @@ function CustomSingleValue<T>(props: SingleValueProps<Option<T>> & { selectProps
 }
 
 function CustomValueContainer<T>(props: ValueContainerProps<Option<T>> & { selectProps: CustomComponentsProps }) {
-	const { ValueContainer } = components;
-
 	if (props.selectProps.valueContainerView) {
 		return props.selectProps.valueContainerView(props);
 	}

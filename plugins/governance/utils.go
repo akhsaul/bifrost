@@ -35,7 +35,7 @@ func ParseVirtualKeyFromFastHTTPRequest(req *fasthttp.RequestCtx) *string {
 		return bifrost.Ptr(xAPIKey)
 	}
 	xGoogleAPIKey := string(req.Request.Header.Peek("x-goog-api-key"))
-	if xGoogleAPIKey != "" && strings.HasPrefix(strings.ToLower(xGoogleAPIKey), VirtualKeyPrefix) {		
+	if xGoogleAPIKey != "" && strings.HasPrefix(strings.ToLower(xGoogleAPIKey), VirtualKeyPrefix) {
 		return bifrost.Ptr(xGoogleAPIKey)
 	}
 	return nil
@@ -100,9 +100,9 @@ func (p *GovernancePlugin) filterModelsForVirtualKey(
 		return []schemas.Model{} // VK not found, return empty list
 	}
 
-	// Empty ProviderConfigs means all models are allowed
+	// Empty ProviderConfigs means no models are allowed (deny-by-default)
 	if len(vk.ProviderConfigs) == 0 {
-		return models
+		return []schemas.Model{}
 	}
 
 	// Filter models based on ProviderConfigs
@@ -115,13 +115,17 @@ func (p *GovernancePlugin) filterModelsForVirtualKey(
 		for _, pc := range vk.ProviderConfigs {
 			if pc.Provider == string(provider) {
 				if p.modelCatalog != nil && p.inMemoryStore != nil {
-					providerConfig := p.inMemoryStore.GetConfiguredProviders()[provider]
-					if p.modelCatalog.IsModelAllowedForProvider(provider, modelName, &providerConfig, pc.AllowedModels) {
+					providerConfig, ok := p.inMemoryStore.GetConfiguredProviders()[provider]
+					providerConfigPtr := &providerConfig
+					if !ok {
+						providerConfigPtr = nil
+					}
+					if p.modelCatalog.IsModelAllowedForProvider(provider, modelName, providerConfigPtr, pc.AllowedModels) {
 						isAllowed = true
 						break
 					}
 				} else {
-					if len(pc.AllowedModels) == 0 || slices.Contains(pc.AllowedModels, modelName) {
+					if pc.AllowedModels.IsAllowed(modelName) {
 						isAllowed = true
 						break
 					}

@@ -81,7 +81,8 @@ func (cr *BifrostChatResponse) ToTextCompletionResponse() *BifrostTextCompletion
 				RequestType:             TextCompletionRequest,
 				ChunkIndex:              cr.ExtraFields.ChunkIndex,
 				Provider:                cr.ExtraFields.Provider,
-				ModelRequested:          cr.ExtraFields.ModelRequested,
+				OriginalModelRequested:  cr.ExtraFields.OriginalModelRequested,
+				ResolvedModelUsed:       cr.ExtraFields.ResolvedModelUsed,
 				Latency:                 cr.ExtraFields.Latency,
 				RawResponse:             cr.ExtraFields.RawResponse,
 				CacheDebug:              cr.ExtraFields.CacheDebug,
@@ -114,7 +115,8 @@ func (cr *BifrostChatResponse) ToTextCompletionResponse() *BifrostTextCompletion
 				RequestType:             TextCompletionRequest,
 				ChunkIndex:              cr.ExtraFields.ChunkIndex,
 				Provider:                cr.ExtraFields.Provider,
-				ModelRequested:          cr.ExtraFields.ModelRequested,
+				OriginalModelRequested:  cr.ExtraFields.OriginalModelRequested,
+				ResolvedModelUsed:       cr.ExtraFields.ResolvedModelUsed,
 				Latency:                 cr.ExtraFields.Latency,
 				RawResponse:             cr.ExtraFields.RawResponse,
 				CacheDebug:              cr.ExtraFields.CacheDebug,
@@ -150,7 +152,8 @@ func (cr *BifrostChatResponse) ToTextCompletionResponse() *BifrostTextCompletion
 				RequestType:             TextCompletionRequest,
 				ChunkIndex:              cr.ExtraFields.ChunkIndex,
 				Provider:                cr.ExtraFields.Provider,
-				ModelRequested:          cr.ExtraFields.ModelRequested,
+				OriginalModelRequested:  cr.ExtraFields.OriginalModelRequested,
+				ResolvedModelUsed:       cr.ExtraFields.ResolvedModelUsed,
 				Latency:                 cr.ExtraFields.Latency,
 				RawResponse:             cr.ExtraFields.RawResponse,
 				CacheDebug:              cr.ExtraFields.CacheDebug,
@@ -167,13 +170,15 @@ func (cr *BifrostChatResponse) ToTextCompletionResponse() *BifrostTextCompletion
 		SystemFingerprint: cr.SystemFingerprint,
 		Usage:             cr.Usage,
 		ExtraFields: BifrostResponseExtraFields{
-			RequestType:    TextCompletionRequest,
-			ChunkIndex:     cr.ExtraFields.ChunkIndex,
-			Provider:       cr.ExtraFields.Provider,
-			ModelRequested: cr.ExtraFields.ModelRequested,
-			Latency:        cr.ExtraFields.Latency,
-			RawResponse:    cr.ExtraFields.RawResponse,
-			CacheDebug:     cr.ExtraFields.CacheDebug,
+			RequestType:             TextCompletionRequest,
+			ChunkIndex:              cr.ExtraFields.ChunkIndex,
+			Provider:                cr.ExtraFields.Provider,
+			OriginalModelRequested:  cr.ExtraFields.OriginalModelRequested,
+			ResolvedModelUsed:       cr.ExtraFields.ResolvedModelUsed,
+			Latency:                 cr.ExtraFields.Latency,
+			RawResponse:             cr.ExtraFields.RawResponse,
+			CacheDebug:              cr.ExtraFields.CacheDebug,
+			ProviderResponseHeaders: cr.ExtraFields.ProviderResponseHeaders,
 		},
 	}
 }
@@ -726,7 +731,6 @@ type AdditionalPropertiesStruct struct {
 // MarshalJSON implements custom JSON marshalling for AdditionalPropertiesStruct.
 // It marshals either AdditionalPropertiesBool or AdditionalPropertiesMap based on which is set.
 func (a AdditionalPropertiesStruct) MarshalJSON() ([]byte, error) {
-
 	// if both are set, return an error
 	if a.AdditionalPropertiesBool != nil && a.AdditionalPropertiesMap != nil {
 		return nil, fmt.Errorf("both AdditionalPropertiesBool and AdditionalPropertiesMap are set; only one should be non-nil")
@@ -1490,7 +1494,7 @@ type BifrostLLMUsage struct {
 	CompletionTokens        int                          `json:"completion_tokens,omitempty"`
 	CompletionTokensDetails *ChatCompletionTokensDetails `json:"completion_tokens_details,omitempty"`
 	TotalTokens             int                          `json:"total_tokens"`
-	Cost                    *BifrostCost                 `json:"cost,omitempty"` //Only for the providers which support cost calculation
+	Cost                    *BifrostCost                 `json:"cost,omitempty"` // Only for the providers which support cost calculation
 }
 
 type ChatPromptTokensDetails struct {
