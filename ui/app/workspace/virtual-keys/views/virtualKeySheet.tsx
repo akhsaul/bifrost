@@ -619,7 +619,7 @@ export default function VirtualKeySheet({ virtualKey, teams, customers, defaultT
 							<fieldset
 								disabled={isManagedByProfile}
 								aria-disabled={isManagedByProfile}
-								inert={isManagedByProfile ? "" : undefined}
+								inert={isManagedByProfile ? true : undefined}
 								className={isManagedByProfile ? "pointer-events-none space-y-4 opacity-50" : "space-y-4"}
 							>
 							<div className="space-y-4">

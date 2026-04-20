@@ -342,7 +342,7 @@ export default function VirtualKeyDetailSheet({ virtualKey, onClose }: VirtualKe
 					<div className="space-y-4">
 						<h3 className="font-semibold">
 							Budget Information
-							{isManagedByProfile && managingProfile?.budgets?.length ? (
+							{isManagedByProfile && managingProfile?.budget_lines?.length ? (
 								<span className="text-muted-foreground ml-2 text-xs font-normal">(from {managingProfile.name})</span>
 							) : null}
 						</h3>
