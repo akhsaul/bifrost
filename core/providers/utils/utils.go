@@ -1702,7 +1702,7 @@ func ShouldSendBackRawResponse(ctx context.Context, defaultSendBackRawResponse b
 }
 
 // SendCreatedEventResponsesChunk sends a ResponsesStreamResponseTypeCreated event.
-func SendCreatedEventResponsesChunk(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, startTime time.Time, responseChan chan *schemas.BifrostStreamChunk) {
+func SendCreatedEventResponsesChunk(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, startTime time.Time, responseChan chan *schemas.BifrostStreamChunk, postHookSpanFinalizer func(context.Context)) {
 	firstChunk := &schemas.BifrostResponsesStreamResponse{
 		Type:           schemas.ResponsesStreamResponseTypeCreated,
 		SequenceNumber: 0,
@@ -1716,11 +1716,11 @@ func SendCreatedEventResponsesChunk(ctx *schemas.BifrostContext, postHookRunner 
 	bifrostResponse := &schemas.BifrostResponse{
 		ResponsesStreamResponse: firstChunk,
 	}
-	ProcessAndSendResponse(ctx, postHookRunner, bifrostResponse, responseChan)
+	ProcessAndSendResponse(ctx, postHookRunner, bifrostResponse, responseChan, postHookSpanFinalizer)
 }
 
 // SendInProgressEventResponsesChunk sends a ResponsesStreamResponseTypeInProgress event
-func SendInProgressEventResponsesChunk(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, startTime time.Time, responseChan chan *schemas.BifrostStreamChunk) {
+func SendInProgressEventResponsesChunk(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, startTime time.Time, responseChan chan *schemas.BifrostStreamChunk, postHookSpanFinalizer func(context.Context)) {
 	chunk := &schemas.BifrostResponsesStreamResponse{
 		Type:           schemas.ResponsesStreamResponseTypeInProgress,
 		SequenceNumber: 1,
@@ -1734,7 +1734,7 @@ func SendInProgressEventResponsesChunk(ctx *schemas.BifrostContext, postHookRunn
 	bifrostResponse := &schemas.BifrostResponse{
 		ResponsesStreamResponse: chunk,
 	}
-	ProcessAndSendResponse(ctx, postHookRunner, bifrostResponse, responseChan)
+	ProcessAndSendResponse(ctx, postHookRunner, bifrostResponse, responseChan, postHookSpanFinalizer)
 }
 
 // BuildClientStreamChunk constructs a BifrostStreamChunk from post-hook results.
@@ -1847,6 +1847,7 @@ func ProcessAndSendResponse(
 	postHookRunner schemas.PostHookRunner,
 	response *schemas.BifrostResponse,
 	responseChan chan *schemas.BifrostStreamChunk,
+	postHookSpanFinalizer func(context.Context),
 ) {
 	// Accumulate chunk for tracing (common for all providers)
 	if tracer, ok := ctx.Value(schemas.BifrostContextKeyTracer).(schemas.Tracer); ok && tracer != nil {
@@ -1862,7 +1863,7 @@ func ProcessAndSendResponse(
 		// Even if skipping, complete the deferred span if this is the final chunk
 		if isFinalChunk := ctx.Value(schemas.BifrostContextKeyStreamEndIndicator); isFinalChunk != nil {
 			if final, ok := isFinalChunk.(bool); ok && final {
-				completeDeferredSpan(ctx, processedResponse, processedError)
+				completeDeferredSpan(ctx, processedResponse, processedError, postHookSpanFinalizer)
 			}
 		}
 		return
@@ -1879,7 +1880,7 @@ func ProcessAndSendResponse(
 	// Check if this is the final chunk and complete deferred span with post-processed data
 	if isFinalChunk := ctx.Value(schemas.BifrostContextKeyStreamEndIndicator); isFinalChunk != nil {
 		if final, ok := isFinalChunk.(bool); ok && final {
-			completeDeferredSpan(ctx, processedResponse, processedError)
+			completeDeferredSpan(ctx, processedResponse, processedError, postHookSpanFinalizer)
 		}
 	}
 }
@@ -1895,6 +1896,7 @@ func ProcessAndSendBifrostError(
 	bifrostErr *schemas.BifrostError,
 	responseChan chan *schemas.BifrostStreamChunk,
 	logger schemas.Logger,
+	postHookSpanFinalizer func(context.Context),
 ) {
 	// Run post hooks first so span reflects post-processed data
 	processedResponse, processedError := postHookRunner(ctx, nil, bifrostErr)
@@ -1903,7 +1905,7 @@ func ProcessAndSendBifrostError(
 		// Even if skipping, complete the deferred span if this is the final chunk
 		if isFinalChunk := ctx.Value(schemas.BifrostContextKeyStreamEndIndicator); isFinalChunk != nil {
 			if final, ok := isFinalChunk.(bool); ok && final {
-				completeDeferredSpan(ctx, processedResponse, processedError)
+				completeDeferredSpan(ctx, processedResponse, processedError, postHookSpanFinalizer)
 			}
 		}
 		return
@@ -1919,7 +1921,7 @@ func ProcessAndSendBifrostError(
 	// Check if this is the final chunk and complete deferred span with post-processed data
 	if isFinalChunk := ctx.Value(schemas.BifrostContextKeyStreamEndIndicator); isFinalChunk != nil {
 		if final, ok := isFinalChunk.(bool); ok && final {
-			completeDeferredSpan(ctx, processedResponse, processedError)
+			completeDeferredSpan(ctx, processedResponse, processedError, postHookSpanFinalizer)
 		}
 	}
 }
@@ -1939,21 +1941,13 @@ func ProcessAndSendBifrostError(
 //
 // Panics inside the finalizer are recovered and logged so they never mask an
 // in-flight panic that triggered the defer.
-func EnsureStreamFinalizerCalled(ctx context.Context) {
-	// Install the recover first so any panic — including one triggered by
-	// accessing ctx itself — is caught. This matters because this helper is
-	// called from `defer`, so a panic here would mask the in-flight panic
-	// that invoked the defer.
+func EnsureStreamFinalizerCalled(ctx context.Context, finalizer func(context.Context)) {
 	defer func() {
 		if r := recover(); r != nil {
 			getLogger().Debug("recovered panic in deferred stream finalizer: %v", r)
 		}
 	}()
-	if ctx == nil {
-		return
-	}
-	finalizer, ok := ctx.Value(schemas.BifrostContextKeyPostHookSpanFinalizer).(func(context.Context))
-	if !ok || finalizer == nil {
+	if finalizer == nil {
 		return
 	}
 	finalizer(ctx)
@@ -2082,6 +2076,7 @@ func HandleStreamCancellation(
 	postHookRunner schemas.PostHookRunner,
 	responseChan chan *schemas.BifrostStreamChunk,
 	logger schemas.Logger,
+	postHookSpanFinalizer func(context.Context),
 ) {
 	// Check if already handled (StreamEndIndicator already set)
 	if indicator := ctx.GetAndSetValue(schemas.BifrostContextKeyStreamEndIndicator, true); indicator != nil {
@@ -2099,7 +2094,7 @@ func HandleStreamCancellation(
 	}
 
 	// Send through PostHook chain - this updates the log to "error" status
-	ProcessAndSendBifrostError(ctx, postHookRunner, cancelErr, responseChan, logger)
+	ProcessAndSendBifrostError(ctx, postHookRunner, cancelErr, responseChan, logger, postHookSpanFinalizer)
 }
 
 // HandleStreamTimeout should be called when a streaming goroutine exits
@@ -2115,6 +2110,7 @@ func HandleStreamTimeout(
 	postHookRunner schemas.PostHookRunner,
 	responseChan chan *schemas.BifrostStreamChunk,
 	logger schemas.Logger,
+	postHookSpanFinalizer func(context.Context),
 ) {
 	// Check if already handled (StreamEndIndicator already set)
 	if indicator := ctx.GetAndSetValue(schemas.BifrostContextKeyStreamEndIndicator, true); indicator != nil {
@@ -2132,7 +2128,7 @@ func HandleStreamTimeout(
 	}
 
 	// Send through PostHook chain - this updates the log to "error" status
-	ProcessAndSendBifrostError(ctx, postHookRunner, timeoutErr, responseChan, logger)
+	ProcessAndSendBifrostError(ctx, postHookRunner, timeoutErr, responseChan, logger, postHookSpanFinalizer)
 }
 
 // ProcessAndSendError handles post-hook processing and sends the error to the channel.
@@ -2145,6 +2141,7 @@ func ProcessAndSendError(
 	err error,
 	responseChan chan *schemas.BifrostStreamChunk,
 	logger schemas.Logger,
+	postHookSpanFinalizer func(context.Context),
 ) {
 	// Send scanner error through channel
 	bifrostError := &schemas.BifrostError{
@@ -2646,7 +2643,7 @@ func GetBudgetTokensFromReasoningEffort(
 // This is called when the final chunk is processed (when StreamEndIndicator is true).
 // It retrieves the deferred span handle from TraceStore using the trace ID from context,
 // populates response attributes from accumulated chunks, and ends the span.
-func completeDeferredSpan(ctx *schemas.BifrostContext, result *schemas.BifrostResponse, err *schemas.BifrostError) {
+func completeDeferredSpan(ctx *schemas.BifrostContext, result *schemas.BifrostResponse, err *schemas.BifrostError, postHookSpanFinalizer func(context.Context)) {
 	if ctx == nil {
 		return
 	}
@@ -2705,14 +2702,14 @@ func completeDeferredSpan(ctx *schemas.BifrostContext, result *schemas.BifrostRe
 	// Finalize aggregated post-hook spans before ending the LLM span
 	// This creates one span per plugin with average execution time
 	// We need to set the llm.call span ID in context so post-hook spans become its children
-	if finalizer, ok := ctx.Value(schemas.BifrostContextKeyPostHookSpanFinalizer).(func(context.Context)); ok && finalizer != nil {
+	if postHookSpanFinalizer != nil {
 		// Get the deferred span ID (the llm.call span) to set as parent for post-hook spans
 		spanID := tracer.GetDeferredSpanID(traceID)
 		if spanID != "" {
 			finalizerCtx := context.WithValue(ctx, schemas.BifrostContextKeySpanID, spanID)
-			finalizer(finalizerCtx)
+			postHookSpanFinalizer(finalizerCtx)
 		} else {
-			finalizer(ctx)
+			postHookSpanFinalizer(ctx)
 		}
 	}
 

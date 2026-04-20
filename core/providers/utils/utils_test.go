@@ -1198,7 +1198,7 @@ func TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromResponseChu
 			}
 
 			responseChan := make(chan *schemas.BifrostStreamChunk, 1)
-			ProcessAndSendResponse(ctx, passThrough, response, responseChan)
+			ProcessAndSendResponse(ctx, passThrough, response, responseChan, nil)
 
 			chunk := <-responseChan
 			if chunk.BifrostChatResponse == nil {
@@ -1289,7 +1289,7 @@ func TestProcessAndSendResponse_StoreRawLoggingOnly_StripsRawDataFromErrorChunk(
 			responseChan := make(chan *schemas.BifrostStreamChunk, 1)
 			ProcessAndSendResponse(ctx, errorRunner, &schemas.BifrostResponse{
 				ChatResponse: &schemas.BifrostChatResponse{ID: "chatcmpl-001"},
-			}, responseChan)
+			}, responseChan, nil)
 
 			chunk := <-responseChan
 			if chunk.BifrostError == nil {

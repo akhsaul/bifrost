@@ -2,6 +2,7 @@
 package schemas
 
 import (
+	"context"
 	"encoding/json"
 	"maps"
 	"time"
@@ -498,16 +499,19 @@ type Provider interface {
 	ListModels(ctx *BifrostContext, keys []Key, request *BifrostListModelsRequest) (*BifrostListModelsResponse, *BifrostError)
 	// TextCompletion performs a text completion request
 	TextCompletion(ctx *BifrostContext, key Key, request *BifrostTextCompletionRequest) (*BifrostTextCompletionResponse, *BifrostError)
-	// TextCompletionStream performs a text completion stream request
-	TextCompletionStream(ctx *BifrostContext, postHookRunner PostHookRunner, key Key, request *BifrostTextCompletionRequest) (chan *BifrostStreamChunk, *BifrostError)
+	// TextCompletionStream performs a text completion stream request.
+	// postHookSpanFinalizer is invoked by the provider's stream goroutine on stream completion
+	// (or on its panic-recovery defer) to finalize aggregated post-hook spans and release the
+	// per-attempt plugin pipeline. Pass nil if the caller does not need finalization.
+	TextCompletionStream(ctx *BifrostContext, postHookRunner PostHookRunner, postHookSpanFinalizer func(context.Context), key Key, request *BifrostTextCompletionRequest) (chan *BifrostStreamChunk, *BifrostError)
 	// ChatCompletion performs a chat completion request
 	ChatCompletion(ctx *BifrostContext, key Key, request *BifrostChatRequest) (*BifrostChatResponse, *BifrostError)
 	// ChatCompletionStream performs a chat completion stream request
-	ChatCompletionStream(ctx *BifrostContext, postHookRunner PostHookRunner, key Key, request *BifrostChatRequest) (chan *BifrostStreamChunk, *BifrostError)
+	ChatCompletionStream(ctx *BifrostContext, postHookRunner PostHookRunner, postHookSpanFinalizer func(context.Context), key Key, request *BifrostChatRequest) (chan *BifrostStreamChunk, *BifrostError)
 	// Responses performs a completion request using the Responses API (uses chat completion request internally for non-openai providers)
 	Responses(ctx *BifrostContext, key Key, request *BifrostResponsesRequest) (*BifrostResponsesResponse, *BifrostError)
 	// ResponsesStream performs a completion request using the Responses API stream (uses chat completion stream request internally for non-openai providers)
-	ResponsesStream(ctx *BifrostContext, postHookRunner PostHookRunner, key Key, request *BifrostResponsesRequest) (chan *BifrostStreamChunk, *BifrostError)
+	ResponsesStream(ctx *BifrostContext, postHookRunner PostHookRunner, postHookSpanFinalizer func(context.Context), key Key, request *BifrostResponsesRequest) (chan *BifrostStreamChunk, *BifrostError)
 	// CountTokens performs a count tokens request
 	CountTokens(ctx *BifrostContext, key Key, request *BifrostResponsesRequest) (*BifrostCountTokensResponse, *BifrostError)
 	// Embedding performs an embedding request
@@ -519,21 +523,21 @@ type Provider interface {
 	// Speech performs a text to speech request
 	Speech(ctx *BifrostContext, key Key, request *BifrostSpeechRequest) (*BifrostSpeechResponse, *BifrostError)
 	// SpeechStream performs a text to speech stream request
-	SpeechStream(ctx *BifrostContext, postHookRunner PostHookRunner, key Key, request *BifrostSpeechRequest) (chan *BifrostStreamChunk, *BifrostError)
+	SpeechStream(ctx *BifrostContext, postHookRunner PostHookRunner, postHookSpanFinalizer func(context.Context), key Key, request *BifrostSpeechRequest) (chan *BifrostStreamChunk, *BifrostError)
 	// Transcription performs a transcription request
 	Transcription(ctx *BifrostContext, key Key, request *BifrostTranscriptionRequest) (*BifrostTranscriptionResponse, *BifrostError)
 	// TranscriptionStream performs a transcription stream request
-	TranscriptionStream(ctx *BifrostContext, postHookRunner PostHookRunner, key Key, request *BifrostTranscriptionRequest) (chan *BifrostStreamChunk, *BifrostError)
+	TranscriptionStream(ctx *BifrostContext, postHookRunner PostHookRunner, postHookSpanFinalizer func(context.Context), key Key, request *BifrostTranscriptionRequest) (chan *BifrostStreamChunk, *BifrostError)
 	// ImageGeneration performs an image generation request
 	ImageGeneration(ctx *BifrostContext, key Key, request *BifrostImageGenerationRequest) (
 		*BifrostImageGenerationResponse, *BifrostError)
 	// ImageGenerationStream performs an image generation stream request
-	ImageGenerationStream(ctx *BifrostContext, postHookRunner PostHookRunner, key Key,
+	ImageGenerationStream(ctx *BifrostContext, postHookRunner PostHookRunner, postHookSpanFinalizer func(context.Context), key Key,
 		request *BifrostImageGenerationRequest) (chan *BifrostStreamChunk, *BifrostError)
 	// ImageEdit performs an image edit request
 	ImageEdit(ctx *BifrostContext, key Key, request *BifrostImageEditRequest) (*BifrostImageGenerationResponse, *BifrostError)
 	// ImageEditStream performs an image edit stream request
-	ImageEditStream(ctx *BifrostContext, postHookRunner PostHookRunner, key Key,
+	ImageEditStream(ctx *BifrostContext, postHookRunner PostHookRunner, postHookSpanFinalizer func(context.Context), key Key,
 		request *BifrostImageEditRequest) (chan *BifrostStreamChunk, *BifrostError)
 	// ImageVariation performs an image variation request
 	ImageVariation(ctx *BifrostContext, key Key, request *BifrostImageVariationRequest) (*BifrostImageGenerationResponse, *BifrostError)
@@ -592,7 +596,7 @@ type Provider interface {
 	// Passthrough executes a non-streaming passthrough; body is fully buffered.
 	Passthrough(ctx *BifrostContext, key Key, req *BifrostPassthroughRequest) (*BifrostPassthroughResponse, *BifrostError)
 	// PassthroughStream executes a streaming passthrough, forwarding raw response bytes as BifrostStreamChunks.
-	PassthroughStream(ctx *BifrostContext, postHookRunner PostHookRunner, key Key, req *BifrostPassthroughRequest) (chan *BifrostStreamChunk, *BifrostError)
+	PassthroughStream(ctx *BifrostContext, postHookRunner PostHookRunner, postHookSpanFinalizer func(context.Context), key Key, req *BifrostPassthroughRequest) (chan *BifrostStreamChunk, *BifrostError)
 }
 
 // WebSocketCapableProvider is an optional interface that providers can implement

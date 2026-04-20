@@ -96,7 +96,7 @@ func TestMistralProvider_CustomAliasChatStreamUsesBaseCompatibilityAndAliasMetad
 		return response, err
 	}
 
-	stream, bifrostErr := provider.ChatCompletionStream(ctx, postHookRunner, schemas.Key{}, request)
+	stream, bifrostErr := provider.ChatCompletionStream(ctx, postHookRunner, nil, schemas.Key{}, request)
 	require.Nil(t, bifrostErr)
 
 	var firstResponse *schemas.BifrostChatResponse
