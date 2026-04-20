@@ -86,14 +86,10 @@ func waitForJobStatus(t *testing.T, store LogStore, jobID string) *AsyncJob {
 func TestSubmitJob_PropagatesContextValues(t *testing.T) {
 	executor := newTestAsyncExecutor(t)
 
-	// Simulate original request context values
-	contextValues := map[any]any{
-		schemas.BifrostContextKeyVirtualKey:         "sk-bf-test",
-		schemas.BifrostContextKey("x-bf-prom-env"):  "production",
-		schemas.BifrostContextKey("x-bf-eh-custom"): "custom-value",
-	}
-
-	var capturedCtx *schemas.BifrostContext
+	capturedCtx := schemas.NewBifrostContext(context.Background(), <-time.After(1*time.Minute))
+	capturedCtx.SetValue(schemas.BifrostContextKeyVirtualKey, "sk-bf-test")
+	capturedCtx.SetValue(schemas.BifrostContextKey("x-bf-eh-custom"), "custom-value")
+	capturedCtx.SetValue(schemas.BifrostContextKey("x-bf-prom-env"), "production")
 	var done atomic.Bool
 
 	operation := func(bgCtx *schemas.BifrostContext) (interface{}, *schemas.BifrostError) {

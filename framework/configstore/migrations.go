@@ -72,6 +72,22 @@ func (l *migrationLock) release(ctx context.Context) {
 	l.conn.Close()
 }
 
+// RunSingleMigration applies a single gormigrate migration on the given
+// *gorm.DB. Mirrors (*RDBConfigStore).RunMigration but takes the *gorm.DB
+// directly, so downstream consumers (bifrost-enterprise, plugins) can run
+// their migrations inside a MigrateOnFreshConnection callback without having
+// to reach the throwaway pool through the ConfigStore abstraction.
+func RunSingleMigration(ctx context.Context, db *gorm.DB, migration *migrator.Migration) error {
+	if db == nil {
+		return fmt.Errorf("db cannot be nil")
+	}
+	if migration == nil {
+		return fmt.Errorf("migration cannot be nil")
+	}
+	m := migrator.New(db.WithContext(ctx), migrator.DefaultOptions, []*migrator.Migration{migration})
+	return m.Migrate()
+}
+
 // Migrate performs the necessary database migrations.
 func triggerMigrations(ctx context.Context, db *gorm.DB) error {
 	// Acquire advisory lock to serialize migrations across cluster nodes.

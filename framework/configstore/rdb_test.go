@@ -53,10 +53,13 @@ func setupRDBTestStore(t *testing.T) *RDBConfigStore {
 	err = db.SetupJoinTable(&tables.TableVirtualKeyProviderConfig{}, "Keys", &tables.TableVirtualKeyProviderConfigKey{})
 	require.NoError(t, err, "Failed to setup join table")
 
-	return &RDBConfigStore{
-		db:     db,
-		logger: nil,
+	s := &RDBConfigStore{logger: nil}
+	s.db.Store(db)
+	s.migrateOnFreshFn = func(ctx context.Context, fn func(context.Context, *gorm.DB) error) error {
+		return fn(ctx, s.DB())
 	}
+	s.refreshPoolFn = func(ctx context.Context) error { return nil }
+	return s
 }
 
 // =============================================================================
@@ -718,7 +721,7 @@ func TestCreateVirtualKeyProviderConfig_WithKeys(t *testing.T) {
 
 	// Load with keys
 	var configWithKeys tables.TableVirtualKeyProviderConfig
-	err = store.db.Preload("Keys").First(&configWithKeys, "id = ?", configs[0].ID).Error
+	err = store.DB().Preload("Keys").First(&configWithKeys, "id = ?", configs[0].ID).Error
 	require.NoError(t, err)
 	assert.Len(t, configWithKeys.Keys, 1)
 }
@@ -1203,7 +1206,7 @@ func createTestPromptTree(t *testing.T, store *RDBConfigStore, ctx context.Conte
 func countRows(t *testing.T, store *RDBConfigStore, model interface{}) int64 {
 	t.Helper()
 	var count int64
-	require.NoError(t, store.db.Model(model).Count(&count).Error)
+	require.NoError(t, store.DB().Model(model).Count(&count).Error)
 	return count
 }
 
@@ -1389,7 +1392,7 @@ func TestDeletePromptSession(t *testing.T) {
 
 		// Session messages for that session should be gone
 		var msgCount int64
-		require.NoError(t, store.db.Model(&tables.TablePromptSessionMessage{}).Where("session_id = ?", sessionID).Count(&msgCount).Error)
+		require.NoError(t, store.DB().Model(&tables.TablePromptSessionMessage{}).Where("session_id = ?", sessionID).Count(&msgCount).Error)
 		assert.Equal(t, int64(0), msgCount)
 	})
 

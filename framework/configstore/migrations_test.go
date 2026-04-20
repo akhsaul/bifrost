@@ -1122,10 +1122,12 @@ func setupFullMigrationDB(t *testing.T) (*RDBConfigStore, *gorm.DB) {
 	err = triggerMigrations(ctx, db)
 	require.NoError(t, err, "triggerMigrations should succeed on a fresh DB")
 
-	store := &RDBConfigStore{
-		db:     db,
-		logger: bifrost.NewDefaultLogger(schemas.LogLevelInfo),
+	store := &RDBConfigStore{logger: bifrost.NewDefaultLogger(schemas.LogLevelInfo)}
+	store.db.Store(db)
+	store.migrateOnFreshFn = func(ctx context.Context, fn func(context.Context, *gorm.DB) error) error {
+		return fn(ctx, store.DB())
 	}
+	store.refreshPoolFn = func(ctx context.Context) error { return nil }
 	return store, db
 }
 
