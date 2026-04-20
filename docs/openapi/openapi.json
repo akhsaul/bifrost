@@ -28469,7 +28469,7 @@
             }
           },
           "400": {
-            "description": "Bad request",
+            "description": "Bad request (e.g. missing required fields, invalid email format, or role not found)",
             "content": {
               "application/json": {
                 "schema": {
@@ -28505,7 +28505,7 @@
       "delete": {
         "operationId": "deleteUser",
         "summary": "Delete user",
-        "description": "Permanently removes a user from the organization. This cascades to delete the user's governance settings (budget/rate limits), team memberships, access profiles, and OIDC sessions. Cannot delete yourself.\n",
+        "description": "Soft-deletes a user from the organization. This performs cascading cleanup of user governance settings (budget/rate limits), team memberships, access profiles, virtual keys, and OIDC sessions before marking the user deleted. Cannot delete yourself.\n",
         "tags": [
           "Users"
         ],
