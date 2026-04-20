@@ -14,7 +14,8 @@ import (
 // CerebrasProvider implements the Provider interface for Cerebras's API.
 type CerebrasProvider struct {
 	logger              schemas.Logger        // Logger for provider operations
-	client              *fasthttp.Client      // HTTP client for API requests
+	client              *fasthttp.Client      // HTTP client for unary API requests (ReadTimeout bounds overall response)
+	streamingClient     *fasthttp.Client      // HTTP client for streaming API requests (no ReadTimeout; idle governed by NewIdleTimeoutReader)
 	networkConfig       schemas.NetworkConfig // Network configuration including extra headers
 	sendBackRawRequest  bool                  // Whether to include raw request in BifrostResponse
 	sendBackRawResponse bool                  // Whether to include raw response in BifrostResponse
@@ -41,6 +42,7 @@ func NewCerebrasProvider(config *schemas.ProviderConfig, logger schemas.Logger) 
 	client = providerUtils.ConfigureProxy(client, config.ProxyConfig, logger)
 	client = providerUtils.ConfigureDialer(client)
 	client = providerUtils.ConfigureTLS(client, config.NetworkConfig, logger)
+	streamingClient := providerUtils.BuildStreamingClient(client)
 	// Set default BaseURL if not provided
 	if config.NetworkConfig.BaseURL == "" {
 		config.NetworkConfig.BaseURL = "https://api.cerebras.ai"
@@ -50,6 +52,7 @@ func NewCerebrasProvider(config *schemas.ProviderConfig, logger schemas.Logger) 
 	return &CerebrasProvider{
 		logger:              logger,
 		client:              client,
+		streamingClient:     streamingClient,
 		networkConfig:       config.NetworkConfig,
 		sendBackRawRequest:  config.SendBackRawRequest,
 		sendBackRawResponse: config.SendBackRawResponse,
@@ -107,7 +110,7 @@ func (provider *CerebrasProvider) TextCompletionStream(ctx *schemas.BifrostConte
 	// Use shared OpenAI-compatible streaming logic
 	return openai.HandleOpenAITextCompletionStreaming(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		provider.networkConfig.BaseURL+"/v1/completions",
 		request,
 		authHeader,
@@ -153,7 +156,7 @@ func (provider *CerebrasProvider) ChatCompletionStream(ctx *schemas.BifrostConte
 	// Use shared OpenAI-compatible streaming logic
 	return openai.HandleOpenAIChatCompletionStreaming(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		provider.networkConfig.BaseURL+"/v1/chat/completions",
 		request,
 		authHeader,

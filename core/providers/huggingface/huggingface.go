@@ -21,7 +21,8 @@ import (
 // HuggingFaceProvider implements the Provider interface for Hugging Face's inference APIs.
 type HuggingFaceProvider struct {
 	logger                    schemas.Logger
-	client                    *fasthttp.Client
+	client                    *fasthttp.Client // unary API requests (ReadTimeout bounds overall response)
+	streamingClient           *fasthttp.Client // streaming API requests (no ReadTimeout; idle governed by NewIdleTimeoutReader)
 	networkConfig             schemas.NetworkConfig
 	sendBackRawResponse       bool
 	sendBackRawRequest        bool
@@ -89,6 +90,7 @@ func NewHuggingFaceProvider(config *schemas.ProviderConfig, logger schemas.Logge
 	client = providerUtils.ConfigureProxy(client, config.ProxyConfig, logger)
 	client = providerUtils.ConfigureDialer(client)
 	client = providerUtils.ConfigureTLS(client, config.NetworkConfig, logger)
+	streamingClient := providerUtils.BuildStreamingClient(client)
 	if config.NetworkConfig.BaseURL == "" {
 		config.NetworkConfig.BaseURL = defaultInferenceBaseURL
 	}
@@ -97,6 +99,7 @@ func NewHuggingFaceProvider(config *schemas.ProviderConfig, logger schemas.Logge
 	return &HuggingFaceProvider{
 		logger:                    logger,
 		client:                    client,
+		streamingClient:           streamingClient,
 		networkConfig:             config.NetworkConfig,
 		sendBackRawResponse:       config.SendBackRawResponse,
 		sendBackRawRequest:        config.SendBackRawRequest,
@@ -569,7 +572,7 @@ func (provider *HuggingFaceProvider) ChatCompletionStream(ctx *schemas.BifrostCo
 	// Use shared OpenAI-compatible streaming logic
 	return openai.HandleOpenAIChatCompletionStreaming(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		provider.buildRequestURL(ctx, "/v1/chat/completions", schemas.ChatCompletionStreamRequest),
 		request,
 		authHeader,
@@ -1056,7 +1059,7 @@ func (provider *HuggingFaceProvider) ImageGenerationStream(ctx *schemas.BifrostC
 	}
 
 	// Make the request
-	err := provider.client.Do(req, resp)
+	err := provider.streamingClient.Do(req, resp)
 	if err != nil {
 		defer providerUtils.ReleaseStreamingResponse(resp)
 		if errors.Is(err, context.Canceled) {
@@ -1435,7 +1438,7 @@ func (provider *HuggingFaceProvider) ImageEditStream(ctx *schemas.BifrostContext
 	}
 
 	// Make the request
-	err := provider.client.Do(req, resp)
+	err := provider.streamingClient.Do(req, resp)
 	if err != nil {
 		defer providerUtils.ReleaseStreamingResponse(resp)
 		if errors.Is(err, context.Canceled) {

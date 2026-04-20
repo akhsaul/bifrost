@@ -471,8 +471,9 @@ func TestTranscriptionWithMockServer(t *testing.T) {
 				assert.Equal(t, 3.5, *resp.Duration)
 				require.NotNil(t, resp.Language)
 				assert.Equal(t, "en", *resp.Language)
-				assert.Equal(t, schemas.TranscriptionRequest, resp.ExtraFields.RequestType)
-				assert.Equal(t, schemas.Mistral, resp.ExtraFields.Provider)
+				// Provider and RequestType on ExtraFields are populated by
+				// bifrost.go's dispatcher via PopulateExtraFields, not by
+				// provider methods called in isolation.
 			},
 		},
 		{
@@ -1532,8 +1533,8 @@ func TestMistralTranscriptionIntegration(t *testing.T) {
 	assert.NotNil(t, resp)
 	// TODO: Send a proper audio file with speech to validate resp.Text is non-empty
 	// assert.NotEmpty(t, resp.Text)
-	assert.Equal(t, schemas.TranscriptionRequest, resp.ExtraFields.RequestType)
-	assert.Equal(t, schemas.Mistral, resp.ExtraFields.Provider)
+	// Note: ExtraFields.Provider/RequestType are populated by bifrost.go's
+	// dispatcher, not by provider methods called in isolation.
 	t.Logf("   Transcribed text: %s", resp.Text)
 }
 
@@ -1622,8 +1623,8 @@ func TestMistralTranscriptionStreamIntegration(t *testing.T) {
 	t.Logf("   Total chunks received: %d", chunkCount)
 	t.Logf("   Transcribed text: %s", allText)
 
-	if lastResponse != nil {
-		assert.Equal(t, schemas.TranscriptionStreamRequest, lastResponse.ExtraFields.RequestType)
-		assert.Equal(t, schemas.Mistral, lastResponse.ExtraFields.Provider)
-	}
+	// Note: ExtraFields.Provider/RequestType on stream chunks are populated
+	// by bifrost.go's dispatcher, not by provider streaming methods called
+	// in isolation.
+	_ = lastResponse
 }

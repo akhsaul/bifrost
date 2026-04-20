@@ -35,9 +35,10 @@ const DefaultAzureScope = "https://cognitiveservices.azure.com/.default"
 
 // AzureProvider implements the Provider interface for Azure's API.
 type AzureProvider struct {
-	logger        schemas.Logger        // Logger for provider operations
-	client        *fasthttp.Client      // HTTP client for API requests
-	networkConfig schemas.NetworkConfig // Network configuration including extra headers
+	logger          schemas.Logger        // Logger for provider operations
+	client          *fasthttp.Client      // HTTP client for unary API requests (ReadTimeout bounds overall response)
+	streamingClient *fasthttp.Client      // HTTP client for streaming API requests (no ReadTimeout; idle governed by NewIdleTimeoutReader)
+	networkConfig   schemas.NetworkConfig // Network configuration including extra headers
 
 	credentials         sync.Map // map of tenant ID:client ID to azcore.TokenCredential
 	sendBackRawRequest  bool     // Whether to include raw request in BifrostResponse
@@ -184,9 +185,11 @@ func NewAzureProvider(config *schemas.ProviderConfig, logger schemas.Logger) (*A
 	client = providerUtils.ConfigureProxy(client, config.ProxyConfig, logger)
 	client = providerUtils.ConfigureDialer(client)
 	client = providerUtils.ConfigureTLS(client, config.NetworkConfig, logger)
+	streamingClient := providerUtils.BuildStreamingClient(client)
 	return &AzureProvider{
 		logger:              logger,
 		client:              client,
+		streamingClient:     streamingClient,
 		networkConfig:       config.NetworkConfig,
 		sendBackRawRequest:  config.SendBackRawRequest,
 		sendBackRawResponse: config.SendBackRawResponse,
@@ -483,7 +486,7 @@ func (provider *AzureProvider) TextCompletionStream(ctx *schemas.BifrostContext,
 
 	return openai.HandleOpenAITextCompletionStreaming(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		url,
 		request,
 		authHeader,
@@ -628,7 +631,7 @@ func (provider *AzureProvider) ChatCompletionStream(ctx *schemas.BifrostContext,
 		// Use shared streaming logic from Anthropic
 		return anthropic.HandleAnthropicChatCompletionStreaming(
 			ctx,
-			provider.client,
+			provider.streamingClient,
 			url,
 			jsonData,
 			authHeader,
@@ -655,7 +658,7 @@ func (provider *AzureProvider) ChatCompletionStream(ctx *schemas.BifrostContext,
 		// Use shared streaming logic from OpenAI
 		return openai.HandleOpenAIChatCompletionStreaming(
 			ctx,
-			provider.client,
+			provider.streamingClient,
 			url,
 			request,
 			authHeader,
@@ -781,7 +784,7 @@ func (provider *AzureProvider) ResponsesStream(ctx *schemas.BifrostContext, post
 		// Use shared streaming logic from Anthropic
 		return anthropic.HandleAnthropicResponsesStream(
 			ctx,
-			provider.client,
+			provider.streamingClient,
 			url,
 			jsonData,
 			authHeader,
@@ -804,7 +807,7 @@ func (provider *AzureProvider) ResponsesStream(ctx *schemas.BifrostContext, post
 		// Use shared streaming logic from OpenAI
 		return openai.HandleOpenAIResponsesStreaming(
 			ctx,
-			provider.client,
+			provider.streamingClient,
 			url,
 			request,
 			authHeader,
@@ -1320,7 +1323,7 @@ func (provider *AzureProvider) ImageGenerationStream(
 	// Azure is OpenAI-compatible
 	return openai.HandleOpenAIImageGenerationStreaming(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		url,
 		request,
 		authHeader,
@@ -1391,7 +1394,7 @@ func (provider *AzureProvider) ImageEditStream(ctx *schemas.BifrostContext, post
 	// Azure is OpenAI-compatible
 	return openai.HandleOpenAIImageEditStreamRequest(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		url,
 		request,
 		authHeader,
@@ -2797,7 +2800,7 @@ func (provider *AzureProvider) PassthroughStream(
 
 	fasthttpReq.SetBody(req.Body)
 
-	activeClient := providerUtils.PrepareResponseStreaming(ctx, provider.client, resp)
+	activeClient := providerUtils.PrepareResponseStreaming(ctx, provider.streamingClient, resp)
 	providerUtils.SetStreamIdleTimeoutIfEmpty(ctx, provider.networkConfig.StreamIdleTimeoutInSeconds)
 
 	startTime := time.Now()

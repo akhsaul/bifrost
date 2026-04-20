@@ -33,7 +33,8 @@ import (
 // BedrockProvider implements the Provider interface for AWS Bedrock.
 type BedrockProvider struct {
 	logger               schemas.Logger                // Logger for provider operations
-	client               *http.Client                  // HTTP client for API requests
+	client               *http.Client                  // HTTP client for unary API requests (Client.Timeout bounds overall response)
+	streamingClient      *http.Client                  // HTTP client for streaming API requests (no Timeout; idle governed by NewIdleTimeoutReader)
 	networkConfig        schemas.NetworkConfig         // Network configuration including extra headers
 	customProviderConfig *schemas.CustomProviderConfig // Custom provider config
 	sendBackRawRequest   bool                          // Whether to include raw request in BifrostResponse
@@ -114,6 +115,7 @@ func NewBedrockProvider(config *schemas.ProviderConfig, logger schemas.Logger) (
 	}
 
 	client := &http.Client{Transport: transport, Timeout: requestTimeout}
+	streamingClient := providerUtils.BuildStreamingHTTPClient(client)
 
 	// Pre-warm response pools
 	for i := 0; i < config.ConcurrencyAndBufferSize.Concurrency; i++ {
@@ -123,6 +125,7 @@ func NewBedrockProvider(config *schemas.ProviderConfig, logger schemas.Logger) (
 	return &BedrockProvider{
 		logger:               logger,
 		client:               client,
+		streamingClient:      streamingClient,
 		networkConfig:        config.NetworkConfig,
 		customProviderConfig: config.CustomProviderConfig,
 		sendBackRawRequest:   config.SendBackRawRequest,
@@ -456,7 +459,7 @@ func (provider *BedrockProvider) makeStreamingRequest(ctx *schemas.BifrostContex
 	}
 
 	// Make the request
-	resp, respErr := provider.client.Do(req)
+	resp, respErr := provider.streamingClient.Do(req)
 	if respErr != nil {
 		if errors.Is(respErr, context.Canceled) {
 			return nil, &schemas.BifrostError{

@@ -288,10 +288,18 @@ func NewProvider(config schemas.ProviderConfig) (*Provider, error) {
         MaxConnsPerHost:     config.NetworkConfig.MaxConnsPerHost, // configurable, default 5000
         MaxIdleConnDuration: 30 * time.Second,
     }
-    return &Provider{client: client, ...}, nil
+    // After ConfigureProxy/ConfigureDialer/ConfigureTLS, build a sibling client
+    // for streaming. BuildStreamingClient zeros ReadTimeout/WriteTimeout/MaxConnDuration
+    // so streams aren't killed by fasthttp's whole-response deadline; per-chunk idle
+    // is enforced at the app layer via NewIdleTimeoutReader.
+    streamingClient := providerUtils.BuildStreamingClient(client)
+    return &Provider{client: client, streamingClient: streamingClient, ...}, nil
 }
 ```
-**Note:** Bedrock uses `net/http` (not fasthttp) with HTTP/2 support. Its `http.Transport` is configured with `ForceAttemptHTTP2: true` and `MaxConnsPerHost` from `NetworkConfig` to allow multiple HTTP/2 connections when the server's per-connection stream limit (100 for AWS Bedrock) is reached.
+
+**Streaming vs unary client:** Every provider holds two clients — `client` for unary requests (`ReadTimeout=30s` bounds the whole response) and `streamingClient` for SSE / EventStream / chunked paths (`ReadTimeout=0`; the per-chunk `NewIdleTimeoutReader` is the only governor). Pass `provider.streamingClient` to every `Handle*Streaming` / `Handle*StreamRequest` helper and to direct `Do` calls inside `*Stream` methods. For new providers, apply the same pattern — missing the switch means streams get killed at 30s.
+
+**Note:** Bedrock uses `net/http` (not fasthttp) with HTTP/2 support. Its `http.Transport` is configured with `ForceAttemptHTTP2: true` and `MaxConnsPerHost` from `NetworkConfig` to allow multiple HTTP/2 connections when the server's per-connection stream limit (100 for AWS Bedrock) is reached. Use `providerUtils.BuildStreamingHTTPClient(client)` to derive the streaming variant — it shares the base `Transport` (safe for concurrent reuse) but clears `Client.Timeout`.
 
 ### The Provider Interface
 
@@ -508,6 +516,21 @@ In `tests/e2e/core/`, **never marshal API payloads to a `Record`/`Map`/plain-obj
 ---
 
 ## Testing
+
+### Always prefer `make test-core` over raw `go test` for provider-level tests
+
+The `make test-core` target is the canonical harness for provider tests — it wires up env vars from `.env` (provider API keys), invokes the per-provider `{provider}_test.go` entrypoint in `core/providers/<provider>/`, and routes through the shared `core/internal/llmtests/` scenario suite that validates end-to-end behavior (including streaming).
+
+Running bare `go test ./core/providers/<provider>/...` only executes unit tests and skips the llmtests scenarios — so it won't catch regressions in streaming, tool-calling, or provider-specific response shapes.
+
+```bash
+make test-core PROVIDER=anthropic TESTCASE=TestChatCompletionStream   # exact test
+make test-core PROVIDER=openai PATTERN=Stream                          # substring match
+make test-core PROVIDER=bedrock                                        # all scenarios for one provider
+make test-core DEBUG=1 PROVIDER=gemini TESTCASE=TestResponsesStream    # attach Delve on :2345
+```
+
+`PATTERN` and `TESTCASE` are mutually exclusive. Provider name must match a directory under `core/providers/` (e.g. `anthropic`, `openai`, `bedrock`, `vertex`, `azure`, `gemini`, `cohere`, `mistral`, `groq`, etc.).
 
 ### LLM Tests (`core/internal/llmtests/`)
 

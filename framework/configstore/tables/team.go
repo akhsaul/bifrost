@@ -25,14 +25,14 @@ type TableTeam struct {
 	// Computed (not a DB column) — populated via correlated subquery in query layer, hence no migration
 	VirtualKeyCount int64 `gorm:"->;-:migration" json:"virtual_key_count"`
 
-	Profile       *string                `gorm:"type:text" json:"-"`
-	ParsedProfile map[string]interface{} `gorm:"-" json:"profile"`
+	Profile       *string        `gorm:"type:text" json:"-"`
+	ParsedProfile map[string]any `gorm:"-" json:"profile"`
 
-	Config       *string                `gorm:"type:text" json:"-"`
-	ParsedConfig map[string]interface{} `gorm:"-" json:"config"`
+	Config       *string        `gorm:"type:text" json:"-"`
+	ParsedConfig map[string]any `gorm:"-" json:"config"`
 
-	Claims       *string                `gorm:"type:text" json:"-"`
-	ParsedClaims map[string]interface{} `gorm:"-" json:"claims"`
+	Claims       *string        `gorm:"type:text" json:"-"`
+	ParsedClaims map[string]any `gorm:"-" json:"claims"`
 
 	// Config hash is used to detect the changes synced from config.json file
 	// Every time we sync the config.json file, we will update the config hash

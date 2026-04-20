@@ -25,7 +25,8 @@ import (
 // OpenAIProvider implements the Provider interface for OpenAI's GPT API.
 type OpenAIProvider struct {
 	logger               schemas.Logger                // Logger for provider operations
-	client               *fasthttp.Client              // HTTP client for API requests
+	client               *fasthttp.Client              // HTTP client for unary API requests (ReadTimeout bounds overall response)
+	streamingClient      *fasthttp.Client              // HTTP client for streaming API requests (no ReadTimeout; idle governed by NewIdleTimeoutReader)
 	networkConfig        schemas.NetworkConfig         // Network configuration including extra headers
 	sendBackRawRequest   bool                          // Whether to include raw request in BifrostResponse
 	sendBackRawResponse  bool                          // Whether to include raw response in BifrostResponse
@@ -59,6 +60,7 @@ func NewOpenAIProvider(config *schemas.ProviderConfig, logger schemas.Logger) *O
 	client = providerUtils.ConfigureProxy(client, config.ProxyConfig, logger)
 	client = providerUtils.ConfigureDialer(client)
 	client = providerUtils.ConfigureTLS(client, config.NetworkConfig, logger)
+	streamingClient := providerUtils.BuildStreamingClient(client)
 	// Set default BaseURL if not provided
 	if config.NetworkConfig.BaseURL == "" {
 		config.NetworkConfig.BaseURL = "https://api.openai.com"
@@ -68,6 +70,7 @@ func NewOpenAIProvider(config *schemas.ProviderConfig, logger schemas.Logger) *O
 	return &OpenAIProvider{
 		logger:               logger,
 		client:               client,
+		streamingClient:      streamingClient,
 		networkConfig:        config.NetworkConfig,
 		sendBackRawRequest:   config.SendBackRawRequest,
 		sendBackRawResponse:  config.SendBackRawResponse,
@@ -393,7 +396,7 @@ func (provider *OpenAIProvider) TextCompletionStream(ctx *schemas.BifrostContext
 	}
 	return HandleOpenAITextCompletionStreaming(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		provider.buildRequestURL(ctx, "/v1/completions", schemas.TextCompletionStreamRequest),
 		request,
 		authHeader,
@@ -907,7 +910,7 @@ func (provider *OpenAIProvider) ChatCompletionStream(ctx *schemas.BifrostContext
 	// Use shared streaming logic
 	return HandleOpenAIChatCompletionStreaming(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		provider.buildRequestURL(ctx, "/v1/chat/completions", schemas.ChatCompletionStreamRequest),
 		request,
 		authHeader,
@@ -1514,7 +1517,7 @@ func (provider *OpenAIProvider) ResponsesStream(ctx *schemas.BifrostContext, pos
 	// Use shared streaming logic
 	return HandleOpenAIResponsesStreaming(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		provider.buildRequestURL(ctx, "/v1/responses", schemas.ResponsesStreamRequest),
 		request,
 		authHeader,
@@ -2115,7 +2118,7 @@ func (provider *OpenAIProvider) SpeechStream(ctx *schemas.BifrostContext, postHo
 
 	return HandleOpenAISpeechStreamRequest(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		provider.buildRequestURL(ctx, "/v1/audio/speech", schemas.SpeechStreamRequest),
 		request,
 		authHeader,
@@ -2553,7 +2556,7 @@ func (provider *OpenAIProvider) TranscriptionStream(ctx *schemas.BifrostContext,
 
 	return HandleOpenAITranscriptionStreamRequest(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		provider.buildRequestURL(ctx, "/v1/audio/transcriptions", schemas.TranscriptionStreamRequest),
 		request,
 		authHeader,
@@ -2979,7 +2982,7 @@ func (provider *OpenAIProvider) ImageGenerationStream(
 	// Use shared streaming logic
 	return HandleOpenAIImageGenerationStreaming(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		provider.buildRequestURL(ctx, "/v1/images/generations", schemas.ImageGenerationStreamRequest),
 		request,
 		authHeader,
@@ -4221,7 +4224,7 @@ func (provider *OpenAIProvider) ImageEditStream(ctx *schemas.BifrostContext, pos
 
 	return HandleOpenAIImageEditStreamRequest(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		provider.buildRequestURL(ctx, "/v1/images/edits", schemas.ImageEditStreamRequest),
 		request,
 		authHeader,
@@ -6933,7 +6936,7 @@ func (provider *OpenAIProvider) PassthroughStream(
 
 	fasthttpReq.SetBody(req.Body)
 
-	activeClient := providerUtils.PrepareResponseStreaming(ctx, provider.client, resp)
+	activeClient := providerUtils.PrepareResponseStreaming(ctx, provider.streamingClient, resp)
 
 	startTime := time.Now()
 

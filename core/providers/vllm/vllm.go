@@ -20,7 +20,8 @@ import (
 // VLLMProvider implements the Provider interface for vLLM's OpenAI-compatible API.
 type VLLMProvider struct {
 	logger              schemas.Logger        // Logger for provider operations
-	client              *fasthttp.Client      // HTTP client for API requests
+	client              *fasthttp.Client      // HTTP client for unary API requests (ReadTimeout bounds overall response)
+	streamingClient     *fasthttp.Client      // HTTP client for streaming API requests (no ReadTimeout; idle governed by NewIdleTimeoutReader)
 	networkConfig       schemas.NetworkConfig // Network configuration including extra headers
 	sendBackRawRequest  bool                  // Whether to include raw request in BifrostResponse
 	sendBackRawResponse bool                  // Whether to include raw response in BifrostResponse
@@ -44,12 +45,14 @@ func NewVLLMProvider(config *schemas.ProviderConfig, logger schemas.Logger) (*VL
 	client = providerUtils.ConfigureProxy(client, config.ProxyConfig, logger)
 	client = providerUtils.ConfigureDialer(client)
 	client = providerUtils.ConfigureTLS(client, config.NetworkConfig, logger)
+	streamingClient := providerUtils.BuildStreamingClient(client)
 	config.NetworkConfig.BaseURL = strings.TrimRight(config.NetworkConfig.BaseURL, "/")
 
 	// BaseURL is optional when keys have vllm_key_config with per-key URLs
 	return &VLLMProvider{
 		logger:              logger,
 		client:              client,
+		streamingClient:     streamingClient,
 		networkConfig:       config.NetworkConfig,
 		sendBackRawRequest:  config.SendBackRawRequest,
 		sendBackRawResponse: config.SendBackRawResponse,
@@ -148,7 +151,7 @@ func (provider *VLLMProvider) TextCompletionStream(ctx *schemas.BifrostContext, 
 	}
 	return openai.HandleOpenAITextCompletionStreaming(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		baseURL+providerUtils.GetPathFromContext(ctx, "/v1/completions"),
 		request,
 		authHeader,
@@ -198,7 +201,7 @@ func (provider *VLLMProvider) ChatCompletionStream(ctx *schemas.BifrostContext, 
 	}
 	return openai.HandleOpenAIChatCompletionStreaming(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		baseURL+providerUtils.GetPathFromContext(ctx, "/v1/chat/completions"),
 		request,
 		authHeader,
@@ -475,7 +478,7 @@ func (provider *VLLMProvider) TranscriptionStream(ctx *schemas.BifrostContext, p
 		req.SetBody(body.Bytes())
 
 		// Make the request
-		err := provider.client.Do(req, resp)
+		err := provider.streamingClient.Do(req, resp)
 		if err != nil {
 			defer providerUtils.ReleaseStreamingResponse(resp)
 			if errors.Is(err, context.Canceled) {

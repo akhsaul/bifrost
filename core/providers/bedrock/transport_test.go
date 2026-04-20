@@ -71,13 +71,18 @@ func newTestProviderWithServer(t *testing.T, ts *httptest.Server) *BedrockProvid
 	targetURL, err := url.Parse(ts.URL)
 	require.NoError(t, err)
 
-	provider.client = &http.Client{
-		Transport: &redirectTransport{
-			target:    targetURL,
-			transport: ts.Client().Transport,
-		},
-		Timeout: 5 * time.Second,
+	redirect := &redirectTransport{
+		target:    targetURL,
+		transport: ts.Client().Transport,
 	}
+	provider.client = &http.Client{
+		Transport: redirect,
+		Timeout:   5 * time.Second,
+	}
+	// Streaming paths use streamingClient (no Timeout); redirect it to the
+	// test server too, otherwise Bedrock streaming tests would hit the real
+	// AWS endpoint.
+	provider.streamingClient = &http.Client{Transport: redirect}
 	return provider
 }
 

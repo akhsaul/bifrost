@@ -26,17 +26,12 @@ const (
 
 type GeminiProvider struct {
 	logger               schemas.Logger                // Logger for provider operations
-	client               *fasthttp.Client              // HTTP client for API requests
+	client               *fasthttp.Client              // HTTP client for unary API requests (ReadTimeout bounds overall response)
+	streamingClient      *fasthttp.Client              // HTTP client for streaming API requests (no ReadTimeout; idle governed by NewIdleTimeoutReader)
 	networkConfig        schemas.NetworkConfig         // Network configuration including extra headers
 	sendBackRawRequest   bool                          // Whether to include raw request in BifrostResponse
 	sendBackRawResponse  bool                          // Whether to include raw response in BifrostResponse
 	customProviderConfig *schemas.CustomProviderConfig // Custom provider config
-}
-
-func buildStreamingResponseClient(base *fasthttp.Client) *fasthttp.Client {
-	client := providerUtils.CloneFastHTTPClientConfig(base)
-	client.StreamResponseBody = true
-	return client
 }
 
 func setGeminiRequestBody(req *fasthttp.Request, bodyReader io.Reader, bodySize int, jsonData []byte) {
@@ -72,6 +67,7 @@ func NewGeminiProvider(config *schemas.ProviderConfig, logger schemas.Logger) *G
 	client = providerUtils.ConfigureProxy(client, config.ProxyConfig, logger)
 	client = providerUtils.ConfigureDialer(client)
 	client = providerUtils.ConfigureTLS(client, config.NetworkConfig, logger)
+	streamingClient := providerUtils.BuildStreamingClient(client)
 
 	// Set default BaseURL if not provided
 	if config.NetworkConfig.BaseURL == "" {
@@ -82,6 +78,7 @@ func NewGeminiProvider(config *schemas.ProviderConfig, logger schemas.Logger) *G
 	return &GeminiProvider{
 		logger:               logger,
 		client:               client,
+		streamingClient:      streamingClient,
 		networkConfig:        config.NetworkConfig,
 		customProviderConfig: config.CustomProviderConfig,
 		sendBackRawRequest:   config.SendBackRawRequest,
@@ -364,7 +361,7 @@ func (provider *GeminiProvider) ChatCompletionStream(ctx *schemas.BifrostContext
 	// Use shared Gemini streaming logic
 	return HandleGeminiChatCompletionStream(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, "/models/"+request.Model+":streamGenerateContent?alt=sse"),
 		jsonData,
 		headers,
@@ -415,9 +412,8 @@ func HandleGeminiChatCompletionStream(
 		req.SetBody(jsonBody)
 	}
 
-	// Make the request
-	streamingClient := buildStreamingResponseClient(client)
-	doErr := streamingClient.Do(req, resp)
+	// Make the request — caller is responsible for passing a streaming-configured client.
+	doErr := client.Do(req, resp)
 	if doErr != nil {
 		defer providerUtils.ReleaseStreamingResponse(resp)
 		if errors.Is(doErr, context.Canceled) {
@@ -859,7 +855,7 @@ func (provider *GeminiProvider) ResponsesStream(ctx *schemas.BifrostContext, pos
 
 	return HandleGeminiResponsesStream(
 		ctx,
-		provider.client,
+		provider.streamingClient,
 		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, "/models/"+request.Model+":streamGenerateContent?alt=sse"),
 		jsonData,
 		headers,
@@ -910,9 +906,8 @@ func HandleGeminiResponsesStream(
 		req.SetBody(jsonBody)
 	}
 
-	// Make the request
-	streamingClient := buildStreamingResponseClient(client)
-	doErr := streamingClient.Do(req, resp)
+	// Make the request — caller is responsible for passing a streaming-configured client.
+	doErr := client.Do(req, resp)
 	if doErr != nil {
 		defer providerUtils.ReleaseStreamingResponse(resp)
 		if errors.Is(doErr, context.Canceled) {
@@ -1400,8 +1395,7 @@ func (provider *GeminiProvider) SpeechStream(ctx *schemas.BifrostContext, postHo
 	}
 
 	// Make the request
-	streamingClient := buildStreamingResponseClient(provider.client)
-	err := streamingClient.Do(req, resp)
+	err := provider.streamingClient.Do(req, resp)
 	if err != nil {
 		defer providerUtils.ReleaseStreamingResponse(resp)
 		if errors.Is(err, context.Canceled) {
@@ -1690,8 +1684,7 @@ func (provider *GeminiProvider) TranscriptionStream(ctx *schemas.BifrostContext,
 	}
 
 	// Make the request
-	streamingClient := buildStreamingResponseClient(provider.client)
-	err := streamingClient.Do(req, resp)
+	err := provider.streamingClient.Do(req, resp)
 	if err != nil {
 		defer providerUtils.ReleaseStreamingResponse(resp)
 		if errors.Is(err, context.Canceled) {
@@ -4154,7 +4147,7 @@ func (provider *GeminiProvider) PassthroughStream(
 
 	fasthttpReq.SetBody(req.Body)
 
-	activeClient := providerUtils.PrepareResponseStreaming(ctx, provider.client, resp)
+	activeClient := providerUtils.PrepareResponseStreaming(ctx, provider.streamingClient, resp)
 	if err := activeClient.Do(fasthttpReq, resp); err != nil {
 		providerUtils.ReleaseStreamingResponse(resp)
 		if errors.Is(err, context.Canceled) {

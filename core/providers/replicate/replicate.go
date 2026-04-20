@@ -24,7 +24,8 @@ import (
 // ReplicateProvider implements the Provider interface for Replicate's API.
 type ReplicateProvider struct {
 	logger               schemas.Logger        // Logger for provider operations
-	client               *fasthttp.Client      // HTTP client for API requests
+	client               *fasthttp.Client      // HTTP client for unary API requests (ReadTimeout bounds overall response)
+	streamingClient      *fasthttp.Client      // HTTP client for streaming API requests (no ReadTimeout; idle governed by NewIdleTimeoutReader)
 	networkConfig        schemas.NetworkConfig // Network configuration including extra headers
 	sendBackRawRequest   bool                  // Whether to include raw request in BifrostResponse
 	sendBackRawResponse  bool                  // Whether to include raw response in BifrostResponse
@@ -52,6 +53,7 @@ func NewReplicateProvider(config *schemas.ProviderConfig, logger schemas.Logger)
 	client = providerUtils.ConfigureProxy(client, config.ProxyConfig, logger)
 	client = providerUtils.ConfigureDialer(client)
 	client = providerUtils.ConfigureTLS(client, config.NetworkConfig, logger)
+	streamingClient := providerUtils.BuildStreamingClient(client)
 	config.NetworkConfig.BaseURL = strings.TrimRight(config.NetworkConfig.BaseURL, "/")
 
 	if config.NetworkConfig.BaseURL == "" {
@@ -61,6 +63,7 @@ func NewReplicateProvider(config *schemas.ProviderConfig, logger schemas.Logger)
 	return &ReplicateProvider{
 		logger:               logger,
 		client:               client,
+		streamingClient:      streamingClient,
 		networkConfig:        config.NetworkConfig,
 		sendBackRawRequest:   config.SendBackRawRequest,
 		sendBackRawResponse:  config.SendBackRawResponse,
@@ -559,7 +562,7 @@ func (provider *ReplicateProvider) TextCompletionStream(ctx *schemas.BifrostCont
 	streamURL := *prediction.URLs.Stream
 
 	// Connect to stream URL
-	_, resp, bifrostErr := listenToReplicateStreamURL(ctx, provider.client, streamURL, key)
+	_, resp, bifrostErr := listenToReplicateStreamURL(ctx, provider.streamingClient, streamURL, key)
 	if bifrostErr != nil {
 		return nil, providerUtils.EnrichError(ctx, bifrostErr, jsonData, nil, provider.sendBackRawRequest, provider.sendBackRawResponse)
 	}
@@ -898,7 +901,7 @@ func (provider *ReplicateProvider) ChatCompletionStream(ctx *schemas.BifrostCont
 	streamURL := *prediction.URLs.Stream
 
 	// Connect to stream URL
-	_, resp, bifrostErr := listenToReplicateStreamURL(ctx, provider.client, streamURL, key)
+	_, resp, bifrostErr := listenToReplicateStreamURL(ctx, provider.streamingClient, streamURL, key)
 	if bifrostErr != nil {
 		return nil, providerUtils.EnrichError(ctx, bifrostErr, jsonData, nil, provider.sendBackRawRequest, provider.sendBackRawResponse)
 	}
@@ -1268,7 +1271,7 @@ func (provider *ReplicateProvider) ResponsesStream(ctx *schemas.BifrostContext, 
 	providerUtils.SetExtraHeaders(ctx, req, provider.networkConfig.ExtraHeaders, nil)
 
 	// Make the streaming request
-	streamErr := provider.client.Do(req, resp)
+	streamErr := provider.streamingClient.Do(req, resp)
 	if streamErr != nil {
 		defer providerUtils.ReleaseStreamingResponse(resp)
 		if errors.Is(streamErr, context.Canceled) {
@@ -1872,7 +1875,7 @@ func (provider *ReplicateProvider) ImageGenerationStream(ctx *schemas.BifrostCon
 	streamURL := *prediction.URLs.Stream
 
 	// Connect to stream URL
-	_, resp, bifrostErr := listenToReplicateStreamURL(ctx, provider.client, streamURL, key)
+	_, resp, bifrostErr := listenToReplicateStreamURL(ctx, provider.streamingClient, streamURL, key)
 	if bifrostErr != nil {
 		return nil, bifrostErr
 	}
@@ -2278,7 +2281,7 @@ func (provider *ReplicateProvider) ImageEditStream(ctx *schemas.BifrostContext, 
 	streamURL := *prediction.URLs.Stream
 
 	// Connect to stream URL
-	_, resp, bifrostErr := listenToReplicateStreamURL(ctx, provider.client, streamURL, key)
+	_, resp, bifrostErr := listenToReplicateStreamURL(ctx, provider.streamingClient, streamURL, key)
 	if bifrostErr != nil {
 		return nil, bifrostErr
 	}
