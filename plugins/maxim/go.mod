@@ -1,11 +1,11 @@
 module github.com/maximhq/bifrost/plugins/maxim
 
-go 1.26.2
+go 1.26.1
 
 require (
-	github.com/maximhq/bifrost/core v1.5.2
-	github.com/maximhq/bifrost/framework v1.3.2
-	github.com/maximhq/maxim-go v0.2.1
+	github.com/maximhq/bifrost/core v1.5.1
+	github.com/maximhq/bifrost/framework v1.3.1
+	github.com/maximhq/maxim-go v0.2.0
 )
 
 require (

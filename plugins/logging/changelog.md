@@ -1,1 +1,3 @@
-- fix: adds support for logging OCR requests
+- feat: add OCR input logging with request type metadata and detail view
+- fix: handle stream terminal detection in logging operations
+- fix: capture responses streaming API errors

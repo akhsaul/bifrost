@@ -45,8 +45,8 @@ import {
   Status
 } from "@/lib/constants/logs";
 import { LogEntry, ResponsesMessage } from "@/lib/types/logs";
-import { downloadAsJson } from "@/lib/utils/browser-download";
 import { cn } from "@/lib/utils";
+import { downloadAsJson } from "@/lib/utils/browser-download";
 import { Link } from "@tanstack/react-router";
 import { addMilliseconds, format } from "date-fns";
 import {
@@ -688,44 +688,7 @@ export function LogDetailView({
                 : ""
             }
           />
-        </div>
-
-        {/* Timeline */}
-        {log.latency != null &&
-          !isNaN(log.latency) &&
-          log.latency > 0 &&
-          (() => {
-            const total = log.latency;
-            const tone =
-              total >= 5000
-                ? "bg-red-400"
-                : total >= 2000
-                  ? "bg-amber-400"
-                  : "bg-blue-400";
-            return (
-              <div className="border-border border-t px-5 py-3">
-                <div className="text-muted-foreground mb-1.5 flex items-center justify-between text-[11px]">
-                  <span>timeline</span>
-                  <span className="font-mono tabular-nums">
-                    {formatLatency(total)}
-                  </span>
-                </div>
-                <div className="relative h-4 overflow-hidden rounded-sm bg-zinc-100 dark:bg-zinc-800">
-                  <div
-                    className={cn("absolute inset-y-0 left-0 opacity-80", tone)}
-                    style={{ width: "100%" }}
-                    title="total latency"
-                  />
-                </div>
-                <div className="text-muted-foreground mt-2 flex flex-wrap gap-4 text-[11px]">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className={cn("h-2 w-2 rounded-sm", tone)} /> total{" "}
-                    {formatLatency(total)}
-                  </span>
-                </div>
-              </div>
-            );
-          })()}
+        </div>        
       </div>
       <details className="group bg-card rounded-sm border" open={false}>
         <summary className="hover:bg-muted/30 flex cursor-pointer items-center justify-between px-4 py-2.5 text-sm transition">
@@ -1529,8 +1492,11 @@ export function LogDetailView({
                     )}
                     {hasToolCalls && text ? (
                       <div className="text-muted-foreground mt-2 text-[11px]">
-                        {message.tool_calls!.length} tool call
-                        {message.tool_calls!.length === 1 ? "" : "s"}
+                        {message.tool_calls!
+                          .map((tc) => tc.function?.name)
+                          .filter(Boolean)
+                          .join(", ") ||
+                          `${message.tool_calls!.length} tool call${message.tool_calls!.length === 1 ? "" : "s"}`}
                       </div>
                     ) : null}
                   </MessageRow>
@@ -1587,11 +1553,17 @@ export function LogDetailView({
                     msg.type === "reasoning" && !!msg.encrypted_content;
                   const meta = text
                     ? role === "system" || role === "tool"
-                      ? `${lineCount} line${lineCount === 1 ? "" : "s"} · ~${approxTokens} tokens`
+                      ? msg.name
+                        ? `${msg.name} · ${lineCount} line${lineCount === 1 ? "" : "s"} · ~${approxTokens} tokens`
+                        : `${lineCount} line${lineCount === 1 ? "" : "s"} · ~${approxTokens} tokens`
                       : role === "reasoning"
                         ? `~${approxTokens} tokens${isEncrypted ? " · encrypted" : ""}`
                         : `${lineCount} line${lineCount === 1 ? "" : "s"}`
-                    : msg.type || undefined;
+                    : msg.name
+                      ? msg.name
+                      : msg.type === "function_call_output" && msg.call_id
+                        ? msg.call_id
+                        : msg.type || undefined;
                   const usePlainText = role === "user" || role === "assistant";
                   return (
                     <MessageRow
@@ -1614,6 +1586,11 @@ export function LogDetailView({
                             lang={role === "system" ? "xml" : undefined}
                           />
                         )
+                      ) : msg.output !== undefined ? (
+                        <CollapsibleCode
+                          text={typeof msg.output === "string" ? msg.output : JSON.stringify(msg.output, null, 2)}
+                          preview={3}
+                        />
                       ) : (
                         <div className="text-muted-foreground text-[12px]">
                           {msg.type || "—"}

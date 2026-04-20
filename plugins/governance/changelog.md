@@ -1,0 +1,4 @@
+- feat: add team budget support with per-team spending tracking and DB tables
+- feat: atomic budget and ratelimit update operations for concurrent safety
+- refactor: budget DB table restructure to support team budgets
+- fix: allow custom providers without a list models endpoint to pass in any model

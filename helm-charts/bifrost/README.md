@@ -4,9 +4,13 @@
 
 Official Helm charts for deploying [Bifrost](https://github.com/maximhq/bifrost) - a high-performance AI gateway with unified interface for multiple providers.
 
-**Latest Version:** 2.1.1
+**Latest Version:** 2.1.2
 
 ## Changelog
+
+### v2.1.2
+
+- Removed `encryption_key` requirement — field is now optional; Bifrost will operate without encryption when omitted
 
 ### v2.1.1
 

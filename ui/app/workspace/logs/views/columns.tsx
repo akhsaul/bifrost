@@ -217,7 +217,7 @@ export function LogMessageCell({
         </div>
       ) : (
         <div
-          className={cn(maxWidth, "truncate font-mono text-sm font-normal")}
+          className={cn(maxWidth, "truncate font-mono text-[12px] font-normal")}
           title={input || "-"}
         >
           {input ||
@@ -262,7 +262,7 @@ export const createColumns = (
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       ),
-      size: 180,
+      size: 130,
       cell: ({ row }) => {
         const timestamp = row.original.timestamp;
         const date = timestamp ? new Date(timestamp) : null;
@@ -285,7 +285,7 @@ export const createColumns = (
     {
       id: "request_type",
       header: "Type",
-      size: 180,
+      size: 150,
       cell: ({ row }) => {
         return (
           <Badge
@@ -309,13 +309,13 @@ export const createColumns = (
     {
       accessorKey: "input",
       header: "Message",
-      size: 250,
+      size: 350,
       cell: ({ row }) => <LogMessageCell log={row.original} />,
     },
     {
       accessorKey: "model",
       header: "Model",
-      size: 220,
+      size: 190,
       cell: ({ row }) => {
         const provider = row.original.provider as ProviderName | undefined;
         const model = row.original.model;

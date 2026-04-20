@@ -8,7 +8,7 @@ type UserAgentIdentifiers []string
 
 var (
 	// ClaudeCLI — Anthropic Claude Code / Claude CLI (identifiers vary by release).
-	ClaudeCLI   = UserAgentIdentifiers{"claude-cli", "claude-code"}
+	ClaudeCLI   = UserAgentIdentifiers{"claude-cli", "claude-code", "claude-vscode"}
 	GeminiCLI   = UserAgentIdentifiers{"geminicli"}
 	CodexCLI    = UserAgentIdentifiers{"codex-tui"}
 	QwenCodeCLI = UserAgentIdentifiers{"qwencode"}
