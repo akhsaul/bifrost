@@ -1,2 +1,0 @@
-- refactor: Updates prompt plugin flow to change the headers used, and better code quality
-- chore: upgraded core to v1.5.3 and framework to v1.3.3

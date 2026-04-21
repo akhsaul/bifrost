@@ -1,4 +1,0 @@
-- fix: update OTel semconv from v1.39.0 to v1.40.0
-- fix: default insecure to true when omitted so HTTP collectors work without explicit config
-- fix: include fallbacks in emitted OTel metrics
-- chore: upgraded core to v1.5.3 and framework to v1.3.3

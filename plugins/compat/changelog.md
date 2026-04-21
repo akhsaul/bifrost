@@ -1,3 +1,0 @@
-- feat: add chat-to-responses conversion for models that only support the Responses API
-- refactor: integrate model catalog to determine per-model conversion requirements
-- chore: upgraded core to v1.5.3 and framework to v1.3.3
