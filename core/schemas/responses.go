@@ -866,6 +866,7 @@ func (output ResponsesToolMessageOutputStruct) MarshalJSON() ([]byte, error) {
 	}
 	return nil, fmt.Errorf("responses tool message output struct is neither a string nor an array of responses message content blocks nor a computer tool call output data nor an image generation call output")
 }
+
 func (output *ResponsesToolMessageOutputStruct) UnmarshalJSON(data []byte) error {
 	var str string
 	if err := Unmarshal(data, &str); err == nil {
@@ -997,7 +998,7 @@ type ResponsesWebFetchToolCallAction struct {
 
 // ResponsesFunctionToolCallOutput represents a function tool call output
 type ResponsesFunctionToolCallOutput struct {
-	ResponsesFunctionToolCallOutputStr    *string //A JSON string of the output of the function tool call.
+	ResponsesFunctionToolCallOutputStr    *string // A JSON string of the output of the function tool call.
 	ResponsesFunctionToolCallOutputBlocks []ResponsesMessageContentBlock
 }
 
@@ -1364,6 +1365,7 @@ const (
 	ResponsesToolTypeWebSearchPreview   ResponsesToolType = "web_search_preview"
 	ResponsesToolTypeMemory             ResponsesToolType = "memory"
 	ResponsesToolTypeToolSearch         ResponsesToolType = "tool_search"
+	ResponsesToolTypeNamespace          ResponsesToolType = "namespace"
 )
 
 // normalizeResponsesToolType maps versioned/provider-specific tool type strings
@@ -1425,6 +1427,7 @@ type ResponsesTool struct {
 	*ResponsesToolLocalShell
 	*ResponsesToolCustom
 	*ResponsesToolWebSearchPreview
+	*ResponsesToolNamespace
 }
 
 // mergeJSONFields merges all top-level fields from src into dst using sjson,
@@ -1550,6 +1553,10 @@ func (t ResponsesTool) MarshalJSON() ([]byte, error) {
 	case ResponsesToolTypeWebSearchPreview:
 		if t.ResponsesToolWebSearchPreview != nil {
 			typeBytes, err = MarshalSorted(t.ResponsesToolWebSearchPreview)
+		}
+	case ResponsesToolTypeNamespace:
+		if t.ResponsesToolNamespace != nil {
+			typeBytes, err = MarshalSorted(t.ResponsesToolNamespace)
 		}
 	}
 	if err != nil {
@@ -1711,6 +1718,13 @@ func (t *ResponsesTool) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		t.ResponsesToolWebSearchPreview = &webSearchPreviewTool
+
+	case ResponsesToolTypeNamespace:
+		var namespaceTool ResponsesToolNamespace
+		if err := Unmarshal(data, &namespaceTool); err != nil {
+			return err
+		}
+		t.ResponsesToolNamespace = &namespaceTool
 	}
 
 	return nil
@@ -2122,6 +2136,11 @@ type ResponsesToolWebFetch struct {
 	MaxUses          *int                           `json:"max_uses,omitempty"`
 	Filters          *ResponsesToolWebSearchFilters `json:"filters,omitempty"`
 	MaxContentTokens *int                           `json:"max_content_tokens,omitempty"`
+}
+
+// ResponsesToolNamespace represents a namespace tool that groups related function tools.
+type ResponsesToolNamespace struct {
+	Tools []ResponsesTool `json:"tools,omitempty"`
 }
 
 // ======================================================= Streaming Structs =======================================================
