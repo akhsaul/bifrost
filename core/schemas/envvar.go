@@ -106,8 +106,8 @@ func (e *EnvVar) IsRedacted() bool {
 	if strings.EqualFold(e.Val, "<redacted>") {
 		return true
 	}
-	// Check if its string with [REDACTED] pattern
-	if strings.HasPrefix(e.Val, "[REDACTED]") && strings.HasSuffix(e.Val, "[REDACTED]") {
+	// Check for [REDACTED] sentinel produced by MarshalJSON in scim config serialization
+	if strings.EqualFold(e.Val, "[REDACTED]") {
 		return true
 	}
 	return false
