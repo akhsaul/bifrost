@@ -413,6 +413,20 @@ false
 {{- if .Values.bifrost.governance.teams }}
 {{- $_ := set $governance "teams" .Values.bifrost.governance.teams }}
 {{- end }}
+{{- if .Values.bifrost.governance.businessUnits }}
+{{- $businessUnits := list }}
+{{- range .Values.bifrost.governance.businessUnits }}
+{{- $bu := dict "id" .id "name" .name }}
+{{- if .budget_id }}{{- $_ := set $bu "budget_id" .budget_id }}{{- end }}
+{{- if .rate_limit_id }}{{- $_ := set $bu "rate_limit_id" .rate_limit_id }}{{- end }}
+{{- if .profile }}{{- $_ := set $bu "profile" .profile }}{{- end }}
+{{- if .config }}{{- $_ := set $bu "config" .config }}{{- end }}
+{{- if .claims }}{{- $_ := set $bu "claims" .claims }}{{- end }}
+{{- if .teamIds }}{{- $_ := set $bu "team_ids" .teamIds }}{{- end }}
+{{- $businessUnits = append $businessUnits $bu }}
+{{- end }}
+{{- $_ := set $governance "business_units" $businessUnits }}
+{{- end }}
 {{- if .Values.bifrost.governance.virtualKeys }}
 {{- $vks := list }}
 {{- range .Values.bifrost.governance.virtualKeys }}
@@ -463,7 +477,7 @@ false
 {{- $_ := set $governance "auth_config" $authConfig }}
 {{- end }}
 {{- end }}
-{{- if or $governance.budgets $governance.rate_limits $governance.customers $governance.teams $governance.virtual_keys $governance.routing_rules $governance.model_configs $governance.providers $governance.pricing_overrides $governance.auth_config }}
+{{- if or $governance.budgets $governance.rate_limits $governance.customers $governance.teams $governance.business_units $governance.virtual_keys $governance.routing_rules $governance.model_configs $governance.providers $governance.pricing_overrides $governance.auth_config }}
 {{- $_ := set $config "governance" $governance }}
 {{- end }}
 {{- end }}
@@ -588,6 +602,7 @@ false
 {{- range .Values.bifrost.guardrails.rules }}
 {{- $rule := dict "id" .id "name" .name "enabled" .enabled "cel_expression" .cel_expression "apply_to" .apply_to }}
 {{- if .description }}{{- $_ := set $rule "description" .description }}{{- end }}
+{{- if hasKey . "query" }}{{- $_ := set $rule "query" .query }}{{- end }}
 {{- if .sampling_rate }}{{- $_ := set $rule "sampling_rate" .sampling_rate }}{{- end }}
 {{- if .timeout }}{{- $_ := set $rule "timeout" .timeout }}{{- end }}
 {{- if .provider_config_ids }}{{- $_ := set $rule "provider_config_ids" .provider_config_ids }}{{- end }}
@@ -1393,6 +1408,18 @@ Call this template at the beginning of deployment/stateful templates
 {{- end }}
 {{- if not $team.name }}
 {{- fail (printf "ERROR: bifrost.governance.teams[%d].name is required for team '%s'." $idx $team.id) }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/* Validate governance business units */}}
+{{- if .Values.bifrost.governance.businessUnits }}
+{{- range $idx, $bu := .Values.bifrost.governance.businessUnits }}
+{{- if not $bu.id }}
+{{- fail (printf "ERROR: bifrost.governance.businessUnits[%d].id is required." $idx) }}
+{{- end }}
+{{- if not $bu.name }}
+{{- fail (printf "ERROR: bifrost.governance.businessUnits[%d].name is required for business unit '%s'." $idx $bu.id) }}
 {{- end }}
 {{- end }}
 {{- end }}

@@ -944,6 +944,23 @@
                   "reset_duration": {
                     "type": "string"
                   },
+                  "virtual_key_id": {
+                    "type": "string",
+                    "description": "Associate this budget to a virtual key (mutually exclusive with provider_config_id and team_id)"
+                  },
+                  "provider_config_id": {
+                    "type": "integer",
+                    "description": "Associate this budget to a virtual key provider config (mutually exclusive with virtual_key_id and team_id)"
+                  },
+                  "team_id": {
+                    "type": "string",
+                    "description": "Associate this budget to a team (mutually exclusive with virtual_key_id and provider_config_id)"
+                  },
+                  "calendar_aligned": {
+                    "type": "boolean",
+                    "description": "Snap budget reset windows to calendar boundaries",
+                    "default": false
+                  },
                   "current_usage": {
                     "type": "number"
                   },
@@ -952,6 +969,32 @@
                     "format": "date-time"
                   }
                 },
+                "allOf": [
+                  {
+                    "not": {
+                      "required": [
+                        "virtual_key_id",
+                        "provider_config_id"
+                      ]
+                    }
+                  },
+                  {
+                    "not": {
+                      "required": [
+                        "virtual_key_id",
+                        "team_id"
+                      ]
+                    }
+                  },
+                  {
+                    "not": {
+                      "required": [
+                        "provider_config_id",
+                        "team_id"
+                      ]
+                    }
+                  }
+                ],
                 "required": [
                   "id",
                   "max_limit",
@@ -1056,6 +1099,9 @@
                   "rate_limit_id": {
                     "type": "string"
                   },
+                  "business_unit_id": {
+                    "type": "string"
+                  },
                   "profile": {
                     "type": "object"
                   },
@@ -1064,6 +1110,45 @@
                   },
                   "claims": {
                     "type": "object"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ]
+              }
+            },
+            "businessUnits": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "budget_id": {
+                    "type": "string"
+                  },
+                  "rate_limit_id": {
+                    "type": "string"
+                  },
+                  "profile": {
+                    "type": "object"
+                  },
+                  "config": {
+                    "type": "object"
+                  },
+                  "claims": {
+                    "type": "object"
+                  },
+                  "teamIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   }
                 },
                 "required": [
@@ -1628,6 +1713,31 @@
                   "cel_expression": {
                     "type": "string"
                   },
+                  "query": {
+                    "description": "Visual rule builder state for the management UI (react-querybuilder). Omitted unless exported from the dashboard. Not evaluated at runtime (cel_expression is).",
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "object",
+                        "required": ["combinator", "rules"],
+                        "properties": {
+                          "combinator": {
+                            "type": "string",
+                            "enum": ["and", "or"]
+                          },
+                          "rules": {
+                            "type": "array",
+                            "items": {
+                              "type": "object"
+                            }
+                          }
+                        },
+                        "additionalProperties": true
+                      }
+                    ]
+                  },
                   "apply_to": {
                     "type": "string",
                     "enum": [
@@ -1658,7 +1768,8 @@
                   "enabled",
                   "cel_expression",
                   "apply_to"
-                ]
+                ],
+                "additionalProperties": false
               }
             },
             "providers": {
@@ -1692,10 +1803,12 @@
                   "provider_name",
                   "policy_name",
                   "enabled"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
-          }
+          },
+          "additionalProperties": false
         },
         "accessProfiles": {
           "type": "array",
