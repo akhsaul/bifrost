@@ -1270,6 +1270,19 @@ func (provider *BedrockProvider) ChatCompletionStream(ctx *schemas.BifrostContex
 						if streamEvent.Usage.CacheWriteInputTokens > usage.PromptTokensDetails.CachedWriteTokens {
 							usage.PromptTokensDetails.CachedWriteTokens = streamEvent.Usage.CacheWriteInputTokens
 						}
+						if streamEvent.Usage.CacheDetails != nil {
+							if usage.PromptTokensDetails.CachedWriteTokenDetails == nil {
+								usage.PromptTokensDetails.CachedWriteTokenDetails = &schemas.ChatCachedWriteTokenDetails{}
+							}
+							for _, cacheDetail := range *streamEvent.Usage.CacheDetails {
+								if cacheDetail.TTL == BedrockCacheWriteTTL5m {
+									usage.PromptTokensDetails.CachedWriteTokenDetails.CachedWriteTokens5m = cacheDetail.InputTokens
+								}
+								if cacheDetail.TTL == BedrockCacheWriteTTL1h {
+									usage.PromptTokensDetails.CachedWriteTokenDetails.CachedWriteTokens1h = cacheDetail.InputTokens
+								}
+							}
+						}
 					}
 				}
 
@@ -1642,6 +1655,19 @@ func (provider *BedrockProvider) ResponsesStream(ctx *schemas.BifrostContext, po
 						}
 						if streamEvent.Usage.CacheWriteInputTokens > usage.InputTokensDetails.CachedWriteTokens {
 							usage.InputTokensDetails.CachedWriteTokens = streamEvent.Usage.CacheWriteInputTokens
+						}
+						if streamEvent.Usage.CacheDetails != nil {
+							if usage.InputTokensDetails.CachedWriteTokenDetails == nil {
+								usage.InputTokensDetails.CachedWriteTokenDetails = &schemas.ChatCachedWriteTokenDetails{}
+							}
+							for _, cacheDetail := range *streamEvent.Usage.CacheDetails {
+								if cacheDetail.TTL == BedrockCacheWriteTTL5m {
+									usage.InputTokensDetails.CachedWriteTokenDetails.CachedWriteTokens5m = cacheDetail.InputTokens
+								}
+								if cacheDetail.TTL == BedrockCacheWriteTTL1h {
+									usage.InputTokensDetails.CachedWriteTokenDetails.CachedWriteTokens1h = cacheDetail.InputTokens
+								}
+							}
 						}
 					}
 				}

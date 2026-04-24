@@ -127,9 +127,9 @@ type ConfigData struct {
 	// from config.json. Omitting this field or setting it to 2 uses v1.5.0+ semantics:
 	// empty = deny all, ["*"] = allow all. Setting it to 1 restores v1.4.x semantics:
 	// empty = allow all (equivalent to ["*"]).
-	Version           int                                   `json:"version,omitempty"`
-	Client            *configstore.ClientConfig             `json:"client"`
-	EncryptionKey     *schemas.EnvVar                       `json:"encryption_key"`
+	Version       int                       `json:"version,omitempty"`
+	Client        *configstore.ClientConfig `json:"client"`
+	EncryptionKey *schemas.EnvVar           `json:"encryption_key"`
 	// Deprecated: Use GovernanceConfig.AuthConfig instead
 	AuthConfig        *configstore.AuthConfig               `json:"auth_config,omitempty"`
 	Providers         map[string]configstore.ProviderConfig `json:"providers"`
@@ -2132,15 +2132,6 @@ func buildMCPPricingDataFromConfig(ctx context.Context, configData *ConfigData) 
 	return mcpPricingData
 }
 
-// redactURL truncates a URL for safe logging, avoiding leakage of tokens or
-// credentials that may be embedded in query parameters or paths.
-func redactURL(u string) string {
-	if len(u) <= 8 {
-		return "***"
-	}
-	return u[:8] + "..."
-}
-
 // ResolveFrameworkPricingConfig resolves framework pricing configuration.
 //
 // Precedence order (highest → lowest): DB > config.json > built-in defaults.
@@ -2219,17 +2210,13 @@ func ResolveFrameworkPricingConfig(
 
 	resolvedPricingURL := &defaultPricingURL
 	resolvedSyncSeconds := &defaultSyncSeconds
-	urlSource := "default"
-	intervalSource := "default"
 
 	if filePricingURL != nil {
 		resolvedPricingURL = filePricingURL
-		urlSource = "file"
 		logger.Debug("pricing_url resolved from file")
 	}
 	if fileSyncSeconds != nil {
 		resolvedSyncSeconds = fileSyncSeconds
-		intervalSource = "file"
 		logger.Debug("pricing_sync_interval resolved from file: %d seconds", *fileSyncSeconds)
 	}
 
@@ -2240,11 +2227,7 @@ func ResolveFrameworkPricingConfig(
 	if dbConfig != nil {
 		configID = dbConfig.ID
 		if dbConfig.PricingURL != nil {
-			if filePricingURL != nil && *filePricingURL != *dbConfig.PricingURL {
-				logger.Info("pricing_url overridden by DB: file=%s db=%s", redactURL(*filePricingURL), redactURL(*dbConfig.PricingURL))
-			}
 			resolvedPricingURL = dbConfig.PricingURL
-			urlSource = "db"
 		} else if !skipURLBackfill {
 			// DB row exists but URL field is NULL — backfill with resolved value.
 			// Skip backfill when the resolved URL is an unresolved env reference
@@ -2264,14 +2247,12 @@ func ResolveFrameworkPricingConfig(
 				logger.Warn("pricing_sync_interval in DB is below minimum (%d seconds), clamping to %d seconds — backfilling", val, modelcatalog.MinimumPricingSyncIntervalSec)
 				clamped := modelcatalog.MinimumPricingSyncIntervalSec
 				resolvedSyncSeconds = &clamped
-				intervalSource = "db"
 				needsDBUpdate = true
 			} else {
 				if fileSyncSeconds != nil && *fileSyncSeconds != *dbConfig.PricingSyncInterval {
 					logger.Info("pricing_sync_interval overridden by DB: file=%d db=%d seconds", *fileSyncSeconds, *dbConfig.PricingSyncInterval)
 				}
 				resolvedSyncSeconds = dbConfig.PricingSyncInterval
-				intervalSource = "db"
 			}
 		} else {
 			// DB row exists but interval field is NULL — backfill.
@@ -2290,16 +2271,11 @@ func ResolveFrameworkPricingConfig(
 	if resolvedPricingURL == nil {
 		logger.Warn("invariant violation: pricing_url resolved to nil — falling back to default %q", defaultPricingURL)
 		resolvedPricingURL = &defaultPricingURL
-		urlSource = "default(invariant-fallback)"
 	}
 	if resolvedSyncSeconds == nil {
 		logger.Warn("invariant violation: pricing_sync_interval resolved to nil — falling back to default %d seconds", defaultSyncSeconds)
 		resolvedSyncSeconds = &defaultSyncSeconds
-		intervalSource = "default(invariant-fallback)"
 	}
-
-	logger.Info("resolved pricing config: url=%s (source: %s) sync_interval=%d seconds (source: %s)",
-		redactURL(*resolvedPricingURL), urlSource, *resolvedSyncSeconds, intervalSource)
 
 	return &configstoreTables.TableFrameworkConfig{
 			ID:                  configID,
