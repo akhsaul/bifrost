@@ -250,6 +250,24 @@ func TestStoreOrEnqueueRetryPreservesAllEntries(t *testing.T) {
 	}
 }
 
+func TestConvertToProcessedStreamResponseUsesResponsesStreamTypeForWebSocketResponses(t *testing.T) {
+	result := &schemas.StreamAccumulatorResult{
+		RequestID:      "req-ws-3000",
+		RequestedModel: "gpt-4o-mini",
+		ResolvedModel:  "gpt-4o-mini",
+		Provider:       schemas.OpenAI,
+		Status:         "success",
+	}
+
+	processed := convertToProcessedStreamResponse(result, schemas.WebSocketResponsesRequest)
+	if processed == nil {
+		t.Fatal("expected processed stream response, got nil")
+	}
+	if processed.StreamType != "responses" {
+		t.Fatalf("expected stream type responses, got %s", processed.StreamType)
+	}
+}
+
 func TestApplyRealtimeOutputToEntryBackfillsUserTranscriptFromRawRequest(t *testing.T) {
 	plugin := &LoggerPlugin{}
 	entry := &logstore.Log{}

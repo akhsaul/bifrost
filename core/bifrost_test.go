@@ -761,6 +761,63 @@ func (ma *MockAccount) SetKeysForProvider(provider schemas.ModelProvider, keys [
 	ma.keys[provider] = keys
 }
 
+type countingTracer struct {
+	schemas.NoOpTracer
+	flushed atomic.Int32
+}
+
+func (t *countingTracer) CreateTrace(_ string, _ ...string) string {
+	return "trace-ws-final"
+}
+
+func (t *countingTracer) CompleteAndFlushTrace(_ string) {
+	t.flushed.Add(1)
+}
+
+func TestRunStreamPreHooks_FinalChunkFlushesTrace(t *testing.T) {
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	account := NewMockAccount()
+	tracer := &countingTracer{}
+
+	client, err := Init(ctx, schemas.BifrostConfig{
+		Account: account,
+		Tracer:  tracer,
+		Logger:  NewDefaultLogger(schemas.LogLevelError),
+	})
+	if err != nil {
+		t.Fatalf("Error initializing Bifrost: %v", err)
+	}
+	defer client.Shutdown()
+
+	hooks, bifrostErr := client.RunStreamPreHooks(ctx, &schemas.BifrostRequest{
+		RequestType: schemas.WebSocketResponsesRequest,
+		ResponsesRequest: &schemas.BifrostResponsesRequest{
+			Provider: schemas.OpenAI,
+			Model:    "gpt-4o-mini",
+		},
+	})
+	if bifrostErr != nil {
+		t.Fatalf("RunStreamPreHooks returned error: %v", bifrostErr)
+	}
+	defer hooks.Cleanup()
+
+	ctx.SetValue(schemas.BifrostContextKeyStreamEndIndicator, true)
+	_, bifrostErr = hooks.PostHookRunner(ctx, &schemas.BifrostResponse{
+		ResponsesResponse: &schemas.BifrostResponsesResponse{
+			Object:    "response",
+			CreatedAt: int(time.Now().Unix()),
+			Model:     "gpt-4o-mini",
+		},
+	}, nil)
+	if bifrostErr != nil {
+		t.Fatalf("PostHookRunner returned error: %v", bifrostErr)
+	}
+
+	if tracer.flushed.Load() != 1 {
+		t.Fatalf("expected trace flush count 1, got %d", tracer.flushed.Load())
+	}
+}
+
 // mockKVStore implements schemas.KVStore for session stickiness tests.
 type mockKVStore struct {
 	mu   sync.RWMutex
