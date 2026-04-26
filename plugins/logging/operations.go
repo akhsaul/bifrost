@@ -397,9 +397,14 @@ func (p *LoggerPlugin) applyStreamingOutputToEntry(entry *logstore.Log, streamRe
 		if shouldStoreRaw {
 			// Raw request
 			if streamResponse.RawRequest != nil && *streamResponse.RawRequest != nil {
-				rawRequestBytes, err := sonic.Marshal(*streamResponse.RawRequest)
-				if err == nil {
-					entry.RawRequest = string(rawRequestBytes)
+				switch raw := (*streamResponse.RawRequest).(type) {
+				case string:
+					entry.RawRequest = strings.TrimSpace(raw)
+				default:
+					rawRequestBytes, err := sonic.Marshal(raw)
+					if err == nil {
+						entry.RawRequest = string(rawRequestBytes)
+					}
 				}
 			}
 			// Raw response
