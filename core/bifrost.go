@@ -4917,23 +4917,27 @@ func (bifrost *Bifrost) tryStreamRequest(ctx *schemas.BifrostContext, req *schem
 			outputStream := make(chan *schemas.BifrostStreamChunk)
 			releasePipeline = false // pipeline is released inside the goroutine after stream drains
 
+			// Snapshot RequestType before the closure. The *BifrostRequest is released
+			// back to bifrostRequestPool when handleStreamRequest returns (via defer);
+			// a concurrent request can reuse it and overwrite RequestType.
+			shortCircuitRequestType := req.RequestType
 			// Create a post hook runner cause pipeline object is put back in the pool on defer
 			pipelinePostHookRunner := func(ctx *schemas.BifrostContext, result *schemas.BifrostResponse, err *schemas.BifrostError) (*schemas.BifrostResponse, *schemas.BifrostError) {
 				if result != nil {
-					result.PopulateExtraFields(req.RequestType, provider, model, model)
+					result.PopulateExtraFields(shortCircuitRequestType, provider, model, model)
 				}
 				if err != nil {
-					err.PopulateExtraFields(req.RequestType, provider, model, model)
+					err.PopulateExtraFields(shortCircuitRequestType, provider, model, model)
 				}
 				resp, bifrostErr := pipeline.RunPostLLMHooks(ctx, result, err, preCount)
 				if IsFinalChunk(ctx) {
 					drainAndAttachPluginLogs(ctx)
 				}
 				if bifrostErr != nil {
-					bifrostErr.PopulateExtraFields(req.RequestType, provider, model, model)
+					bifrostErr.PopulateExtraFields(shortCircuitRequestType, provider, model, model)
 					return nil, bifrostErr
 				} else if resp != nil {
-					resp.PopulateExtraFields(req.RequestType, provider, model, model)
+					resp.PopulateExtraFields(shortCircuitRequestType, provider, model, model)
 				}
 				return resp, nil
 			}
@@ -5695,6 +5699,11 @@ func (bifrost *Bifrost) requestWorker(provider schemas.Provider, config *schemas
 				// Snapshot per-attempt so postHookRunner doesn't observe a later retry's
 				// alias while this attempt's provider goroutine is still emitting chunks.
 				attemptResolvedModel := resolvedModel
+				// Snapshot RequestType before the closure. After tryStreamRequest receives
+				// the stream channel it releases the *ChannelMessage back to the pool;
+				// a concurrent request can then reuse it and overwrite RequestType.
+				// Reading req.RequestType inside the closure would observe the new request's type.
+				attemptRequestType := req.RequestType
 				pipeline := bifrost.getPluginPipeline()
 				postHookRunner := func(ctx *schemas.BifrostContext, result *schemas.BifrostResponse, err *schemas.BifrostError) (*schemas.BifrostResponse, *schemas.BifrostError) {
 					// Populate extra fields before RunPostLLMHooks so plugins (e.g. logging)
@@ -5702,20 +5711,20 @@ func (bifrost *Bifrost) requestWorker(provider schemas.Provider, config *schemas
 					// Uses the per-attempt snapshot — capturing the outer resolvedModel by
 					// reference would let a later retry's alias bleed into this attempt's chunks.
 					if result != nil {
-						result.PopulateExtraFields(req.RequestType, provider.GetProviderKey(), originalModelRequested, attemptResolvedModel)
+						result.PopulateExtraFields(attemptRequestType, provider.GetProviderKey(), originalModelRequested, attemptResolvedModel)
 					}
 					if err != nil {
-						err.PopulateExtraFields(req.RequestType, provider.GetProviderKey(), originalModelRequested, attemptResolvedModel)
+						err.PopulateExtraFields(attemptRequestType, provider.GetProviderKey(), originalModelRequested, attemptResolvedModel)
 					}
 					resp, bifrostErr := pipeline.RunPostLLMHooks(ctx, result, err, len(*bifrost.llmPlugins.Load()))
 					if IsFinalChunk(ctx) {
 						drainAndAttachPluginLogs(ctx)
 					}
 					if bifrostErr != nil {
-						bifrostErr.PopulateExtraFields(req.RequestType, provider.GetProviderKey(), originalModelRequested, attemptResolvedModel)
+						bifrostErr.PopulateExtraFields(attemptRequestType, provider.GetProviderKey(), originalModelRequested, attemptResolvedModel)
 						return nil, bifrostErr
 					} else if resp != nil {
-						resp.PopulateExtraFields(req.RequestType, provider.GetProviderKey(), originalModelRequested, attemptResolvedModel)
+						resp.PopulateExtraFields(attemptRequestType, provider.GetProviderKey(), originalModelRequested, attemptResolvedModel)
 					}
 					return resp, nil
 				}
