@@ -1153,6 +1153,13 @@
             "additionalProperties": false
           }
         },
+        "object_storage_exclude_fields": {
+          "type": "array",
+          "description": "Payload field DB column names that should NOT be offloaded to object storage and must remain in the database (e.g. output_message, input_history, raw_request, raw_response). Unknown names are ignored.",
+          "items": {
+            "type": "string"
+          }
+        },
         "retention_days": {
           "type": "integer",
           "minimum": 0,
