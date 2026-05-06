@@ -787,7 +787,7 @@ func (m *MockConfigStore) UpdateVirtualKey(ctx context.Context, virtualKey *tabl
 	return nil
 }
 
-func (m *MockConfigStore) DeleteVirtualKey(ctx context.Context, id string) error {
+func (m *MockConfigStore) DeleteVirtualKey(ctx context.Context, id string, tx ...*gorm.DB) error {
 	return nil
 }
 
