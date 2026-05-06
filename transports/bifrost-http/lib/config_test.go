@@ -12471,7 +12471,6 @@ func TestGenerateClientConfigHash(t *testing.T) {
 		DisableContentLogging:  false,
 		LogRetentionDays:       30,
 		EnforceAuthOnInference: false,
-		AllowDirectKeys:        true,
 		AllowedOrigins:         []string{"http://localhost:3000"},
 		MaxRequestBodySizeMB:   100,
 	}
@@ -12544,14 +12543,6 @@ func TestGenerateClientConfigHash(t *testing.T) {
 	hash9, _ := cc9.GenerateClientConfigHash()
 	if hash1 == hash9 {
 		t.Error("Different EnforceAuthOnInference should produce different hash")
-	}
-
-	// Different AllowDirectKeys should produce different hash
-	cc10 := cc1
-	cc10.AllowDirectKeys = false
-	hash10, _ := cc10.GenerateClientConfigHash()
-	if hash1 == hash10 {
-		t.Error("Different AllowDirectKeys should produce different hash")
 	}
 
 	// Different AllowedOrigins should produce different hash
@@ -13888,7 +13879,6 @@ func TestGenerateClientConfigHash_RuntimeVsMigrationParity(t *testing.T) {
 			DisableContentLogging:  false,
 			LogRetentionDays:       30,
 			EnforceAuthOnInference: false,
-			AllowDirectKeys:        true,
 			MaxRequestBodySizeMB:   100,
 		}
 
@@ -13901,7 +13891,6 @@ func TestGenerateClientConfigHash_RuntimeVsMigrationParity(t *testing.T) {
 			DisableContentLogging:  ccToSave.DisableContentLogging,
 			LogRetentionDays:       ccToSave.LogRetentionDays,
 			EnforceAuthOnInference: ccToSave.EnforceAuthOnInference,
-			AllowDirectKeys:        ccToSave.AllowDirectKeys,
 			MaxRequestBodySizeMB:   ccToSave.MaxRequestBodySizeMB,
 			Compat: configstore.CompatConfig{
 				ConvertTextToChat:      ccToSave.CompatConvertTextToChat,
@@ -13925,7 +13914,6 @@ func TestGenerateClientConfigHash_RuntimeVsMigrationParity(t *testing.T) {
 			DisableContentLogging:  ccFromDB.DisableContentLogging,
 			LogRetentionDays:       ccFromDB.LogRetentionDays,
 			EnforceAuthOnInference: ccFromDB.EnforceAuthOnInference,
-			AllowDirectKeys:        ccFromDB.AllowDirectKeys,
 			MaxRequestBodySizeMB:   ccFromDB.MaxRequestBodySizeMB,
 			Compat: configstore.CompatConfig{
 				ConvertTextToChat:      ccFromDB.CompatConvertTextToChat,
@@ -17218,7 +17206,6 @@ func assertDefaultClientConfigValues(t *testing.T, cc configstore.ClientConfig) 
 	require.Equal(t, true, *cc.EnableLogging, "EnableLogging should default to true")
 	require.Equal(t, false, cc.DisableContentLogging, "DisableContentLogging should default to false")
 	require.Equal(t, false, cc.EnforceAuthOnInference, "EnforceAuthOnInference should default to false")
-	require.Equal(t, false, cc.AllowDirectKeys, "AllowDirectKeys should default to false")
 	require.Equal(t, []string{"*"}, cc.AllowedOrigins, "AllowedOrigins should default to [*]")
 	require.Equal(t, 100, cc.MaxRequestBodySizeMB, "MaxRequestBodySizeMB should default to 100")
 	require.Equal(t, 10, cc.MCPAgentDepth, "MCPAgentDepth should default to 10")
