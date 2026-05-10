@@ -32196,7 +32196,7 @@
       "put": {
         "operationId": "editMCPClient",
         "summary": "Edit MCP client",
-        "description": "Updates an existing MCP client's configuration.\nUnlike client creation, tool_pricing can be included to set per-tool execution costs since tools are already fetched.\nOptionally provide vk_configs to manage which virtual keys have access to this MCP server and with which tools. When provided, this fully replaces all existing VK assignments in a single atomic transaction.\n",
+        "description": "Updates an existing MCP client's configuration.\nUnlike client creation, tool_pricing can be included to set per-tool execution costs since tools are already fetched.\nOptionally provide vk_configs to manage which virtual keys have access to this MCP server and with which tools. When provided, this fully replaces all existing VK assignments in a single atomic transaction.\nSet disabled: true to shut down the client's connection and workers without removing it. Set disabled: false to reconnect a previously disabled client.\n",
         "tags": [
           "MCP"
         ],
@@ -32316,6 +32316,11 @@
                     "type": "boolean",
                     "default": false,
                     "description": "When true, this MCP client's tools are accessible to all virtual keys without requiring\nexplicit per-key assignment. All tools are allowed by default. If a virtual key has an\nexplicit MCP config for this client, that config takes precedence and overrides this behaviour.\n"
+                  },
+                  "disabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "When true, the client's connection, health monitor, and tool syncer are shut down.\nThe client entry is preserved so it can be re-enabled later by sending disabled: false.\nDisabled clients do not expose tools to inference requests.\n"
                   },
                   "vk_configs": {
                     "type": "array",
@@ -54295,9 +54300,11 @@
             "enum": [
               "connected",
               "disconnected",
-              "error"
+              "error",
+              "pending_tools",
+              "disabled"
             ],
-            "description": "Connection state of an MCP client"
+            "description": "Connection state of an MCP client:\n- connected: Client is connected and ready to use\n- disconnected: Client is not connected (will be auto-recovered by health monitor)\n- error: Client is in an unrecoverable error state\n- pending_tools: Connected but tools not yet populated (per-user OAuth clients)\n- disabled: Client has been intentionally disabled; no connection or workers are active\n"
           },
           "vk_configs": {
             "type": "array",
@@ -54427,6 +54434,11 @@
             "type": "boolean",
             "default": false,
             "description": "When true, this MCP client's tools are accessible to all virtual keys without requiring\nexplicit per-key assignment. All tools are allowed by default. If a virtual key has an\nexplicit MCP config for this client, that config takes precedence and overrides this behaviour.\n"
+          },
+          "disabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether the client is intentionally disabled.\nWhen true, the client has no active connection or workers and its tools are not available for inference.\n"
           }
         }
       },
