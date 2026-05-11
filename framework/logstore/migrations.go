@@ -1673,21 +1673,22 @@ func migrationAddRequestIDColumnToMCPToolLogs(ctx context.Context, db *gorm.DB) 
 					return err
 				}
 			}
+
 			if tx.Dialector.Name() == "postgres" {
 				if err := execBatchedGormMaintenanceUpdate(tx, "mcp request_id backfill", `
-						WITH batch AS (
-							SELECT ctid
-							FROM mcp_tool_logs
-							WHERE request_id IS NULL OR request_id = ''
-							LIMIT ?
-							FOR UPDATE SKIP LOCKED
-						)
-						UPDATE mcp_tool_logs
-						SET request_id = id
-						FROM batch
-						WHERE mcp_tool_logs.ctid = batch.ctid
-					`); err != nil {
-					return err
+          WITH batch AS (
+            SELECT ctid
+            FROM mcp_tool_logs
+            WHERE request_id IS NULL OR request_id = ''
+            LIMIT ?
+            FOR UPDATE SKIP LOCKED
+          )
+          UPDATE mcp_tool_logs
+          SET request_id = id
+          FROM batch
+          WHERE mcp_tool_logs.ctid = batch.ctid
+        `); err != nil {
+				return err
 				}
 			} else {
 				result := tx.Exec("UPDATE mcp_tool_logs SET request_id = id WHERE request_id IS NULL OR request_id = ''")
