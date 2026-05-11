@@ -216,6 +216,7 @@ CREATE UNLOGGED TABLE mcp_tool_logs (
 func populateScaleMigrationTables(t *testing.T, ctx context.Context, db *gorm.DB, rows int) {
 	t.Helper()
 	t.Logf("populating %d logs and %d mcp_tool_logs rows", rows, rows)
+	require.NoError(t, db.WithContext(ctx).Exec("SET synchronous_commit = off").Error)
 
 	insertLogsSQL := `
 INSERT INTO logs (
@@ -260,7 +261,8 @@ SELECT
 	(gs % 6000)::INTEGER,
 	0,
 	NOW() - ((gs % 129600) * INTERVAL '1 minute')
-	FROM generate_series(1, ?) AS gs`
+FROM generate_series(1, ?) AS gs`
+	require.NoError(t, db.WithContext(ctx).Exec(insertLogsSQL, rows).Error)
 
 	insertMCPSQL := `
 INSERT INTO mcp_tool_logs (
@@ -281,22 +283,10 @@ SELECT
 	(gs % 5000)::DOUBLE PRECISION / 10.0,
 	(gs % 500)::DOUBLE PRECISION / 100000.0,
 	CASE WHEN gs % 19 = 0 THEN 'error' ELSE 'success' END,
-		'{"tenant":"scale"}',
-		NOW() - ((gs % 129600) * INTERVAL '1 minute')
-	FROM generate_series(1, ?) AS gs`
-	err := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Exec("SET LOCAL synchronous_commit = off").Error; err != nil {
-			return err
-		}
-		if err := tx.Exec(insertLogsSQL, rows).Error; err != nil {
-			return err
-		}
-		if err := tx.Exec(insertMCPSQL, rows).Error; err != nil {
-			return err
-		}
-		return nil
-	})
-	require.NoError(t, err)
+	'{"tenant":"scale"}',
+	NOW() - ((gs % 129600) * INTERVAL '1 minute')
+FROM generate_series(1, ?) AS gs`
+	require.NoError(t, db.WithContext(ctx).Exec(insertMCPSQL, rows).Error)
 }
 
 func createOldShapeScaleMatViews(t *testing.T, ctx context.Context, db *gorm.DB) {

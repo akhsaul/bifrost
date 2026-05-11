@@ -402,8 +402,8 @@ func migrationUpdateObjectColumnValues(ctx context.Context, db *gorm.DB) error {
 			}
 
 			updateSQL := `
-					WITH batch AS (
-						SELECT ctid,
+				WITH batch AS (
+					SELECT ctid,
 						CASE object_type
 							WHEN 'chat.completion' THEN 'chat_completion'
 							WHEN 'text.completion' THEN 'text_completion'

@@ -207,13 +207,13 @@ var filterMatViews = []filterMatViewDef{
 // filterMatViewKeyPairColumns maps the (idCol, nameCol) pair callers pass into
 // GetDistinctKeyPairs to the per-dimension matview that pre-aggregates it.
 var filterMatViewKeyPairColumns = map[[2]string]string{
-	{"selected_key_id", "selected_key_name"}:   "mv_filter_selected_keys",
-	{"virtual_key_id", "virtual_key_name"}:     "mv_filter_virtual_keys",
-	{"routing_rule_id", "routing_rule_name"}:   "mv_filter_routing_rules",
-	{"team_id", "team_name"}:                   "mv_filter_teams",
-	{"customer_id", "customer_name"}:           "mv_filter_customers",
-	{"user_id", "user_id"}:                     "mv_filter_users",
-	{"business_unit_id", "business_unit_name"}: "mv_filter_business_units",
+	{"selected_key_id", "selected_key_name"}:     "mv_filter_selected_keys",
+	{"virtual_key_id", "virtual_key_name"}:       "mv_filter_virtual_keys",
+	{"routing_rule_id", "routing_rule_name"}:     "mv_filter_routing_rules",
+	{"team_id", "team_name"}:                     "mv_filter_teams",
+	{"customer_id", "customer_name"}:             "mv_filter_customers",
+	{"user_id", "user_id"}:                       "mv_filter_users",
+	{"business_unit_id", "business_unit_name"}:   "mv_filter_business_units",
 }
 
 func filterMatViewDDL(v filterMatViewDef) string {
@@ -240,7 +240,7 @@ func filterMatViewUniqueIdxName(v filterMatViewDef) string {
 // repairMatViewShapes to detect drifted matviews. Parses the selectExpr so we
 // don't have to maintain a parallel slice.
 func filterMatViewRequiredColumns(v filterMatViewDef) []string {
-	parts := splitSelectExpr(v.selectExpr)
+	parts := strings.Split(v.selectExpr, ",")
 	cols := make([]string, 0, len(parts))
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
@@ -253,38 +253,6 @@ func filterMatViewRequiredColumns(v filterMatViewDef) []string {
 		}
 	}
 	return cols
-}
-
-func splitSelectExpr(selectExpr string) []string {
-	var parts []string
-	start := 0
-	depth := 0
-	inString := false
-	for i := 0; i < len(selectExpr); i++ {
-		switch selectExpr[i] {
-		case '\'':
-			if inString && i+1 < len(selectExpr) && selectExpr[i+1] == '\'' {
-				i++
-				continue
-			}
-			inString = !inString
-		case '(':
-			if !inString {
-				depth++
-			}
-		case ')':
-			if !inString && depth > 0 {
-				depth--
-			}
-		case ',':
-			if !inString && depth == 0 {
-				parts = append(parts, selectExpr[start:i])
-				start = i + 1
-			}
-		}
-	}
-	parts = append(parts, selectExpr[start:])
-	return parts
 }
 
 type matviewUniqueIndexDef struct {
@@ -354,7 +322,7 @@ func ensureMatViews(ctx context.Context, db *gorm.DB) error {
 	defer conn.Close()
 
 	var acquired bool
-	if err := conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", matviewEnsureAdvisoryLockKey).Scan(&acquired); err != nil {
+	if err := conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", matviewRefreshAdvisoryLockKey).Scan(&acquired); err != nil {
 		return fmt.Errorf("failed to try advisory lock for matview creation: %w", err)
 	}
 	if !acquired {
@@ -362,7 +330,7 @@ func ensureMatViews(ctx context.Context, db *gorm.DB) error {
 		return nil
 	}
 	defer func() {
-		_, _ = conn.ExecContext(ctx, "SELECT pg_advisory_unlock($1)", matviewEnsureAdvisoryLockKey)
+		_, _ = conn.ExecContext(ctx, "SELECT pg_advisory_unlock($1)", matviewRefreshAdvisoryLockKey)
 	}()
 
 	if err := dropLegacyMatViews(ctx, conn); err != nil {
@@ -419,14 +387,13 @@ func repairMatViewShapes(ctx context.Context, conn *sql.Conn) error {
 func matViewNeedsRebuild(ctx context.Context, conn *sql.Conn, view string, requiredColumns []string) (bool, error) {
 	var exists bool
 	if err := conn.QueryRowContext(ctx, `
-			SELECT EXISTS (
-				SELECT 1
-				FROM pg_class
-				WHERE relkind = 'm'
-				  AND relname = $1
-				  AND relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = current_schema())
-			)
-		`, view).Scan(&exists); err != nil {
+		SELECT EXISTS (
+			SELECT 1
+			FROM pg_class
+			WHERE relkind = 'm'
+			  AND relname = $1
+		)
+	`, view).Scan(&exists); err != nil {
 		return false, fmt.Errorf("failed to check matview %s existence: %w", view, err)
 	}
 	if !exists {
@@ -435,14 +402,13 @@ func matViewNeedsRebuild(ctx context.Context, conn *sql.Conn, view string, requi
 
 	rows, err := conn.QueryContext(ctx, `
 		SELECT a.attname
-			FROM pg_class c
-			JOIN pg_attribute a ON a.attrelid = c.oid
-			WHERE c.relkind = 'm'
-			  AND c.relname = $1
-			  AND c.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = current_schema())
-			  AND a.attnum > 0
-			  AND NOT a.attisdropped
-		`, view)
+		FROM pg_class c
+		JOIN pg_attribute a ON a.attrelid = c.oid
+		WHERE c.relkind = 'm'
+		  AND c.relname = $1
+		  AND a.attnum > 0
+		  AND NOT a.attisdropped
+	`, view)
 	if err != nil {
 		return false, fmt.Errorf("failed to inspect matview %s columns: %w", view, err)
 	}
@@ -477,12 +443,11 @@ func ensureMatViewUniqueIndexes(ctx context.Context, conn *sql.Conn) error {
 		if err := conn.QueryRowContext(ctx, `
 			SELECT COALESCE(bool_and(pi.indisvalid AND pi.indisunique), false)
 			FROM pg_class pc
-				JOIN pg_index pi ON pi.indrelid = pc.oid
-				JOIN pg_class ic ON ic.oid = pi.indexrelid
-				WHERE pc.relname = $1
-				  AND pc.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = current_schema())
-				  AND ic.relname = $2
-			`, idx.view, idx.name).Scan(&indexReady); err != nil {
+			JOIN pg_index pi ON pi.indrelid = pc.oid
+			JOIN pg_class ic ON ic.oid = pi.indexrelid
+			WHERE pc.relname = $1
+			  AND ic.relname = $2
+		`, idx.view, idx.name).Scan(&indexReady); err != nil {
 			return fmt.Errorf("failed to check matview index %s validity: %w", idx.name, err)
 		}
 		if indexReady {
@@ -528,10 +493,10 @@ const matViewRefreshSafetyInterval = 10 * time.Minute
 // changed. Per-process state — multi-replica deployments still serialize via
 // the advisory lock.
 type matViewRefreshGate struct {
-	mu           sync.Mutex
-	lastActivity int64
-	lastForcedAt time.Time
-	initialized  bool
+	mu               sync.Mutex
+	lastActivity     int64
+	lastForcedAt     time.Time
+	initialized      bool
 }
 
 var refreshGate matViewRefreshGate
