@@ -332,6 +332,7 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_async_job_result_ttl_column"}, run: migrationAddAsyncJobResultTTLColumn},
 	{IDs: []string{"add_required_headers_json_column"}, run: migrationAddRequiredHeadersJSONColumn},
 	{IDs: []string{"add_logging_headers_json_column"}, run: migrationAddLoggingHeadersJSONColumn},
+	{IDs: []string{"add_redact_sensitive_headers_json_column"}, run: migrationAddRedactSensitiveHeadersJSONColumn},
 	{IDs: []string{"add_hide_deleted_virtual_keys_in_filters_column"}, run: migrationAddHideDeletedVirtualKeysInFiltersColumn},
 	{IDs: []string{"add_enforce_scim_auth_column"}, run: migrationAddEnforceSCIMAuthColumn},
 	{IDs: []string{"add_enforce_auth_on_inference_column"}, run: migrationAddEnforceAuthOnInferenceColumn},
@@ -460,6 +461,23 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_live_models_sync_interval_column"}, run: migrationAddLiveModelsSyncIntervalColumn},
 	{IDs: []string{"add_pricing_override_user_id_column"}, run: migrationAddPricingOverrideUserIDColumn},
 	{IDs: []string{"add_budget_reset_config_column"}, run: migrationAddBudgetResetConfigColumn},
+}
+
+func migrationAddRedactSensitiveHeadersJSONColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	name := "add_redact_sensitive_headers_json_column"
+	logger.Info("[configstore] starting migration %s", name)
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{ID: name,
+		Migrate: func(tx *gorm.DB) error {
+			return addColumnIfNotExists(tx.WithContext(ctx), logger, &tables.TableClientConfig{}, "RedactSensitiveHeadersJSON")
+		},
+		Rollback: func(tx *gorm.DB) error {
+			return dropColumnIfExists(tx.WithContext(ctx), logger, &tables.TableClientConfig{}, "redact_sensitive_headers_json")
+		},
+	}})
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error running %s migration: %w", name, err)
+	}
+	return nil
 }
 
 // quoteSQLiteIdentifier quotes a SQLite identifier, escaping any double quotes.

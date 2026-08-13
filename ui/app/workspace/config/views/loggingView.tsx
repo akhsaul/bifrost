@@ -18,11 +18,13 @@ export default function LoggingView() {
 	const [localConfig, setLocalConfig] = useState<CoreConfig>(DefaultCoreConfig);
 	const [needsRestart, setNeedsRestart] = useState<boolean>(false);
 	const [loggingHeadersText, setLoggingHeadersText] = useState<string>("");
+	const [redactSensitiveHeadersText, setRedactSensitiveHeadersText] = useState<string>("");
 
 	useEffect(() => {
 		if (config) {
 			setLocalConfig(config);
 			setLoggingHeadersText(config.logging_headers?.join(", ") || "");
+			setRedactSensitiveHeadersText(config.redact_sensitive_headers?.join(", ") || "");
 		}
 	}, [config]);
 
@@ -37,6 +39,7 @@ export default function LoggingView() {
 			localConfig.log_retention_days !== config.log_retention_days ||
 			localConfig.hide_deleted_virtual_keys_in_filters !== config.hide_deleted_virtual_keys_in_filters ||
 			JSON.stringify(localConfig.logging_headers || []) !== JSON.stringify(config.logging_headers || [])
+			|| JSON.stringify(localConfig.redact_sensitive_headers || []) !== JSON.stringify(config.redact_sensitive_headers || [])
 		);
 	}, [config, localConfig]);
 
@@ -52,6 +55,11 @@ export default function LoggingView() {
 	const handleLoggingHeadersChange = useCallback((value: string) => {
 		setLoggingHeadersText(value);
 		setLocalConfig((prev) => ({ ...prev, logging_headers: parseArrayFromText(value) }));
+	}, []);
+
+	const handleRedactSensitiveHeadersChange = useCallback((value: string) => {
+		setRedactSensitiveHeadersText(value);
+		setLocalConfig((prev) => ({ ...prev, redact_sensitive_headers: parseArrayFromText(value) }));
 	}, []);
 
 	const handleSave = useCallback(async () => {
@@ -169,6 +177,16 @@ export default function LoggingView() {
 								}
 							}}
 						/>
+					</div>
+				)}
+
+				{localConfig.enable_logging && bifrostConfig?.is_logs_connected && (
+					<div className="space-y-2 rounded-sm border p-4">
+						<label htmlFor="redact-sensitive-headers" className="text-sm font-medium">Redact Sensitive Headers</label>
+						<p className="text-muted-foreground text-sm">
+							Comma-separated outgoing provider header names whose values are stored as <code className="text-xs">[REDACTED]</code>. Supports exact names and wildcard patterns, case-insensitively. Leave empty to retain values as sent.
+						</p>
+						<Textarea id="redact-sensitive-headers" data-testid="workspace-redact-sensitive-headers-textarea" className="h-24" placeholder="Authorization, x-api-key, x-provider-*" value={redactSensitiveHeadersText} onChange={(e) => handleRedactSensitiveHeadersChange(e.target.value)} />
 					</div>
 				)}
 

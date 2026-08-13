@@ -585,7 +585,7 @@ export interface LogEntry {
 	is_large_payload_response?: boolean; // true if response used large payload streaming
 	passthrough_request_body?: string; // Raw passthrough request body (UTF-8)
 	passthrough_response_body?: string; // Raw passthrough response body (UTF-8)
-	metadata?: Record<string, string>; // JSON metadata (e.g., isAsyncRequest)
+	metadata?: Record<string, unknown>; // JSON metadata (e.g., isAsyncRequest and outgoing_bifrost)
 	redaction_mapping?: {
 		input?: Record<string, string>;
 		output?: Record<string, string>;

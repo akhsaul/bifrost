@@ -50,6 +50,7 @@ type TableClientConfig struct {
 	AsyncJobResultTTL                     int                            `gorm:"default:3600" json:"async_job_result_ttl"`                        // Default TTL for async job results in seconds (default: 3600 = 1 hour)
 	RequiredHeadersJSON                   string                         `gorm:"type:text" json:"-"`                                              // JSON serialized []string
 	LoggingHeadersJSON                    string                         `gorm:"type:text" json:"-"`                                              // JSON serialized []string
+	RedactSensitiveHeadersJSON            string                         `gorm:"type:text" json:"-"`                                              // JSON serialized []string
 	HideDeletedVirtualKeysInFilters       bool                           `gorm:"default:false" json:"hide_deleted_virtual_keys_in_filters"`       // Hide deleted virtual keys in logs filter dropdowns
 	RoutingChainMaxDepth                  int                            `gorm:"default:10" json:"routing_chain_max_depth"`                       // Maximum depth for routing rule chain evaluation (default: 10)
 	MCPExternalClientURL                  string                         `gorm:"type:varchar(512)" json:"mcp_external_client_url,omitempty"`      // Public base URL used as redirect_uri when Bifrost acts as an OAuth client to upstream MCP servers
@@ -85,16 +86,17 @@ type TableClientConfig struct {
 	UpdatedAt time.Time `gorm:"index;not null" json:"updated_at"`
 
 	// Virtual fields for runtime use (not stored in DB)
-	PrometheusLabels   []string                  `gorm:"-" json:"prometheus_labels"`
-	AllowedOrigins     []string                  `gorm:"-" json:"allowed_origins,omitempty"`
-	AllowedHeaders     []string                  `gorm:"-" json:"allowed_headers,omitempty"`
-	RequiredHeaders    []string                  `gorm:"-" json:"required_headers,omitempty"`
-	LoggingHeaders     []string                  `gorm:"-" json:"logging_headers,omitempty"`
-	WhitelistedRoutes  []string                  `gorm:"-" json:"whitelisted_routes,omitempty"`
-	HeaderFilterConfig *GlobalHeaderFilterConfig `gorm:"-" json:"header_filter_config,omitempty"`
-	Metadata           map[string]any            `gorm:"-" json:"metadata,omitempty"`
-	OAuth2ServerConfig *OAuth2ServerConfig       `gorm:"-" json:"oauth2_server_config,omitempty"`
-	WebhookConfig      *WebhookConfig            `gorm:"-" json:"webhook_config,omitempty"`
+	PrometheusLabels       []string                  `gorm:"-" json:"prometheus_labels"`
+	AllowedOrigins         []string                  `gorm:"-" json:"allowed_origins,omitempty"`
+	AllowedHeaders         []string                  `gorm:"-" json:"allowed_headers,omitempty"`
+	RequiredHeaders        []string                  `gorm:"-" json:"required_headers,omitempty"`
+	LoggingHeaders         []string                  `gorm:"-" json:"logging_headers,omitempty"`
+	RedactSensitiveHeaders []string                  `gorm:"-" json:"redact_sensitive_headers,omitempty"`
+	WhitelistedRoutes      []string                  `gorm:"-" json:"whitelisted_routes,omitempty"`
+	HeaderFilterConfig     *GlobalHeaderFilterConfig `gorm:"-" json:"header_filter_config,omitempty"`
+	Metadata               map[string]any            `gorm:"-" json:"metadata,omitempty"`
+	OAuth2ServerConfig     *OAuth2ServerConfig       `gorm:"-" json:"oauth2_server_config,omitempty"`
+	WebhookConfig          *WebhookConfig            `gorm:"-" json:"webhook_config,omitempty"`
 }
 
 // WebhookConfig holds global webhook delivery settings. Delivery
@@ -178,6 +180,15 @@ func (cc *TableClientConfig) BeforeSave(tx *gorm.DB) error {
 	} else {
 		cc.LoggingHeadersJSON = "[]"
 	}
+	if cc.RedactSensitiveHeaders != nil {
+		data, err := json.Marshal(cc.RedactSensitiveHeaders)
+		if err != nil {
+			return err
+		}
+		cc.RedactSensitiveHeadersJSON = string(data)
+	} else {
+		cc.RedactSensitiveHeadersJSON = "[]"
+	}
 
 	if cc.HeaderFilterConfig != nil {
 		data, err := json.Marshal(cc.HeaderFilterConfig)
@@ -258,6 +269,11 @@ func (cc *TableClientConfig) AfterFind(tx *gorm.DB) error {
 
 	if cc.LoggingHeadersJSON != "" {
 		if err := json.Unmarshal([]byte(cc.LoggingHeadersJSON), &cc.LoggingHeaders); err != nil {
+			return err
+		}
+	}
+	if cc.RedactSensitiveHeadersJSON != "" {
+		if err := json.Unmarshal([]byte(cc.RedactSensitiveHeadersJSON), &cc.RedactSensitiveHeaders); err != nil {
 			return err
 		}
 	}

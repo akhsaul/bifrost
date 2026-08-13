@@ -815,6 +815,23 @@ func mergeRealtimeMetadata(metadata map[string]interface{}, ctx *schemas.Bifrost
 	return metadata
 }
 
+// mergeLogMetadata combines request-start metadata with metadata captured at
+// finalization. Finalization metadata contains the last outgoing provider
+// header snapshot; it intentionally overwrites same-named values.
+func mergeLogMetadata(initial, current map[string]interface{}) map[string]interface{} {
+	if initial == nil && current == nil {
+		return nil
+	}
+	merged := make(map[string]interface{}, len(initial)+len(current))
+	for key, value := range initial {
+		merged[key] = value
+	}
+	for key, value := range current {
+		merged[key] = value
+	}
+	return merged
+}
+
 // formatRoutingEngineLogs formats routing engine logs into a human-readable string.
 // Format: [timestamp] [engine] - message
 // Parameters:

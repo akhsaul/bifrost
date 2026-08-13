@@ -480,7 +480,7 @@ export const createColumns = (
 		size: 126,
 		cell: ({ row }) => {
 			const value = row.original.metadata?.[key];
-			return <div className="max-w-[150px] truncate font-mono text-xs">{value ?? "-"}</div>;
+			return <div className="max-w-[150px] truncate font-mono text-xs">{value == null ? "-" : String(value)}</div>;
 		},
 	}));
 

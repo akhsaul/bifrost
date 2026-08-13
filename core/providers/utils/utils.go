@@ -420,6 +420,7 @@ func makeRequestWithDoFunc(ctx context.Context, do func() error) (time.Duration,
 // path it blocks until the background client.Do goroutine finishes, preventing a data race
 // between the still-running goroutine and the caller's release of req/resp.
 func MakeRequestWithContext(ctx context.Context, client *fasthttp.Client, req *fasthttp.Request, resp *fasthttp.Response) (time.Duration, *schemas.BifrostError, func()) {
+	SnapshotOutgoingHeaders(ctx, req)
 	latency, bifrostErr, wait := makeRequestWithDoFunc(ctx, func() error { return client.Do(req, resp) })
 	return latency, bifrostErr, wait
 }
@@ -427,6 +428,7 @@ func MakeRequestWithContext(ctx context.Context, client *fasthttp.Client, req *f
 // MakeRequestWithContextFollowRedirects is like MakeRequestWithContext but follows up to
 // maxRedirects HTTP redirects automatically (equivalent to curl's -L flag).
 func MakeRequestWithContextFollowRedirects(ctx context.Context, client *fasthttp.Client, req *fasthttp.Request, resp *fasthttp.Response, maxRedirects int) (time.Duration, *schemas.BifrostError, func()) {
+	SnapshotOutgoingHeaders(ctx, req)
 	latency, bifrostErr, wait := makeRequestWithDoFunc(ctx, func() error { return client.DoRedirects(req, resp, maxRedirects) })
 	return latency, bifrostErr, wait
 }
@@ -443,6 +445,7 @@ func MakeRequestWithContextFollowRedirects(ctx context.Context, client *fasthttp
 // Returns client.Do's error untouched so callers keep their own error
 // classification and latency bookkeeping.
 func DoStreamingRequest(ctx context.Context, client *fasthttp.Client, req *fasthttp.Request, resp *fasthttp.Response) error {
+	SnapshotOutgoingHeaders(ctx, req)
 	startTime := time.Now()
 	err := client.Do(req, resp)
 	schemas.AddUpstreamLatency(ctx, time.Since(startTime))
@@ -480,6 +483,7 @@ func (b *upstreamTimingBody) Close() error { return b.inner.Close() }
 // reads that drain it. Streamed responses consumed through NewIdleTimeoutReader
 // are unwrapped there — the idle reader does its own per-chunk timing.
 func DoHTTPRequest(client *http.Client, req *http.Request) (*http.Response, error) {
+	SnapshotOutgoingHTTPHeaders(req.Context(), req)
 	startTime := time.Now()
 	resp, err := client.Do(req)
 	schemas.AddUpstreamLatency(req.Context(), time.Since(startTime))
@@ -487,6 +491,36 @@ func DoHTTPRequest(client *http.Client, req *http.Request) (*http.Response, erro
 		resp.Body = &upstreamTimingBody{inner: resp.Body, ctx: req.Context()}
 	}
 	return resp, err
+}
+
+// SnapshotOutgoingHeaders records the final headers immediately before a provider
+// request is sent. The snapshot is intentionally request-scoped and replaces the
+// previous attempt, so retries expose the last request that was actually sent.
+func SnapshotOutgoingHeaders(ctx context.Context, req *fasthttp.Request) {
+	bc, ok := ctx.(*schemas.BifrostContext)
+	if !ok || req == nil {
+		return
+	}
+	headers := make(map[string]string)
+	req.Header.VisitAll(func(key, value []byte) {
+		headers[string(key)] = string(value)
+	})
+	bc.SetValue(schemas.BifrostContextKeyOutgoingHeaders, headers)
+}
+
+// SnapshotOutgoingHTTPHeaders is the net/http equivalent used by Bedrock.
+func SnapshotOutgoingHTTPHeaders(ctx context.Context, req *http.Request) {
+	bc, ok := ctx.(*schemas.BifrostContext)
+	if !ok || req == nil {
+		return
+	}
+	headers := make(map[string]string, len(req.Header))
+	for key, values := range req.Header {
+		if len(values) > 0 {
+			headers[key] = strings.Join(values, ", ")
+		}
+	}
+	bc.SetValue(schemas.BifrostContextKeyOutgoingHeaders, headers)
 }
 
 // Deprecated: ConfigureRetry is now handled internally by ConfigureDialer.

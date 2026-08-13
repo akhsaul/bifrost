@@ -638,6 +638,7 @@ export function LogDetailView({
 	};
 
 	if (!log) return null;
+	const metadata = log.metadata ?? {};
 
 	const selectedPromptDisplayName = resolvedSelectedPromptName ?? log.selected_prompt_name ?? "";
 
@@ -818,20 +819,20 @@ export function LogDetailView({
 									Large Payload
 								</Badge>
 							)}
-							{isRealtimeTurn && log.metadata?.realtime_transport && (
+							{isRealtimeTurn && Boolean(log.metadata?.realtime_transport) && (
 								<Badge
 									variant="outline"
-									className={cn("rounded-sm px-2 py-0.5 font-medium", getRealtimeTransportBadgeClass(log.metadata.realtime_transport))}
+									className={cn("rounded-sm px-2 py-0.5 font-medium", getRealtimeTransportBadgeClass(String(metadata.realtime_transport)))}
 								>
-									{formatRealtimeTransport(log.metadata.realtime_transport)}
+									{formatRealtimeTransport(String(metadata.realtime_transport))}
 								</Badge>
 							)}
-							{isRealtimeTurn && log.metadata?.realtime_voice && (
+							{isRealtimeTurn && Boolean(log.metadata?.realtime_voice) && (
 								<Badge
 									variant="outline"
 									className="rounded-sm border-amber-300 bg-amber-50 px-2 py-0.5 font-medium text-amber-700 dark:border-amber-600 dark:bg-amber-950 dark:text-amber-300"
 								>
-									{log.metadata.realtime_voice}
+									{String(metadata.realtime_voice)}
 								</Badge>
 							)}
 						</div>
@@ -1266,60 +1267,60 @@ export function LogDetailView({
 								</>
 							)}
 
-							{isRealtimeTurn && (
+					{isRealtimeTurn && (
 								<>
-									{log.metadata?.realtime_session_id && (
+					{Boolean(log.metadata?.realtime_session_id) && (
 										<LogEntryDetailsView
 											className="w-full"
 											label="Realtime Session"
 											value={
 												<span className="flex items-center gap-1">
-													<code className="font-mono text-xs">{log.metadata.realtime_session_id}</code>
+					<code className="font-mono text-xs">{String(metadata.realtime_session_id)}</code>
 													<CopyInlineButton
-														text={String(log.metadata.realtime_session_id)}
+										text={String(metadata.realtime_session_id)}
 														testId="logdetails-copy-realtime-session-id-button"
 													/>
 												</span>
 											}
 										/>
 									)}
-									{log.metadata?.provider_session_id && (
+					{Boolean(log.metadata?.provider_session_id) && (
 										<LogEntryDetailsView
 											className="w-full"
 											label="Provider Session"
 											value={
 												<span className="flex items-center gap-1">
-													<code className="font-mono text-xs">{log.metadata.provider_session_id}</code>
+					<code className="font-mono text-xs">{String(metadata.provider_session_id)}</code>
 													<CopyInlineButton
-														text={String(log.metadata.provider_session_id)}
+										text={String(metadata.provider_session_id)}
 														testId="logdetails-copy-provider-session-id-button"
 													/>
 												</span>
 											}
 										/>
 									)}
-									{log.metadata?.realtime_transport && (
+					{Boolean(log.metadata?.realtime_transport) && (
 										<LogEntryDetailsView
 											className="w-full"
 											label="Transport"
-											value={formatRealtimeTransport(log.metadata.realtime_transport)}
+									value={formatRealtimeTransport(String(metadata.realtime_transport))}
 										/>
 									)}
-									{log.metadata?.realtime_voice && (
-										<LogEntryDetailsView className="w-full" label="Voice" value={String(log.metadata.realtime_voice)} />
+					{Boolean(log.metadata?.realtime_voice) && (
+									<LogEntryDetailsView className="w-full" label="Voice" value={String(metadata.realtime_voice)} />
 									)}
-									{log.metadata?.realtime_source && (
+					{Boolean(log.metadata?.realtime_source) && (
 										<LogEntryDetailsView
 											className="w-full"
 											label="Turn Source"
-											value={formatRealtimeSource(log.metadata.realtime_source)}
+											value={formatRealtimeSource(String(metadata.realtime_source))}
 										/>
 									)}
-									{log.metadata?.realtime_event_type && (
+					{Boolean(log.metadata?.realtime_event_type) && (
 										<LogEntryDetailsView
 											className="w-full"
 											label="Trigger Event"
-											value={<code className="font-mono text-xs">{log.metadata.realtime_event_type}</code>}
+											value={<code className="font-mono text-xs">{String(metadata.realtime_event_type)}</code>}
 										/>
 									)}
 								</>
@@ -1595,6 +1596,7 @@ export function LogDetailView({
 						log.metadata &&
 						Object.keys(log.metadata).filter((k) => {
 							if (k === "isAsyncRequest") return false;
+							if (k === "outgoing_bifrost") return false;
 							if (
 								isRealtimeTurn &&
 								[
@@ -1617,7 +1619,8 @@ export function LogDetailView({
 									<div className="grid w-full grid-cols-3 items-start justify-between gap-4">
 										{Object.entries(log.metadata)
 											.filter(([key]) => {
-												if (key === "isAsyncRequest") return false;
+														if (key === "isAsyncRequest") return false;
+														if (key === "outgoing_bifrost") return false;
 												if (
 													isRealtimeTurn &&
 													[
@@ -1640,6 +1643,20 @@ export function LogDetailView({
 								</div>
 							</>
 						)}
+					{!isContainer && !isPassthrough && (() => {
+						const outgoing = log.metadata?.outgoing_bifrost as { headers?: Record<string, string> } | undefined;
+						const headers = outgoing?.headers;
+						if (!headers || Object.keys(headers).length === 0) return null;
+						return <>
+							<DottedSeparator />
+							<div className="space-y-4">
+								<BlockHeader title="OUTGOING BIFROST" />
+								<div className="grid w-full grid-cols-3 items-start justify-between gap-4">
+									{Object.entries(headers).map(([key, value]) => <LogEntryDetailsView key={key} className="w-full" label={key} value={value} />)}
+								</div>
+							</div>
+						</>;
+					})()}
 				</div>
 			</details>
 			<Tabs key={log.id} defaultValue={showTabs ? "messages" : "plugins"} className="gap-2">
