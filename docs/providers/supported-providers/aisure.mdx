@@ -1,0 +1,19 @@
+---
+title: "AISure"
+description: "Configure AISure's OpenAI-compatible chat endpoint"
+---
+
+AISure's supplied chat endpoint is `https://wtwbcruvpghcppwahiaj.supabase.co/functions/v1/chat`. Bifrost uses the Supabase project root as `base_url` and preserves `/functions/v1/chat` as the chat path.
+
+```json
+{
+  "providers": {
+    "aisure": {
+      "network_config": { "base_url": "https://wtwbcruvpghcppwahiaj.supabase.co" },
+      "keys": [{ "name": "aisure", "value": "env.AISURE_API_KEY" }]
+    }
+  }
+}
+```
+
+Requests use Bearer authentication. Chat completions and streaming use the supplied endpoint; model listing and operations not exposed by AISure return the upstream or explicit unsupported-operation response.

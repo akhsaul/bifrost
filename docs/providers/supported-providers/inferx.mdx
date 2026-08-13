@@ -1,0 +1,18 @@
+---
+title: "Inferx"
+description: "Configure Inferx through its OpenAI-compatible API"
+---
+
+Inferx exposes an OpenAI-compatible inference API. The default base URL is `https://model.inferx.net/endpoints/v1`; Bifrost uses `/chat/completions` for chat requests and `/models` for model discovery.
+
+```json
+{
+  "providers": {
+    "inferx": {
+      "keys": [{ "name": "inferx", "value": "env.INFERX_API_KEY" }]
+    }
+  }
+}
+```
+
+Requests use `Authorization: Bearer <api-key>`. Chat completions, SSE streaming, model listing, and Responses-to-Chat fallback are supported. Unsupported upstream operations return an explicit unsupported-operation error.

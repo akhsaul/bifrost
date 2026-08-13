@@ -20,12 +20,23 @@ type GroqProvider struct {
 	networkConfig       schemas.NetworkConfig // Network configuration including extra headers
 	sendBackRawRequest  bool                  // Whether to include raw request in BifrostResponse
 	sendBackRawResponse bool                  // Whether to include raw response in BifrostResponse
+	providerKey         schemas.ModelProvider
+	modelsPath          string
+	chatPath            string
+	speechPath          string
+	transcriptionPath   string
 }
 
 // NewGroqProvider creates a new Groq provider instance.
 // It initializes the HTTP client with the provided configuration and sets up response pools.
 // The client is configured with timeouts, concurrency limits, and optional proxy settings.
 func NewGroqProvider(config *schemas.ProviderConfig, logger schemas.Logger) (*GroqProvider, error) {
+	return NewCompatibleProvider(config, logger, schemas.Groq, "https://api.groq.com/openai", "/v1/models", "/v1/chat/completions")
+}
+
+// NewCompatibleProvider builds the shared OpenAI-compatible adapter used by
+// providers exposing the standard OpenAI request and SSE formats.
+func NewCompatibleProvider(config *schemas.ProviderConfig, logger schemas.Logger, providerKey schemas.ModelProvider, defaultBaseURL, modelsPath, chatPath string) (*GroqProvider, error) {
 	config.CheckAndSetDefaults()
 
 	requestTimeout := time.Second * time.Duration(config.NetworkConfig.DefaultRequestTimeoutInSeconds)
@@ -51,7 +62,7 @@ func NewGroqProvider(config *schemas.ProviderConfig, logger schemas.Logger) (*Gr
 	streamingClient := providerUtils.BuildStreamingClient(client)
 	// Set default BaseURL if not provided
 	if config.NetworkConfig.BaseURL == "" {
-		config.NetworkConfig.BaseURL = "https://api.groq.com/openai"
+		config.NetworkConfig.BaseURL = defaultBaseURL
 	}
 	config.NetworkConfig.BaseURL = strings.TrimRight(config.NetworkConfig.BaseURL, "/")
 
@@ -62,12 +73,17 @@ func NewGroqProvider(config *schemas.ProviderConfig, logger schemas.Logger) (*Gr
 		networkConfig:       config.NetworkConfig,
 		sendBackRawRequest:  config.SendBackRawRequest,
 		sendBackRawResponse: config.SendBackRawResponse,
+		providerKey:         providerKey,
+		modelsPath:          modelsPath,
+		chatPath:            chatPath,
+		speechPath:          "/v1/audio/speech",
+		transcriptionPath:   "/v1/audio/transcriptions",
 	}, nil
 }
 
 // GetProviderKey returns the provider identifier for Groq.
 func (provider *GroqProvider) GetProviderKey() schemas.ModelProvider {
-	return schemas.Groq
+	return provider.providerKey
 }
 
 // ListModels performs a list models request to Groq's API.
@@ -76,10 +92,10 @@ func (provider *GroqProvider) ListModels(ctx *schemas.BifrostContext, keys []sch
 		ctx,
 		provider.client,
 		request,
-		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, "/v1/models"),
+		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, provider.modelsPath),
 		keys,
 		provider.networkConfig.ExtraHeaders,
-		schemas.Groq,
+		provider.providerKey,
 		providerUtils.ShouldSendBackRawRequest(ctx, provider.sendBackRawRequest),
 		providerUtils.ShouldSendBackRawResponse(ctx, provider.sendBackRawResponse),
 	)
@@ -87,14 +103,14 @@ func (provider *GroqProvider) ListModels(ctx *schemas.BifrostContext, keys []sch
 
 // TextCompletion is not supported by the Groq provider.
 func (provider *GroqProvider) TextCompletion(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostTextCompletionRequest) (*schemas.BifrostTextCompletionResponse, *schemas.BifrostError) {
-	return nil, providerUtils.NewUnsupportedOperationError("text completion", "groq")
+	return nil, providerUtils.NewUnsupportedOperationError("text completion", provider.GetProviderKey())
 }
 
 // TextCompletionStream performs a streaming text completion request to Groq's API.
 // It formats the request, sends it to Groq, and processes the response.
 // Returns a channel of BifrostStreamChunk objects or an error if the request fails.
 func (provider *GroqProvider) TextCompletionStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostTextCompletionRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
-	return nil, providerUtils.NewUnsupportedOperationError("text completion", "groq")
+	return nil, providerUtils.NewUnsupportedOperationError("text completion", provider.GetProviderKey())
 }
 
 // ChatCompletion performs a chat completion request to the Groq API.
@@ -102,7 +118,7 @@ func (provider *GroqProvider) ChatCompletion(ctx *schemas.BifrostContext, key sc
 	return openai.HandleOpenAIChatCompletionRequest(
 		ctx,
 		provider.client,
-		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, "/v1/chat/completions"),
+		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, provider.chatPath),
 		request,
 		openai.BearerAuthHeader(key),
 		provider.networkConfig.ExtraHeaders,
@@ -124,14 +140,14 @@ func (provider *GroqProvider) ChatCompletionStream(ctx *schemas.BifrostContext, 
 	return openai.HandleOpenAIChatCompletionStreaming(
 		ctx,
 		provider.streamingClient,
-		provider.networkConfig.BaseURL+"/v1/chat/completions",
+		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, provider.chatPath),
 		request,
 		openai.BearerAuthHeader(key),
 		provider.networkConfig.ExtraHeaders,
 		provider.networkConfig.StreamIdleTimeoutInSeconds,
 		providerUtils.ShouldSendBackRawRequest(ctx, provider.sendBackRawRequest),
 		providerUtils.ShouldSendBackRawResponse(ctx, provider.sendBackRawResponse),
-		schemas.Groq,
+		provider.providerKey,
 		postHookRunner,
 		nil,
 		nil,
@@ -180,12 +196,12 @@ func (provider *GroqProvider) Speech(ctx *schemas.BifrostContext, key schemas.Ke
 	return openai.HandleOpenAISpeechRequest(
 		ctx,
 		provider.client,
-		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, "/v1/audio/speech"),
+		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, provider.speechPath),
 		request,
 		key,
 		provider.networkConfig.ExtraHeaders,
 		nil,
-		schemas.Groq,
+		provider.providerKey,
 		providerUtils.ShouldSendBackRawRequest(ctx, provider.sendBackRawRequest),
 		providerUtils.ShouldSendBackRawResponse(ctx, provider.sendBackRawResponse),
 		nil,
@@ -215,12 +231,12 @@ func (provider *GroqProvider) Transcription(ctx *schemas.BifrostContext, key sch
 	return openai.HandleOpenAITranscriptionRequest(
 		ctx,
 		provider.client,
-		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, "/v1/audio/transcriptions"),
+		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, provider.transcriptionPath),
 		request,
 		key,
 		provider.networkConfig.ExtraHeaders,
 		nil,
-		schemas.Groq,
+		provider.providerKey,
 		providerUtils.ShouldSendBackRawResponse(ctx, provider.sendBackRawResponse),
 		nil,
 		provider.logger,

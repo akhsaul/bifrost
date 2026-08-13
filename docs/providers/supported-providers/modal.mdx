@@ -1,0 +1,19 @@
+---
+title: "Modal"
+description: "Configure Modal OpenAI-compatible endpoints"
+---
+
+Modal endpoints expose an OpenAI-compatible API. The default base URL is `https://api.us-west-2.modal.direct`; configure a deployment-specific `base_url` when required. Bifrost sends Bearer authentication and supports chat completions, model listing, SSE streaming, and Responses-to-Chat fallback.
+
+```json
+{
+  "providers": {
+    "modal": {
+      "network_config": { "base_url": "https://api.us-west-2.modal.direct" },
+      "keys": [{ "name": "modal", "value": "env.MODAL_TOKEN" }]
+    }
+  }
+}
+```
+
+Use the model name exposed by the Modal endpoint. Unsupported upstream operations return an explicit unsupported-operation error.

@@ -30,6 +30,17 @@ export const KnownProvidersNames = [
 	"fireworks",
 	"sarvam",
 	"wafer",
+	"tokenrouter",
+	"modal",
+	"byteplus",
+	"poolside",
+	"longcat",
+	"inferx",
+	"dahl",
+	"morphllm",
+	"tokenharbor",
+	"aisure",
+	"tokenfaucet",
 ] as const;
 
 // Local Provider type derived from KNOWN_PROVIDERS constant
@@ -142,6 +153,17 @@ export const ProviderLabels: Record<ProviderName, string> = {
 	fireworks: "Fireworks AI",
 	sarvam: "Sarvam AI",
 	wafer: "Wafer",
+	tokenrouter: "TokenRouter",
+	modal: "Modal",
+	byteplus: "BytePlus",
+	poolside: "Poolside",
+	longcat: "Longcat",
+	inferx: "Inferx",
+	dahl: "Dahl",
+	morphllm: "Morphllm",
+	tokenharbor: "TokenHarbor",
+	aisure: "AISure",
+	tokenfaucet: "TokenFaucet",
 } as const;
 
 // Helper function to get provider label, supporting custom providers

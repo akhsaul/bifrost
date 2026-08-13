@@ -1,0 +1,18 @@
+---
+title: "TokenRouter"
+description: "Configure TokenRouter through its OpenAI-compatible API"
+---
+
+TokenRouter is configured through the shared OpenAI-compatible adapter. The default base URL is `https://api.tokenrouter.com/v1`; requests use `/chat/completions` and `/models`.
+
+```json
+{
+  "providers": {
+    "tokenrouter": {
+      "keys": [{ "name": "tokenrouter", "value": "env.TOKENROUTER_API_KEY" }]
+    }
+  }
+}
+```
+
+Authentication uses `Authorization: Bearer <token>`. Chat completions, streaming SSE, model listing, and Responses-to-Chat fallback are supported. Provider-specific operations such as embeddings, files, batches, and media return an explicit unsupported-operation error.

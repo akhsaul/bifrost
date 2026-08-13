@@ -1,0 +1,18 @@
+---
+title: "Longcat"
+description: "Configure Longcat through its OpenAI-compatible API"
+---
+
+Longcat exposes an OpenAI-compatible API. The default base URL is `https://api.longcat.chat/openai/v1`; Bifrost uses `/chat/completions` for chat requests and `/models` for model discovery.
+
+```json
+{
+  "providers": {
+    "longcat": {
+      "keys": [{ "name": "longcat", "value": "env.LONGCAT_API_KEY" }]
+    }
+  }
+}
+```
+
+Requests use `Authorization: Bearer <api-key>`. Chat completions, SSE streaming, model listing, and Responses-to-Chat fallback are supported. Unsupported upstream operations return an explicit unsupported-operation error.

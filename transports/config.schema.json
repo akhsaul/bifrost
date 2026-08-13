@@ -394,6 +394,39 @@
         "groq": {
           "$ref": "#/$defs/provider"
         },
+        "tokenrouter": {
+          "$ref": "#/$defs/provider"
+        },
+        "modal": {
+          "$ref": "#/$defs/provider"
+        },
+        "byteplus": {
+          "$ref": "#/$defs/provider"
+        },
+        "poolside": {
+          "$ref": "#/$defs/provider"
+        },
+        "longcat": {
+          "$ref": "#/$defs/provider"
+        },
+        "inferx": {
+          "$ref": "#/$defs/provider"
+        },
+        "dahl": {
+          "$ref": "#/$defs/provider"
+        },
+        "morphllm": {
+          "$ref": "#/$defs/provider"
+        },
+        "tokenharbor": {
+          "$ref": "#/$defs/provider"
+        },
+        "aisure": {
+          "$ref": "#/$defs/provider"
+        },
+        "tokenfaucet": {
+          "$ref": "#/$defs/provider"
+        },
         "gemini": {
           "$ref": "#/$defs/provider"
         },
@@ -2498,6 +2531,9 @@
                         "cohere",
                         "mistral",
                         "groq",
+						"tokenrouter",
+						"modal",
+						"byteplus",
                         "ollama",
                         "openrouter",
                         "vertex",
@@ -7094,6 +7130,17 @@
             "mistral",
             "ollama",
             "groq",
+			"tokenrouter",
+			"modal",
+            "byteplus",
+			"poolside",
+			"longcat",
+			"inferx",
+			"dahl",
+			"morphllm",
+			"tokenharbor",
+			"aisure",
+			"tokenfaucet",
             "opencode-go",
             "opencode-zen",
             "sgl",

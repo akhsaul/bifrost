@@ -21,19 +21,26 @@ import (
 	"github.com/maximhq/bifrost/core/mcp"
 	"github.com/maximhq/bifrost/core/mcp/codemode/starlark"
 	"github.com/maximhq/bifrost/core/mcp/credstore"
+	"github.com/maximhq/bifrost/core/providers/aisure"
 	"github.com/maximhq/bifrost/core/providers/anthropic"
 	"github.com/maximhq/bifrost/core/providers/azure"
 	"github.com/maximhq/bifrost/core/providers/bedrock"
 	"github.com/maximhq/bifrost/core/providers/bedrockmantle"
+	"github.com/maximhq/bifrost/core/providers/byteplus"
 	"github.com/maximhq/bifrost/core/providers/cerebras"
 	"github.com/maximhq/bifrost/core/providers/cohere"
+	"github.com/maximhq/bifrost/core/providers/dahl"
 	"github.com/maximhq/bifrost/core/providers/deepseek"
 	"github.com/maximhq/bifrost/core/providers/elevenlabs"
 	"github.com/maximhq/bifrost/core/providers/fireworks"
 	"github.com/maximhq/bifrost/core/providers/gemini"
 	"github.com/maximhq/bifrost/core/providers/groq"
 	"github.com/maximhq/bifrost/core/providers/huggingface"
+	"github.com/maximhq/bifrost/core/providers/inferx"
+	"github.com/maximhq/bifrost/core/providers/longcat"
 	"github.com/maximhq/bifrost/core/providers/mistral"
+	"github.com/maximhq/bifrost/core/providers/modal"
+	"github.com/maximhq/bifrost/core/providers/morphllm"
 	"github.com/maximhq/bifrost/core/providers/nebius"
 	"github.com/maximhq/bifrost/core/providers/ollama"
 	"github.com/maximhq/bifrost/core/providers/openai"
@@ -41,11 +48,15 @@ import (
 	"github.com/maximhq/bifrost/core/providers/openrouter"
 	"github.com/maximhq/bifrost/core/providers/parasail"
 	"github.com/maximhq/bifrost/core/providers/perplexity"
+	"github.com/maximhq/bifrost/core/providers/poolside"
 	"github.com/maximhq/bifrost/core/providers/replicate"
 	"github.com/maximhq/bifrost/core/providers/runware"
 	"github.com/maximhq/bifrost/core/providers/runway"
 	"github.com/maximhq/bifrost/core/providers/sarvam"
 	"github.com/maximhq/bifrost/core/providers/sgl"
+	"github.com/maximhq/bifrost/core/providers/tokenfaucet"
+	"github.com/maximhq/bifrost/core/providers/tokenharbor"
+	"github.com/maximhq/bifrost/core/providers/tokenrouter"
 	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
 	"github.com/maximhq/bifrost/core/providers/vertex"
 	"github.com/maximhq/bifrost/core/providers/vllm"
@@ -4351,6 +4362,28 @@ func (bifrost *Bifrost) createBaseProvider(providerKey schemas.ModelProvider, co
 		return ollama.NewOllamaProvider(config, bifrost.logger)
 	case schemas.Groq:
 		return groq.NewGroqProvider(config, bifrost.logger)
+	case schemas.TokenRouter:
+		return tokenrouter.NewTokenRouterProvider(config, bifrost.logger)
+	case schemas.Modal:
+		return modal.NewModalProvider(config, bifrost.logger)
+	case schemas.BytePlus:
+		return byteplus.NewBytePlusProvider(config, bifrost.logger)
+	case schemas.Poolside:
+		return poolside.NewPoolsideProvider(config, bifrost.logger)
+	case schemas.Longcat:
+		return longcat.NewLongcatProvider(config, bifrost.logger)
+	case schemas.Inferx:
+		return inferx.NewInferxProvider(config, bifrost.logger)
+	case schemas.Dahl:
+		return dahl.NewDahlProvider(config, bifrost.logger)
+	case schemas.Morphllm:
+		return morphllm.NewMorphllmProvider(config, bifrost.logger)
+	case schemas.TokenHarbor:
+		return tokenharbor.NewTokenHarborProvider(config, bifrost.logger)
+	case schemas.AISure:
+		return aisure.NewAISureProvider(config, bifrost.logger)
+	case schemas.TokenFaucet:
+		return tokenfaucet.NewTokenFaucetProvider(config, bifrost.logger)
 	case schemas.OpencodeGo:
 		return opencode.NewOpencodeGoProvider(config, bifrost.logger)
 	case schemas.OpencodeZen:

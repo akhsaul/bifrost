@@ -1,0 +1,18 @@
+---
+title: "Morphllm"
+description: "Configure Morphllm through its OpenAI-compatible API"
+---
+
+Morphllm exposes an OpenAI-compatible API at `https://api.morphllm.com/v1`. Bifrost uses `/chat/completions` and `/models`.
+
+```json
+{
+  "providers": {
+    "morphllm": {
+      "keys": [{ "name": "morphllm", "value": "env.MORPHLLM_API_KEY" }]
+    }
+  }
+}
+```
+
+Requests use Bearer authentication. Chat completions, streaming, model listing, and Responses-to-Chat fallback are supported.

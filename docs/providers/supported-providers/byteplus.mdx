@@ -1,0 +1,18 @@
+---
+title: "BytePlus"
+description: "Configure BytePlus Ark through its OpenAI-compatible API"
+---
+
+BytePlus Ark uses the OpenAI-compatible API at `https://ark.ap-southeast.bytepluses.com/api/v3`. Bifrost appends `/chat/completions` and `/models`, so custom base URLs should contain only the API root.
+
+```json
+{
+  "providers": {
+    "byteplus": {
+      "keys": [{ "name": "byteplus", "value": "env.BYTEPLUS_API_KEY" }]
+    }
+  }
+}
+```
+
+Authentication is Bearer-token based. Chat, streaming, model listing, and Responses-to-Chat fallback are supported; unsupported media, embedding, file, and batch operations return a clear error.
