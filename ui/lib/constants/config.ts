@@ -66,6 +66,17 @@ export const ModelPlaceholders = {
 	fireworks: "e.g. accounts/fireworks/models/deepseek-v3p2",
 	sarvam: "e.g. sarvam-30b, sarvam-105b",
 	wafer: "e.g. glm-5.2, kimi-k2.6",
+	tokenrouter: "e.g. openai/gpt-4o-mini, anthropic/claude-3.5-sonnet",
+	modal: "e.g. google/gemini-2.5-flash, meta-llama/Llama-3.1-8B-Instruct",
+	byteplus: "e.g. ep-xxxxxxxx-xxxxxxxx",
+	poolside: "e.g. code-command, Qwen3-Coder-480B-A35B-Instruct",
+	longcat: "e.g. LongCat-Flash-Chat, LongCat-Flash-Thinking",
+	inferx: "e.g. inferx-model-name",
+	dahl: "e.g. dahl-model-name",
+	morphllm: "e.g. morph-v3-fast, morph-v3-large",
+	tokenharbor: "e.g. provider-model-name",
+	aisure: "e.g. aisure-model-name",
+	tokenfaucet: "e.g. tokenfaucet-model-name",
 };
 
 export const isKeyRequiredByProvider: Record<ProviderName, boolean> = {
@@ -99,6 +110,17 @@ export const isKeyRequiredByProvider: Record<ProviderName, boolean> = {
 	fireworks: true,
 	sarvam: true,
 	wafer: true,
+	tokenrouter: true,
+	modal: true,
+	byteplus: true,
+	poolside: true,
+	longcat: true,
+	inferx: true,
+	dahl: true,
+	morphllm: true,
+	tokenharbor: true,
+	aisure: true,
+	tokenfaucet: true,
 };
 
 export const DefaultNetworkConfig = {

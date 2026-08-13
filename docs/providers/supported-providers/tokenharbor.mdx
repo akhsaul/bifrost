@@ -1,0 +1,18 @@
+---
+title: "TokenHarbor"
+description: "Configure TokenHarbor through its OpenAI-compatible API"
+---
+
+TokenHarbor exposes an OpenAI-compatible API at `https://tokenharbor.ai/v1`. Bifrost uses `/chat/completions` and `/models`.
+
+```json
+{
+  "providers": {
+    "tokenharbor": {
+      "keys": [{ "name": "tokenharbor", "value": "env.TOKENHARBOR_API_KEY" }]
+    }
+  }
+}
+```
+
+Requests use Bearer authentication. Chat completions, streaming, model listing, and Responses-to-Chat fallback are supported.

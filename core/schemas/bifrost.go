@@ -73,6 +73,17 @@ const (
 	Fireworks     ModelProvider = "fireworks"
 	Sarvam        ModelProvider = "sarvam"
 	Wafer         ModelProvider = "wafer"
+	TokenRouter   ModelProvider = "tokenrouter"
+	Modal         ModelProvider = "modal"
+	BytePlus      ModelProvider = "byteplus"
+	Poolside      ModelProvider = "poolside"
+	Longcat       ModelProvider = "longcat"
+	Inferx        ModelProvider = "inferx"
+	Dahl          ModelProvider = "dahl"
+	Morphllm      ModelProvider = "morphllm"
+	TokenHarbor   ModelProvider = "tokenharbor"
+	AISure        ModelProvider = "aisure"
+	TokenFaucet   ModelProvider = "tokenfaucet"
 )
 
 // SupportedBaseProviders is the list of base providers allowed for custom providers.
@@ -118,6 +129,17 @@ var StandardProviders = []ModelProvider{
 	Fireworks,
 	Sarvam,
 	Wafer,
+	TokenRouter,
+	Modal,
+	BytePlus,
+	Poolside,
+	Longcat,
+	Inferx,
+	Dahl,
+	Morphllm,
+	TokenHarbor,
+	AISure,
+	TokenFaucet,
 }
 
 // RequestType represents the type of request being made to a provider.

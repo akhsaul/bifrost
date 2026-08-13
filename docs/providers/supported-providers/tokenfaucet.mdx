@@ -1,0 +1,18 @@
+---
+title: "TokenFaucet"
+description: "Configure TokenFaucet through its OpenAI-compatible API"
+---
+
+TokenFaucet exposes an OpenAI-compatible API at `https://freetokenfaucet.com/v1`. Bifrost uses `/chat/completions` and `/models`.
+
+```json
+{
+  "providers": {
+    "tokenfaucet": {
+      "keys": [{ "name": "tokenfaucet", "value": "env.TOKENFAUCET_API_KEY" }]
+    }
+  }
+}
+```
+
+Requests use Bearer authentication. Chat completions, streaming, model listing, and Responses-to-Chat fallback are supported.
