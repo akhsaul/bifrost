@@ -11,7 +11,7 @@ import { getErrorMessage, setProviderFormDirtyState, useAppDispatch } from "@/li
 import { useUpdateProviderMutation } from "@/lib/store/apis/providersApi";
 import { ModelProvider, isKnownProvider } from "@/lib/types/config";
 import { networkOnlyFormSchema, type SecretVar, type NetworkOnlyFormSchema } from "@/lib/types/schemas";
-import { toSecretVarFormValue, toOptionalSecretVarPayload } from "@/lib/utils/secretVarForm";
+import { toEnvRefString, toHeaderStringMap, toSecretVarFormValue, toOptionalSecretVarPayload } from "@/lib/utils/secretVarForm";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
@@ -22,6 +22,16 @@ import { buildProviderUpdatePayload } from "../views/utils";
 interface NetworkFormFragmentProps {
 	provider: ModelProvider;
 }
+
+const toMaskedEnvFormValue = (value?: string, ref?: string): string | SecretVar => {
+	if (!ref) return value || "";
+	return { value: value || "", ref, type: "env" };
+};
+
+const toMaskedEnvHeaderFormValue = (headers?: Record<string, string>, refs?: Record<string, string>) => {
+	if (!headers) return undefined;
+	return Object.fromEntries(Object.entries(headers).map(([key, value]) => [key, toMaskedEnvFormValue(value, refs?.[key])]));
+};
 
 // seconds to human readable time
 const secondsToHumanReadable = (seconds: number) => {
@@ -74,8 +84,8 @@ export function NetworkFormFragment({ provider }: NetworkFormFragmentProps) {
 		reValidateMode: "onChange",
 		defaultValues: {
 			network_config: {
-				base_url: provider.network_config?.base_url || undefined,
-				extra_headers: provider.network_config?.extra_headers,
+				base_url: toMaskedEnvFormValue(provider.network_config?.base_url, provider.network_config?.base_url_ref),
+				extra_headers: toMaskedEnvHeaderFormValue(provider.network_config?.extra_headers, provider.network_config?.extra_header_refs),
 				default_request_timeout_in_seconds:
 					provider.network_config?.default_request_timeout_in_seconds ?? DefaultNetworkConfig.default_request_timeout_in_seconds,
 				max_retries: provider.network_config?.max_retries ?? DefaultNetworkConfig.max_retries,
@@ -100,7 +110,8 @@ export function NetworkFormFragment({ provider }: NetworkFormFragmentProps) {
 
 	const onSubmit = (data: NetworkOnlyFormSchema) => {
 		const requiresBaseUrl = isCustomProvider;
-		if (requiresBaseUrl && (data.network_config?.base_url ?? "").trim() === "") {
+		const submittedBaseURL = toEnvRefString(data.network_config?.base_url as SecretVar | string | undefined);
+		if (requiresBaseUrl && submittedBaseURL.trim() === "") {
 			if ((provider.network_config?.base_url ?? "").trim() !== "") {
 				toast.error("You can't remove network configuration for this provider.");
 			} else {
@@ -112,8 +123,10 @@ export function NetworkFormFragment({ provider }: NetworkFormFragmentProps) {
 		const updatedProvider = buildProviderUpdatePayload(provider, {
 			network_config: {
 				...provider.network_config,
-				base_url: data.network_config?.base_url || undefined,
-				extra_headers: data.network_config?.extra_headers || undefined,
+				base_url_ref: undefined,
+				extra_header_refs: undefined,
+				base_url: submittedBaseURL || undefined,
+				extra_headers: toHeaderStringMap(data.network_config?.extra_headers as Record<string, SecretVar> | undefined),
 				default_request_timeout_in_seconds:
 					data.network_config?.default_request_timeout_in_seconds ?? DefaultNetworkConfig.default_request_timeout_in_seconds,
 				max_retries: data.network_config?.max_retries ?? 0,
@@ -147,8 +160,8 @@ export function NetworkFormFragment({ provider }: NetworkFormFragmentProps) {
 		// Reset form with new provider's network_config when provider.name changes
 		form.reset({
 			network_config: {
-				base_url: provider.network_config?.base_url || undefined,
-				extra_headers: provider.network_config?.extra_headers,
+				base_url: toMaskedEnvFormValue(provider.network_config?.base_url, provider.network_config?.base_url_ref),
+				extra_headers: toMaskedEnvHeaderFormValue(provider.network_config?.extra_headers, provider.network_config?.extra_header_refs),
 				default_request_timeout_in_seconds:
 					provider.network_config?.default_request_timeout_in_seconds ?? DefaultNetworkConfig.default_request_timeout_in_seconds,
 				max_retries: provider.network_config?.max_retries ?? DefaultNetworkConfig.max_retries,
@@ -184,12 +197,12 @@ export function NetworkFormFragment({ provider }: NetworkFormFragmentProps) {
 									<FormItem>
 										<FormLabel>Base URL {baseURLRequired ? "(Required)" : "(Optional)"}</FormLabel>
 										<FormControl>
-											<Input
-												placeholder={isCustomProvider ? "https://api.your-provider.com" : "https://api.example.com"}
-												{...field}
-												value={field.value || ""}
-												disabled={!hasUpdateProviderAccess}
-											/>
+																<SecretVarInput
+																	placeholder={isCustomProvider ? "https://api.your-provider.com or env.PROVIDER_URL" : "https://api.example.com or env.PROVIDER_URL"}
+																	value={typeof field.value === "string" ? toSecretVarFormValue(field.value) : field.value}
+																	onChange={field.onChange}
+																	disabled={!hasUpdateProviderAccess}
+																/>
 										</FormControl>
 										<FormMessage />
 									</FormItem>

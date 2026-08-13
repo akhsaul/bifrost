@@ -40,6 +40,16 @@ const maskValue = (value: string, visiblePrefix: number, visibleSuffix: number) 
 	return `${prefix}****${suffix}`;
 };
 
+const envReferenceLabel = (ref: string): string => {
+	const exact = /^env\.[A-Za-z_][A-Za-z0-9_]*$/.exec(ref);
+	if (exact) return exact[0];
+	const interpolation = /\$\{(env\.[A-Za-z_][A-Za-z0-9_]*)\}/.exec(ref);
+	return interpolation?.[1] ?? ref;
+};
+
+const isEnvReference = (value: string): boolean =>
+	/^env\.[A-Za-z_][A-Za-z0-9_]*$/.test(value) || /\$\{env\.[A-Za-z_][A-Za-z0-9_]*\}/.test(value);
+
 export const SecretVarInput = React.forwardRef<HTMLInputElement | HTMLTextAreaElement, SecretVarInputProps>(
 	(
 		{
@@ -90,7 +100,9 @@ export const SecretVarInput = React.forwardRef<HTMLInputElement | HTMLTextAreaEl
 		const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
 			const inputValue = e.target.value;
 			const isMaskedOrPlaceholder =
-				!hasChanged.current && displayValue !== rawValue && (displayValue === "<REDACTED>" || (displayValue.length > 0 && !showBadge));
+				!hasChanged.current &&
+				displayValue !== rawValue &&
+				(displayValue === "<REDACTED>" || (displayValue.length > 0 && (!showBadge || displayValue.includes("****"))));
 			let newValue = inputValue;
 			if (isMaskedOrPlaceholder) {
 				if (inputValue === displayValue) {
@@ -104,7 +116,7 @@ export const SecretVarInput = React.forwardRef<HTMLInputElement | HTMLTextAreaEl
 			// Auto-detect env var / vault reference prefix
 			if (newValue.startsWith("vault.")) {
 				onChange?.({ value: "", ref: newValue, type: "vault" });
-			} else if (newValue.startsWith("env.")) {
+			} else if (isEnvReference(newValue)) {
 				onChange?.({ value: "", ref: newValue, type: "env" });
 			} else {
 				onChange?.({ value: newValue, ref: "" });
@@ -157,7 +169,7 @@ export const SecretVarInput = React.forwardRef<HTMLInputElement | HTMLTextAreaEl
 					)}
 					{showEnvBadge && (
 						<Badge variant="success" className={cn("mr-2 whitespace-nowrap", isTextarea && "mb-2")}>
-							{value?.ref}
+							{envReferenceLabel(value?.ref ?? "")}
 						</Badge>
 					)}
 					{showVaultBadge && (

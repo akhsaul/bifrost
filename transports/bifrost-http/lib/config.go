@@ -5636,6 +5636,11 @@ func (c *Config) GetAllProviders() ([]schemas.ModelProvider, error) {
 func (c *Config) AddProvider(ctx context.Context, provider schemas.ModelProvider, config configstore.ProviderConfig) error {
 	c.Mu.Lock()
 	defer c.Mu.Unlock()
+	if config.NetworkConfig != nil {
+		if _, err := schemas.ResolveNetworkConfig(*config.NetworkConfig); err != nil {
+			return fmt.Errorf("invalid provider environment reference: %w", err)
+		}
+	}
 	// Check if provider already exists
 	if _, exists := c.Providers[provider]; exists {
 		return fmt.Errorf("provider %s: %w", provider, ErrAlreadyExists)
@@ -5697,6 +5702,11 @@ func (c *Config) AddProvider(ctx context.Context, provider schemas.ModelProvider
 func (c *Config) UpdateProviderConfig(ctx context.Context, provider schemas.ModelProvider, config configstore.ProviderConfig) error {
 	c.Mu.Lock()
 	defer c.Mu.Unlock()
+	if config.NetworkConfig != nil {
+		if _, err := schemas.ResolveNetworkConfig(*config.NetworkConfig); err != nil {
+			return fmt.Errorf("invalid provider environment reference: %w", err)
+		}
+	}
 	// Get existing configuration for validation
 	existingConfig, exists := c.Providers[provider]
 	if !exists {

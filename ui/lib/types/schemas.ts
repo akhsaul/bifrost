@@ -446,8 +446,8 @@ export const networkConfigSchema = z
 // Network form schema - more lenient for form inputs
 export const networkFormConfigSchema = z
 	.object({
-		base_url: z
-			.union([
+			base_url: z
+				.union([
 				z
 					.string()
 					.url("Must be a valid URL")
@@ -455,9 +455,10 @@ export const networkFormConfigSchema = z
 						message: "Must be a valid HTTP or HTTPS URL",
 					}),
 				z.string().length(0),
-			])
+					secretVarSchema,
+				])
 			.optional(),
-		extra_headers: z.record(z.string(), z.string()).optional(),
+		extra_headers: z.record(z.string(), z.union([z.string(), secretVarSchema])).optional(),
 		default_request_timeout_in_seconds: z.coerce
 			.number("Timeout must be a number")
 			.min(1, "Timeout must be greater than 0 seconds")

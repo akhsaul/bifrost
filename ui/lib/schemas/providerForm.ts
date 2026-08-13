@@ -265,7 +265,10 @@ export const ProviderFormSchema = z
 				});
 			}
 
-			if (data.networkConfig?.base_url && !/^https?:\/\/.+/.test(data.networkConfig.base_url)) {
+			const baseURL = data.networkConfig?.base_url ?? "";
+			const isEnvReference = /^env\.[A-Za-z_][A-Za-z0-9_]*$/.test(baseURL);
+			const hasEnvInterpolation = /\$\{env\.[A-Za-z_][A-Za-z0-9_]*\}/.test(baseURL);
+			if (baseURL && !/^https?:\/\/.+/.test(baseURL) && !isEnvReference && !hasEnvInterpolation) {
 				ctx.addIssue({
 					code: z.ZodIssueCode.custom,
 					message: "Base URL must start with http:// or https://",

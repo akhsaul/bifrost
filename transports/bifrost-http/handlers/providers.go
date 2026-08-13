@@ -87,7 +87,7 @@ const (
 // ProviderResponse represents the response for provider operations
 type ProviderResponse struct {
 	Name                     schemas.ModelProvider            `json:"name"`
-	NetworkConfig            schemas.NetworkConfig            `json:"network_config"`                   // Network-related settings
+	NetworkConfig            ProviderNetworkConfigResponse    `json:"network_config"`                   // Network-related settings
 	ConcurrencyAndBufferSize schemas.ConcurrencyAndBufferSize `json:"concurrency_and_buffer_size"`      // Concurrency settings
 	ProxyConfig              *schemas.ProxyConfig             `json:"proxy_config"`                     // Proxy configuration
 	SendBackRawRequest       bool                             `json:"send_back_raw_request"`            // Include raw request in BifrostResponse
@@ -99,6 +99,63 @@ type ProviderResponse struct {
 	Status                   string                           `json:"status,omitempty"`                 // Operational status (e.g., list_models_failed)
 	Description              string                           `json:"description,omitempty"`            // Error/status description
 	ConfigHash               string                           `json:"config_hash,omitempty"`            // Hash of config.json version, used for change detection
+}
+
+// ProviderNetworkConfigResponse keeps environment references separately from
+// masked resolved values. This lets the UI show the same env badge as key
+// inputs without exposing provider credentials in the response.
+type ProviderNetworkConfigResponse struct {
+	schemas.NetworkConfig
+	BaseURLRef      string            `json:"base_url_ref,omitempty"`
+	ExtraHeaderRefs map[string]string `json:"extra_header_refs,omitempty"`
+}
+
+// MarshalJSON flattens NetworkConfig even though it has a custom JSON
+// marshaler, while adding the UI-only reference metadata.
+func (response ProviderNetworkConfigResponse) MarshalJSON() ([]byte, error) {
+	data, err := sonic.Marshal(response.NetworkConfig)
+	if err != nil {
+		return nil, err
+	}
+	var fields map[string]any
+	if err := sonic.Unmarshal(data, &fields); err != nil {
+		return nil, err
+	}
+	if response.BaseURLRef != "" {
+		fields["base_url_ref"] = response.BaseURLRef
+	}
+	if len(response.ExtraHeaderRefs) > 0 {
+		fields["extra_header_refs"] = response.ExtraHeaderRefs
+	}
+	return sonic.Marshal(fields)
+}
+
+func redactProviderNetworkConfig(config schemas.NetworkConfig) ProviderNetworkConfigResponse {
+	response := ProviderNetworkConfigResponse{NetworkConfig: config}
+	if schemas.IsEnvReferenceString(config.BaseURL) {
+		response.BaseURLRef = config.BaseURL
+		response.BaseURL = "<REDACTED>"
+		if masked, err := schemas.MaskEnvString(config.BaseURL); err == nil {
+			response.BaseURL = masked
+		}
+	}
+	if config.ExtraHeaders != nil {
+		response.ExtraHeaders = make(map[string]string, len(config.ExtraHeaders))
+		for key, value := range config.ExtraHeaders {
+			response.ExtraHeaders[key] = value
+			if schemas.IsEnvReferenceString(value) {
+				response.ExtraHeaders[key] = "<REDACTED>"
+				if masked, err := schemas.MaskEnvString(value); err == nil {
+					response.ExtraHeaders[key] = masked
+				}
+				if response.ExtraHeaderRefs == nil {
+					response.ExtraHeaderRefs = make(map[string]string)
+				}
+				response.ExtraHeaderRefs[key] = value
+			}
+		}
+	}
+	return response
 }
 
 // ListProvidersResponse represents the response for listing all providers
@@ -303,8 +360,13 @@ func (h *ProviderHandler) addProvider(ctx *fasthttp.RequestCtx) {
 			SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid retry backoff: %v", err))
 			return
 		}
-		if payload.NetworkConfig.BaseURL != "" {
-			if err := bifrost.ValidateExternalURL(payload.NetworkConfig.BaseURL, payload.NetworkConfig.AllowPrivateNetwork); err != nil {
+		resolvedNetworkConfig, err := schemas.ResolveNetworkConfig(*payload.NetworkConfig)
+		if err != nil {
+			SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid provider environment reference: %v", err))
+			return
+		}
+		if resolvedNetworkConfig.BaseURL != "" {
+			if err := bifrost.ValidateExternalURL(resolvedNetworkConfig.BaseURL, resolvedNetworkConfig.AllowPrivateNetwork); err != nil {
 				SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid base URL: %v", err))
 				return
 			}
@@ -492,8 +554,13 @@ func (h *ProviderHandler) updateProvider(ctx *fasthttp.RequestCtx) {
 		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid retry backoff: %v", err))
 		return
 	}
-	if nc.BaseURL != "" {
-		if err := bifrost.ValidateExternalURL(nc.BaseURL, nc.AllowPrivateNetwork); err != nil {
+	resolvedNetworkConfig, err := schemas.ResolveNetworkConfig(nc)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid provider environment reference: %v", err))
+		return
+	}
+	if resolvedNetworkConfig.BaseURL != "" {
+		if err := bifrost.ValidateExternalURL(resolvedNetworkConfig.BaseURL, resolvedNetworkConfig.AllowPrivateNetwork); err != nil {
 			SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid base URL: %v", err))
 			return
 		}
@@ -1245,7 +1312,7 @@ func (h *ProviderHandler) getProviderResponseFromConfig(provider schemas.ModelPr
 
 	return ProviderResponse{
 		Name:                     provider,
-		NetworkConfig:            *config.NetworkConfig,
+		NetworkConfig:            redactProviderNetworkConfig(*config.NetworkConfig),
 		ConcurrencyAndBufferSize: *config.ConcurrencyAndBufferSize,
 		ProxyConfig:              config.ProxyConfig,
 		SendBackRawRequest:       config.SendBackRawRequest,

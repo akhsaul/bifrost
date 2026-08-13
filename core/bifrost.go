@@ -3729,6 +3729,11 @@ func (bifrost *Bifrost) UpdateProvider(providerKey schemas.ModelProvider) error 
 	if providerConfig == nil {
 		return fmt.Errorf("config is nil for provider %s", providerKey)
 	}
+	resolvedConfig, err := schemas.ResolveProviderNetworkConfig(providerConfig)
+	if err != nil {
+		return fmt.Errorf("provider %s environment resolution failed: %w", providerKey, err)
+	}
+	providerConfig = resolvedConfig
 	// Lock the provider while publishing the new runtime state. The slow cleanup
 	// of old workers happens after unlock so new requests can route to newPq.
 	providerMutex := bifrost.getProviderMutex(providerKey)
@@ -4433,6 +4438,12 @@ func (bifrost *Bifrost) createBaseProvider(providerKey schemas.ModelProvider, co
 // It initializes the request queue and starts worker goroutines for processing requests.
 // Note: This function assumes the caller has already acquired the appropriate mutex for the provider.
 func (bifrost *Bifrost) prepareProvider(providerKey schemas.ModelProvider, config *schemas.ProviderConfig) error {
+	resolvedConfig, err := schemas.ResolveProviderNetworkConfig(config)
+	if err != nil {
+		return fmt.Errorf("provider %s environment resolution failed: %w", providerKey, err)
+	}
+	config = resolvedConfig
+
 	// Create ProviderQueue with lifecycle management
 	pq := &ProviderQueue{
 		queue:      make(chan *ChannelMessage, config.ConcurrencyAndBufferSize.BufferSize),
