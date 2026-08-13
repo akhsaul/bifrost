@@ -3742,15 +3742,14 @@
       "properties": {
         "base_url": {
           "type": "string",
-          "format": "uri",
-          "description": "Base URL for the provider (optional, required for Ollama)"
+          "description": "Base URL for the provider (optional, required for Ollama). Supports literal env.VAR_NAME or ${env.VAR_NAME} interpolation. The environment value must resolve to a fully-qualified URL."
         },
         "extra_headers": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Additional headers to send with requests"
+          "description": "Additional headers to send with requests. Header names are literal; values support literal env.VAR_NAME or ${env.VAR_NAME} interpolation."
         },
         "default_request_timeout_in_seconds": {
           "type": "integer",
@@ -3831,7 +3830,7 @@
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Additional headers to send with requests"
+          "description": "Additional headers to send with requests. Header names are literal; values support literal env.VAR_NAME or ${env.VAR_NAME} interpolation."
         },
         "default_request_timeout_in_seconds": {
           "type": "integer",

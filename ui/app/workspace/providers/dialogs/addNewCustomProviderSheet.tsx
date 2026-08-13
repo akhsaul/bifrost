@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { SecretVarInput } from "@/components/ui/secretVarInput";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -7,7 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { DefaultNetworkConfig } from "@/lib/constants/config";
 import { getErrorMessage, useCreateProviderMutation } from "@/lib/store";
 import { BaseProvider, ModelProviderName } from "@/lib/types/config";
-import { allowedRequestsSchema } from "@/lib/types/schemas";
+import { allowedRequestsSchema, type SecretVar } from "@/lib/types/schemas";
+import { toEnvRefString, toSecretVarFormValue } from "@/lib/utils/secretVarForm";
 import { cleanPathOverrides } from "@/lib/utils/validation";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,7 +22,18 @@ import { AllowedRequestsFields } from "../fragments/allowedRequestsFields";
 const formSchema = z.object({
 	name: z.string().min(1),
 	baseFormat: z.string().min(1),
-	base_url: z.string().min(1, "Base URL is required").url("Must be a valid URL"),
+	base_url: z.union([
+		z.string().min(1, "Base URL is required").refine((url) => {
+			if (/^env\.[A-Za-z_][A-Za-z0-9_]*$/.test(url) || /\$\{env\.[A-Za-z_][A-Za-z0-9_]*\}/.test(url)) return true;
+			try {
+				const parsed = new URL(url);
+				return parsed.protocol === "http:" || parsed.protocol === "https:";
+			} catch {
+				return false;
+			}
+		}, "Must be a valid HTTP or HTTPS URL or env reference"),
+		z.object({ value: z.string().optional(), ref: z.string().optional(), type: z.enum(["plain_text", "env", "vault"]).optional() }),
+	]),
 	allowed_requests: allowedRequestsSchema,
 	request_path_overrides: z.record(z.string(), z.string().optional()).optional(),
 	is_key_less: z.boolean().optional(),
@@ -105,7 +118,7 @@ export function AddCustomProviderSheetContent({ show = true, onClose, onSave }: 
 				is_key_less: data.is_key_less ?? false,
 			},
 			network_config: {
-				base_url: data.base_url,
+				base_url: toEnvRefString(data.base_url as SecretVar | string),
 				allow_private_network: data.allow_private_network ?? false,
 				default_request_timeout_in_seconds: DefaultNetworkConfig.default_request_timeout_in_seconds,
 				max_retries: 0,
@@ -189,12 +202,12 @@ export function AddCustomProviderSheetContent({ show = true, onClose, onSave }: 
 									<FormLabel>Base URL</FormLabel>
 									<div>
 										<FormControl>
-											<Input
-												placeholder={"https://api.your-provider.com"}
+											<SecretVarInput
+												placeholder="https://api.your-provider.com or env.PROVIDER_URL"
 												data-testid="base-url-input"
+												value={typeof field.value === "string" ? toSecretVarFormValue(field.value) : field.value}
+												onChange={field.onChange}
 												disabled={!hasProviderCreateAccess}
-												{...field}
-												value={field.value || ""}
 											/>
 										</FormControl>
 										<FormMessage />

@@ -3,7 +3,7 @@ import { type SecretVar } from "@/lib/types/schemas";
 function inferType(ref: string | undefined): SecretVar["type"] | undefined {
 	if (!ref) return undefined;
 	if (ref.startsWith("vault.")) return "vault";
-	if (ref.startsWith("env.")) return "env";
+	if (ref.startsWith("env.") || /\$\{env\.[A-Za-z_][A-Za-z0-9_]*\}/.test(ref)) return "env";
 	return undefined;
 }
 
@@ -20,7 +20,7 @@ export const toSecretVarFormValue = (field?: SecretVar | string): SecretVar => {
 	if (typeof field === "string") {
 		const value = field.trim();
 		if (!value) return emptySecretVar();
-		const isSecretRef = value.startsWith("env.") || value.startsWith("vault.");
+		const isSecretRef = value.startsWith("env.") || value.startsWith("vault.") || /\$\{env\.[A-Za-z_][A-Za-z0-9_]*\}/.test(value);
 		return {
 			value: isSecretRef ? "" : value,
 			ref: isSecretRef ? value : "",
@@ -41,8 +41,9 @@ export const toSecretVarMapFormValue = (map?: Record<string, string | SecretVar>
 
 // toEnvRefString flattens a SecretVar form value to its persisted string form:
 // the "vault.path" or "env.VAR" reference when secret-backed, otherwise the literal value.
-export const toEnvRefString = (field?: SecretVar): string => {
+export const toEnvRefString = (field?: SecretVar | string): string => {
 	if (!field) return "";
+	if (typeof field === "string") return field.trim();
 	const effectiveType = field.type ?? inferType(field.ref);
 	if (effectiveType && effectiveType !== "plain_text") return (field.ref || "").trim();
 	return (field.value || "").trim();
