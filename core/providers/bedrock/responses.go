@@ -2062,6 +2062,16 @@ func (request *BedrockConverseRequest) ToBifrostResponsesRequest(ctx *schemas.Bi
 						if summaryValue, ok := schemas.SafeExtractStringPointer(request.ExtraParams["reasoning_summary"]); ok {
 							summary = summaryValue
 						}
+						// Converse has no reasoning-summary field, so an OpenAI reasoning
+						// model routed through the /bedrock drop-in would never be asked
+						// for summaries and would return no reasoning text at all - and
+						// Converse usage has no reasoning-token field to fall back on, so
+						// the caller's reasoning_config would produce nothing observable.
+						// The gemini drop-in defaults the same way for the same reason
+						// (gemini/utils.go convertGenerationConfigToResponsesParameters).
+						if summary == nil && schemas.IsOpenAIModelFamily(ctx, bifrostReq.Model) {
+							summary = schemas.Ptr("auto")
+						}
 						var (
 							effortStr string
 							found     bool
@@ -2320,9 +2330,22 @@ func ToBedrockResponsesRequest(ctx *schemas.BifrostContext, bifrostReq *schemas.
 				}
 				if schemas.IsAnthropicModelFamily(ctx, bifrostReq.Model) {
 					if anthropic.IsAdaptiveOnlyThinkingModel(capModel) {
-						bedrockReq.AdditionalModelRequestFields.Set("thinking", map[string]any{
+						thinkingConfig := map[string]any{
 							"type": "adaptive",
-						})
+						}
+						// Mirror the effort arm below: without an explicit display these
+						// models emit no visible thinking blocks, so a caller who asked
+						// for a reasoning budget would get a 200 carrying no reasoning.
+						if bifrostReq.Params.Reasoning.Summary != nil {
+							if *bifrostReq.Params.Reasoning.Summary == "none" {
+								thinkingConfig["display"] = "omitted"
+							} else {
+								thinkingConfig["display"] = "summarized"
+							}
+						} else {
+							thinkingConfig["display"] = "summarized"
+						}
+						bedrockReq.AdditionalModelRequestFields.Set("thinking", thinkingConfig)
 						// Preserve a co-present effort — these models support effort,
 						// and the budget is otherwise dropped.
 						if bifrostReq.Params.Reasoning.Effort != nil && *bifrostReq.Params.Reasoning.Effort != "none" {
@@ -4577,46 +4600,91 @@ func convertSingleBedrockMessageToBifrostMessages(ctx *schemas.BifrostContext, m
 	return outputMessages
 }
 
-// convertBifrostReasoningToBedrockReasoning converts a Bifrost reasoning message to Bedrock reasoning blocks
+// convertBifrostReasoningToBedrockReasoning converts a Bifrost reasoning message to Bedrock reasoning blocks.
+//
+// Every block this emits MUST carry a non-nil Text. BedrockReasoningContentText.Text
+// is `*string json:"text,omitempty"`, so a nil pointer does not serialise as
+// `"text":null` -- the key disappears from the request entirely, and Bedrock Converse
+// answers:
+//
+//	N validation errors detected: Value at 'messages.2.member.content.1.member.
+//	reasoningContent.reasoningText.text' failed to satisfy constraint: Member must not be null
+//
+// once per replayed assistant turn. See reasoning_replay_test.go, which pins the
+// invariant at both the struct and the serialised-wire level.
 func convertBifrostReasoningToBedrockReasoning(msg *schemas.ResponsesMessage) []BedrockContentBlock {
 	var reasoningBlocks []BedrockContentBlock
 
-	if msg.Content != nil && msg.Content.ContentBlocks != nil {
+	// Track whether the content blocks actually produced reasoning rather than
+	// branching on Content being non-nil. A non-nil but empty ContentBlocks -- or
+	// one holding only non-reasoning blocks -- must fall through to
+	// ResponsesReasoning instead of shadowing it, otherwise the replayed reasoning
+	// is silently dropped. Mirrors toBedrockInvokeAnthropicResponse in invoke.go,
+	// which already guards this on the invoke path.
+	emittedFromContentBlocks := false
+	if msg.Content != nil {
 		for _, block := range msg.Content.ContentBlocks {
 			if block.Type == schemas.ResponsesOutputMessageContentTypeReasoning && block.Text != nil {
-				reasoningBlock := BedrockContentBlock{
+				reasoningBlocks = append(reasoningBlocks, BedrockContentBlock{
 					ReasoningContent: &BedrockReasoningContent{
 						ReasoningText: &BedrockReasoningContentText{
 							Text:      block.Text,
 							Signature: reasoningSignatureForBedrock(block.Signature),
 						},
 					},
-				}
-				reasoningBlocks = append(reasoningBlocks, reasoningBlock)
+				})
+				emittedFromContentBlocks = true
 			}
 		}
-	} else if msg.ResponsesReasoning != nil {
-		if len(msg.ResponsesReasoning.Summary) > 0 {
-			for _, reasoningContent := range msg.ResponsesReasoning.Summary {
-				reasoningBlock := BedrockContentBlock{
-					ReasoningContent: &BedrockReasoningContent{
-						ReasoningText: &BedrockReasoningContentText{
-							Text: &reasoningContent.Text,
-						},
-					},
-				}
-				reasoningBlocks = append(reasoningBlocks, reasoningBlock)
-			}
-		} else if msg.ResponsesReasoning.EncryptedContent != nil && *msg.ResponsesReasoning.EncryptedContent != "" {
-			reasoningBlock := BedrockContentBlock{
+	}
+	if emittedFromContentBlocks || msg.ResponsesReasoning == nil {
+		return reasoningBlocks
+	}
+
+	// Routed through the helper rather than read directly, so the empty-string
+	// guard matches every other signature site (see reasoningSignatureForBedrock).
+	signature := reasoningSignatureForBedrock(msg.ResponsesReasoning.EncryptedContent)
+
+	if len(msg.ResponsesReasoning.Summary) > 0 {
+		for i, reasoningContent := range msg.ResponsesReasoning.Summary {
+			text := reasoningContent.Text
+			block := BedrockContentBlock{
 				ReasoningContent: &BedrockReasoningContent{
-					ReasoningText: &BedrockReasoningContentText{
-						Signature: msg.ResponsesReasoning.EncryptedContent,
-					},
+					ReasoningText: &BedrockReasoningContentText{Text: &text},
 				},
 			}
-			reasoningBlocks = append(reasoningBlocks, reasoningBlock)
+			// The signature goes on the first block only. Bedrock verifies it
+			// against that block's text, so repeating one signature across several
+			// summary entries would present it as signing text it never signed --
+			// and dropping it entirely, as this branch used to, loses the replay
+			// token the next turn needs.
+			if i == 0 {
+				block.ReasoningContent.ReasoningText.Signature = signature
+			}
+			reasoningBlocks = append(reasoningBlocks, block)
 		}
+		return reasoningBlocks
+	}
+
+	if signature != nil {
+		// A signature with no accompanying thinking text. This is what the
+		// streaming ingress path emits (an empty summary plus the signature in
+		// encrypted_content), so it is what a client faithfully replaying a
+		// streamed turn sends back.
+		//
+		// An empty Text is the only text available here -- the client never
+		// received the prose to replay -- but an ABSENT one is not an option: it
+		// is the difference between a request Bedrock evaluates and one it
+		// rejects outright before reading a token.
+		emptyText := ""
+		reasoningBlocks = append(reasoningBlocks, BedrockContentBlock{
+			ReasoningContent: &BedrockReasoningContent{
+				ReasoningText: &BedrockReasoningContentText{
+					Text:      &emptyText,
+					Signature: signature,
+				},
+			},
+		})
 	}
 
 	return reasoningBlocks
