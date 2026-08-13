@@ -96,6 +96,7 @@ type ClientConfig struct {
 	AsyncJobResultTTL                     int                                   `json:"async_job_result_ttl"`                        // Default TTL for async job results in seconds (default: 3600 = 1 hour)
 	RequiredHeaders                       []string                              `json:"required_headers,omitempty"`                  // Headers that must be present on every request (case-insensitive)
 	LoggingHeaders                        []string                              `json:"logging_headers,omitempty"`                   // Headers to capture in log metadata
+	RedactSensitiveHeaders                []string                              `json:"redact_sensitive_headers,omitempty"`          // Outgoing headers whose values are redacted in logs
 	WhitelistedRoutes                     []string                              `json:"whitelisted_routes,omitempty"`                // Routes that bypass auth middleware
 	HideDeletedVirtualKeysInFilters       bool                                  `json:"hide_deleted_virtual_keys_in_filters"`        // Hide deleted virtual keys from logs/MCP filter data
 	RoutingChainMaxDepth                  int                                   `json:"routing_chain_max_depth"`                     // Maximum depth for routing rule chain evaluation (default: 10)
@@ -338,6 +339,16 @@ func (c *ClientConfig) GenerateClientConfigHash() (string, error) {
 			return "", err
 		}
 		hash.Write([]byte("loggingHeaders:"))
+		hash.Write(data)
+	}
+	if len(c.RedactSensitiveHeaders) > 0 {
+		sortedRedact := append([]string(nil), c.RedactSensitiveHeaders...)
+		sort.Strings(sortedRedact)
+		data, err := sonic.Marshal(sortedRedact)
+		if err != nil {
+			return "", err
+		}
+		hash.Write([]byte("redactSensitiveHeaders:"))
 		hash.Write(data)
 	}
 

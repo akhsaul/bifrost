@@ -451,6 +451,7 @@ type Config struct {
 	DisableContentLogging        *bool                  `json:"disable_content_logging"`
 	RetainContentInObjectStorage *bool                  `json:"retain_content_in_object_storage"` // Pointer to live config value; when true, content-disabled requests are offloaded to object storage as hidden instead of dropped
 	LoggingHeaders               *[]string              `json:"logging_headers"`                  // Pointer to live config slice; changes are reflected immediately without restart
+	RedactSensitiveHeaders       *[]string              `json:"redact_sensitive_headers"`         // Pointer to live redaction patterns
 	Writer                       *logstore.WriterConfig `json:"writer,omitempty"`
 	ObjectStorageEnabled         bool                   `json:"-"` // Set by the server from the logstore config; required for retain_content_in_object_storage to take effect
 }
@@ -490,6 +491,7 @@ type LoggerPlugin struct {
 	objectStorageEnabled         bool      // Log store offloads payloads to object storage; required for retain_content_in_object_storage
 	retainWarnOnce               sync.Once // Warns once when retention is configured without object storage
 	loggingHeaders               *[]string // Pointer to live config slice for headers to capture in metadata
+	redactSensitiveHeaders       *[]string
 	pricingManager               *modelcatalog.ModelCatalog
 	mcpCatalog                   *mcpcatalog.MCPCatalog // MCP catalog for tool cost calculation
 	mu                           sync.Mutex
@@ -556,6 +558,7 @@ func Init(ctx context.Context, config *Config, logger schemas.Logger, logsStore 
 		retainContentInObjectStorage: config.RetainContentInObjectStorage,
 		objectStorageEnabled:         config.ObjectStorageEnabled,
 		loggingHeaders:               config.LoggingHeaders,
+		redactSensitiveHeaders:       config.RedactSensitiveHeaders,
 		done:                         make(chan struct{}),
 		logger:                       logger,
 		writerConfig:                 writerConfig,
@@ -668,14 +671,21 @@ func (p *LoggerPlugin) HTTPTransportStreamChunkHook(ctx *schemas.BifrostContext,
 // System entries (e.g. isAsyncRequest) should be set AFTER calling this so they take precedence.
 func (p *LoggerPlugin) captureLoggingHeaders(ctx *schemas.BifrostContext) map[string]interface{} {
 	allHeaders, _ := ctx.Value(schemas.BifrostContextKeyRequestHeaders).(map[string]string)
-	if allHeaders == nil {
-		return nil
-	}
 
 	var metadata map[string]any
+	if outgoing, ok := ctx.Value(schemas.BifrostContextKeyOutgoingHeaders).(map[string]string); ok && len(outgoing) > 0 {
+		headers := make(map[string]string, len(outgoing))
+		for key, value := range outgoing {
+			if p.shouldRedactHeader(key) {
+				value = "[REDACTED]"
+			}
+			headers[key] = value
+		}
+		metadata = map[string]any{"outgoing_bifrost": map[string]any{"headers": headers}}
+	}
 
 	// Check configured logging headers (supports wildcard patterns like "x-custom-*")
-	if p.loggingHeaders != nil {
+	if allHeaders != nil && p.loggingHeaders != nil {
 		for _, h := range *p.loggingHeaders {
 			pattern := strings.ToLower(strings.TrimSpace(h))
 			for hKey, hVal := range allHeaders {
@@ -712,6 +722,19 @@ func (p *LoggerPlugin) captureLoggingHeaders(ctx *schemas.BifrostContext) map[st
 	}
 
 	return metadata
+}
+
+func (p *LoggerPlugin) shouldRedactHeader(name string) bool {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if p.redactSensitiveHeaders == nil {
+		return false
+	}
+	for _, pattern := range *p.redactSensitiveHeaders {
+		if schemas.MatchHeaderPattern(name, strings.ToLower(strings.TrimSpace(pattern))) {
+			return true
+		}
+	}
+	return false
 }
 
 // PreRequestHook implements schemas.LLMPlugin (no-op — required for plugin indexing).
@@ -1177,7 +1200,11 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 	if customerNames, ok := ctx.Value(schemas.BifrostContextKeyGovernanceCustomerNames).([]string); ok && len(customerNames) > 0 {
 		entry.CustomerNamesParsed = customerNames
 	}
-	entry.MetadataParsed = pending.InitialData.Metadata
+	// Merge metadata captured after the provider request was sent. The initial
+	// metadata is captured in PreLLMHook, before outgoing provider headers exist;
+	// the current snapshot must win for outgoing_bifrost while preserving the
+	// request metadata collected at the start of the request.
+	entry.MetadataParsed = mergeLogMetadata(pending.InitialData.Metadata, p.captureLoggingHeaders(ctx))
 	entry.MetadataParsed = mergeRealtimeMetadata(entry.MetadataParsed, ctx)
 	entry.RoutingEngineLogs = routingEngineLogs
 

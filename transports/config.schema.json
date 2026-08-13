@@ -221,6 +221,12 @@
           },
           "description": "Headers to capture in log metadata. Values are extracted from incoming requests and stored in the metadata field of log entries."
         },
+        "redact_sensitive_headers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Outgoing provider header names to redact in log metadata. Supports exact names and wildcard patterns; matching is case-insensitive.",
+          "default": []
+        },
         "whitelisted_routes": {
           "type": "array",
           "items": {
@@ -2467,6 +2473,11 @@
                     "is_vk_mandatory": {
                       "type": "boolean",
                       "description": "Whether virtual key (x-bf-vk header) is mandatory for all requests"
+                    },
+                    "redact_sensitive_headers": {
+                      "type": "array",
+                      "items": { "type": "string" },
+                      "description": "Outgoing provider header names to redact in log metadata"
                     },
                     "required_headers": {
                       "type": "array",

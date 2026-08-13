@@ -203,6 +203,7 @@ func (s *BifrostHTTPServer) loadBuiltinPlugins(ctx context.Context) error {
 			DisableContentLogging:        &s.Config.ClientConfig.DisableContentLogging,
 			RetainContentInObjectStorage: &s.Config.ClientConfig.RetainContentInObjectStorage,
 			LoggingHeaders:               &s.Config.ClientConfig.LoggingHeaders,
+			RedactSensitiveHeaders:       &s.Config.ClientConfig.RedactSensitiveHeaders,
 		}
 		if s.Config.LogsStoreConfig != nil {
 			config.Writer = s.Config.LogsStoreConfig.Writer

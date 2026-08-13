@@ -593,6 +593,7 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 
 	// Handle LoggingHeaders changes (no restart needed - logging plugin reads via pointer)
 	updatedConfig.LoggingHeaders = payload.ClientConfig.LoggingHeaders
+	updatedConfig.RedactSensitiveHeaders = payload.ClientConfig.RedactSensitiveHeaders
 
 	// Handle WhitelistedRoutes changes (updated dynamically via AuthMiddleware)
 	updatedConfig.WhitelistedRoutes = payload.ClientConfig.WhitelistedRoutes
