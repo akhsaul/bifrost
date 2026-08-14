@@ -55,7 +55,7 @@ jobs:
           go-version: "1.26.5"
 
       - name: Configure Git
-        run: make build-docker-image VERSION=dev-$(date +%d-%b-%H-%M-%S) LOCAL=1 DYNAMIC=1
+        run: make docker-image VERSION=dev-$(date +%d-%b-%H-%M-%S) LOCAL=1 APP_PORT=2972
 
       - name: Configure Git
         run: |
