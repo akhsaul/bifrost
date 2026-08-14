@@ -1,0 +1,71 @@
+name: Build Docker for me (Akhsaul)
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - feature/**
+
+# Prevent concurrent runs
+concurrency:
+  group: build-docker
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test-cli:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version: "1.26.5"
+
+      - name: Run CLI tests
+        working-directory: cli
+        run: go test ./...
+
+  release-cli:
+    needs: [test-cli]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      success: ${{ steps.release.outputs.success }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Set up Go
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
+        with:
+          go-version: "1.26.5"
+
+      - name: Configure Git
+        run: make build-docker-image VERSION=dev-$(date +%d-%b-%H-%M-%S) LOCAL=1 DYNAMIC=1
+
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Release CLI
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: docker image list
+
