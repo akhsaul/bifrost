@@ -29,6 +29,14 @@ export const configApi = baseApi.injectEndpoints({
 			providesTags: ["Config"],
 		}),
 
+		// Get exported configuration conforming to schema
+		getExportConfig: builder.query<Record<string, unknown>, void>({
+			query: () => ({
+				url: "/config/export",
+			}),
+			providesTags: ["Config"],
+		}),
+
 		// Get version information
 		getVersion: builder.query<string, void>({
 			query: () => ({
@@ -145,6 +153,8 @@ export const configApi = baseApi.injectEndpoints({
 export const {
 	useGetVersionQuery,
 	useGetCoreConfigQuery,
+	useGetExportConfigQuery,
+	useLazyGetExportConfigQuery,
 	useUpdateCoreConfigMutation,
 	useUpdateProxyConfigMutation,
 	useForcePricingSyncMutation,

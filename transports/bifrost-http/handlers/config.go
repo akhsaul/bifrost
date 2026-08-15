@@ -117,6 +117,7 @@ func NewConfigHandler(configManager ConfigManager, store *lib.Config) *ConfigHan
 // It adds the `PUT /api/config` endpoint.
 func (h *ConfigHandler) RegisterRoutes(r *router.Router, middlewares ...schemas.BifrostHTTPMiddleware) {
 	r.GET("/api/config", lib.ChainMiddlewares(h.getConfig, middlewares...))
+	r.GET("/api/config/export", lib.ChainMiddlewares(h.exportConfig, middlewares...))
 	r.PUT("/api/config", lib.ChainMiddlewares(h.updateConfig, middlewares...))
 	r.POST("/api/config/metadata", lib.ChainMiddlewares(h.updateMetadata, middlewares...))
 	r.GET("/api/version", lib.ChainMiddlewares(h.getVersion, middlewares...))
@@ -247,6 +248,390 @@ func (h *ConfigHandler) getConfig(ctx *fasthttp.RequestCtx) {
 	}
 	SendJSON(ctx, mapConfig)
 }
+
+// exportConfig handles GET /api/config/export - Get the complete exportable configuration conforming to https://www.getbifrost.ai/schema
+func (h *ConfigHandler) exportConfig(ctx *fasthttp.RequestCtx) {
+	exportMap := make(map[string]any)
+	exportMap["$schema"] = "https://www.getbifrost.ai/schema"
+	exportMap["version"] = 2
+	exportMap["source_of_truth"] = "split"
+
+	// Server config
+	readBufferSize := 65536
+	if h.store.ServerConfig != nil && h.store.ServerConfig.ReadBufferSize > 0 {
+		readBufferSize = h.store.ServerConfig.ReadBufferSize
+	}
+	exportMap["server"] = map[string]any{
+		"read_buffer_size": readBufferSize,
+	}
+
+	if h.store.EnvLabel != "" {
+		exportMap["env_label"] = h.store.EnvLabel
+	}
+
+	// Client config
+	var clientCfg *configstore.ClientConfig
+	if h.store.ConfigStore != nil {
+		if cc, err := h.store.ConfigStore.GetClientConfig(ctx); err == nil && cc != nil {
+			clientCfg = cc
+		}
+	}
+	if clientCfg == nil {
+		clientCfg = h.store.ClientConfig
+	}
+	if clientCfg != nil {
+		exportMap["client"] = formatExportClientConfig(clientCfg.Redacted())
+	}
+
+	// Providers
+	var providersConfig map[schemas.ModelProvider]configstore.ProviderConfig
+	if h.store.ConfigStore != nil {
+		if pConfigs, err := h.store.ConfigStore.GetProvidersConfig(ctx); err == nil && len(pConfigs) > 0 {
+			providersConfig = pConfigs
+		}
+	}
+	if providersConfig == nil {
+		h.store.Mu.RLock()
+		if len(h.store.Providers) > 0 {
+			providersConfig = make(map[schemas.ModelProvider]configstore.ProviderConfig, len(h.store.Providers))
+			for k, v := range h.store.Providers {
+				providersConfig[k] = v
+			}
+		}
+		h.store.Mu.RUnlock()
+	}
+	if len(providersConfig) > 0 {
+		formattedProviders := make(map[string]any)
+		for pName, pCfg := range providersConfig {
+			redacted := pCfg.Redacted()
+			formattedProviders[string(pName)] = formatExportProviderConfig(redacted)
+		}
+		exportMap["providers"] = formattedProviders
+	}
+
+	// Framework
+	var frameworkCfg any
+	if h.store.ConfigStore != nil {
+		if fc, err := h.store.ConfigStore.GetFrameworkConfig(ctx); err == nil && fc != nil {
+			normalized, _, _ := lib.ResolveFrameworkPricingConfig(fc, nil)
+			frameworkCfg = normalized
+		}
+	}
+	if frameworkCfg == nil {
+		h.store.Mu.RLock()
+		storedFC := h.store.FrameworkConfig
+		h.store.Mu.RUnlock()
+		normalized, _, _ := lib.ResolveFrameworkPricingConfig(nil, storedFC)
+		frameworkCfg = normalized
+	}
+	if frameworkCfg != nil {
+		exportMap["framework"] = frameworkCfg
+	}
+
+	// MCP
+	var mcpCfg *schemas.MCPConfig
+	if h.store.ConfigStore != nil {
+		if m, err := h.store.ConfigStore.GetMCPConfig(ctx); err == nil && m != nil {
+			mcpCfg = m
+		}
+	}
+	if mcpCfg == nil {
+		mcpCfg = h.store.MCPConfig
+	}
+	if mcpCfg != nil && (len(mcpCfg.ClientConfigs) > 0 || mcpCfg.ToolManagerConfig != nil) {
+		exportMap["mcp"] = formatExportMCPConfig(mcpCfg)
+	}
+
+	// Governance
+	var govCfg *configstore.GovernanceConfig
+	if h.store.ConfigStore != nil {
+		if g, err := h.store.ConfigStore.GetGovernanceConfig(ctx); err == nil && g != nil {
+			govCfg = g
+		}
+	}
+	if govCfg == nil {
+		govCfg = h.store.GovernanceConfig
+	}
+	if govCfg != nil {
+		formattedGov := formatExportGovernanceConfig(govCfg)
+		if len(formattedGov) > 0 {
+			exportMap["governance"] = formattedGov
+		}
+	}
+
+	// Plugins
+	var pluginConfigs []*schemas.PluginConfig
+	if h.store.ConfigStore != nil {
+		if plugins, err := h.store.ConfigStore.GetPlugins(ctx); err == nil && len(plugins) > 0 {
+			for _, p := range plugins {
+				var cfg any
+				if p.ConfigJSON != "" && p.ConfigJSON != "{}" {
+					_ = json.Unmarshal([]byte(p.ConfigJSON), &cfg)
+				}
+				pluginConfigs = append(pluginConfigs, &schemas.PluginConfig{
+					Name:      p.Name,
+					Enabled:   p.Enabled,
+					Path:      p.Path,
+					Config:    cfg,
+					Placement: p.Placement,
+					Order:     p.Order,
+				})
+			}
+		}
+	}
+	if len(pluginConfigs) == 0 && len(h.store.PluginConfigs) > 0 {
+		pluginConfigs = h.store.PluginConfigs
+	}
+	if len(pluginConfigs) > 0 {
+		exportMap["plugins"] = pluginConfigs
+	}
+
+	// Storage configs if configured
+	if h.store.ConfigStore != nil {
+		if vs, err := h.store.ConfigStore.GetVectorStoreConfig(ctx); err == nil && vs != nil {
+			exportMap["vector_store"] = vs
+		}
+		if ls, err := h.store.ConfigStore.GetLogsStoreConfig(ctx); err == nil && ls != nil {
+			exportMap["logs_store"] = ls
+		}
+	} else if h.store.LogsStoreConfig != nil {
+		exportMap["logs_store"] = h.store.LogsStoreConfig
+	}
+
+	SendJSON(ctx, exportMap)
+}
+
+func formatExportClientConfig(c configstore.ClientConfig) map[string]any {
+	out := make(map[string]any)
+
+	// Fields with defaults (always include)
+	out["drop_excess_requests"] = c.DropExcessRequests
+	if c.InitialPoolSize > 0 {
+		out["initial_pool_size"] = c.InitialPoolSize
+	} else {
+		out["initial_pool_size"] = 1000
+	}
+
+	if c.EnableLogging != nil {
+		out["enable_logging"] = *c.EnableLogging
+	} else {
+		out["enable_logging"] = true
+	}
+
+	out["disable_content_logging"] = c.DisableContentLogging
+	out["retain_content_in_object_storage"] = c.RetainContentInObjectStorage
+	out["allow_per_request_content_storage_override"] = c.AllowPerRequestContentStorageOverride
+	out["allow_per_request_raw_override"] = c.AllowPerRequestRawOverride
+	out["allow_direct_keys"] = c.AllowDirectKeys
+	out["disable_db_pings_in_health"] = c.DisableDBPingsInHealth
+	out["dump_errors_in_console_logs"] = c.DumpErrorsInConsoleLogs
+
+	if c.LogRetentionDays > 0 {
+		out["log_retention_days"] = c.LogRetentionDays
+	} else {
+		out["log_retention_days"] = 365
+	}
+
+	if c.AsyncJobResultTTL > 0 {
+		out["async_job_result_ttl"] = c.AsyncJobResultTTL
+	} else {
+		out["async_job_result_ttl"] = 3600
+	}
+
+	if c.RoutingChainMaxDepth > 0 {
+		out["routing_chain_max_depth"] = c.RoutingChainMaxDepth
+	} else {
+		out["routing_chain_max_depth"] = 10
+	}
+
+	out["hide_deleted_virtual_keys_in_filters"] = c.HideDeletedVirtualKeysInFilters
+	out["enforce_auth_on_inference"] = c.EnforceAuthOnInference
+
+	out["compat"] = map[string]any{
+		"convert_text_to_chat":      c.Compat.ConvertTextToChat,
+		"convert_chat_to_responses": c.Compat.ConvertChatToResponses,
+		"should_drop_params":        c.Compat.ShouldDropParams,
+		"should_convert_params":     c.Compat.ShouldConvertParams,
+	}
+
+	// Optional fields with no default: include ONLY if non-empty
+	if len(c.PrometheusLabels) > 0 {
+		out["prometheus_labels"] = c.PrometheusLabels
+	}
+	if len(c.AllowedOrigins) > 0 {
+		out["allowed_origins"] = c.AllowedOrigins
+	}
+	if len(c.AllowedHeaders) > 0 {
+		out["allowed_headers"] = c.AllowedHeaders
+	}
+	if len(c.RequiredHeaders) > 0 {
+		out["required_headers"] = c.RequiredHeaders
+	}
+	if len(c.LoggingHeaders) > 0 {
+		out["logging_headers"] = c.LoggingHeaders
+	}
+	if len(c.RedactSensitiveHeaders) > 0 {
+		out["redact_sensitive_headers"] = c.RedactSensitiveHeaders
+	}
+	if len(c.WhitelistedRoutes) > 0 {
+		out["whitelisted_routes"] = c.WhitelistedRoutes
+	}
+	if c.MaxRequestBodySizeMB > 0 {
+		out["max_request_body_size_mb"] = c.MaxRequestBodySizeMB
+	}
+	if c.DualCredentialConflictBehavior != "" {
+		out["dual_credential_conflict_behavior"] = c.DualCredentialConflictBehavior
+	}
+	if c.HeaderFilterConfig != nil && (len(c.HeaderFilterConfig.Allowlist) > 0 || len(c.HeaderFilterConfig.Denylist) > 0) {
+		out["header_filter_config"] = c.HeaderFilterConfig
+	}
+	if c.MCPExternalClientURL != nil && (c.MCPExternalClientURL.Val != "" || c.MCPExternalClientURL.GetRawRef() != "") {
+		out["mcp_external_client_url"] = c.MCPExternalClientURL
+	}
+	if c.MCPServerAuthMode != "" {
+		out["mcp_server_auth_mode"] = c.MCPServerAuthMode
+	}
+	if c.OAuth2ServerConfig != nil {
+		out["oauth2_server_config"] = c.OAuth2ServerConfig
+	}
+
+	return out
+}
+
+func formatExportProviderConfig(p *configstore.ProviderConfig) map[string]any {
+	if p == nil {
+		return nil
+	}
+	out := make(map[string]any)
+
+	if len(p.Keys) > 0 {
+		keysList := make([]map[string]any, len(p.Keys))
+		for i, k := range p.Keys {
+			km := map[string]any{
+				"id":   k.ID,
+				"name": k.Name,
+			}
+			if k.Value.IsFromSecret() && k.Value.GetRawRef() != "" {
+				km["value"] = k.Value.GetRawRef()
+			} else if k.Value.Val != "" {
+				km["value"] = k.Value.Val
+			}
+			if len(k.Models) > 0 {
+				km["models"] = k.Models
+			}
+			if len(k.BlacklistedModels) > 0 {
+				km["blacklisted_models"] = k.BlacklistedModels
+			}
+			if k.Weight > 0 {
+				km["weight"] = k.Weight
+			} else {
+				km["weight"] = 1
+			}
+			if k.Enabled != nil {
+				km["enabled"] = *k.Enabled
+			}
+			if len(k.Aliases) > 0 {
+				km["aliases"] = k.Aliases
+			}
+			if k.AzureKeyConfig != nil {
+				km["azure_key_config"] = k.AzureKeyConfig
+			}
+			if k.VertexKeyConfig != nil {
+				km["vertex_key_config"] = k.VertexKeyConfig
+			}
+			if k.BedrockKeyConfig != nil {
+				km["bedrock_key_config"] = k.BedrockKeyConfig
+			}
+			if k.BedrockMantleKeyConfig != nil {
+				km["bedrock_mantle_key_config"] = k.BedrockMantleKeyConfig
+			}
+			if k.OllamaKeyConfig != nil {
+				km["ollama_key_config"] = k.OllamaKeyConfig
+			}
+			keysList[i] = km
+		}
+		out["keys"] = keysList
+	} else {
+		out["keys"] = []any{}
+	}
+
+	if p.NetworkConfig != nil {
+		out["network_config"] = p.NetworkConfig
+	}
+	if p.ConcurrencyAndBufferSize != nil {
+		out["concurrency_and_buffer_size"] = p.ConcurrencyAndBufferSize
+	}
+	if p.ProxyConfig != nil {
+		out["proxy_config"] = p.ProxyConfig
+	}
+	if p.SendBackRawRequest {
+		out["send_back_raw_request"] = p.SendBackRawRequest
+	}
+	if p.SendBackRawResponse {
+		out["send_back_raw_response"] = p.SendBackRawResponse
+	}
+	if p.StoreRawRequestResponse {
+		out["store_raw_request_response"] = p.StoreRawRequestResponse
+	}
+	if p.CustomProviderConfig != nil {
+		out["custom_provider_config"] = p.CustomProviderConfig
+	}
+	if p.OpenAIConfig != nil {
+		out["openai_config"] = p.OpenAIConfig
+	}
+
+	return out
+}
+
+func formatExportMCPConfig(m *schemas.MCPConfig) map[string]any {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]any)
+	if len(m.ClientConfigs) > 0 {
+		out["client_configs"] = m.ClientConfigs
+	}
+	if m.ToolManagerConfig != nil {
+		out["tool_manager_config"] = m.ToolManagerConfig
+	}
+	if m.ToolSyncInterval > 0 {
+		out["tool_sync_interval"] = m.ToolSyncInterval
+	}
+	return out
+}
+
+func formatExportGovernanceConfig(g *configstore.GovernanceConfig) map[string]any {
+	if g == nil {
+		return nil
+	}
+	out := make(map[string]any)
+	if g.AuthConfig != nil {
+		out["auth_config"] = g.AuthConfig
+	}
+	if len(g.VirtualKeys) > 0 {
+		out["virtual_keys"] = g.VirtualKeys
+	}
+	if len(g.Teams) > 0 {
+		out["teams"] = g.Teams
+	}
+	if len(g.Customers) > 0 {
+		out["customers"] = g.Customers
+	}
+	if len(g.Budgets) > 0 {
+		out["budgets"] = g.Budgets
+	}
+	if len(g.RateLimits) > 0 {
+		out["rate_limits"] = g.RateLimits
+	}
+	if len(g.RoutingRules) > 0 {
+		out["routing_rules"] = g.RoutingRules
+	}
+	if g.ComplexityAnalyzerConfig != nil {
+		out["complexity_analyzer_config"] = g.ComplexityAnalyzerConfig
+	}
+	return out
+}
+
 
 // updateMetadata handles POST /api/config/metadata - merges a JSON object of
 // key/value pairs into the ClientConfig metadata blob. Keys with a nil value
