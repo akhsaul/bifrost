@@ -106,3 +106,78 @@ func TestExportConfig_StructureAndDefaults(t *testing.T) {
 		t.Errorf("expected value env.OPENAI_API_KEY, got %v", key["value"])
 	}
 }
+
+func TestExportConfig_CustomProviderAllowedRequestsDefaults(t *testing.T) {
+	inMemoryStore := &lib.Config{
+		ClientConfig: &configstore.ClientConfig{
+			InitialPoolSize:  1000,
+			LogRetentionDays: 365,
+		},
+		Providers: map[schemas.ModelProvider]configstore.ProviderConfig{
+			schemas.TokenFaucet: {
+				Keys: []schemas.Key{
+					{
+						ID:     "key-tf-1",
+						Name:   "tokenfaucet-primary",
+						Value:  *schemas.NewSecretVar("env.TOKENFAUCET_API_KEY"),
+						Weight: 1,
+					},
+				},
+				CustomProviderConfig: &schemas.CustomProviderConfig{
+					BaseProviderType: schemas.OpenAI,
+					IsKeyLess:        false,
+					// AllowedRequests is nil -> should be exported with all defaults
+				},
+			},
+		},
+	}
+
+	handler := NewConfigHandler(nil, inMemoryStore)
+
+	ctx := &fasthttp.RequestCtx{}
+	ctx.Request.Header.SetMethod("GET")
+	ctx.Request.SetRequestURI("/api/config/export")
+
+	handler.exportConfig(ctx)
+
+	if ctx.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("expected status 200, got %d", ctx.Response.StatusCode())
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(ctx.Response.Body(), &result); err != nil {
+		t.Fatalf("failed to unmarshal exported config JSON: %v", err)
+	}
+
+	providers, ok := result["providers"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected providers object, got %T", result["providers"])
+	}
+	tokenfaucet, ok := providers["tokenfaucet"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected tokenfaucet provider object, got %T", providers["tokenfaucet"])
+	}
+	cpc, ok := tokenfaucet["custom_provider_config"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected custom_provider_config object, got %T", tokenfaucet["custom_provider_config"])
+	}
+	if cpc["base_provider_type"] != "openai" {
+		t.Errorf("expected base_provider_type openai, got %v", cpc["base_provider_type"])
+	}
+	ar, ok := cpc["allowed_requests"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected allowed_requests object, got %T", cpc["allowed_requests"])
+	}
+	if ar["chat_completion"] != true {
+		t.Errorf("expected chat_completion true, got %v", ar["chat_completion"])
+	}
+	if ar["chat_completion_stream"] != true {
+		t.Errorf("expected chat_completion_stream true, got %v", ar["chat_completion_stream"])
+	}
+	if ar["list_models"] != true {
+		t.Errorf("expected list_models true, got %v", ar["list_models"])
+	}
+	if ar["realtime"] != false {
+		t.Errorf("expected realtime false, got %v", ar["realtime"])
+	}
+}

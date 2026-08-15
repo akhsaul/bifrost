@@ -574,13 +574,158 @@ func formatExportProviderConfig(p *configstore.ProviderConfig) map[string]any {
 		out["store_raw_request_response"] = p.StoreRawRequestResponse
 	}
 	if p.CustomProviderConfig != nil {
-		out["custom_provider_config"] = p.CustomProviderConfig
+		out["custom_provider_config"] = formatExportCustomProviderConfig(p.CustomProviderConfig)
 	}
 	if p.OpenAIConfig != nil {
 		out["openai_config"] = p.OpenAIConfig
 	}
 
 	return out
+}
+
+func formatExportCustomProviderConfig(c *schemas.CustomProviderConfig) map[string]any {
+	if c == nil {
+		return nil
+	}
+	out := map[string]any{
+		"base_provider_type": c.BaseProviderType,
+		"is_key_less":        c.IsKeyLess,
+		"allowed_requests":   formatExportAllowedRequests(c.AllowedRequests),
+	}
+	if len(c.RequestPathOverrides) > 0 {
+		out["request_path_overrides"] = c.RequestPathOverrides
+	}
+	return out
+}
+
+func formatExportAllowedRequests(ar *schemas.AllowedRequests) map[string]bool {
+	if ar == nil {
+		return map[string]bool{
+			"list_models":             true,
+			"text_completion":         true,
+			"text_completion_stream":  true,
+			"chat_completion":         true,
+			"chat_completion_stream":  true,
+			"responses":               true,
+			"responses_stream":        true,
+			"responses_retrieve":      true,
+			"responses_delete":        true,
+			"responses_cancel":        true,
+			"responses_input_items":   true,
+			"count_tokens":            true,
+			"compaction":              true,
+			"embedding":               true,
+			"rerank":                  true,
+			"ocr":                     true,
+			"speech":                  true,
+			"speech_stream":           true,
+			"transcription":           true,
+			"transcription_stream":    true,
+			"image_generation":        true,
+			"image_generation_stream": true,
+			"image_edit":              true,
+			"image_edit_stream":       true,
+			"image_variation":         true,
+			"video_generation":        true,
+			"video_retrieve":          true,
+			"video_download":          true,
+			"video_delete":            true,
+			"video_list":              true,
+			"video_remix":             true,
+			"batch_create":            true,
+			"batch_list":              true,
+			"batch_retrieve":          true,
+			"batch_cancel":            true,
+			"batch_delete":            true,
+			"batch_results":           true,
+			"file_upload":             true,
+			"file_list":               true,
+			"file_retrieve":           true,
+			"file_delete":             true,
+			"file_content":            true,
+			"container_create":        true,
+			"container_list":          true,
+			"container_retrieve":      true,
+			"container_delete":        true,
+			"container_file_create":   true,
+			"container_file_list":     true,
+			"container_file_retrieve": true,
+			"container_file_content":  true,
+			"container_file_delete":   true,
+			"passthrough":             true,
+			"passthrough_stream":      true,
+			"websocket_responses":     true,
+			"realtime":                false,
+			"cached_content_create":   true,
+			"cached_content_list":     true,
+			"cached_content_retrieve": true,
+			"cached_content_update":   true,
+			"cached_content_delete":   true,
+		}
+	}
+
+	return map[string]bool{
+		"list_models":             ar.ListModels,
+		"text_completion":         ar.TextCompletion,
+		"text_completion_stream":  ar.TextCompletionStream,
+		"chat_completion":         ar.ChatCompletion,
+		"chat_completion_stream":  ar.ChatCompletionStream,
+		"responses":               ar.Responses,
+		"responses_stream":        ar.ResponsesStream,
+		"responses_retrieve":      ar.ResponsesRetrieve,
+		"responses_delete":        ar.ResponsesDelete,
+		"responses_cancel":        ar.ResponsesCancel,
+		"responses_input_items":   ar.ResponsesInputItems,
+		"count_tokens":            ar.CountTokens,
+		"compaction":              ar.Compaction,
+		"embedding":               ar.Embedding,
+		"rerank":                  ar.Rerank,
+		"ocr":                     ar.OCR,
+		"speech":                  ar.Speech,
+		"speech_stream":           ar.SpeechStream,
+		"transcription":           ar.Transcription,
+		"transcription_stream":    ar.TranscriptionStream,
+		"image_generation":        ar.ImageGeneration,
+		"image_generation_stream": ar.ImageGenerationStream,
+		"image_edit":              ar.ImageEdit,
+		"image_edit_stream":       ar.ImageEditStream,
+		"image_variation":         ar.ImageVariation,
+		"video_generation":        ar.VideoGeneration,
+		"video_retrieve":          ar.VideoRetrieve,
+		"video_download":          ar.VideoDownload,
+		"video_delete":            ar.VideoDelete,
+		"video_list":              ar.VideoList,
+		"video_remix":             ar.VideoRemix,
+		"batch_create":            ar.BatchCreate,
+		"batch_list":              ar.BatchList,
+		"batch_retrieve":          ar.BatchRetrieve,
+		"batch_cancel":            ar.BatchCancel,
+		"batch_delete":            ar.BatchDelete,
+		"batch_results":           ar.BatchResults,
+		"file_upload":             ar.FileUpload,
+		"file_list":               ar.FileList,
+		"file_retrieve":           ar.FileRetrieve,
+		"file_delete":             ar.FileDelete,
+		"file_content":            ar.FileContent,
+		"container_create":        ar.ContainerCreate,
+		"container_list":          ar.ContainerList,
+		"container_retrieve":      ar.ContainerRetrieve,
+		"container_delete":        ar.ContainerDelete,
+		"container_file_create":   ar.ContainerFileCreate,
+		"container_file_list":     ar.ContainerFileList,
+		"container_file_retrieve": ar.ContainerFileRetrieve,
+		"container_file_content":  ar.ContainerFileContent,
+		"container_file_delete":   ar.ContainerFileDelete,
+		"passthrough":             ar.Passthrough,
+		"passthrough_stream":      ar.PassthroughStream,
+		"websocket_responses":     ar.WebSocketResponses,
+		"realtime":                ar.Realtime,
+		"cached_content_create":   ar.CachedContentCreate,
+		"cached_content_list":     ar.CachedContentList,
+		"cached_content_retrieve": ar.CachedContentRetrieve,
+		"cached_content_update":   ar.CachedContentUpdate,
+		"cached_content_delete":   ar.CachedContentDelete,
+	}
 }
 
 func formatExportMCPConfig(m *schemas.MCPConfig) map[string]any {
