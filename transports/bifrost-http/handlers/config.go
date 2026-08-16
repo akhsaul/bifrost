@@ -325,7 +325,9 @@ func (h *ConfigHandler) exportConfig(ctx *fasthttp.RequestCtx) {
 		frameworkCfg = normalized
 	}
 	if frameworkCfg != nil {
-		exportMap["framework"] = frameworkCfg
+		if fc, ok := frameworkCfg.(*configstoreTables.TableFrameworkConfig); ok && fc != nil {
+			exportMap["framework"] = formatExportFrameworkConfig(fc)
+		}
 	}
 
 	// MCP
@@ -508,7 +510,6 @@ func formatExportProviderConfig(p *configstore.ProviderConfig) map[string]any {
 		keysList := make([]map[string]any, len(p.Keys))
 		for i, k := range p.Keys {
 			km := map[string]any{
-				"id":   k.ID,
 				"name": k.Name,
 			}
 			if k.Value.IsFromSecret() && k.Value.GetRawRef() != "" {
@@ -548,6 +549,15 @@ func formatExportProviderConfig(p *configstore.ProviderConfig) map[string]any {
 			if k.OllamaKeyConfig != nil {
 				km["ollama_key_config"] = k.OllamaKeyConfig
 			}
+			if k.VLLMKeyConfig != nil {
+				km["vllm_key_config"] = k.VLLMKeyConfig
+			}
+			if k.ReplicateKeyConfig != nil {
+				km["replicate_key_config"] = k.ReplicateKeyConfig
+			}
+			if k.SGLKeyConfig != nil {
+				km["sgl_key_config"] = k.SGLKeyConfig
+			}
 			keysList[i] = km
 		}
 		out["keys"] = keysList
@@ -555,23 +565,14 @@ func formatExportProviderConfig(p *configstore.ProviderConfig) map[string]any {
 		out["keys"] = []any{}
 	}
 
-	if p.NetworkConfig != nil {
-		out["network_config"] = p.NetworkConfig
-	}
-	if p.ConcurrencyAndBufferSize != nil {
-		out["concurrency_and_buffer_size"] = p.ConcurrencyAndBufferSize
-	}
+	out["network_config"] = formatExportNetworkConfig(p.NetworkConfig)
+	out["concurrency_and_buffer_size"] = formatExportConcurrencyAndBufferSize(p.ConcurrencyAndBufferSize)
+	out["send_back_raw_request"] = p.SendBackRawRequest
+	out["send_back_raw_response"] = p.SendBackRawResponse
+	out["store_raw_request_response"] = p.StoreRawRequestResponse
+
 	if p.ProxyConfig != nil {
 		out["proxy_config"] = p.ProxyConfig
-	}
-	if p.SendBackRawRequest {
-		out["send_back_raw_request"] = p.SendBackRawRequest
-	}
-	if p.SendBackRawResponse {
-		out["send_back_raw_response"] = p.SendBackRawResponse
-	}
-	if p.StoreRawRequestResponse {
-		out["store_raw_request_response"] = p.StoreRawRequestResponse
 	}
 	if p.CustomProviderConfig != nil {
 		out["custom_provider_config"] = formatExportCustomProviderConfig(p.CustomProviderConfig)
@@ -581,6 +582,118 @@ func formatExportProviderConfig(p *configstore.ProviderConfig) map[string]any {
 	}
 
 	return out
+}
+
+func formatExportNetworkConfig(n *schemas.NetworkConfig) map[string]any {
+	out := map[string]any{
+		"default_request_timeout_in_seconds": schemas.DefaultRequestTimeoutInSeconds,
+		"max_retries":                        0,
+		"retry_backoff_initial":              500,
+		"retry_backoff_max":                  5000,
+		"allow_private_network":              false,
+	}
+	if n != nil {
+		if n.BaseURL != "" {
+			out["base_url"] = n.BaseURL
+		}
+		if len(n.ExtraHeaders) > 0 {
+			out["extra_headers"] = n.ExtraHeaders
+		}
+		if n.DefaultRequestTimeoutInSeconds > 0 {
+			out["default_request_timeout_in_seconds"] = n.DefaultRequestTimeoutInSeconds
+		}
+		if n.MaxRetries > 0 {
+			out["max_retries"] = n.MaxRetries
+		}
+		if n.RetryBackoffInitial > 0 {
+			out["retry_backoff_initial"] = int64(n.RetryBackoffInitial / time.Millisecond)
+		}
+		if n.RetryBackoffMax > 0 {
+			out["retry_backoff_max"] = int64(n.RetryBackoffMax / time.Millisecond)
+		}
+		if n.EnforceHTTP2 {
+			out["enforce_http2"] = n.EnforceHTTP2
+		}
+		if n.HTTP2PingIntervalInSeconds > 0 {
+			out["http2_ping_interval_in_seconds"] = n.HTTP2PingIntervalInSeconds
+		}
+		if n.InsecureSkipVerify {
+			out["insecure_skip_verify"] = n.InsecureSkipVerify
+		}
+		if n.CACertPEM != nil {
+			if n.CACertPEM.IsFromSecret() && n.CACertPEM.GetRawRef() != "" {
+				out["ca_cert_pem"] = n.CACertPEM.GetRawRef()
+			} else if n.CACertPEM.Val != "" {
+				out["ca_cert_pem"] = n.CACertPEM.Val
+			}
+		}
+		if n.StreamIdleTimeoutInSeconds > 0 {
+			out["stream_idle_timeout_in_seconds"] = n.StreamIdleTimeoutInSeconds
+		}
+		if n.KeepAliveTimeoutInSeconds > 0 {
+			out["keep_alive_timeout_in_seconds"] = n.KeepAliveTimeoutInSeconds
+		}
+		if n.MaxConnsPerHost > 0 {
+			out["max_conns_per_host"] = n.MaxConnsPerHost
+		}
+		if len(n.BetaHeaderOverrides) > 0 {
+			out["beta_header_overrides"] = n.BetaHeaderOverrides
+		}
+		out["allow_private_network"] = n.AllowPrivateNetwork
+	}
+	return out
+}
+
+func formatExportConcurrencyAndBufferSize(c *schemas.ConcurrencyAndBufferSize) map[string]any {
+	concurrency := schemas.DefaultConcurrency
+	bufferSize := schemas.DefaultBufferSize
+	if c != nil {
+		if c.Concurrency > 0 {
+			concurrency = c.Concurrency
+		}
+		if c.BufferSize > 0 {
+			bufferSize = c.BufferSize
+		}
+	}
+	return map[string]any{
+		"concurrency": concurrency,
+		"buffer_size": bufferSize,
+	}
+}
+
+func formatExportFrameworkConfig(fc *configstoreTables.TableFrameworkConfig) map[string]any {
+	if fc == nil {
+		return nil
+	}
+	pricing := make(map[string]any)
+	if fc.PricingURL != nil && *fc.PricingURL != "" {
+		pricing["pricing_url"] = *fc.PricingURL
+	}
+	if fc.PricingSyncInterval != nil && *fc.PricingSyncInterval > 0 {
+		pricing["pricing_sync_interval"] = *fc.PricingSyncInterval
+	} else {
+		pricing["pricing_sync_interval"] = 86400
+	}
+	if fc.ModelParametersURL != nil && *fc.ModelParametersURL != "" {
+		pricing["model_parameters_url"] = *fc.ModelParametersURL
+	}
+	if fc.MCPLibraryURL != nil && *fc.MCPLibraryURL != "" {
+		pricing["mcp_library_url"] = *fc.MCPLibraryURL
+	}
+	if fc.MCPLibrarySyncInterval != nil && *fc.MCPLibrarySyncInterval > 0 {
+		pricing["mcp_library_sync_interval"] = *fc.MCPLibrarySyncInterval
+	} else {
+		pricing["mcp_library_sync_interval"] = 86400
+	}
+	if fc.LiveModelsSyncInterval != nil && *fc.LiveModelsSyncInterval > 0 {
+		pricing["live_models_sync_interval"] = *fc.LiveModelsSyncInterval
+	} else {
+		pricing["live_models_sync_interval"] = 86400
+	}
+
+	return map[string]any{
+		"pricing": pricing,
+	}
 }
 
 func formatExportCustomProviderConfig(c *schemas.CustomProviderConfig) map[string]any {

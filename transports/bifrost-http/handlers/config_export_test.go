@@ -4,11 +4,20 @@ import (
 	"encoding/json"
 	"testing"
 
+	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/schemas"
+	"github.com/maximhq/bifrost/framework"
 	"github.com/maximhq/bifrost/framework/configstore"
+	"github.com/maximhq/bifrost/framework/modelcatalog"
 	"github.com/maximhq/bifrost/transports/bifrost-http/lib"
 	"github.com/valyala/fasthttp"
 )
+
+func init() {
+	l := bifrost.NewDefaultLogger(schemas.LogLevelInfo)
+	lib.SetLogger(l)
+	SetLogger(l)
+}
 
 func TestExportConfig_StructureAndDefaults(t *testing.T) {
 	inMemoryStore := &lib.Config{
@@ -105,13 +114,39 @@ func TestExportConfig_StructureAndDefaults(t *testing.T) {
 	if key["value"] != "env.OPENAI_API_KEY" {
 		t.Errorf("expected value env.OPENAI_API_KEY, got %v", key["value"])
 	}
+	if key["id"] != nil {
+		t.Errorf("expected key id to be omitted from exported config, got %v", key["id"])
+	}
+
+	// Verify provider required fields always exported
+	if openai["concurrency_and_buffer_size"] == nil {
+		t.Errorf("expected concurrency_and_buffer_size to be exported")
+	}
+	if openai["network_config"] == nil {
+		t.Errorf("expected network_config to be exported")
+	}
+	if openai["send_back_raw_request"] == nil {
+		t.Errorf("expected send_back_raw_request to be exported")
+	}
+	if openai["send_back_raw_response"] == nil {
+		t.Errorf("expected send_back_raw_response to be exported")
+	}
+	if openai["store_raw_request_response"] == nil {
+		t.Errorf("expected store_raw_request_response to be exported")
+	}
 }
 
 func TestExportConfig_CustomProviderAllowedRequestsDefaults(t *testing.T) {
+	defaultSync := int64(86400)
 	inMemoryStore := &lib.Config{
 		ClientConfig: &configstore.ClientConfig{
 			InitialPoolSize:  1000,
 			LogRetentionDays: 365,
+		},
+		FrameworkConfig: &framework.FrameworkConfig{
+			Pricing: &modelcatalog.Config{
+				PricingSyncInterval: &defaultSync,
+			},
 		},
 		Providers: map[schemas.ModelProvider]configstore.ProviderConfig{
 			schemas.TokenFaucet: {
@@ -179,5 +214,21 @@ func TestExportConfig_CustomProviderAllowedRequestsDefaults(t *testing.T) {
 	}
 	if ar["realtime"] != false {
 		t.Errorf("expected realtime false, got %v", ar["realtime"])
+	}
+
+	// Verify framework does not contain id or config_hash
+	framework, ok := result["framework"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected framework object, got %T", result["framework"])
+	}
+	pricing, ok := framework["pricing"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected pricing object, got %T", framework["pricing"])
+	}
+	if pricing["id"] != nil {
+		t.Errorf("expected pricing id to be omitted, got %v", pricing["id"])
+	}
+	if pricing["config_hash"] != nil {
+		t.Errorf("expected pricing config_hash to be omitted, got %v", pricing["config_hash"])
 	}
 }
