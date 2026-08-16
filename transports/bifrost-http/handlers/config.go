@@ -390,14 +390,22 @@ func (h *ConfigHandler) exportConfig(ctx *fasthttp.RequestCtx) {
 
 	// Storage configs if configured
 	if h.store.ConfigStore != nil {
+		exportMap["config_store"] = map[string]any{
+			"enabled": true,
+		}
 		if vs, err := h.store.ConfigStore.GetVectorStoreConfig(ctx); err == nil && vs != nil {
 			exportMap["vector_store"] = vs
 		}
 		if ls, err := h.store.ConfigStore.GetLogsStoreConfig(ctx); err == nil && ls != nil {
 			exportMap["logs_store"] = ls
 		}
-	} else if h.store.LogsStoreConfig != nil {
-		exportMap["logs_store"] = h.store.LogsStoreConfig
+	} else {
+		exportMap["config_store"] = map[string]any{
+			"enabled": false,
+		}
+		if h.store.LogsStoreConfig != nil {
+			exportMap["logs_store"] = h.store.LogsStoreConfig
+		}
 	}
 
 	SendJSON(ctx, exportMap)

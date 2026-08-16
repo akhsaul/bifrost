@@ -232,6 +232,11 @@ func TestExportConfig_CustomProviderAllowedRequestsDefaults(t *testing.T) {
 	if hash, ok := pricing["config_hash"].(string); !ok || hash == "" {
 		t.Errorf("expected non-empty pricing config_hash, got %v", pricing["config_hash"])
 	}
+
+	// Verify config_store is exported
+	if result["config_store"] == nil {
+		t.Errorf("expected config_store to be exported in config export")
+	}
 }
 
 func TestExportConfig_FrameworkConfigHashPreserved(t *testing.T) {
