@@ -574,9 +574,7 @@ func formatExportProviderConfig(p *configstore.ProviderConfig) map[string]any {
 	if p.ProxyConfig != nil {
 		out["proxy_config"] = p.ProxyConfig
 	}
-	if p.CustomProviderConfig != nil {
-		out["custom_provider_config"] = formatExportCustomProviderConfig(p.CustomProviderConfig)
-	}
+	out["custom_provider_config"] = formatExportCustomProviderConfig(p.CustomProviderConfig)
 	if p.OpenAIConfig != nil {
 		out["openai_config"] = p.OpenAIConfig
 	}
@@ -690,6 +688,9 @@ func formatExportFrameworkConfig(fc *configstoreTables.TableFrameworkConfig) map
 	} else {
 		pricing["live_models_sync_interval"] = 86400
 	}
+	if fc.ConfigHash != "" {
+		pricing["config_hash"] = fc.ConfigHash
+	}
 
 	return map[string]any{
 		"pricing": pricing,
@@ -697,16 +698,20 @@ func formatExportFrameworkConfig(fc *configstoreTables.TableFrameworkConfig) map
 }
 
 func formatExportCustomProviderConfig(c *schemas.CustomProviderConfig) map[string]any {
-	if c == nil {
-		return nil
-	}
-	out := map[string]any{
-		"base_provider_type": c.BaseProviderType,
-		"is_key_less":        c.IsKeyLess,
-		"allowed_requests":   formatExportAllowedRequests(c.AllowedRequests),
-	}
-	if len(c.RequestPathOverrides) > 0 {
-		out["request_path_overrides"] = c.RequestPathOverrides
+	out := make(map[string]any)
+	if c != nil {
+		if c.BaseProviderType != "" {
+			out["base_provider_type"] = c.BaseProviderType
+		}
+		if c.IsKeyLess {
+			out["is_key_less"] = c.IsKeyLess
+		}
+		out["allowed_requests"] = formatExportAllowedRequests(c.AllowedRequests)
+		if len(c.RequestPathOverrides) > 0 {
+			out["request_path_overrides"] = c.RequestPathOverrides
+		}
+	} else {
+		out["allowed_requests"] = formatExportAllowedRequests(nil)
 	}
 	return out
 }

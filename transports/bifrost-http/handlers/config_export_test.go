@@ -8,6 +8,7 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework"
 	"github.com/maximhq/bifrost/framework/configstore"
+	configstoreTables "github.com/maximhq/bifrost/framework/configstore/tables"
 	"github.com/maximhq/bifrost/framework/modelcatalog"
 	"github.com/maximhq/bifrost/transports/bifrost-http/lib"
 	"github.com/valyala/fasthttp"
@@ -216,7 +217,7 @@ func TestExportConfig_CustomProviderAllowedRequestsDefaults(t *testing.T) {
 		t.Errorf("expected realtime false, got %v", ar["realtime"])
 	}
 
-	// Verify framework does not contain id or config_hash
+	// Verify framework contains config_hash but omits id
 	framework, ok := result["framework"].(map[string]any)
 	if !ok {
 		t.Fatalf("expected framework object, got %T", result["framework"])
@@ -228,7 +229,41 @@ func TestExportConfig_CustomProviderAllowedRequestsDefaults(t *testing.T) {
 	if pricing["id"] != nil {
 		t.Errorf("expected pricing id to be omitted, got %v", pricing["id"])
 	}
-	if pricing["config_hash"] != nil {
-		t.Errorf("expected pricing config_hash to be omitted, got %v", pricing["config_hash"])
+	if hash, ok := pricing["config_hash"].(string); !ok || hash == "" {
+		t.Errorf("expected non-empty pricing config_hash, got %v", pricing["config_hash"])
 	}
+}
+
+func TestExportConfig_FrameworkConfigHashPreserved(t *testing.T) {
+	defaultSync := int64(86400)
+	dummyStore := &lib.Config{
+		ClientConfig: &configstore.ClientConfig{
+			InitialPoolSize: 1000,
+		},
+		FrameworkConfig: &framework.FrameworkConfig{
+			Pricing: &modelcatalog.Config{
+				PricingSyncInterval: &defaultSync,
+			},
+		},
+	}
+	h := NewConfigHandler(nil, dummyStore)
+
+	fc := &configstoreTables.TableFrameworkConfig{
+		ID:                  10,
+		ConfigHash:          "test_hash_99",
+		PricingSyncInterval: &defaultSync,
+	}
+
+	exported := formatExportFrameworkConfig(fc)
+	pricing, ok := exported["pricing"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected pricing map")
+	}
+	if pricing["id"] != nil {
+		t.Errorf("expected id to be omitted")
+	}
+	if pricing["config_hash"] != "test_hash_99" {
+		t.Errorf("expected config_hash 'test_hash_99', got %v", pricing["config_hash"])
+	}
+	_ = h
 }
