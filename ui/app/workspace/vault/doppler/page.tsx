@@ -254,31 +254,10 @@ export default function DopplerVaultPage() {
 							</div>
 
 							<div className="rounded-lg border p-3">
-								<span className="text-muted-foreground block text-[11px]">Default Environment</span>
-								<span className="font-mono font-semibold text-foreground">
-									{status?.config || "(Per Reference)"}
+								<span className="text-muted-foreground block text-[11px]">Token Type</span>
+								<span className="font-mono font-semibold text-foreground capitalize">
+									{status?.authenticated_entity?.token?.type || status?.authenticated_entity?.type || "Service Token"}
 								</span>
-							</div>
-						</div>
-
-						{/* Effective Permissions */}
-						<div>
-							<span className="text-muted-foreground mb-1.5 block font-medium">Effective Doppler Permissions:</span>
-							<div className="flex flex-wrap gap-2">
-								<Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
-									<CheckCircle2 className="mr-1 h-3 w-3" />
-									Read (Resolve Secrets)
-								</Badge>
-								{status?.access_mode === "read_and_write" ? (
-									<Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
-										<CheckCircle2 className="mr-1 h-3 w-3" />
-										Write (Auto-Store & Delete)
-									</Badge>
-								) : (
-									<Badge variant="outline" className="border-slate-500/30 bg-slate-500/10 text-slate-600 dark:text-slate-400">
-										Write (Disabled in Read-Only Mode)
-									</Badge>
-								)}
 							</div>
 						</div>
 					</CardContent>

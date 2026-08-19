@@ -69,12 +69,6 @@ func (h *VaultHandler) getDopplerStatus(ctx *fasthttp.RequestCtx) {
 					resp["error"] = pingErr.Error()
 				}
 			}
-
-			permissions := []string{"read"}
-			if cfg.IsReadAndWrite() {
-				permissions = append(permissions, "write")
-			}
-			resp["permissions"] = permissions
 		}
 	}
 

@@ -25,7 +25,6 @@ export interface VaultDopplerStatusResponse {
 	base_url?: string;
 	connected?: boolean;
 	authenticated_entity?: DopplerAuthEntity;
-	permissions?: string[];
 	message?: string;
 	error?: string;
 }
