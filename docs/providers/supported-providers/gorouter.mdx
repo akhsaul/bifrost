@@ -1,0 +1,18 @@
+---
+title: "GoRouter"
+description: "Configure GoRouter through its OpenAI-compatible API"
+---
+
+GoRouter exposes an OpenAI-compatible API at `https://gorouter.app/v1`. Bifrost uses `/chat/completions` and `/models`.
+
+```json
+{
+  "providers": {
+    "gorouter": {
+      "keys": [{ "name": "gorouter", "value": "env.GOROUTER_API_KEY" }]
+    }
+  }
+}
+```
+
+Requests use Bearer authentication. Chat completions, streaming, model listing, and Responses-to-Chat fallback are supported.

@@ -77,6 +77,9 @@ export const ModelPlaceholders = {
 	tokenharbor: "e.g. provider-model-name",
 	aisure: "e.g. aisure-model-name",
 	tokenfaucet: "e.g. tokenfaucet-model-name",
+	seekai: "e.g. seekai-model-name",
+	gorouter: "e.g. gorouter-model-name",
+	vyceai: "e.g. vyceai-model-name",
 };
 
 export const isKeyRequiredByProvider: Record<ProviderName, boolean> = {
@@ -121,6 +124,9 @@ export const isKeyRequiredByProvider: Record<ProviderName, boolean> = {
 	tokenharbor: true,
 	aisure: true,
 	tokenfaucet: true,
+	seekai: true,
+	gorouter: true,
+	vyceai: true,
 };
 
 export const DefaultNetworkConfig = {

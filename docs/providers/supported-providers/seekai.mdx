@@ -1,0 +1,18 @@
+---
+title: "SeekAI"
+description: "Configure SeekAI through its OpenAI-compatible API"
+---
+
+SeekAI exposes an OpenAI-compatible API at `https://seekai.cc/v1`. Bifrost uses `/chat/completions` and `/models`.
+
+```json
+{
+  "providers": {
+    "seekai": {
+      "keys": [{ "name": "seekai", "value": "env.SEEKAI_API_KEY" }]
+    }
+  }
+}
+```
+
+Requests use Bearer authentication. Chat completions, streaming, model listing, and Responses-to-Chat fallback are supported.

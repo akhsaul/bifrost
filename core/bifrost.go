@@ -34,6 +34,7 @@ import (
 	"github.com/maximhq/bifrost/core/providers/elevenlabs"
 	"github.com/maximhq/bifrost/core/providers/fireworks"
 	"github.com/maximhq/bifrost/core/providers/gemini"
+	"github.com/maximhq/bifrost/core/providers/gorouter"
 	"github.com/maximhq/bifrost/core/providers/groq"
 	"github.com/maximhq/bifrost/core/providers/huggingface"
 	"github.com/maximhq/bifrost/core/providers/inferx"
@@ -53,6 +54,7 @@ import (
 	"github.com/maximhq/bifrost/core/providers/runware"
 	"github.com/maximhq/bifrost/core/providers/runway"
 	"github.com/maximhq/bifrost/core/providers/sarvam"
+	"github.com/maximhq/bifrost/core/providers/seekai"
 	"github.com/maximhq/bifrost/core/providers/sgl"
 	"github.com/maximhq/bifrost/core/providers/tokenfaucet"
 	"github.com/maximhq/bifrost/core/providers/tokenharbor"
@@ -60,6 +62,7 @@ import (
 	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
 	"github.com/maximhq/bifrost/core/providers/vertex"
 	"github.com/maximhq/bifrost/core/providers/vllm"
+	"github.com/maximhq/bifrost/core/providers/vyceai"
 	"github.com/maximhq/bifrost/core/providers/wafer"
 	"github.com/maximhq/bifrost/core/providers/xai"
 	schemas "github.com/maximhq/bifrost/core/schemas"
@@ -4389,6 +4392,12 @@ func (bifrost *Bifrost) createBaseProvider(providerKey schemas.ModelProvider, co
 		return aisure.NewAISureProvider(config, bifrost.logger)
 	case schemas.TokenFaucet:
 		return tokenfaucet.NewTokenFaucetProvider(config, bifrost.logger)
+	case schemas.SeekAI:
+		return seekai.NewSeekAIProvider(config, bifrost.logger)
+	case schemas.GoRouter:
+		return gorouter.NewGoRouterProvider(config, bifrost.logger)
+	case schemas.VyceAI:
+		return vyceai.NewVyceAIProvider(config, bifrost.logger)
 	case schemas.OpencodeGo:
 		return opencode.NewOpencodeGoProvider(config, bifrost.logger)
 	case schemas.OpencodeZen:

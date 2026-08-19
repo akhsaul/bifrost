@@ -41,6 +41,9 @@ export const KnownProvidersNames = [
 	"tokenharbor",
 	"aisure",
 	"tokenfaucet",
+	"seekai",
+	"gorouter",
+	"vyceai",
 ] as const;
 
 // Local Provider type derived from KNOWN_PROVIDERS constant
@@ -164,6 +167,9 @@ export const ProviderLabels: Record<ProviderName, string> = {
 	tokenharbor: "TokenHarbor",
 	aisure: "AISure",
 	tokenfaucet: "TokenFaucet",
+	seekai: "SeekAI",
+	gorouter: "GoRouter",
+	vyceai: "VyceAI",
 } as const;
 
 // Helper function to get provider label, supporting custom providers

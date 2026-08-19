@@ -84,6 +84,9 @@ const (
 	TokenHarbor   ModelProvider = "tokenharbor"
 	AISure        ModelProvider = "aisure"
 	TokenFaucet   ModelProvider = "tokenfaucet"
+	SeekAI        ModelProvider = "seekai"
+	GoRouter      ModelProvider = "gorouter"
+	VyceAI        ModelProvider = "vyceai"
 )
 
 // SupportedBaseProviders is the list of base providers allowed for custom providers.
@@ -140,6 +143,9 @@ var StandardProviders = []ModelProvider{
 	TokenHarbor,
 	AISure,
 	TokenFaucet,
+	SeekAI,
+	GoRouter,
+	VyceAI,
 }
 
 // RequestType represents the type of request being made to a provider.

@@ -433,6 +433,15 @@
         "tokenfaucet": {
           "$ref": "#/$defs/provider"
         },
+        "seekai": {
+          "$ref": "#/$defs/provider"
+        },
+        "gorouter": {
+          "$ref": "#/$defs/provider"
+        },
+        "vyceai": {
+          "$ref": "#/$defs/provider"
+        },
         "gemini": {
           "$ref": "#/$defs/provider"
         },
@@ -7199,6 +7208,9 @@
 			"tokenharbor",
 			"aisure",
 			"tokenfaucet",
+			"seekai",
+			"gorouter",
+			"vyceai",
             "opencode-go",
             "opencode-zen",
             "sgl",

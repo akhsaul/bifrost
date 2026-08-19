@@ -835,6 +835,18 @@ export const ProviderIcons = {
 		const resolvedSize = resolveSize(size);
 		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="TokenFaucet"><title>TokenFaucet</title><path d="M7 4h10v4H7zM9 8h6v12H9z" fill="currentColor" /><path d="M5 12h14" stroke="currentColor" strokeWidth="2" /></svg>;
 	},
+	seekai: ({ size = "md", className = "" }: IconProps) => {
+		const resolvedSize = resolveSize(size);
+		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="SeekAI"><title>SeekAI</title><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" /><path d="M16 16l4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><path d="M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>;
+	},
+	gorouter: ({ size = "md", className = "" }: IconProps) => {
+		const resolvedSize = resolveSize(size);
+		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="GoRouter"><title>GoRouter</title><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" /><path d="M8 12h8M12 8l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+	},
+	vyceai: ({ size = "md", className = "" }: IconProps) => {
+		const resolvedSize = resolveSize(size);
+		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="VyceAI"><title>VyceAI</title><path d="M4 6l8 12 8-12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><circle cx="12" cy="10" r="2" fill="currentColor" /></svg>;
+	},
 	wafer: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
 
