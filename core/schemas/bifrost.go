@@ -89,6 +89,7 @@ const (
 	VyceAI        ModelProvider = "vyceai"
 	Hcnsec        ModelProvider = "hcnsec"
 	Neuralwatt    ModelProvider = "neuralwatt"
+	Antigravity   ModelProvider = "antigravity"
 )
 
 // SupportedBaseProviders is the list of base providers allowed for custom providers.
@@ -100,6 +101,7 @@ var SupportedBaseProviders = []ModelProvider{
 	OpenAI,
 	HuggingFace,
 	Replicate,
+	Antigravity,
 }
 
 // StandardProviders is the list of all built-in (non-custom) providers.
@@ -150,6 +152,7 @@ var StandardProviders = []ModelProvider{
 	VyceAI,
 	Hcnsec,
 	Neuralwatt,
+	Antigravity,
 }
 
 // RequestType represents the type of request being made to a provider.

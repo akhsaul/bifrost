@@ -139,6 +139,7 @@ type Key struct {
 	ReplicateKeyConfig     *ReplicateKeyConfig     `json:"replicate_key_config,omitempty"`      // Replicate-specific key configuration
 	OllamaKeyConfig        *OllamaKeyConfig        `json:"ollama_key_config,omitempty"`         // Ollama-specific key configuration
 	SGLKeyConfig           *SGLKeyConfig           `json:"sgl_key_config,omitempty"`            // SGLang-specific key configuration
+	AntigravityKeyConfig   *AntigravityKeyConfig   `json:"antigravity_key_config,omitempty"`    // Antigravity-specific key configuration
 	Enabled                *bool                   `json:"enabled,omitempty"`                   // Whether the key is active (default:true)
 	UseForBatchAPI         *bool                   `json:"use_for_batch_api,omitempty"`         // Whether this key can be used for batch API operations (default:false for new keys, migrated keys default to true)
 	UseAnthropicEndpoints  *bool                   `json:"use_anthropic_endpoints,omitempty"`   // Whether to use anthropic endpoints for this key
@@ -778,6 +779,17 @@ type OllamaKeyConfig struct {
 // enabling per-key routing and round-robin load balancing across multiple SGLang instances.
 type SGLKeyConfig struct {
 	URL SecretVar `json:"url"` // SGLang server base URL (required, supports env. prefix)
+}
+
+// AntigravityKeyConfig represents the Antigravity-specific key configuration.
+// It contains OAuth2 credentials and project settings required for Antigravity / Google Cloud Code API access.
+type AntigravityKeyConfig struct {
+	ProjectID     *SecretVar `json:"project_id,omitempty"`     // Google Cloud project ID (discovered automatically via loadCodeAssist if empty)
+	RefreshToken  *SecretVar `json:"refresh_token,omitempty"`  // Google OAuth2 refresh token for obtaining access tokens
+	AccessToken   *SecretVar `json:"access_token,omitempty"`   // Google OAuth2 access token (optional, refreshed automatically if refresh_token is set)
+	ClientID      *SecretVar `json:"client_id,omitempty"`      // Custom OAuth2 client ID (uses public Antigravity client ID if empty)
+	ClientSecret  *SecretVar `json:"client_secret,omitempty"`  // Custom OAuth2 client secret (uses public Antigravity client secret if empty)
+	ClientProfile *string    `json:"client_profile,omitempty"` // Client profile: "ide" (default) or "cli"
 }
 
 // Account defines the interface for managing provider accounts and their configurations.
