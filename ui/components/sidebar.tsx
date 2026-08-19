@@ -982,6 +982,22 @@ export default function AppSidebar() {
 				hasAccess: true,
 			},
 			{
+				title: "Vault",
+				url: "/workspace/vault/doppler",
+				icon: KeyRound,
+				description: "External secret manager",
+				hasAccess: true,
+				subItems: [
+					{
+						title: "Doppler",
+						url: "/workspace/vault/doppler",
+						icon: ShieldCheck,
+						description: "Doppler SecretOps integration",
+						hasAccess: true,
+					},
+				],
+			},
+			{
 				title: "Settings",
 				url: "/workspace/config",
 				icon: Settings2Icon,

@@ -18,4 +18,5 @@ export * from "./providersApi";
 export * from "./promptsApi";
 export * from "./sessionApi";
 export * from "./skillsApi";
+export * from "./vaultApi";
 export * from "./webhooksApi";

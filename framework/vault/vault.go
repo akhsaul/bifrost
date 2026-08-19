@@ -121,6 +121,22 @@ func InitVaultManager(cfg *Config, logger schemas.Logger) (*VaultManager, error)
 	return manager, nil
 }
 
+// GetProvider returns the underlying VaultProvider.
+func (m *VaultManager) GetProvider() VaultProvider {
+	if m == nil {
+		return nil
+	}
+	return m.provider
+}
+
+// GetConfig returns the vault configuration.
+func (m *VaultManager) GetConfig() *Config {
+	if m == nil {
+		return nil
+	}
+	return m.config
+}
+
 // GetPrefix returns the configured prefix for the vault manager.
 func (m *VaultManager) GetPrefix() string {
 	if m == nil || m.config == nil {

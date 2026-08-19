@@ -1958,6 +1958,8 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 		skillsServingHandler.RegisterRoutes(s.Router, middlewares...)
 	}
 	cacheHandler.RegisterRoutes(s.Router, middlewares...)
+	vaultHandler := handlers.NewVaultHandler(s.Config)
+	vaultHandler.RegisterRoutes(s.Router, middlewares...)
 	if featureFlagsHandler != nil {
 		featureFlagsHandler.RegisterRoutes(s.Router, middlewares...)
 	}

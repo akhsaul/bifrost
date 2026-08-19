@@ -348,6 +348,64 @@ func (d *DopplerProvider) DeleteSecret(ctx context.Context, project, config, nam
 	return nil
 }
 
+// DopplerAuthInfo represents the token and identity information from GET /v3/me.
+type DopplerAuthInfo struct {
+	Type      string         `json:"type,omitempty"`
+	Name      string         `json:"name,omitempty"`
+	Slug      string         `json:"slug,omitempty"`
+	Workplace map[string]any `json:"workplace,omitempty"`
+	Token     map[string]any `json:"token,omitempty"`
+}
+
+// GetAuthInfo retrieves identity and workplace details for the Doppler token (GET /v3/me).
+func (d *DopplerProvider) GetAuthInfo(ctx context.Context) (*DopplerAuthInfo, error) {
+	reqURL := fmt.Sprintf("%s/v3/me", d.baseURL)
+
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseRequest(req)
+	defer fasthttp.ReleaseResponse(resp)
+
+	req.SetRequestURI(reqURL)
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.Header.Set("Authorization", "Bearer "+d.token)
+	req.Header.Set("Accept", "application/json")
+
+	if err := d.doRequest(ctx, req, resp); err != nil {
+		return nil, err
+	}
+
+	statusCode := resp.StatusCode()
+	if statusCode == fasthttp.StatusUnauthorized || statusCode == fasthttp.StatusForbidden {
+		return nil, ErrUnauthorized
+	}
+	if statusCode != fasthttp.StatusOK {
+		return nil, d.parseAPIError(resp)
+	}
+
+	var authInfo DopplerAuthInfo
+	if err := sonic.Unmarshal(resp.Body(), &authInfo); err != nil {
+		return nil, fmt.Errorf("vault: failed to parse doppler auth info: %w", err)
+	}
+
+	return &authInfo, nil
+}
+
+// Project returns the default project name configured for the Doppler provider.
+func (d *DopplerProvider) Project() string {
+	return d.project
+}
+
+// Config returns the default config/environment name configured for the Doppler provider.
+func (d *DopplerProvider) Config() string {
+	return d.config
+}
+
+// BaseURL returns the base URL configured for the Doppler provider.
+func (d *DopplerProvider) BaseURL() string {
+	return d.baseURL
+}
+
 // Ping verifies connectivity and auth credentials with the Doppler API (GET /v3/me).
 func (d *DopplerProvider) Ping(ctx context.Context) error {
 	reqURL := fmt.Sprintf("%s/v3/me", d.baseURL)
