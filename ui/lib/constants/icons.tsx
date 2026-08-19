@@ -847,6 +847,14 @@ export const ProviderIcons = {
 		const resolvedSize = resolveSize(size);
 		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="VyceAI"><title>VyceAI</title><path d="M4 6l8 12 8-12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><circle cx="12" cy="10" r="2" fill="currentColor" /></svg>;
 	},
+	hcnsec: ({ size = "md", className = "" }: IconProps) => {
+		const resolvedSize = resolveSize(size);
+		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="HCNSEC"><title>HCNSEC</title><path d="M12 3l7 4v6c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V7l7-4z" stroke="currentColor" strokeWidth="2" /><path d="M9 12h6M12 9v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>;
+	},
+	neuralwatt: ({ size = "md", className = "" }: IconProps) => {
+		const resolvedSize = resolveSize(size);
+		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Neuralwatt"><title>Neuralwatt</title><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>;
+	},
 	wafer: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
 

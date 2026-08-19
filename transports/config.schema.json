@@ -442,6 +442,12 @@
         "vyceai": {
           "$ref": "#/$defs/provider"
         },
+        "hcnsec": {
+          "$ref": "#/$defs/provider"
+        },
+        "neuralwatt": {
+          "$ref": "#/$defs/provider"
+        },
         "gemini": {
           "$ref": "#/$defs/provider"
         },
@@ -7211,6 +7217,8 @@
 			"seekai",
 			"gorouter",
 			"vyceai",
+			"hcnsec",
+			"neuralwatt",
             "opencode-go",
             "opencode-zen",
             "sgl",

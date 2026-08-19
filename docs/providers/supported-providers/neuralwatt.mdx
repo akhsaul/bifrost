@@ -1,0 +1,18 @@
+---
+title: "Neuralwatt"
+description: "Configure Neuralwatt through its OpenAI-compatible API"
+---
+
+Neuralwatt exposes an OpenAI-compatible API at `https://api.neuralwatt.com/v1`. Bifrost uses `/chat/completions` and `/models`.
+
+```json
+{
+  "providers": {
+    "neuralwatt": {
+      "keys": [{ "name": "neuralwatt", "value": "env.NEURALWATT_API_KEY" }]
+    }
+  }
+}
+```
+
+Requests use Bearer authentication. Chat completions, streaming, model listing, and Responses-to-Chat fallback are supported.

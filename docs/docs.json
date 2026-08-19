@@ -157,6 +157,8 @@
                   "providers/supported-providers/seekai",
                   "providers/supported-providers/gorouter",
                   "providers/supported-providers/vyceai",
+                  "providers/supported-providers/hcnsec",
+                  "providers/supported-providers/neuralwatt",
                   "providers/supported-providers/huggingface",
                   "providers/supported-providers/mistral",
                   "providers/supported-providers/nebius",

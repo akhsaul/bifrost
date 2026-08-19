@@ -87,6 +87,8 @@ const (
 	SeekAI        ModelProvider = "seekai"
 	GoRouter      ModelProvider = "gorouter"
 	VyceAI        ModelProvider = "vyceai"
+	Hcnsec        ModelProvider = "hcnsec"
+	Neuralwatt    ModelProvider = "neuralwatt"
 )
 
 // SupportedBaseProviders is the list of base providers allowed for custom providers.
@@ -146,6 +148,8 @@ var StandardProviders = []ModelProvider{
 	SeekAI,
 	GoRouter,
 	VyceAI,
+	Hcnsec,
+	Neuralwatt,
 }
 
 // RequestType represents the type of request being made to a provider.

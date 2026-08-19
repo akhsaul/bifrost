@@ -1,0 +1,18 @@
+---
+title: "HCNSEC"
+description: "Configure HCNSEC through its OpenAI-compatible API"
+---
+
+HCNSEC exposes an OpenAI-compatible API at `https://api.hcnsec.cn/v1`. Bifrost uses `/chat/completions` and `/models`.
+
+```json
+{
+  "providers": {
+    "hcnsec": {
+      "keys": [{ "name": "hcnsec", "value": "env.HCNSEC_API_KEY" }]
+    }
+  }
+}
+```
+
+Requests use Bearer authentication. Chat completions, streaming, model listing, and Responses-to-Chat fallback are supported.

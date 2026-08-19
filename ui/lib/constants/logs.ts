@@ -44,6 +44,8 @@ export const KnownProvidersNames = [
 	"seekai",
 	"gorouter",
 	"vyceai",
+	"hcnsec",
+	"neuralwatt",
 ] as const;
 
 // Local Provider type derived from KNOWN_PROVIDERS constant
@@ -170,6 +172,8 @@ export const ProviderLabels: Record<ProviderName, string> = {
 	seekai: "SeekAI",
 	gorouter: "GoRouter",
 	vyceai: "VyceAI",
+	hcnsec: "HCNSEC",
+	neuralwatt: "Neuralwatt",
 } as const;
 
 // Helper function to get provider label, supporting custom providers

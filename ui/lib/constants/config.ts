@@ -80,6 +80,8 @@ export const ModelPlaceholders = {
 	seekai: "e.g. seekai-model-name",
 	gorouter: "e.g. gorouter-model-name",
 	vyceai: "e.g. vyceai-model-name",
+	hcnsec: "e.g. hcnsec-model-name",
+	neuralwatt: "e.g. neuralwatt-model-name",
 };
 
 export const isKeyRequiredByProvider: Record<ProviderName, boolean> = {
@@ -127,6 +129,8 @@ export const isKeyRequiredByProvider: Record<ProviderName, boolean> = {
 	seekai: true,
 	gorouter: true,
 	vyceai: true,
+	hcnsec: true,
+	neuralwatt: true,
 };
 
 export const DefaultNetworkConfig = {

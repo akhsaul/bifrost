@@ -36,6 +36,7 @@ import (
 	"github.com/maximhq/bifrost/core/providers/gemini"
 	"github.com/maximhq/bifrost/core/providers/gorouter"
 	"github.com/maximhq/bifrost/core/providers/groq"
+	"github.com/maximhq/bifrost/core/providers/hcnsec"
 	"github.com/maximhq/bifrost/core/providers/huggingface"
 	"github.com/maximhq/bifrost/core/providers/inferx"
 	"github.com/maximhq/bifrost/core/providers/longcat"
@@ -43,6 +44,7 @@ import (
 	"github.com/maximhq/bifrost/core/providers/modal"
 	"github.com/maximhq/bifrost/core/providers/morphllm"
 	"github.com/maximhq/bifrost/core/providers/nebius"
+	"github.com/maximhq/bifrost/core/providers/neuralwatt"
 	"github.com/maximhq/bifrost/core/providers/ollama"
 	"github.com/maximhq/bifrost/core/providers/openai"
 	"github.com/maximhq/bifrost/core/providers/opencode"
@@ -4398,6 +4400,10 @@ func (bifrost *Bifrost) createBaseProvider(providerKey schemas.ModelProvider, co
 		return gorouter.NewGoRouterProvider(config, bifrost.logger)
 	case schemas.VyceAI:
 		return vyceai.NewVyceAIProvider(config, bifrost.logger)
+	case schemas.Hcnsec:
+		return hcnsec.NewHcnsecProvider(config, bifrost.logger)
+	case schemas.Neuralwatt:
+		return neuralwatt.NewNeuralwattProvider(config, bifrost.logger)
 	case schemas.OpencodeGo:
 		return opencode.NewOpencodeGoProvider(config, bifrost.logger)
 	case schemas.OpencodeZen:
