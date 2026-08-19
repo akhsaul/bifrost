@@ -3,6 +3,8 @@ package configstore
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/maximhq/bifrost/framework/vault"
 )
 
 // ConfigStoreType represents the type of config store.
@@ -16,18 +18,20 @@ const (
 
 // Config represents the configuration for the config store.
 type Config struct {
-	Enabled bool            `json:"enabled"`
-	Type    ConfigStoreType `json:"type"`
-	Config  any             `json:"config"`
+	Enabled    bool            `json:"enabled"`
+	Type       ConfigStoreType `json:"type"`
+	Config     any             `json:"config"`
+	VaultStore *vault.Config   `json:"vault_store,omitempty"`
 }
 
 // UnmarshalJSON unmarshals the config from JSON.
 func (c *Config) UnmarshalJSON(data []byte) error {
 	// First, unmarshal into a temporary struct to get the basic fields
 	type TempConfig struct {
-		Enabled bool            `json:"enabled"`
-		Type    ConfigStoreType `json:"type"`
-		Config  json.RawMessage `json:"config"`
+		Enabled    bool            `json:"enabled"`
+		Type       ConfigStoreType `json:"type"`
+		Config     json.RawMessage `json:"config"`
+		VaultStore *vault.Config   `json:"vault_store,omitempty"`
 	}
 
 	var temp TempConfig
@@ -38,6 +42,7 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 	// Set basic fields
 	c.Enabled = temp.Enabled
 	c.Type = temp.Type
+	c.VaultStore = temp.VaultStore
 
 	if !temp.Enabled {
 		c.Config = nil

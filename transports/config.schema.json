@@ -1791,7 +1791,7 @@
             },
             "type": {
               "type": "string",
-              "enum": ["aws-secrets-manager", "gcp-secret-manager", "hashicorp-vault"],
+              "enum": ["aws-secrets-manager", "gcp-secret-manager", "hashicorp-vault", "doppler"],
               "description": "Vault backend type"
             },
             "prefix": {
@@ -1802,6 +1802,18 @@
               "type": "string",
               "enum": ["read_only", "read_and_write"],
               "description": "read_only resolves existing refs only; read_and_write also auto-stores plaintext fields and deletes owned secrets. Defaults to read_only."
+            },
+            "doppler": {
+              "type": "object",
+              "description": "Doppler Secrets configuration",
+              "properties": {
+                "token": { "anyOf": [{ "type": "string" }, { "type": "object", "properties": { "value": { "type": "string" }, "env_var": { "type": "string" }, "from_env": { "type": "boolean" } }, "additionalProperties": false }] },
+                "project": { "anyOf": [{ "type": "string" }, { "type": "object", "properties": { "value": { "type": "string" }, "env_var": { "type": "string" }, "from_env": { "type": "boolean" } }, "additionalProperties": false }] },
+                "config": { "anyOf": [{ "type": "string" }, { "type": "object", "properties": { "value": { "type": "string" }, "env_var": { "type": "string" }, "from_env": { "type": "boolean" } }, "additionalProperties": false }] },
+                "base_url": { "anyOf": [{ "type": "string" }, { "type": "object", "properties": { "value": { "type": "string" }, "env_var": { "type": "string" }, "from_env": { "type": "boolean" } }, "additionalProperties": false }] },
+                "timeout_sec": { "type": "integer", "description": "HTTP request timeout in seconds (default: 10)" }
+              },
+              "additionalProperties": false
             },
             "aws": {
               "type": "object",

@@ -39,6 +39,7 @@ import (
 	"github.com/maximhq/bifrost/framework/oauth2"
 	"github.com/maximhq/bifrost/framework/objectstore"
 	plugins "github.com/maximhq/bifrost/framework/plugins"
+	"github.com/maximhq/bifrost/framework/vault"
 	"github.com/maximhq/bifrost/framework/vectorstore"
 	"github.com/maximhq/bifrost/plugins/compat"
 	"github.com/maximhq/bifrost/plugins/governance"
@@ -4595,9 +4596,15 @@ func initEncryption(configData *ConfigData) error {
 	return nil
 }
 
-// initVault is a no-op stub at the OSS level.
-// Vault initialization is performed by the enterprise layer via config_store.vault_store.
-func initVault(_ *ConfigData) {}
+// initVault initializes the vault store if configured.
+func initVault(configData *ConfigData) {
+	if configData == nil || configData.ConfigStoreConfig == nil || configData.ConfigStoreConfig.VaultStore == nil || !configData.ConfigStoreConfig.VaultStore.Enabled {
+		return
+	}
+	if _, err := vault.InitVaultManager(configData.ConfigStoreConfig.VaultStore, logger); err != nil {
+		logger.Error("failed to initialize vault store: %v", err)
+	}
+}
 
 // syncEncryption encrypts all plaintext rows in the config store if encryption is enabled.
 // Called during bootup after encryption key is initialized and all config data has been loaded.
