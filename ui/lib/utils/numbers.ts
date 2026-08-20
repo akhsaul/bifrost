@@ -43,3 +43,13 @@ export function formatTokenPriceFull(cost?: number): string {
 	if (cost === undefined || cost === null) return "Not available";
 	return `${formatTokenPriceValue(cost)} / 1M tokens`;
 }
+
+export function formatTokenLimitCompact(tokens?: number): string {
+	if (tokens === undefined || tokens === null || tokens === 0) return "—";
+	return formatCompactNumber(tokens);
+}
+
+export function formatTokenLimitFull(tokens?: number): string {
+	if (tokens === undefined || tokens === null || tokens === 0) return "Not available";
+	return `${tokens.toLocaleString()} tokens`;
+}

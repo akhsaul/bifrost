@@ -33,9 +33,17 @@ export interface ListModelsResponse {
 	total: number;
 }
 
+export interface ModelArchitecture {
+	modality?: string;
+	tokenizer?: string;
+	instruct_type?: string;
+	input_modalities?: string[];
+	output_modalities?: string[];
+}
+
 // ModelDetails is the shape returned by /api/models/details — used by the
 // model-catalog Models tab to list (model, provider) entries with their
-// additional_attributes.
+// capability and pricing metadata.
 export interface ModelDetails {
 	name: string;
 	provider: string;
@@ -46,7 +54,8 @@ export interface ModelDetails {
 	output_cost_per_token?: number;
 	cache_creation_input_token_cost?: number;
 	cache_read_input_token_cost?: number;
-	architecture?: unknown;
+	architecture?: ModelArchitecture;
+	is_deprecated?: boolean;
 	additional_attributes?: Record<string, string>;
 	accessible_by_keys?: string[];
 }

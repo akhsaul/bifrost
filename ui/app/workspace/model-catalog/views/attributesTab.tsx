@@ -10,7 +10,7 @@ import { RenderProviderIcon } from "@/lib/constants/icons";
 import { ProviderLabels, ProviderName } from "@/lib/constants/logs";
 import { ModelDetails, useGetModelDetailsQuery, useGetProvidersQuery } from "@/lib/store";
 import { KnownProvider } from "@/lib/types/config";
-import { formatTokenPriceCompact } from "@/lib/utils/numbers";
+import { formatTokenLimitCompact, formatTokenLimitFull, formatTokenPriceCompact } from "@/lib/utils/numbers";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
 import { ChevronLeft, ChevronRight, Edit, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -147,8 +147,10 @@ export default function AttributesTab({ hasAccess }: AttributesTabProps) {
 					<Table containerClassName="h-full overflow-y-auto overflow-x-hidden" className="table-fixed">
 						<TableHeader className="bg-muted sticky top-0 z-20">
 							<TableRow className="hover:bg-transparent">
-								<TableHead className="w-[116px] font-medium">Provider</TableHead>
-								<TableHead className="font-medium">Model</TableHead>
+								<TableHead className="w-[110px] font-medium">Provider</TableHead>
+								<TableHead className="w-[170px] font-medium">Model</TableHead>
+								<TableHead className="w-[76px] px-2 text-right font-medium">Context</TableHead>
+								<TableHead className="w-[84px] px-2 text-right font-medium">Max Output</TableHead>
 								<TableHead className="w-[72px] px-2 text-right font-medium">Input</TableHead>
 								<TableHead className="w-[76px] px-2 text-right font-medium">Output</TableHead>
 								<TableHead className="w-[86px] px-2 text-right font-medium">Cache Write</TableHead>
@@ -161,7 +163,7 @@ export default function AttributesTab({ hasAccess }: AttributesTabProps) {
 						<TableBody>
 							{models.length === 0 ? (
 								<TableRow>
-									<TableCell colSpan={9} className="h-24 text-center">
+									<TableCell colSpan={11} className="h-24 text-center">
 										<span className="text-muted-foreground text-sm">
 											{!debouncedSearch && !providerFilter ? "No models loaded yet." : "No matching models."}
 										</span>
@@ -176,12 +178,48 @@ export default function AttributesTab({ hasAccess }: AttributesTabProps) {
 										<TableRow key={`${m.provider}|${m.name}`} data-testid={`model-catalog-row-${testKey}`}>
 											<TableCell className="py-3">
 												<div className="flex min-w-0 items-center gap-2">
-													<RenderProviderIcon provider={m.provider as KnownProvider} size="sm" className="h-4 w-4" />
+													<RenderProviderIcon provider={m.provider as KnownProvider} size="sm" className="h-4 w-4 shrink-0" />
 													<span className="truncate text-sm">{ProviderLabels[m.provider as ProviderName] || m.provider}</span>
 												</div>
 											</TableCell>
-											<TableCell className="truncate py-3 font-mono text-sm" title={m.name}>
-												{m.name}
+											<TableCell className="py-3">
+												<div className="flex items-center gap-1.5 overflow-hidden">
+													<span className="truncate font-mono text-sm" title={m.name}>
+														{m.name}
+													</span>
+													{m.is_deprecated && (
+														<Badge
+															variant="outline"
+															className="text-muted-foreground border-destructive/30 text-destructive shrink-0 px-1 py-0 text-[10px] font-medium"
+														>
+															DEPRECATED
+														</Badge>
+													)}
+												</div>
+											</TableCell>
+											<TableCell className="px-2 py-3 text-right font-mono text-sm">
+												<TooltipProvider>
+													<Tooltip>
+														<TooltipTrigger asChild>
+															<span className="cursor-default">{formatTokenLimitCompact(m.context_length)}</span>
+														</TooltipTrigger>
+														{m.context_length ? (
+															<TooltipContent side="bottom">{formatTokenLimitFull(m.context_length)}</TooltipContent>
+														) : null}
+													</Tooltip>
+												</TooltipProvider>
+											</TableCell>
+											<TableCell className="px-2 py-3 text-right font-mono text-sm">
+												<TooltipProvider>
+													<Tooltip>
+														<TooltipTrigger asChild>
+															<span className="cursor-default">{formatTokenLimitCompact(m.max_output_tokens)}</span>
+														</TooltipTrigger>
+														{m.max_output_tokens ? (
+															<TooltipContent side="bottom">{formatTokenLimitFull(m.max_output_tokens)}</TooltipContent>
+														) : null}
+													</Tooltip>
+												</TooltipProvider>
 											</TableCell>
 											<TableCell className="px-2 py-3 text-right font-mono text-sm">
 												{formatTokenPriceCompact(m.input_cost_per_token)}

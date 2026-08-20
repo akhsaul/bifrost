@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +9,7 @@ import { RenderProviderIcon } from "@/lib/constants/icons";
 import { ProviderLabels, ProviderName } from "@/lib/constants/logs";
 import { getErrorMessage, ModelDetails, useGetCoreConfigQuery, useUpsertModelCatalogEntriesMutation } from "@/lib/store";
 import { KnownProvider } from "@/lib/types/config";
-import { formatTokenPriceFull } from "@/lib/utils/numbers";
+import { formatTokenLimitFull, formatTokenPriceFull } from "@/lib/utils/numbers";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
 import { ExternalLink, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -167,8 +168,79 @@ export default function AttributeSheet({ model, onClose }: AttributeSheetProps) 
 							</div>
 							<div>
 								<Label className="text-sm font-medium">Model</Label>
-								<div className="bg-muted/30 mt-2 rounded-sm border px-3 py-2 font-mono text-sm">{model.name}</div>
+								<div className="bg-muted/30 mt-2 flex items-center justify-between gap-2 rounded-sm border px-3 py-2">
+									<span className="truncate font-mono text-sm">{model.name}</span>
+									{model.is_deprecated && (
+										<Badge
+											variant="outline"
+											className="text-muted-foreground border-destructive/30 text-destructive shrink-0 px-1.5 py-0.5 text-[10px] font-medium"
+										>
+											DEPRECATED
+										</Badge>
+									)}
+								</div>
 							</div>
+						</div>
+
+						<DottedSeparator />
+
+						{/* Limits & Capabilities */}
+						<div className="space-y-3">
+							<Label className="text-sm font-medium">Limits & Capabilities</Label>
+							<div className="grid grid-cols-3 gap-4">
+								<div className="bg-muted/30 rounded-sm border px-3 py-2">
+									<p className="text-muted-foreground text-xs">Context Window</p>
+									<p className="mt-1 font-mono text-sm" data-testid="model-catalog-context-length">
+										{formatTokenLimitFull(model.context_length)}
+									</p>
+								</div>
+								<div className="bg-muted/30 rounded-sm border px-3 py-2">
+									<p className="text-muted-foreground text-xs">Max Input Tokens</p>
+									<p className="mt-1 font-mono text-sm" data-testid="model-catalog-max-input-tokens">
+										{formatTokenLimitFull(model.max_input_tokens)}
+									</p>
+								</div>
+								<div className="bg-muted/30 rounded-sm border px-3 py-2">
+									<p className="text-muted-foreground text-xs">Max Output Tokens</p>
+									<p className="mt-1 font-mono text-sm" data-testid="model-catalog-max-output-tokens">
+										{formatTokenLimitFull(model.max_output_tokens)}
+									</p>
+								</div>
+							</div>
+							{model.architecture && (
+								<div className="bg-muted/30 space-y-1.5 rounded-sm border p-3 text-xs">
+									{model.architecture.modality && (
+										<div className="flex items-center justify-between">
+											<span className="text-muted-foreground">Modality:</span>
+											<span className="font-medium">{model.architecture.modality}</span>
+										</div>
+									)}
+									{model.architecture.input_modalities && model.architecture.input_modalities.length > 0 && (
+										<div className="flex items-center justify-between">
+											<span className="text-muted-foreground">Input Modalities:</span>
+											<span className="font-medium">{model.architecture.input_modalities.join(", ")}</span>
+										</div>
+									)}
+									{model.architecture.output_modalities && model.architecture.output_modalities.length > 0 && (
+										<div className="flex items-center justify-between">
+											<span className="text-muted-foreground">Output Modalities:</span>
+											<span className="font-medium">{model.architecture.output_modalities.join(", ")}</span>
+										</div>
+									)}
+									{model.architecture.tokenizer && (
+										<div className="flex items-center justify-between">
+											<span className="text-muted-foreground">Tokenizer:</span>
+											<span className="font-mono">{model.architecture.tokenizer}</span>
+										</div>
+									)}
+									{model.architecture.instruct_type && (
+										<div className="flex items-center justify-between">
+											<span className="text-muted-foreground">Instruct Type:</span>
+											<span className="font-mono">{model.architecture.instruct_type}</span>
+										</div>
+									)}
+								</div>
+							)}
 						</div>
 
 						<DottedSeparator />
