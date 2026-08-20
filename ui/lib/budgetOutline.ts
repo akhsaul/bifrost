@@ -26,6 +26,7 @@ const SHORT_PERIOD: Record<string, string> = {
 	"1M": "mo",
 	"1Q": "qtr",
 	"1Y": "yr",
+	"999Y": "lifetime",
 };
 
 export function shortPeriod(duration?: string | null): string {

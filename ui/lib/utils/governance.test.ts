@@ -13,6 +13,7 @@ import {
 } from "@/lib/constants/governance";
 import {
 	budgetSignature,
+	formatRateLimitLines,
 	getBudgetOverrideValidUntil,
 	getEffectiveBudgetLimit,
 	hasActiveBudgetOverride,
@@ -241,5 +242,41 @@ describe("budgetSignature without ids", () => {
 			reset_config: b.reset_config,
 		}));
 		expect(budgetSignature(stripped)).toBe(budgetSignature(row(4)));
+	});
+});
+
+describe("lifetime duration", () => {
+	it("offers Lifetime on both rate limits and budgets", () => {
+		expect(resetDurationOptions.map((o) => o.value)).toContain("999Y");
+		expect(budgetResetDurationOptions.map((o) => o.value)).toContain("999Y");
+	});
+
+	it("keeps Lifetime as the last option after Monthly and Quarterly", () => {
+		const rateValues = resetDurationOptions.map((o) => o.value);
+		expect(rateValues.indexOf("999Y")).toBeGreaterThan(rateValues.indexOf("1M"));
+
+		const budgetValues = budgetResetDurationOptions.map((o) => o.value);
+		expect(budgetValues.indexOf("999Y")).toBeGreaterThan(budgetValues.indexOf("1Q"));
+	});
+
+	it("maps 999Y to Lifetime label", () => {
+		expect(resetDurationLabels["999Y"]).toBe("Lifetime");
+	});
+
+	it("renders 999Y in human readable and compact forms", () => {
+		expect(parseResetPeriod("999Y")).toBe("Lifetime");
+		expect(shortPeriod("999Y")).toBe("lifetime");
+		expect(periodRank("999Y")).toBeGreaterThan(periodRank("1Y"));
+	});
+
+	it("formats rate limit lines with lifetime suffix", () => {
+		expect(
+			formatRateLimitLines({
+				token_max_limit: 50000,
+				token_reset_duration: "999Y",
+				request_max_limit: 1000,
+				request_reset_duration: "999Y",
+			}),
+		).toEqual(["50K tokens/lifetime", "1K req/lifetime"]);
 	});
 });

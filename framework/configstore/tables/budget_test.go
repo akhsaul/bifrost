@@ -271,6 +271,37 @@ func TestParseDurationQuarter(t *testing.T) {
 	assert.Error(t, err, "a bare suffix with no multiplier must be rejected")
 }
 
+// TestParseDurationYearAndLifetime verifies the "Y" suffix parses correctly and
+// large values like "999Y" (Lifetime) are clamped safely to math.MaxInt64 without overflowing.
+func TestParseDurationYearAndLifetime(t *testing.T) {
+	oneYear, err := ParseDuration("1Y")
+	require.NoError(t, err)
+	assert.Equal(t, 365*24*time.Hour, oneYear)
+
+	tenYears, err := ParseDuration("10Y")
+	require.NoError(t, err)
+	assert.Equal(t, 10*365*24*time.Hour, tenYears)
+
+	hundredYears, err := ParseDuration("100Y")
+	require.NoError(t, err)
+	assert.Equal(t, 100*365*24*time.Hour, hundredYears)
+
+	// "999Y" should be clamped to math.MaxInt64 and remain > 0 (no integer overflow)
+	lifetime, err := ParseDuration("999Y")
+	require.NoError(t, err)
+	assert.Equal(t, time.Duration(math.MaxInt64), lifetime)
+	assert.Greater(t, lifetime, time.Duration(0))
+
+	_, err = ParseDuration("Y")
+	assert.Error(t, err, "a bare suffix with no multiplier must be rejected")
+
+	_, err = ParseDuration("-1Y")
+	assert.Error(t, err, "negative year must be rejected")
+
+	_, err = ParseDuration("0Y")
+	assert.Error(t, err, "zero year must be rejected")
+}
+
 // TestBudgetResetConfigRoundTripsThroughDatabase verifies the quarter definition
 // survives a save/reload cycle via the JSON column.
 func TestBudgetResetConfigRoundTripsThroughDatabase(t *testing.T) {

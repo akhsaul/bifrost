@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -607,8 +609,12 @@ func ParseDuration(duration string) (time.Duration, error) {
 		return 0, fmt.Errorf("invalid month duration: %s", duration)
 	case duration[len(duration)-1:] == "Y":
 		years := duration[:len(duration)-1]
-		if y, err := time.ParseDuration(years + "h"); err == nil {
-			return y * 24 * 365, nil // Approximate year as 365 days
+		if yVal, err := strconv.ParseInt(years, 10, 64); err == nil && yVal > 0 {
+			const nsPerYear = int64(24 * 365 * time.Hour)
+			if yVal > math.MaxInt64/nsPerYear {
+				return time.Duration(math.MaxInt64), nil
+			}
+			return time.Duration(yVal * nsPerYear), nil
 		}
 		return 0, fmt.Errorf("invalid year duration: %s", duration)
 	default:

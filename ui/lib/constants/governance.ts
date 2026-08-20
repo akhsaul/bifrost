@@ -10,13 +10,18 @@ export const resetDurationOptions = [
 	{ label: "Daily", value: "1d" },
 	{ label: "Weekly", value: "1w" },
 	{ label: "Monthly", value: "1M" },
+	{ label: "Lifetime", value: "999Y" },
 ];
 
 // Reset periods offered on budgets. Quarterly is budget-only: resetDurationOptions
 // above is shared with the rate-limit selects, and the backend has no notion of a
 // quarterly token or request limit, so adding "1Q" there would offer a window it
 // cannot enforce.
-export const budgetResetDurationOptions = [...resetDurationOptions, { label: "Quarterly", value: "1Q" }];
+export const budgetResetDurationOptions = [
+	...resetDurationOptions.filter((o) => o.value !== "999Y"),
+	{ label: "Quarterly", value: "1Q" },
+	{ label: "Lifetime", value: "999Y" },
+];
 
 // Durations that support calendar-aligned resets (snap to day/week/month/quarter/year boundaries).
 // Must stay in sync with IsCalendarAlignableDuration in framework/configstore/tables/utils.go.
@@ -35,6 +40,8 @@ export const resetDurationLabels: Record<string, string> = {
 	"1w": "Weekly",
 	"1M": "Monthly",
 	"1Q": "Quarterly",
+	"1Y": "Yearly",
+	"999Y": "Lifetime",
 };
 
 const MONTH_ABBREVIATIONS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

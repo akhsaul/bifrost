@@ -3,6 +3,7 @@
  */
 export function parseResetPeriod(duration: string): string {
 	if (!duration) return "Unknown";
+	if (duration === "999Y") return "Lifetime";
 
 	const timeValue = parseInt(duration.slice(0, -1));
 	const timeUnit = duration.slice(-1);
@@ -16,6 +17,7 @@ export function parseResetPeriod(duration: string): string {
 		M: { singular: "month", plural: "months" },
 		Q: { singular: "quarter", plural: "quarters" },
 		y: { singular: "year", plural: "years" },
+		Y: { singular: "year", plural: "years" },
 	};
 
 	const unit = unitMap[timeUnit];
@@ -135,6 +137,9 @@ const shortDurationLabels: Record<string, string> = {
 	"1d": "/day",
 	"1w": "/wk",
 	"1M": "/mo",
+	"1Q": "/qtr",
+	"1Y": "/yr",
+	"999Y": "/lifetime",
 };
 
 /**
