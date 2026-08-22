@@ -289,7 +289,12 @@ func HandleAntigravityChatCompletion(
 			providerUtils.ParseAndSetRawRequest(&chatResp.ExtraFields, jsonBody)
 		}
 		if sendBackRawResponse {
-			chatResp.ExtraFields.RawResponse = body
+			var rawResp interface{}
+			if err := sonic.Unmarshal(body, &rawResp); err == nil {
+				chatResp.ExtraFields.RawResponse = rawResp
+			} else {
+				chatResp.ExtraFields.RawResponse = string(body)
+			}
 		}
 	}
 	_ = streamState
@@ -458,7 +463,7 @@ func HandleAntigravityChatCompletionStream(
 					providerUtils.ParseAndSetRawRequest(&response.ExtraFields, jsonBody)
 				}
 				if sendBackRawResponse {
-					response.ExtraFields.RawResponse = eventData
+					response.ExtraFields.RawResponse = string(eventData)
 				}
 
 				lastChunkTime = time.Now()
