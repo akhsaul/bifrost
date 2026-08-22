@@ -16,11 +16,13 @@
 package live
 
 import (
+	"maps"
 	"slices"
 	"sync"
 
 	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/schemas"
+	"github.com/maximhq/bifrost/framework/modelcatalog/datasheet"
 )
 
 // Key identifies one cached response. KeyID is "" for keyless providers
@@ -33,7 +35,8 @@ type Key struct {
 
 // Entry is a single cached response.
 type Entry struct {
-	Models []string
+	Models  []string
+	Details map[string]*datasheet.Entry
 }
 
 type Store struct {
@@ -67,11 +70,35 @@ func New(logger schemas.Logger) *Store {
 // in-flight window to lose a race in (seeding, tests); anything that fetches
 // from an upstream first should go through Generation + UpsertIfCurrent.
 func (s *Store) Upsert(provider schemas.ModelProvider, keyID string, unfiltered bool, models []string) {
+	s.UpsertWithDetails(provider, keyID, unfiltered, models, nil)
+}
+
+// UpsertWithDetails stores models along with capability details for each model.
+func (s *Store) UpsertWithDetails(provider schemas.ModelProvider, keyID string, unfiltered bool, models []string, details map[string]*datasheet.Entry) {
 	cp := make([]string, len(models))
 	copy(cp, models)
+	var detailsCp map[string]*datasheet.Entry
+	if details != nil {
+		detailsCp = make(map[string]*datasheet.Entry, len(details))
+		for k, v := range details {
+			if v != nil {
+				entryCp := *v
+				if entryCp.Architecture != nil {
+					archCp := *entryCp.Architecture
+					archCp.InputModalities = slices.Clone(entryCp.Architecture.InputModalities)
+					archCp.OutputModalities = slices.Clone(entryCp.Architecture.OutputModalities)
+					entryCp.Architecture = &archCp
+				}
+				if entryCp.AdditionalAttributes != nil {
+					entryCp.AdditionalAttributes = maps.Clone(entryCp.AdditionalAttributes)
+				}
+				detailsCp[k] = &entryCp
+			}
+		}
+	}
 	k := Key{Provider: provider, KeyID: keyID, Unfiltered: unfiltered}
 	s.mu.Lock()
-	s.entries[k] = Entry{Models: cp}
+	s.entries[k] = Entry{Models: cp, Details: detailsCp}
 	s.mu.Unlock()
 }
 
@@ -93,16 +120,66 @@ func (s *Store) Generation(provider schemas.ModelProvider) uint64 {
 // prunes a key that is no longer configured, so an unguarded commit would
 // advertise that key's models until the process restarted.
 func (s *Store) UpsertIfCurrent(provider schemas.ModelProvider, keyID string, unfiltered bool, models []string, gen uint64) bool {
+	return s.UpsertIfCurrentWithDetails(provider, keyID, unfiltered, models, nil, gen)
+}
+
+// UpsertIfCurrentWithDetails stores a fetch and details with the generation guard.
+func (s *Store) UpsertIfCurrentWithDetails(provider schemas.ModelProvider, keyID string, unfiltered bool, models []string, details map[string]*datasheet.Entry, gen uint64) bool {
 	cp := make([]string, len(models))
 	copy(cp, models)
+	var detailsCp map[string]*datasheet.Entry
+	if details != nil {
+		detailsCp = make(map[string]*datasheet.Entry, len(details))
+		for k, v := range details {
+			if v != nil {
+				entryCp := *v
+				if entryCp.Architecture != nil {
+					archCp := *entryCp.Architecture
+					archCp.InputModalities = slices.Clone(entryCp.Architecture.InputModalities)
+					archCp.OutputModalities = slices.Clone(entryCp.Architecture.OutputModalities)
+					entryCp.Architecture = &archCp
+				}
+				if entryCp.AdditionalAttributes != nil {
+					entryCp.AdditionalAttributes = maps.Clone(entryCp.AdditionalAttributes)
+				}
+				detailsCp[k] = &entryCp
+			}
+		}
+	}
 	k := Key{Provider: provider, KeyID: keyID, Unfiltered: unfiltered}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.gen[provider] != gen {
 		return false
 	}
-	s.entries[k] = Entry{Models: cp}
+	s.entries[k] = Entry{Models: cp, Details: detailsCp}
 	return true
+}
+
+// GetModelCapability returns capability metadata cached from a live list-models response.
+func (s *Store) GetModelCapability(provider schemas.ModelProvider, model string) *datasheet.Entry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for k, e := range s.entries {
+		if k.Provider != provider || e.Details == nil {
+			continue
+		}
+		if entry, ok := e.Details[model]; ok && entry != nil {
+			cp := *entry
+			if cp.Architecture != nil {
+				archCp := *cp.Architecture
+				archCp.InputModalities = slices.Clone(cp.Architecture.InputModalities)
+				archCp.OutputModalities = slices.Clone(cp.Architecture.OutputModalities)
+				cp.Architecture = &archCp
+			}
+			if cp.AdditionalAttributes != nil {
+				cp.AdditionalAttributes = maps.Clone(cp.AdditionalAttributes)
+			}
+			return &cp
+		}
+	}
+	return nil
 }
 
 // bumpLocked invalidates every generation handed out for the provider so far.
@@ -184,7 +261,7 @@ func (s *Store) UnfilteredModelsForProvider(provider schemas.ModelProvider) []st
 }
 
 // Snapshot returns a defensive copy of every entry for diagnostics. Slices
-// are copied; the returned map is independent of store state.
+// and maps are copied; the returned map is independent of store state.
 func (s *Store) Snapshot() map[Key]Entry {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -192,7 +269,17 @@ func (s *Store) Snapshot() map[Key]Entry {
 	for k, e := range s.entries {
 		cp := make([]string, len(e.Models))
 		copy(cp, e.Models)
-		out[k] = Entry{Models: cp}
+		var detailsCp map[string]*datasheet.Entry
+		if e.Details != nil {
+			detailsCp = make(map[string]*datasheet.Entry, len(e.Details))
+			for name, entry := range e.Details {
+				if entry != nil {
+					entryCp := *entry
+					detailsCp[name] = &entryCp
+				}
+			}
+		}
+		out[k] = Entry{Models: cp, Details: detailsCp}
 	}
 	return out
 }

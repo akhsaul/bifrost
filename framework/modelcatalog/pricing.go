@@ -2,7 +2,9 @@ package modelcatalog
 
 import (
 	"context"
+	"maps"
 
+	"github.com/maximhq/bifrost/core/providers/antigravity"
 	"github.com/maximhq/bifrost/core/schemas"
 	configstoreTables "github.com/maximhq/bifrost/framework/configstore/tables"
 	"github.com/maximhq/bifrost/framework/modelcatalog/datasheet"
@@ -13,7 +15,20 @@ import (
 // entries; falls back to the lexicographically first available mode for
 // deterministic behavior.
 func (mc *ModelCatalog) GetModelCapabilityEntryForModel(model string, provider schemas.ModelProvider) *PricingEntry {
-	return mc.datasheet.GetCapabilityEntry(model, provider)
+	if entry := mc.datasheet.GetCapabilityEntry(model, provider); entry != nil {
+		return entry
+	}
+	if mc.live != nil {
+		if entry := mc.live.GetModelCapability(provider, model); entry != nil {
+			return entry
+		}
+	}
+	if provider == schemas.Antigravity {
+		if m := antigravity.GetStaticModelCapability(model); m != nil {
+			return convertModelToEntry(m, provider)
+		}
+	}
+	return nil
 }
 
 // IsRequestTypeSupported preserves the historical (model, provider,
@@ -41,7 +56,48 @@ func (mc *ModelCatalog) IsTextCompletionSupported(model string, provider schemas
 // GetPricingEntryForModel returns any pricing entry for the model across
 // known modes. Used by the inference handler to enrich list-models responses.
 func (mc *ModelCatalog) GetPricingEntryForModel(model string, provider schemas.ModelProvider) *PricingEntry {
-	return mc.datasheet.GetPricingEntryForModel(model, provider)
+	if entry := mc.datasheet.GetPricingEntryForModel(model, provider); entry != nil {
+		return entry
+	}
+	if mc.live != nil {
+		if entry := mc.live.GetModelCapability(provider, model); entry != nil {
+			return entry
+		}
+	}
+	if provider == schemas.Antigravity {
+		if m := antigravity.GetStaticModelCapability(model); m != nil {
+			return convertModelToEntry(m, provider)
+		}
+	}
+	return nil
+}
+
+func convertModelToEntry(m *schemas.Model, provider schemas.ModelProvider) *PricingEntry {
+	if m == nil {
+		return nil
+	}
+	entry := &PricingEntry{
+		BaseModel:       m.ID,
+		Provider:        string(provider),
+		Mode:            "chat",
+		ContextLength:   m.ContextLength,
+		MaxInputTokens:  m.MaxInputTokens,
+		MaxOutputTokens: m.MaxOutputTokens,
+		Architecture:    m.Architecture,
+		IsDeprecated:    m.IsDeprecated,
+	}
+	if entry.MaxInputTokens == nil && entry.ContextLength != nil {
+		entry.MaxInputTokens = entry.ContextLength
+	}
+	if entry.ContextLength == nil && entry.MaxInputTokens != nil {
+		entry.ContextLength = entry.MaxInputTokens
+	}
+	if len(m.AdditionalAttributes) > 0 {
+		entry.AdditionalAttributes = maps.Clone(m.AdditionalAttributes)
+	} else if m.Description != nil {
+		entry.AdditionalAttributes = map[string]string{"description": *m.Description}
+	}
+	return entry
 }
 
 // CalculateCost computes the dollar cost for a Bifrost response.

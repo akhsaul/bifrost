@@ -5,7 +5,10 @@
 package modelcatalog
 
 import (
+	"maps"
+
 	"github.com/maximhq/bifrost/core/schemas"
+	"github.com/maximhq/bifrost/framework/modelcatalog/datasheet"
 )
 
 // UpsertLive caches one (provider, keyID, unfiltered) list-models response.
@@ -13,7 +16,7 @@ func (mc *ModelCatalog) UpsertLive(provider schemas.ModelProvider, keyID string,
 	mc.live.Upsert(provider, keyID, unfiltered, models)
 }
 
-// UpsertLiveFromResponse extracts model IDs from a BifrostListModelsResponse
+// UpsertLiveFromResponse extracts model IDs and capability details from a BifrostListModelsResponse
 // (parsing "provider/model" prefixes, filtering by provider match,
 // deduplicating) and pushes them into the live cache. A nil resp is a no-op
 // so callers can't accidentally clear an existing cache entry by handing in
@@ -22,7 +25,8 @@ func (mc *ModelCatalog) UpsertLiveFromResponse(provider schemas.ModelProvider, k
 	if resp == nil {
 		return
 	}
-	mc.live.Upsert(provider, keyID, unfiltered, extractModelIDs(resp, provider))
+	modelIDs, details := extractModelIDsAndDetails(resp, provider)
+	mc.live.UpsertWithDetails(provider, keyID, unfiltered, modelIDs, details)
 }
 
 // LiveGeneration returns the live cache's invalidation counter for the
@@ -42,7 +46,8 @@ func (mc *ModelCatalog) UpsertLiveFromResponseIfCurrent(provider schemas.ModelPr
 	if resp == nil {
 		return false
 	}
-	return mc.live.UpsertIfCurrent(provider, keyID, unfiltered, extractModelIDs(resp, provider), gen)
+	modelIDs, details := extractModelIDsAndDetails(resp, provider)
+	return mc.live.UpsertIfCurrentWithDetails(provider, keyID, unfiltered, modelIDs, details, gen)
 }
 
 // InvalidateLive drops both filtered + unfiltered live entries for one key.
@@ -120,21 +125,50 @@ func (mc *ModelCatalog) ConfiguredProviders() []schemas.ModelProvider {
 // identifiers, filtering entries whose ID prefix doesn't match the
 // requested provider.
 func extractModelIDs(resp *schemas.BifrostListModelsResponse, provider schemas.ModelProvider) []string {
+	models, _ := extractModelIDsAndDetails(resp, provider)
+	return models
+}
+
+// extractModelIDsAndDetails flattens a list-models response into bare model
+// identifiers and extracts capability metadata for each model.
+func extractModelIDsAndDetails(resp *schemas.BifrostListModelsResponse, provider schemas.ModelProvider) ([]string, map[string]*datasheet.Entry) {
 	if resp == nil {
-		return nil
+		return nil, nil
 	}
 	seen := make(map[string]struct{}, len(resp.Data))
 	out := make([]string, 0, len(resp.Data))
+	details := make(map[string]*datasheet.Entry, len(resp.Data))
 	for _, m := range resp.Data {
 		parsedProvider, parsedModel := schemas.ParseModelString(m.ID, "")
 		if parsedProvider != "" && parsedProvider != provider {
 			continue
 		}
-		if _, ok := seen[parsedModel]; ok {
-			continue
+		if _, ok := seen[parsedModel]; !ok {
+			seen[parsedModel] = struct{}{}
+			out = append(out, parsedModel)
 		}
-		seen[parsedModel] = struct{}{}
-		out = append(out, parsedModel)
+		entry := &datasheet.Entry{
+			BaseModel:       parsedModel,
+			Provider:        string(provider),
+			Mode:            "chat",
+			ContextLength:   m.ContextLength,
+			MaxInputTokens:  m.MaxInputTokens,
+			MaxOutputTokens: m.MaxOutputTokens,
+			Architecture:    m.Architecture,
+			IsDeprecated:    m.IsDeprecated,
+		}
+		if entry.MaxInputTokens == nil && entry.ContextLength != nil {
+			entry.MaxInputTokens = entry.ContextLength
+		}
+		if entry.ContextLength == nil && entry.MaxInputTokens != nil {
+			entry.ContextLength = entry.MaxInputTokens
+		}
+		if len(m.AdditionalAttributes) > 0 {
+			entry.AdditionalAttributes = maps.Clone(m.AdditionalAttributes)
+		} else if m.Description != nil {
+			entry.AdditionalAttributes = map[string]string{"description": *m.Description}
+		}
+		details[parsedModel] = entry
 	}
-	return out
+	return out, details
 }
