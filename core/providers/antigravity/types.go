@@ -15,15 +15,26 @@ type AntigravityCredentials struct {
 	ClientProfile string `json:"client_profile,omitempty"`
 }
 
+// AntigravityInnerRequest represents the inner request payload for generateContent and streamGenerateContent.
+type AntigravityInnerRequest struct {
+	SessionID         string                   `json:"sessionId,omitempty"`
+	Contents          []gemini.Content         `json:"contents,omitempty"`
+	SystemInstruction *gemini.Content          `json:"systemInstruction,omitempty"`
+	GenerationConfig  *gemini.GenerationConfig `json:"generationConfig,omitempty"`
+	SafetySettings    []gemini.SafetySetting   `json:"safetySettings,omitempty"`
+	Tools             []gemini.Tool            `json:"tools,omitempty"`
+	ToolConfig        *gemini.ToolConfig       `json:"toolConfig,omitempty"`
+}
+
 // AntigravityRequestEnvelope is the top-level envelope required by Google Cloud Code API endpoints.
 type AntigravityRequestEnvelope struct {
-	Project            string                          `json:"project"`
-	RequestID          string                          `json:"requestId"`
-	Model              string                          `json:"model,omitempty"`
-	UserAgent          string                          `json:"userAgent"` // "antigravity"
-	RequestType        string                          `json:"requestType"` // "agent" or "image_gen"
-	Request            *gemini.GeminiGenerationRequest `json:"request"`
-	EnabledCreditTypes []string                        `json:"enabledCreditTypes,omitempty"`
+	Project            string                   `json:"project"`
+	Model              string                   `json:"model,omitempty"`
+	UserAgent          string                   `json:"userAgent"` // "antigravity"
+	RequestID          string                   `json:"requestId"`
+	RequestType        string                   `json:"requestType"` // "agent" or "image_gen"
+	Request            *AntigravityInnerRequest `json:"request"`
+	EnabledCreditTypes []string                 `json:"enabledCreditTypes,omitempty"`
 }
 
 // AntigravityTokenResponse represents the response from the Google OAuth2 token refresh endpoint.

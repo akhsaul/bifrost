@@ -93,7 +93,7 @@ func (provider *AntigravityProvider) ChatCompletion(
 		return nil, providerUtils.NewBifrostOperationError(schemas.ErrRequestBodyConversion, err)
 	}
 
-	targetURL := provider.networkConfig.BaseURL + providerUtils.GetPathFromContext(ctx, StreamGeneratePath)
+	targetURL := provider.networkConfig.BaseURL + providerUtils.GetPathFromContext(ctx, GenerateContentPath)
 	headers := map[string]string{
 		"Authorization": "Bearer " + accessToken,
 		"User-Agent":    GetUserAgent(creds.ClientProfile),

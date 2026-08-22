@@ -84,9 +84,10 @@ func TestResolveModel(t *testing.T) {
 	}{
 		{"gemini-claude-sonnet-4-5", "claude-sonnet-4-6"},
 		{"gemini-claude-opus-4-5-thinking", "claude-opus-4-6-thinking"},
-		{"antigravity/gemini-3.6-flash-high", "gemini-3.6-flash-high"},
+		{"antigravity/gemini-3.6-flash-high", "gemini-3.6-flash-tiered(high)"},
 		{"gemini-3-pro-image-preview", "gemini-3-pro-image"},
-		{"gemini-3.6-flash-high", "gemini-3.6-flash-high"},
+		{"gemini-3.6-flash-high", "gemini-3.6-flash-tiered(high)"},
+		{"gemini-3.5-flash-low", "gemini-3.5-flash-low"},
 	}
 
 	for _, tt := range tests {
@@ -237,7 +238,7 @@ func TestAntigravityProvider_ChatCompletion(t *testing.T) {
 	ClearTokenCache()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "streamGenerateContent") {
+		if strings.Contains(r.URL.Path, "generateContent") {
 			w.Header().Set("Content-Type", "text/event-stream")
 			w.WriteHeader(http.StatusOK)
 			chunk := `{"response":{"candidates":[{"content":{"parts":[{"text":"Hello from Antigravity!"}],"role":"model"},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":5,"candidatesTokenCount":6,"totalTokenCount":11}}}`
@@ -405,7 +406,7 @@ func TestAntigravityProvider_Responses(t *testing.T) {
 	ClearTokenCache()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "streamGenerateContent") {
+		if strings.Contains(r.URL.Path, "generateContent") {
 			w.Header().Set("Content-Type", "text/event-stream")
 			w.WriteHeader(http.StatusOK)
 			chunk := `{"response":{"candidates":[{"content":{"parts":[{"text":"Response output"}],"role":"model"},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":3,"candidatesTokenCount":4,"totalTokenCount":7}}}`

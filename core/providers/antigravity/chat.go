@@ -46,13 +46,42 @@ func ToAntigravityChatRequest(
 
 	sanitizeAntigravityRequest(geminiReq, resolvedModel)
 
+	var sysInstruction *gemini.Content
+	if geminiReq.SystemInstruction != nil && len(geminiReq.SystemInstruction.Parts) > 0 {
+		sysInstruction = geminiReq.SystemInstruction
+	}
+
+	var genConfig *gemini.GenerationConfig
+	if geminiReq.GenerationConfig.MaxOutputTokens > 0 ||
+		geminiReq.GenerationConfig.Temperature != nil ||
+		geminiReq.GenerationConfig.TopP != nil ||
+		geminiReq.GenerationConfig.TopK != nil ||
+		len(geminiReq.GenerationConfig.StopSequences) > 0 ||
+		geminiReq.GenerationConfig.ThinkingConfig != nil {
+		cfgCopy := geminiReq.GenerationConfig
+		genConfig = &cfgCopy
+	}
+
+	sessionID := GenerateAntigravitySessionID()
+	reqID := GenerateAntigravityRequestID(sessionID, resolvedModel, "agent", len(geminiReq.Contents))
+
+	innerReq := &AntigravityInnerRequest{
+		SessionID:         sessionID,
+		Contents:          geminiReq.Contents,
+		SystemInstruction: sysInstruction,
+		GenerationConfig:  genConfig,
+		SafetySettings:    geminiReq.SafetySettings,
+		Tools:             geminiReq.Tools,
+		ToolConfig:        geminiReq.ToolConfig,
+	}
+
 	envelope := &AntigravityRequestEnvelope{
 		Project:     projectID,
-		RequestID:   GenerateAntigravityRequestID(),
 		Model:       resolvedModel,
 		UserAgent:   "antigravity",
+		RequestID:   reqID,
 		RequestType: "agent",
-		Request:     geminiReq,
+		Request:     innerReq,
 	}
 
 	jsonBytes, err := sonic.Marshal(envelope)
@@ -87,13 +116,42 @@ func ToAntigravityResponsesRequest(
 
 	sanitizeAntigravityRequest(geminiReq, resolvedModel)
 
+	var sysInstruction *gemini.Content
+	if geminiReq.SystemInstruction != nil && len(geminiReq.SystemInstruction.Parts) > 0 {
+		sysInstruction = geminiReq.SystemInstruction
+	}
+
+	var genConfig *gemini.GenerationConfig
+	if geminiReq.GenerationConfig.MaxOutputTokens > 0 ||
+		geminiReq.GenerationConfig.Temperature != nil ||
+		geminiReq.GenerationConfig.TopP != nil ||
+		geminiReq.GenerationConfig.TopK != nil ||
+		len(geminiReq.GenerationConfig.StopSequences) > 0 ||
+		geminiReq.GenerationConfig.ThinkingConfig != nil {
+		cfgCopy := geminiReq.GenerationConfig
+		genConfig = &cfgCopy
+	}
+
+	sessionID := GenerateAntigravitySessionID()
+	reqID := GenerateAntigravityRequestID(sessionID, resolvedModel, "agent", len(geminiReq.Contents))
+
+	innerReq := &AntigravityInnerRequest{
+		SessionID:         sessionID,
+		Contents:          geminiReq.Contents,
+		SystemInstruction: sysInstruction,
+		GenerationConfig:  genConfig,
+		SafetySettings:    geminiReq.SafetySettings,
+		Tools:             geminiReq.Tools,
+		ToolConfig:        geminiReq.ToolConfig,
+	}
+
 	envelope := &AntigravityRequestEnvelope{
 		Project:     projectID,
-		RequestID:   GenerateAntigravityRequestID(),
 		Model:       resolvedModel,
 		UserAgent:   "antigravity",
+		RequestID:   reqID,
 		RequestType: "agent",
-		Request:     geminiReq,
+		Request:     innerReq,
 	}
 
 	jsonBytes, err := sonic.Marshal(envelope)
@@ -108,6 +166,16 @@ func ToAntigravityResponsesRequest(
 func sanitizeAntigravityRequest(req *gemini.GeminiGenerationRequest, model string) {
 	if req == nil {
 		return
+	}
+
+	// Sanitize competitive system prompt strings that Google Cloud Code flags
+	if req.SystemInstruction != nil {
+		blockedPhrase := "You are a Claude agent, built on Anthropic's Claude Agent SDK."
+		for i := range req.SystemInstruction.Parts {
+			if strings.Contains(req.SystemInstruction.Parts[i].Text, blockedPhrase) {
+				req.SystemInstruction.Parts[i].Text = strings.ReplaceAll(req.SystemInstruction.Parts[i].Text, blockedPhrase, "")
+			}
+		}
 	}
 
 	isClaude := strings.Contains(strings.ToLower(model), "claude")

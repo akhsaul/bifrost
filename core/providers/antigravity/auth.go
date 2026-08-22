@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"math"
+	"math/big"
 	"net/http"
 	"net/url"
 	"os"
@@ -23,15 +25,17 @@ const (
 	// DefaultAntigravityClientSecret is the public Google OAuth client secret for Antigravity.
 	DefaultAntigravityClientSecret = ""
 
-	GoogleOAuthAuthURL    = "https://accounts.google.com/o/oauth2/v2/auth"
-	GoogleOAuthTokenURL   = "https://oauth2.googleapis.com/token"
-	DefaultRuntimeBaseURL = "https://cloudcode-pa.googleapis.com"
-	LoadCodeAssistPath    = "/v1internal:loadCodeAssist"
-	StreamGeneratePath    = "/v1internal:streamGenerateContent?alt=sse"
-	FetchModelsPath       = "/v1internal:fetchAvailableModels"
+	GoogleOAuthAuthURL     = "https://accounts.google.com/o/oauth2/v2/auth"
+	GoogleOAuthTokenURL    = "https://oauth2.googleapis.com/token"
+	CloudCodeAssistBaseURL = "https://cloudcode-pa.googleapis.com"
+	DefaultRuntimeBaseURL  = "https://daily-cloudcode-pa.googleapis.com"
+	GenerateContentPath    = "/v1internal:generateContent"
+	StreamGeneratePath     = "/v1internal:streamGenerateContent?alt=sse"
+	LoadCodeAssistPath     = "/v1internal:loadCodeAssist"
+	FetchModelsPath        = "/v1internal:fetchAvailableModels"
 
 	DefaultClientProfile = "ide"
-	DefaultIDEVersion    = "0.1.0"
+	DefaultIDEVersion    = "2.1.1"
 	DefaultOS            = "darwin"
 	DefaultArch          = "arm64"
 )
@@ -63,13 +67,39 @@ func GetUserAgent(profile string) string {
 	return fmt.Sprintf("antigravity/ide/%s %s/%s", DefaultIDEVersion, DefaultOS, DefaultArch)
 }
 
-// GenerateAntigravityRequestID generates a unique request ID with the format agent/<timestamp>/<hex>.
-func GenerateAntigravityRequestID() string {
-	b := make([]byte, 4)
-	if _, err := rand.Read(b); err != nil {
-		return fmt.Sprintf("agent/%d/%08x", time.Now().UnixMilli(), time.Now().UnixNano()%0xffffffff)
+func uuidFromSeed(seed string) string {
+	h := sha256.Sum256([]byte(seed))
+	b := h[:16]
+	b[6] = (b[6] & 0x0f) | 0x50 // version 5
+	b[8] = (b[8] & 0x3f) | 0x80 // RFC 4122 variant
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
+// GenerateAntigravitySessionID generates a deterministic or random signed 64-bit int string for session continuity.
+func GenerateAntigravitySessionID() string {
+	n, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
+	if err != nil {
+		return fmt.Sprintf("-%d", time.Now().UnixNano())
 	}
-	return fmt.Sprintf("agent/%d/%s", time.Now().UnixMilli(), hex.EncodeToString(b))
+	return fmt.Sprintf("-%d", n.Int64())
+}
+
+// GenerateAntigravityRequestID generates a unique request ID with the standard Antigravity IDE format:
+// agent/<conversation-uuid>/<timestamp>/<trajectory-uuid>/<step>
+func GenerateAntigravityRequestID(sessionID, model, requestType string, contentsCount int) string {
+	if sessionID == "" {
+		sessionID = "default"
+	}
+	convSeed := fmt.Sprintf("antigravity:conversation:%s", sessionID)
+	trajSeed := fmt.Sprintf("antigravity:trajectory:%s:%s:%s", sessionID, model, requestType)
+	convUUID := uuidFromSeed(convSeed)
+	trajUUID := uuidFromSeed(trajSeed)
+	step := contentsCount*2 - 1
+	if step < 1 {
+		step = 1
+	}
+	return fmt.Sprintf("agent/%s/%d/%s/%d", convUUID, time.Now().UnixMilli(), trajUUID, step)
 }
 
 // GetCredentials extracts and normalizes AntigravityCredentials from a schemas.Key.
@@ -318,10 +348,11 @@ func EnsureProjectID(
 	profile string,
 	logger schemas.Logger,
 ) (string, error) {
-	if baseURL == "" {
-		baseURL = DefaultRuntimeBaseURL
+	discoveryBase := CloudCodeAssistBaseURL
+	if baseURL != "" && !strings.Contains(baseURL, "daily-cloudcode") {
+		discoveryBase = baseURL
 	}
-	targetURL := strings.TrimRight(baseURL, "/") + LoadCodeAssistPath
+	targetURL := strings.TrimRight(discoveryBase, "/") + LoadCodeAssistPath
 
 	req := fasthttp.AcquireRequest()
 	resp := fasthttp.AcquireResponse()

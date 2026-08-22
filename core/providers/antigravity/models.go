@@ -9,14 +9,18 @@ import (
 
 // AntigravityPublicModels contains the standard models available through Antigravity / Google Cloud Code.
 var AntigravityPublicModels = []schemas.Model{
+	{ID: "gemini-3.7-flash-high", Name: schemas.Ptr("Gemini 3.7 Flash (High)"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65536)},
+	{ID: "gemini-3.7-flash-medium", Name: schemas.Ptr("Gemini 3.7 Flash (Medium)"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65536)},
+	{ID: "gemini-3.7-flash-low", Name: schemas.Ptr("Gemini 3.7 Flash (Low)"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65536)},
 	{ID: "gemini-3.6-flash-high", Name: schemas.Ptr("Gemini 3.6 Flash (High)"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65536)},
 	{ID: "gemini-3.6-flash-medium", Name: schemas.Ptr("Gemini 3.6 Flash (Medium)"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65536)},
 	{ID: "gemini-3.6-flash-low", Name: schemas.Ptr("Gemini 3.6 Flash (Low)"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65536)},
+	{ID: "gemini-3.5-flash-high", Name: schemas.Ptr("Gemini 3.5 Flash (High)"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65536)},
+	{ID: "gemini-3.5-flash-low", Name: schemas.Ptr("Gemini 3.5 Flash (Medium)"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65536)},
+	{ID: "gemini-3.5-flash-extra-low", Name: schemas.Ptr("Gemini 3.5 Flash (Low)"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65536)},
 	{ID: "gemini-pro-agent", Name: schemas.Ptr("Gemini 3.1 Pro (High)"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65535)},
 	{ID: "gemini-3.1-pro-low", Name: schemas.Ptr("Gemini 3.1 Pro (Low)"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65535)},
 	{ID: "gemini-3-flash-agent", Name: schemas.Ptr("Gemini 3.5 Flash (High)"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65536)},
-	{ID: "gemini-3.5-flash-low", Name: schemas.Ptr("Gemini 3.5 Flash (Medium)"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65536)},
-	{ID: "gemini-3.5-flash-extra-low", Name: schemas.Ptr("Gemini 3.5 Flash (Low)"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65536)},
 	{ID: "gemini-3.1-flash-lite", Name: schemas.Ptr("Gemini 3.1 Flash Lite"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65535)},
 	{ID: "gemini-2.5-flash-thinking", Name: schemas.Ptr("Gemini 2.5 Flash Thinking"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65535)},
 	{ID: "gemini-2.5-flash", Name: schemas.Ptr("Gemini 2.5 Flash"), ContextLength: schemas.Ptr(1048576), MaxOutputTokens: schemas.Ptr(65535)},
@@ -28,6 +32,14 @@ var AntigravityPublicModels = []schemas.Model{
 
 // AntigravityModelAliases maps legacy or convenient model names to upstream model IDs.
 var AntigravityModelAliases = map[string]string{
+	"gemini-3.7-flash-high":             "gemini-3.7-flash-tiered(high)",
+	"gemini-3.7-flash-medium":           "gemini-3.7-flash-tiered(medium)",
+	"gemini-3.7-flash-low":              "gemini-3.7-flash-tiered(low)",
+	"gemini-3.6-flash-high":             "gemini-3.6-flash-tiered(high)",
+	"gemini-3.6-flash-medium":           "gemini-3.6-flash-tiered(medium)",
+	"gemini-3.6-flash-low":              "gemini-3.6-flash-tiered(low)",
+	"gemini-3-flash-agent":              "gemini-3.5-flash-high",
+	"gemini-pro-agent":                  "gemini-3.1-pro-high",
 	"gemini-claude-sonnet-4-5":          "claude-sonnet-4-6",
 	"gemini-claude-sonnet-4-5-thinking": "claude-sonnet-4-6",
 	"gemini-claude-opus-4-5-thinking":   "claude-opus-4-6-thinking",
