@@ -448,6 +448,9 @@
         "neuralwatt": {
           "$ref": "#/$defs/provider"
         },
+        "antigravity": {
+          "$ref": "#/$defs/provider"
+        },
         "gemini": {
           "$ref": "#/$defs/provider"
         },
@@ -7231,6 +7234,7 @@
 			"vyceai",
 			"hcnsec",
 			"neuralwatt",
+			"antigravity",
             "opencode-go",
             "opencode-zen",
             "sgl",

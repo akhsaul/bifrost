@@ -46,6 +46,7 @@ export const KnownProvidersNames = [
 	"vyceai",
 	"hcnsec",
 	"neuralwatt",
+	"antigravity",
 ] as const;
 
 // Local Provider type derived from KNOWN_PROVIDERS constant
@@ -174,6 +175,7 @@ export const ProviderLabels: Record<ProviderName, string> = {
 	vyceai: "VyceAI",
 	hcnsec: "HCNSEC",
 	neuralwatt: "Neuralwatt",
+	antigravity: "Antigravity",
 } as const;
 
 // Helper function to get provider label, supporting custom providers

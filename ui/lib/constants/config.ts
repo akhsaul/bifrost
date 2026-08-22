@@ -82,6 +82,7 @@ export const ModelPlaceholders = {
 	vyceai: "e.g. vyceai-model-name",
 	hcnsec: "e.g. hcnsec-model-name",
 	neuralwatt: "e.g. neuralwatt-model-name",
+	antigravity: "e.g. gemini-3.6-flash-medium, claude-sonnet-4-6, gemini-2.5-flash",
 };
 
 export const isKeyRequiredByProvider: Record<ProviderName, boolean> = {
@@ -131,6 +132,7 @@ export const isKeyRequiredByProvider: Record<ProviderName, boolean> = {
 	vyceai: true,
 	hcnsec: true,
 	neuralwatt: true,
+	antigravity: true,
 };
 
 export const DefaultNetworkConfig = {
@@ -255,6 +257,13 @@ export const PROVIDER_SUPPORTED_REQUESTS: Record<BaseProvider, string[]> = {
 		"responses",
 		"responses_stream",
 		"embedding",
+	],
+	antigravity: [
+		"list_models",
+		"chat_completion",
+		"chat_completion_stream",
+		"responses",
+		"responses_stream",
 	],
 };
 

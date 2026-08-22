@@ -855,6 +855,20 @@ export const ProviderIcons = {
 		const resolvedSize = resolveSize(size);
 		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Neuralwatt"><title>Neuralwatt</title><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>;
 	},
+	antigravity: ({ size = "md", className = "" }: IconProps) => {
+		const resolvedSize = resolveSize(size);
+		return (
+			<img
+				src="/images/harness/antigravity.svg"
+				alt="Antigravity"
+				width={resolvedSize}
+				height={resolvedSize}
+				loading="lazy"
+				decoding="async"
+				className={className}
+			/>
+		);
+	},
 	wafer: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
 
