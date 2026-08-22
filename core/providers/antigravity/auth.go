@@ -21,8 +21,9 @@ const (
 	// DefaultAntigravityClientID is the public Google OAuth client ID used by the Antigravity CLI / Cloud Code.
 	DefaultAntigravityClientID = ""
 	// DefaultAntigravityClientSecret is the public Google OAuth client secret for Antigravity.
-	DefaultAntigravityClientSecret = "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"
+	DefaultAntigravityClientSecret = ""
 
+	GoogleOAuthAuthURL    = "https://accounts.google.com/o/oauth2/v2/auth"
 	GoogleOAuthTokenURL   = "https://oauth2.googleapis.com/token"
 	DefaultRuntimeBaseURL = "https://cloudcode-pa.googleapis.com"
 	LoadCodeAssistPath    = "/v1internal:loadCodeAssist"
@@ -371,4 +372,114 @@ func EnsureProjectID(
 	}
 
 	return "", fmt.Errorf("no project ID found in loadCodeAssist response: %s", string(resp.Body()))
+}
+
+// BuildAntigravityAuthURL generates the Google OAuth authorization URL for Antigravity.
+func BuildAntigravityAuthURL(redirectURI, state string) string {
+	params := url.Values{}
+	params.Set("client_id", DefaultAntigravityClientID)
+	params.Set("response_type", "code")
+	if redirectURI != "" {
+		params.Set("redirect_uri", redirectURI)
+	}
+	params.Set("scope", strings.Join([]string{
+		"https://www.googleapis.com/auth/cloud-platform",
+		"https://www.googleapis.com/auth/userinfo.email",
+		"https://www.googleapis.com/auth/userinfo.profile",
+		"https://www.googleapis.com/auth/cclog",
+		"https://www.googleapis.com/auth/experimentsandconfigs",
+	}, " "))
+	if state != "" {
+		params.Set("state", state)
+	}
+	params.Set("access_type", "offline")
+	params.Set("prompt", "consent")
+	return GoogleOAuthAuthURL + "?" + params.Encode()
+}
+
+// ExchangeAuthCode exchanges a Google OAuth authorization code for tokens and auto-discovers the Cloud Code project ID.
+func ExchangeAuthCode(
+	ctx *schemas.BifrostContext,
+	client *fasthttp.Client,
+	code string,
+	redirectURI string,
+	clientID string,
+	clientSecret string,
+	logger schemas.Logger,
+) (*AntigravityCredentials, error) {
+	if clientID == "" {
+		clientID = DefaultAntigravityClientID
+	}
+	if clientSecret == "" {
+		clientSecret = DefaultAntigravityClientSecret
+	}
+
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseRequest(req)
+	defer fasthttp.ReleaseResponse(resp)
+
+	form := url.Values{}
+	form.Set("grant_type", "authorization_code")
+	form.Set("code", strings.TrimSpace(code))
+	if redirectURI != "" {
+		form.Set("redirect_uri", strings.TrimSpace(redirectURI))
+	}
+	form.Set("client_id", clientID)
+	form.Set("client_secret", clientSecret)
+
+	req.Header.SetMethod(http.MethodPost)
+	req.SetRequestURI(GoogleOAuthTokenURL)
+	req.Header.SetContentType("application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", GetUserAgent(DefaultClientProfile))
+	req.SetBodyString(form.Encode())
+
+	var err error
+	if client != nil {
+		err = client.Do(req, resp)
+	} else {
+		err = fasthttp.Do(req, resp)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("network error during auth code exchange: %w", err)
+	}
+
+	if resp.StatusCode() != fasthttp.StatusOK {
+		return nil, fmt.Errorf("token exchange returned status %d: %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	var tokResp struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    int    `json:"expires_in"`
+		TokenType    string `json:"token_type"`
+		Error        string `json:"error,omitempty"`
+		ErrorDesc    string `json:"error_description,omitempty"`
+	}
+	if err := sonic.Unmarshal(resp.Body(), &tokResp); err != nil {
+		return nil, fmt.Errorf("failed to decode token exchange response: %w", err)
+	}
+
+	if tokResp.Error != "" {
+		return nil, fmt.Errorf("token exchange error: %s (%s)", tokResp.Error, tokResp.ErrorDesc)
+	}
+
+	creds := &AntigravityCredentials{
+		AccessToken:   tokResp.AccessToken,
+		RefreshToken:  tokResp.RefreshToken,
+		ClientID:      clientID,
+		ClientSecret:  clientSecret,
+		ClientProfile: DefaultClientProfile,
+	}
+
+	// Auto-discover Project ID using the newly exchanged access token
+	if tokResp.AccessToken != "" {
+		if projectID, err := EnsureProjectID(ctx, client, tokResp.AccessToken, DefaultRuntimeBaseURL, DefaultClientProfile, logger); err == nil && projectID != "" {
+			creds.ProjectID = projectID
+		}
+	}
+
+	return creds, nil
 }

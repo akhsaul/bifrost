@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { SecretVarInput } from "@/components/ui/secretVarInput";
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -7,10 +8,12 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TagInput } from "@/components/ui/tagInput";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useLazyGetAntigravityAuthUrlQuery, useExchangeAntigravityAuthCodeMutation } from "@/lib/store/apis/providersApi";
 import { isRedacted } from "@/lib/utils/validation";
-import { Info } from "lucide-react";
+import { CheckCircle2, Info, Loader2, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Control, UseFormReturn } from "react-hook-form";
+import { toast } from "sonner";
 import { DeploymentsTable } from "./deploymentsTable";
 
 // Providers that support batch APIs
@@ -62,6 +65,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 	const isSGL = effectiveProvider === "sgl";
 	const isDeepseek = effectiveProvider === "deepseek";
 	const isFireworks = effectiveProvider === "fireworks";
+	const isAntigravity = effectiveProvider === "antigravity";
 	const isKeylessProvider = isOllama || isSGL;
 	const supportsBatchAPI = BATCH_SUPPORTED_PROVIDERS.includes(effectiveProvider);
 
@@ -76,6 +80,81 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 
 	// Auth type state for Vertex: 'service_account', 'service_account_json', or 'api_key'
 	const [vertexAuthType, setVertexAuthType] = useState<"service_account" | "service_account_json" | "api_key">("service_account");
+
+	// Auth type state for Antigravity: 'oauth' or 'manual'
+	const [antigravityAuthType, setAntigravityAuthType] = useState<"oauth" | "manual">("oauth");
+	const [manualCode, setManualCode] = useState("");
+	const [authError, setAuthError] = useState<string | null>(null);
+	const [getAuthUrl, { isLoading: isFetchingUrl }] = useLazyGetAntigravityAuthUrlQuery();
+	const [exchangeCode, { isLoading: isExchanging }] = useExchangeAntigravityAuthCodeMutation();
+
+	// Detect Antigravity auth type
+	useEffect(() => {
+		if (form.formState.isDirty) return;
+		if (isAntigravity) {
+			const authType = form.getValues("key.antigravity_key_config._auth_type");
+			if (authType) {
+				setAntigravityAuthType(authType);
+			}
+		}
+	}, [isAntigravity, form]);
+
+	const handleGoogleLogin = async () => {
+		setAuthError(null);
+		try {
+			const redirectUri = `${window.location.origin}/oauth-callback`;
+			const res = await getAuthUrl({ redirect_uri: redirectUri }).unwrap();
+			if (!res.auth_url) throw new Error("No authorization URL returned");
+
+			const width = 600;
+			const height = 700;
+			const left = window.screenX + (window.outerWidth - width) / 2;
+			const top = window.screenY + (window.outerHeight - height) / 2;
+			const popup = window.open(
+				res.auth_url,
+				"antigravity_oauth",
+				`width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes`
+			);
+
+			const handleMessage = async (event: MessageEvent) => {
+				if (event.data?.type === "antigravity_oauth_code" && event.data?.code) {
+					window.removeEventListener("message", handleMessage);
+					popup?.close();
+					await completeExchange(event.data.code, redirectUri);
+				}
+			};
+			window.addEventListener("message", handleMessage);
+		} catch (err: any) {
+			setAuthError(err?.data?.error || err?.message || "Failed to start Google OAuth flow");
+		}
+	};
+
+	const completeExchange = async (code: string, redirectUri?: string) => {
+		setAuthError(null);
+		try {
+			const uri = redirectUri || `${window.location.origin}/oauth-callback`;
+			const res = await exchangeCode({
+				code: code.trim(),
+				redirect_uri: uri,
+			}).unwrap();
+
+			form.setValue("key.value", { value: res.refresh_token, ref: "" }, { shouldDirty: true, shouldValidate: true });
+			form.setValue("key.antigravity_key_config.refresh_token", { value: res.refresh_token, ref: "" }, { shouldDirty: true });
+			if (res.access_token) {
+				form.setValue("key.antigravity_key_config.access_token", { value: res.access_token, ref: "" }, { shouldDirty: true });
+			}
+			if (res.project_id) {
+				form.setValue("key.antigravity_key_config.project_id", { value: res.project_id, ref: "" }, { shouldDirty: true });
+			}
+			if (!form.getValues("key.name")) {
+				form.setValue("key.name", "google-antigravity-auth", { shouldDirty: true, shouldValidate: true });
+			}
+			toast.success("Antigravity Google OAuth connected successfully!");
+			setManualCode("");
+		} catch (err: any) {
+			setAuthError(err?.data?.error || err?.message || "Failed to exchange authorization code");
+		}
+	};
 
 	// Detect auth type from existing form values when editing
 	useEffect(() => {
@@ -228,7 +307,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 				/>
 			</div>
 			{/* Hide API Key field for providers with dedicated auth tabs */}
-			{!isAzure && !isBedrock && !isBedrockMantle && !isVertex && (
+			{!isAzure && !isBedrock && !isBedrockMantle && !isVertex && !isAntigravity && (
 				<FormField
 					control={control}
 					name={`key.value`}
@@ -1238,6 +1317,180 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 							/>
 						</>
 					)}
+				</div>
+			)}
+			{isAntigravity && (
+				<div className="space-y-4">
+					<Separator className="my-6" />
+					<div className="space-y-2">
+						<FormLabel>Authentication Method</FormLabel>
+						<Tabs
+							value={antigravityAuthType}
+							onValueChange={(v) => {
+								const t = v as "oauth" | "manual";
+								setAntigravityAuthType(t);
+								form.setValue("key.antigravity_key_config._auth_type", t, { shouldDirty: true });
+							}}
+						>
+							<TabsList className="grid w-full grid-cols-2">
+								<TabsTrigger data-testid="apikey-antigravity-oauth-tab" value="oauth">
+									Google OAuth (Recommended)
+								</TabsTrigger>
+								<TabsTrigger data-testid="apikey-antigravity-manual-tab" value="manual">
+									Manual Key / JSON
+								</TabsTrigger>
+							</TabsList>
+						</Tabs>
+					</div>
+
+					{antigravityAuthType === "oauth" ? (
+						<div className="space-y-4 rounded-md border p-4 bg-muted/20">
+							{Boolean(form.watch("key.value")?.value || form.watch("key.antigravity_key_config.refresh_token")?.value) ? (
+								<div className="flex flex-col gap-3">
+									<div className="flex items-center gap-3 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800/40 rounded-md p-3">
+										<CheckCircle2 className="h-5 w-5 shrink-0" />
+										<div className="text-sm">
+											<div className="font-semibold">Google Account Connected</div>
+											<div className="text-xs opacity-90">
+												{form.watch("key.antigravity_key_config.project_id")?.value
+													? `Google Cloud Project ID: ${form.watch("key.antigravity_key_config.project_id")?.value}`
+													: "OAuth Refresh Token loaded and auto-refreshed"}
+											</div>
+										</div>
+									</div>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										className="self-start text-xs"
+										onClick={handleGoogleLogin}
+										disabled={isFetchingUrl || isExchanging}
+									>
+										{isFetchingUrl || isExchanging ? (
+											<Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+										) : (
+											<RefreshCw className="mr-2 h-3.5 w-3.5" />
+										)}
+										Reconnect / Switch Google Account
+									</Button>
+								</div>
+							) : (
+								<div className="space-y-3">
+									<p className="text-muted-foreground text-sm">
+										Click below to sign in with your Google account. Bifrost will automatically retrieve the OAuth tokens and discover your Cloud Code project.
+									</p>
+									<Button
+										type="button"
+										variant="default"
+										data-testid="antigravity-oauth-login-btn"
+										className="w-full flex items-center justify-center gap-2"
+										onClick={handleGoogleLogin}
+										disabled={isFetchingUrl || isExchanging}
+									>
+										{isFetchingUrl || isExchanging ? (
+											<Loader2 className="h-4 w-4 animate-spin" />
+										) : (
+											<svg className="h-4 w-4" viewBox="0 0 24 24">
+												<path
+													fill="#EA4335"
+													d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"
+												/>
+												<path
+													fill="#4285F4"
+													d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"
+												/>
+												<path
+													fill="#FBBC05"
+													d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9z"
+												/>
+												<path
+													fill="#34A853"
+													d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z"
+												/>
+											</svg>
+										)}
+										Sign in with Google (OAuth)
+									</Button>
+
+									<div className="mt-4 pt-4 border-t space-y-2">
+										<FormLabel className="text-xs text-muted-foreground">
+											Alternative: Paste Authorization Code or Redirect URL
+										</FormLabel>
+										<div className="flex gap-2">
+											<Input
+												placeholder="4/0A... or http://localhost/oauth-callback?code=..."
+												value={manualCode}
+												onChange={(e) => {
+													const val = e.target.value;
+													if (val.includes("code=")) {
+														try {
+															const urlObj = new URL(val.startsWith("http") ? val : `http://localhost/${val}`);
+															const c = urlObj.searchParams.get("code");
+															if (c) {
+																setManualCode(c);
+																return;
+															}
+														} catch {}
+													}
+													setManualCode(val);
+												}}
+												className="text-xs"
+											/>
+											<Button
+												type="button"
+												variant="secondary"
+												size="sm"
+												onClick={() => completeExchange(manualCode)}
+												disabled={!manualCode.trim() || isExchanging}
+											>
+												{isExchanging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Exchange"}
+											</Button>
+										</div>
+									</div>
+								</div>
+							)}
+
+							{authError && (
+								<p className="text-destructive text-xs mt-2">{authError}</p>
+							)}
+						</div>
+					) : (
+						<div className="space-y-4">
+							<FormField
+								control={control}
+								name={`key.value`}
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Refresh Token / JSON / API Key</FormLabel>
+										<FormControl>
+											<SecretVarInput placeholder="Google OAuth refresh token, access token, or JSON" type="text" {...field} />
+										</FormControl>
+										<FormDescription>
+											Paste your Google OAuth refresh_token, ya29. access token, or credentials JSON object.
+										</FormDescription>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+						</div>
+					)}
+
+					<FormField
+						control={control}
+						name={`key.antigravity_key_config.project_id`}
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>Google Cloud Project ID (Optional override)</FormLabel>
+								<FormControl>
+									<SecretVarInput placeholder="Auto-discovered or custom GCP project ID" {...field} />
+								</FormControl>
+								<FormDescription>
+									Leave blank to use the project ID discovered automatically via Cloud Code assist.
+								</FormDescription>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
 				</div>
 			)}
 		</div>

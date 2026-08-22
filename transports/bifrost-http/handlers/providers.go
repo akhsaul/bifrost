@@ -15,6 +15,7 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/fasthttp/router"
 	bifrost "github.com/maximhq/bifrost/core"
+	antigravity "github.com/maximhq/bifrost/core/providers/antigravity"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore"
 	"github.com/maximhq/bifrost/framework/configstore/tables"
@@ -217,6 +218,9 @@ func (h *ProviderHandler) RegisterRoutes(r *router.Router, middlewares ...schema
 	r.GET("/api/models/parameters", lib.ChainMiddlewares(h.getModelParameters, middlewares...))
 	r.GET("/api/models/base", lib.ChainMiddlewares(h.listBaseModels, middlewares...))
 	r.PUT("/api/models/catalog", lib.ChainMiddlewares(h.upsertModelCatalogEntries, middlewares...))
+	// Antigravity OAuth helper endpoints
+	r.GET("/api/providers/antigravity/oauth/auth-url", lib.ChainMiddlewares(h.getAntigravityAuthURL, middlewares...))
+	r.POST("/api/providers/antigravity/oauth/exchange", lib.ChainMiddlewares(h.exchangeAntigravityAuthCode, middlewares...))
 }
 
 // listProviders handles GET /api/providers - List all providers
@@ -1398,4 +1402,76 @@ func (h *ProviderHandler) upsertModelCatalogEntries(ctx *fasthttp.RequestCtx) {
 		return
 	}
 	ctx.SetStatusCode(fasthttp.StatusNoContent)
+}
+
+// getAntigravityAuthURL handles GET /api/providers/antigravity/oauth/auth-url
+func (h *ProviderHandler) getAntigravityAuthURL(ctx *fasthttp.RequestCtx) {
+	redirectURI := strings.TrimSpace(string(ctx.QueryArgs().Peek("redirect_uri")))
+	state := strings.TrimSpace(string(ctx.QueryArgs().Peek("state")))
+
+	authURL := antigravity.BuildAntigravityAuthURL(redirectURI, state)
+	resp := map[string]string{
+		"auth_url":  authURL,
+		"client_id": antigravity.DefaultAntigravityClientID,
+	}
+	data, err := sonic.Marshal(resp)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
+}
+
+type exchangeAntigravityCodePayload struct {
+	Code         string `json:"code"`
+	RedirectURI  string `json:"redirect_uri"`
+	ClientID     string `json:"client_id,omitempty"`
+	ClientSecret string `json:"client_secret,omitempty"`
+}
+
+// exchangeAntigravityAuthCode handles POST /api/providers/antigravity/oauth/exchange
+func (h *ProviderHandler) exchangeAntigravityAuthCode(ctx *fasthttp.RequestCtx) {
+	var payload exchangeAntigravityCodePayload
+	if err := sonic.Unmarshal(ctx.PostBody(), &payload); err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	payload.Code = strings.TrimSpace(payload.Code)
+	if payload.Code == "" {
+		SendError(ctx, fasthttp.StatusBadRequest, "Authorization code is required")
+		return
+	}
+
+	creds, err := antigravity.ExchangeAuthCode(
+		nil,
+		nil,
+		payload.Code,
+		payload.RedirectURI,
+		payload.ClientID,
+		payload.ClientSecret,
+		nil,
+	)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Failed to exchange auth code: %v", err))
+		return
+	}
+
+	resp := map[string]string{
+		"refresh_token": creds.RefreshToken,
+		"access_token":  creds.AccessToken,
+		"project_id":    creds.ProjectID,
+		"client_id":     creds.ClientID,
+		"client_secret": creds.ClientSecret,
+	}
+	data, err := sonic.Marshal(resp)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
 }

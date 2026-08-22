@@ -118,6 +118,26 @@ export interface ListBaseModelsResponse {
 	total: number;
 }
 
+export interface AntigravityAuthUrlResponse {
+	auth_url: string;
+	client_id: string;
+}
+
+export interface AntigravityExchangeRequest {
+	code: string;
+	redirect_uri?: string;
+	client_id?: string;
+	client_secret?: string;
+}
+
+export interface AntigravityExchangeResponse {
+	refresh_token: string;
+	access_token: string;
+	project_id: string;
+	client_id?: string;
+	client_secret?: string;
+}
+
 type UpdateProviderMutationArg = UpdateProviderRequest & { name: ModelProviderName };
 
 const DEFAULT_MODEL_PARAMETERS: ModelDatasheetResponse = {
@@ -478,6 +498,22 @@ export const providersApi = baseApi.injectEndpoints({
 			}),
 			invalidatesTags: ["Models"],
 		}),
+
+		// Antigravity OAuth endpoints
+		getAntigravityAuthUrl: builder.query<AntigravityAuthUrlResponse, { redirect_uri?: string; state?: string } | void>({
+			query: (params) => ({
+				url: "/providers/antigravity/oauth/auth-url",
+				params: params || {},
+			}),
+		}),
+
+		exchangeAntigravityAuthCode: builder.mutation<AntigravityExchangeResponse, AntigravityExchangeRequest>({
+			query: (body) => ({
+				url: "/providers/antigravity/oauth/exchange",
+				method: "POST",
+				body,
+			}),
+		}),
 	}),
 });
 
@@ -509,4 +545,7 @@ export const {
 	useGetModelDetailsQuery,
 	useLazyGetModelDetailsQuery,
 	useUpsertModelCatalogEntriesMutation,
+	useGetAntigravityAuthUrlQuery,
+	useLazyGetAntigravityAuthUrlQuery,
+	useExchangeAntigravityAuthCodeMutation,
 } = providersApi;

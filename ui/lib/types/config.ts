@@ -203,10 +203,27 @@ export interface SGLKeyConfig {
 	url: SecretVar;
 }
 
-// Default SGLKeyConfig
-export const DefaultSGLKeyConfig: SGLKeyConfig = {
-	url: { value: "", ref: "" },
-} as const satisfies Required<SGLKeyConfig>;
+// AntigravityKeyConfig matching Go's schemas.AntigravityKeyConfig
+export interface AntigravityKeyConfig {
+	_auth_type?: "oauth" | "manual";
+	project_id?: SecretVar;
+	refresh_token?: SecretVar;
+	access_token?: SecretVar;
+	client_id?: SecretVar;
+	client_secret?: SecretVar;
+	client_profile?: string;
+}
+
+// Default AntigravityKeyConfig
+export const DefaultAntigravityKeyConfig: AntigravityKeyConfig = {
+	_auth_type: "oauth",
+	project_id: { value: "", ref: "" },
+	refresh_token: { value: "", ref: "" },
+	access_token: { value: "", ref: "" },
+	client_id: { value: "", ref: "" },
+	client_secret: { value: "", ref: "" },
+	client_profile: "ide",
+};
 
 // Key structure matching Go's schemas.Key
 export interface ModelProviderKey {
@@ -228,6 +245,7 @@ export interface ModelProviderKey {
 	replicate_key_config?: ReplicateKeyConfig;
 	ollama_key_config?: OllamaKeyConfig;
 	sgl_key_config?: SGLKeyConfig;
+	antigravity_key_config?: AntigravityKeyConfig;
 	config_hash?: string; // Present when config is synced from config.json
 	status?: "unknown" | "success" | "list_models_failed";
 	description?: string;

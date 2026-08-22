@@ -266,6 +266,17 @@ export const sglKeyConfigSchema = z
 		path: ["url"],
 	});
 
+// Antigravity key config schema
+export const antigravityKeyConfigSchema = z.object({
+	_auth_type: z.enum(["oauth", "manual"]).optional(),
+	project_id: secretVarSchema.optional(),
+	refresh_token: secretVarSchema.optional(),
+	access_token: secretVarSchema.optional(),
+	client_id: secretVarSchema.optional(),
+	client_secret: secretVarSchema.optional(),
+	client_profile: z.string().optional(),
+});
+
 // Model family enum schema — must mirror schemas.ModelFamily in Go.
 export const modelFamilySchema = z.enum([
 	"anthropic",
@@ -349,6 +360,7 @@ export const modelProviderKeySchema = z
 		replicate_key_config: replicateKeyConfigSchema.optional(),
 		ollama_key_config: ollamaKeyConfigSchema.optional(),
 		sgl_key_config: sglKeyConfigSchema.optional(),
+		antigravity_key_config: antigravityKeyConfigSchema.optional(),
 		use_for_batch_api: z.boolean().optional(),
 		use_anthropic_endpoints: z.boolean().optional(),
 		enabled: z.boolean().optional(),
@@ -358,6 +370,17 @@ export const modelProviderKeySchema = z
 			// Providers with dedicated config that never need a top-level API key
 			if (data.vllm_key_config || data.replicate_key_config || data.ollama_key_config || data.sgl_key_config) {
 				return true;
+			}
+			// Antigravity allows OAuth credentials via antigravity_key_config or top-level value
+			if (data.antigravity_key_config) {
+				if (
+					isSecretVarSet(data.antigravity_key_config.refresh_token) ||
+					isSecretVarSet(data.antigravity_key_config.access_token) ||
+					isSecretVarSet(data.value)
+				) {
+					return true;
+				}
+				return false;
 			}
 			// Bedrock Mantle authenticates via SigV4 (its key config) or a Bearer key — only require
 			// a top-level API key when the user explicitly chose the api_key auth method.
