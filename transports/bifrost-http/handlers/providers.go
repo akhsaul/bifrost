@@ -1465,6 +1465,8 @@ func (h *ProviderHandler) exchangeAntigravityAuthCode(ctx *fasthttp.RequestCtx) 
 		"project_id":    creds.ProjectID,
 		"client_id":     creds.ClientID,
 		"client_secret": creds.ClientSecret,
+		"email":         creds.Email,
+		"name":          creds.Name,
 	}
 	data, err := sonic.Marshal(resp)
 	if err != nil {

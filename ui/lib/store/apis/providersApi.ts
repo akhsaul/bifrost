@@ -136,6 +136,8 @@ export interface AntigravityExchangeResponse {
 	project_id: string;
 	client_id?: string;
 	client_secret?: string;
+	email?: string;
+	name?: string;
 }
 
 type UpdateProviderMutationArg = UpdateProviderRequest & { name: ModelProviderName };

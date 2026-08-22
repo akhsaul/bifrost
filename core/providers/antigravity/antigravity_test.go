@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bytedance/sonic"
 	schemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/valyala/fasthttp"
 )
@@ -301,6 +302,103 @@ func TestAntigravityProvider_ChatCompletion(t *testing.T) {
 
 	if resp.Usage == nil || resp.Usage.TotalTokens != 11 {
 		t.Errorf("unexpected usage: %v", resp.Usage)
+	}
+}
+
+func TestFetchGoogleUserInfo(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer mock-access-token" {
+			t.Errorf("unexpected authorization header: %s", r.Header.Get("Authorization"))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"id": "106104910333037428195",
+			"email": "ikhsanmaulana1289@gmail.com",
+			"verified_email": true,
+			"name": "Ikhsan Maulana"
+		}`))
+	}))
+	defer server.Close()
+
+	// Temporarily override or test directly
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseRequest(req)
+	defer fasthttp.ReleaseResponse(resp)
+
+	req.Header.SetMethod(http.MethodGet)
+	req.SetRequestURI(server.URL)
+	req.Header.Set("Authorization", "Bearer mock-access-token")
+
+	client := &fasthttp.Client{}
+	if err := client.Do(req, resp); err != nil {
+		t.Fatalf("client.Do failed: %v", err)
+	}
+
+	var userInfo GoogleUserInfo
+	if err := sonic.Unmarshal(resp.Body(), &userInfo); err != nil {
+		t.Fatalf("unmarshal userinfo failed: %v", err)
+	}
+
+	if userInfo.Email != "ikhsanmaulana1289@gmail.com" {
+		t.Errorf("expected email ikhsanmaulana1289@gmail.com, got %s", userInfo.Email)
+	}
+	if userInfo.Name != "Ikhsan Maulana" {
+		t.Errorf("expected name Ikhsan Maulana, got %s", userInfo.Name)
+	}
+}
+
+func TestFetchAvailableModelsFromAPI(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != FetchModelsPath {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer mock-token" {
+			t.Errorf("unexpected auth header: %s", r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{
+			"models": {
+				"gemini-3.5-flash-low": {
+					"displayName": "Gemini 3.5 Flash (Medium)",
+					"maxTokens": 1048576,
+					"maxOutputTokens": 65536,
+					"isInternal": false
+				},
+				"internal-test-model": {
+					"displayName": "Internal Model",
+					"isInternal": true
+				}
+			}
+		}`))
+	}))
+	defer server.Close()
+
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	client := &fasthttp.Client{}
+
+	models, err := FetchAvailableModelsFromAPI(ctx, client, "mock-token", "proj-xyz", server.URL, nil, nil)
+	if err != nil {
+		t.Fatalf("FetchAvailableModelsFromAPI failed: %v", err)
+	}
+
+	if len(models) != 1 {
+		t.Fatalf("expected 1 non-internal model, got %d", len(models))
+	}
+	if models[0].ID != "gemini-3.5-flash-low" {
+		t.Errorf("expected gemini-3.5-flash-low, got %s", models[0].ID)
+	}
+	if models[0].Name == nil || *models[0].Name != "Gemini 3.5 Flash (Medium)" {
+		t.Errorf("expected displayName Gemini 3.5 Flash (Medium), got %v", models[0].Name)
+	}
+	if models[0].ContextLength == nil || *models[0].ContextLength != 1048576 {
+		t.Errorf("expected maxTokens 1048576, got %v", models[0].ContextLength)
 	}
 }
 

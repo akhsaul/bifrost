@@ -1,8 +1,12 @@
 package antigravity
 
 import (
+	"fmt"
+	"net/http"
+	"sort"
 	"strings"
 
+	"github.com/bytedance/sonic"
 	schemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/valyala/fasthttp"
 )
@@ -61,6 +65,96 @@ func ResolveModel(model string) string {
 	return stripped
 }
 
+// FetchAvailableModelsFromAPI calls /v1internal:fetchAvailableModels using the provided credentials.
+func FetchAvailableModelsFromAPI(
+	ctx *schemas.BifrostContext,
+	client *fasthttp.Client,
+	accessToken string,
+	projectID string,
+	baseURL string,
+	extraHeaders map[string]string,
+	logger schemas.Logger,
+) ([]schemas.Model, error) {
+	if baseURL == "" {
+		baseURL = DefaultRuntimeBaseURL
+	}
+	targetURL := strings.TrimRight(baseURL, "/") + FetchModelsPath
+
+	reqBody, err := sonic.Marshal(map[string]string{
+		"project": projectID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal fetchAvailableModels request: %w", err)
+	}
+
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseRequest(req)
+	defer fasthttp.ReleaseResponse(resp)
+
+	req.Header.SetMethod(http.MethodPost)
+	req.SetRequestURI(targetURL)
+	req.Header.SetContentType("application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("User-Agent", GetUserAgent("cli"))
+	for k, v := range extraHeaders {
+		req.Header.Set(k, v)
+	}
+	req.SetBody(reqBody)
+
+	var doErr error
+	if client != nil {
+		doErr = client.Do(req, resp)
+	} else {
+		doErr = fasthttp.Do(req, resp)
+	}
+	if doErr != nil {
+		return nil, fmt.Errorf("failed to execute fetchAvailableModels request: %w", doErr)
+	}
+
+	if resp.StatusCode() != fasthttp.StatusOK {
+		return nil, fmt.Errorf("fetchAvailableModels returned status %d: %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	var fetchResp AntigravityFetchModelsResponse
+	if err := sonic.Unmarshal(resp.Body(), &fetchResp); err != nil {
+		return nil, fmt.Errorf("failed to decode fetchAvailableModels response: %w", err)
+	}
+
+	if len(fetchResp.Models) == 0 {
+		return nil, fmt.Errorf("no models returned by fetchAvailableModels")
+	}
+
+	var models []schemas.Model
+	for modelID, details := range fetchResp.Models {
+		if details.IsInternal {
+			continue
+		}
+		model := schemas.Model{
+			ID: modelID,
+		}
+		if details.DisplayName != "" {
+			model.Name = schemas.Ptr(details.DisplayName)
+		} else {
+			model.Name = schemas.Ptr(modelID)
+		}
+		if details.MaxTokens > 0 {
+			model.ContextLength = schemas.Ptr(details.MaxTokens)
+		}
+		if details.MaxOutputTokens > 0 {
+			model.MaxOutputTokens = schemas.Ptr(details.MaxOutputTokens)
+		}
+		models = append(models, model)
+	}
+
+	sort.Slice(models, func(i, j int) bool {
+		return models[i].ID < models[j].ID
+	})
+
+	return models, nil
+}
+
 // HandleListModels returns the list of supported Antigravity models.
 func HandleListModels(
 	ctx *schemas.BifrostContext,
@@ -70,6 +164,24 @@ func HandleListModels(
 	extraHeaders map[string]string,
 	logger schemas.Logger,
 ) (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
+	if len(keys) > 0 {
+		for _, key := range keys {
+			accessToken, projectID, err := GetAccessTokenAndProject(ctx, client, key, baseURL, logger)
+			if err == nil && accessToken != "" && projectID != "" {
+				if dynamicModels, fetchErr := FetchAvailableModelsFromAPI(ctx, client, accessToken, projectID, baseURL, extraHeaders, logger); fetchErr == nil && len(dynamicModels) > 0 {
+					return &schemas.BifrostListModelsResponse{
+						Data: dynamicModels,
+						ExtraFields: schemas.BifrostResponseExtraFields{
+							Provider: schemas.Antigravity,
+							Latency:  0,
+						},
+					}, nil
+				}
+			}
+		}
+	}
+
+	// Fallback to static public models
 	models := make([]schemas.Model, len(AntigravityPublicModels))
 	copy(models, AntigravityPublicModels)
 

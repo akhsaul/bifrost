@@ -27,6 +27,7 @@ const (
 
 	GoogleOAuthAuthURL     = "https://accounts.google.com/o/oauth2/v2/auth"
 	GoogleOAuthTokenURL    = "https://oauth2.googleapis.com/token"
+	GoogleUserInfoURL      = "https://www.googleapis.com/oauth2/v2/userinfo"
 	CloudCodeAssistBaseURL = "https://cloudcode-pa.googleapis.com"
 	DefaultRuntimeBaseURL  = "https://daily-cloudcode-pa.googleapis.com"
 	GenerateContentPath    = "/v1internal:generateContent"
@@ -36,6 +37,7 @@ const (
 
 	DefaultClientProfile = "ide"
 	DefaultIDEVersion    = "2.1.1"
+	DefaultCLIVersion    = "1.1.18"
 	DefaultOS            = "darwin"
 	DefaultArch          = "arm64"
 )
@@ -62,7 +64,7 @@ func ClearTokenCache() {
 // GetUserAgent returns the appropriate User-Agent string for the given Antigravity client profile.
 func GetUserAgent(profile string) string {
 	if strings.ToLower(profile) == "cli" {
-		return fmt.Sprintf("antigravity/cli/%s (aidev_client; os_type=%s; arch=%s; auth_method=consumer)", DefaultIDEVersion, DefaultOS, DefaultArch)
+		return "antigravity/cli/1.1.18 (aidev_client; os_type=linux; arch=amd64; cl=968774718; auth_method=consumer)"
 	}
 	return fmt.Sprintf("antigravity/ide/%s %s/%s", DefaultIDEVersion, DefaultOS, DefaultArch)
 }
@@ -505,12 +507,60 @@ func ExchangeAuthCode(
 		ClientProfile: DefaultClientProfile,
 	}
 
-	// Auto-discover Project ID using the newly exchanged access token
+	// Auto-discover Project ID and fetch userinfo using the newly exchanged access token
 	if tokResp.AccessToken != "" {
 		if projectID, err := EnsureProjectID(ctx, client, tokResp.AccessToken, DefaultRuntimeBaseURL, DefaultClientProfile, logger); err == nil && projectID != "" {
 			creds.ProjectID = projectID
 		}
+		if userInfo, err := FetchGoogleUserInfo(ctx, client, tokResp.AccessToken, logger); err == nil && userInfo != nil {
+			creds.Email = userInfo.Email
+			creds.Name = userInfo.Name
+		}
 	}
 
 	return creds, nil
+}
+
+// FetchGoogleUserInfo queries the Google OAuth2 userinfo endpoint for email and profile metadata.
+func FetchGoogleUserInfo(
+	ctx *schemas.BifrostContext,
+	client *fasthttp.Client,
+	accessToken string,
+	logger schemas.Logger,
+) (*GoogleUserInfo, error) {
+	if accessToken == "" {
+		return nil, fmt.Errorf("missing access token")
+	}
+
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseRequest(req)
+	defer fasthttp.ReleaseResponse(resp)
+
+	req.Header.SetMethod(http.MethodGet)
+	req.SetRequestURI(GoogleUserInfoURL)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "Go-http-client/1.1")
+
+	var err error
+	if client != nil {
+		err = client.Do(req, resp)
+	} else {
+		err = fasthttp.Do(req, resp)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch userinfo: %w", err)
+	}
+
+	if resp.StatusCode() != fasthttp.StatusOK {
+		return nil, fmt.Errorf("userinfo request returned status %d: %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	var userInfo GoogleUserInfo
+	if err := sonic.Unmarshal(resp.Body(), &userInfo); err != nil {
+		return nil, fmt.Errorf("failed to decode userinfo response: %w", err)
+	}
+
+	return &userInfo, nil
 }

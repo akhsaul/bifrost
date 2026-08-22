@@ -13,6 +13,35 @@ type AntigravityCredentials struct {
 	ClientID      string `json:"client_id,omitempty"`
 	ClientSecret  string `json:"client_secret,omitempty"`
 	ClientProfile string `json:"client_profile,omitempty"`
+	Email         string `json:"email,omitempty"`
+	Name          string `json:"name,omitempty"`
+}
+
+// GoogleUserInfo represents the response from Google OAuth2 userinfo endpoint (https://www.googleapis.com/oauth2/v2/userinfo).
+type GoogleUserInfo struct {
+	ID            string `json:"id"`
+	Email         string `json:"email"`
+	VerifiedEmail bool   `json:"verified_email"`
+	Name          string `json:"name"`
+	GivenName     string `json:"given_name"`
+	FamilyName    string `json:"family_name"`
+	Picture       string `json:"picture"`
+}
+
+// AntigravityModelDetails represents individual model metadata in fetchAvailableModels.
+type AntigravityModelDetails struct {
+	DisplayName      string `json:"displayName"`
+	MaxTokens        int    `json:"maxTokens"`
+	MaxOutputTokens  int    `json:"maxOutputTokens"`
+	SupportsImages   bool   `json:"supportsImages"`
+	SupportsThinking bool   `json:"supportsThinking"`
+	SupportsVideo    bool   `json:"supportsVideo"`
+	IsInternal       bool   `json:"isInternal"`
+}
+
+// AntigravityFetchModelsResponse is the top-level payload returned by /v1internal:fetchAvailableModels.
+type AntigravityFetchModelsResponse struct {
+	Models map[string]AntigravityModelDetails `json:"models"`
 }
 
 // AntigravityInnerRequest represents the inner request payload for generateContent and streamGenerateContent.

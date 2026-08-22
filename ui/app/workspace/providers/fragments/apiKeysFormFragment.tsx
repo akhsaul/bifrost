@@ -146,10 +146,12 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			if (res.project_id) {
 				form.setValue("key.antigravity_key_config.project_id", { value: res.project_id, ref: "" }, { shouldDirty: true });
 			}
-			if (!form.getValues("key.name")) {
-				form.setValue("key.name", "google-antigravity-auth", { shouldDirty: true, shouldValidate: true });
+			const currentName = form.getValues("key.name");
+			if (!currentName || currentName === "google-antigravity-auth" || currentName.startsWith("oauth-antigravity-")) {
+				const keyName = res.email ? `oauth-antigravity-${res.email}` : "oauth-antigravity-account";
+				form.setValue("key.name", keyName, { shouldDirty: true, shouldValidate: true });
 			}
-			toast.success("Antigravity Google OAuth connected successfully!");
+			toast.success(res.email ? `Connected as ${res.email}!` : "Antigravity Google OAuth connected successfully!");
 			setManualCode("");
 		} catch (err: any) {
 			setAuthError(err?.data?.error || err?.message || "Failed to exchange authorization code");
