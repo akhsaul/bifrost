@@ -60,6 +60,38 @@ function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
 		: [];
 	const limitedModels = modelList.filter((m) => m.is_limited || m.remaining_fraction <= 0);
 
+	const formatResetTime = (dateStr?: string) => {
+		if (!dateStr) return null;
+		try {
+			const date = new Date(dateStr);
+			if (isNaN(date.getTime())) return null;
+			const browserLocale =
+				(typeof navigator !== "undefined" && (navigator.languages?.[0] || navigator.language)) ||
+				Intl.DateTimeFormat().resolvedOptions().locale ||
+				undefined;
+
+			const datePart = date.toLocaleDateString(browserLocale, {
+				day: "numeric",
+				month: "short",
+				year: "2-digit"
+			});
+
+			const timePart = date.toLocaleTimeString('en', {
+				second: "2-digit",
+				minute: "2-digit",
+				hour: "numeric",
+				hour12: false
+			});
+
+			return `${datePart} ${timePart}`;
+		} catch {
+			return null;
+		}
+	};
+
+	const weeklyResetFormatted = formatResetTime(weeklyBucket?.reset_time);
+	const fiveHourResetFormatted = formatResetTime(fiveHourBucket?.reset_time);
+
 	return (
 		<Card className="shadow-sm">
 			<CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -97,25 +129,45 @@ function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
 					<>
 						{/* Quota overview buckets */}
 						<div className="rounded-md border p-4 bg-muted/30 flex flex-col gap-3">
-							<div className="flex items-center justify-between">
-								<span className="text-sm font-medium">{weeklyBucket?.display_name || "Weekly Limit"}</span>
-								<span className="text-xs font-mono text-muted-foreground">
-									{(weeklyFraction * 100).toFixed(1)}% Remaining
-								</span>
+							{/* Weekly Limit Bucket */}
+							<div className="flex flex-col gap-1">
+								<div className="flex items-center justify-between">
+									<div className="flex items-center gap-1.5">
+										<span className="text-sm font-medium">{weeklyBucket?.display_name || "Weekly Limit"}</span>
+										{weeklyResetFormatted && (
+											<span className="text-[11px] text-muted-foreground">
+												(Resets at {weeklyResetFormatted})
+											</span>
+										)}
+									</div>
+									<span className="text-xs font-mono text-muted-foreground">
+										{(weeklyFraction * 100).toFixed(1)}% Remaining
+									</span>
+								</div>
+								<Progress value={weeklyFraction * 100} className="h-2" />
 							</div>
-							<Progress value={weeklyFraction * 100} className="h-2" />
 
-							<div className="flex items-center justify-between pt-2">
-								<span className="text-sm font-medium">{fiveHourBucket?.display_name || "5-Hour Sliding Window"}</span>
-								<span
-									className={`text-xs font-mono font-semibold ${
-										fiveHourFraction < 0.2 ? "text-rose-600" : "text-amber-600"
-									}`}
-								>
-									{(fiveHourFraction * 100).toFixed(1)}% Remaining
-								</span>
+							{/* Five Hour Window Bucket */}
+							<div className="flex flex-col gap-1 pt-1">
+								<div className="flex items-center justify-between">
+									<div className="flex items-center gap-1.5">
+										<span className="text-sm font-medium">{fiveHourBucket?.display_name || "5-Hour Sliding Window"}</span>
+										{fiveHourResetFormatted && (
+											<span className="text-[11px] text-muted-foreground">
+												(Resets at {fiveHourResetFormatted})
+											</span>
+										)}
+									</div>
+									<span
+										className={`text-xs font-mono font-semibold ${
+											fiveHourFraction < 0.2 ? "text-rose-600" : "text-amber-600"
+										}`}
+									>
+										{(fiveHourFraction * 100).toFixed(1)}% Remaining
+									</span>
+								</div>
+								<Progress value={fiveHourFraction * 100} className="h-2" />
 							</div>
-							<Progress value={fiveHourFraction * 100} className="h-2" />
 						</div>
 
 						{/* Affected Models / Model Quotas Section */}
@@ -186,8 +238,8 @@ function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
 							<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
 								<Clock className="h-3.5 w-3.5" />
 								<span>
-									{fiveHourBucket?.reset_time
-										? `Resets at ${new Date(fiveHourBucket.reset_time).toLocaleTimeString()}`
+									{fiveHourResetFormatted
+										? `5h Window Resets at ${fiveHourResetFormatted}`
 										: "Sliding 5h auto-refreshes"}
 								</span>
 							</div>
