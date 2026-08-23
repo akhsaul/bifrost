@@ -1495,7 +1495,7 @@ func (h *ProviderHandler) getKeyQuota(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	key, err := h.inMemoryStore.GetProviderKey(providerName, keyID)
+	key, err := h.inMemoryStore.GetProviderKeyRaw(providerName, keyID)
 	if err != nil {
 		if errors.Is(err, lib.ErrNotFound) {
 			SendError(ctx, fasthttp.StatusNotFound, fmt.Sprintf("Provider key not found: %v", err))
@@ -1505,9 +1505,9 @@ func (h *ProviderHandler) getKeyQuota(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	providerInstance, err := h.client.GetProvider(providerName)
-	if err != nil {
-		SendError(ctx, fasthttp.StatusNotFound, fmt.Sprintf("Provider instance not found: %v", err))
+	providerInstance := h.client.GetProviderByKey(providerName)
+	if providerInstance == nil {
+		SendError(ctx, fasthttp.StatusNotFound, fmt.Sprintf("Provider instance not found: %v", providerName))
 		return
 	}
 
@@ -1518,7 +1518,7 @@ func (h *ProviderHandler) getKeyQuota(ctx *fasthttp.RequestCtx) {
 	}
 
 	bifrostCtx := schemas.NewBifrostContext(ctx, schemas.NoDeadline)
-	summary, bErr := quotaProvider.GetKeyQuotaSummary(bifrostCtx, key)
+	summary, bErr := quotaProvider.GetKeyQuotaSummary(bifrostCtx, *key)
 	if bErr != nil {
 		SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("Failed to retrieve quota summary: %s", bErr.GetErrorString()))
 		return
@@ -1549,7 +1549,7 @@ func (h *ProviderHandler) getModelsQuota(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	key, err := h.inMemoryStore.GetProviderKey(providerName, keyID)
+	key, err := h.inMemoryStore.GetProviderKeyRaw(providerName, keyID)
 	if err != nil {
 		if errors.Is(err, lib.ErrNotFound) {
 			SendError(ctx, fasthttp.StatusNotFound, fmt.Sprintf("Provider key not found: %v", err))
@@ -1559,9 +1559,9 @@ func (h *ProviderHandler) getModelsQuota(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	providerInstance, err := h.client.GetProvider(providerName)
-	if err != nil {
-		SendError(ctx, fasthttp.StatusNotFound, fmt.Sprintf("Provider instance not found: %v", err))
+	providerInstance := h.client.GetProviderByKey(providerName)
+	if providerInstance == nil {
+		SendError(ctx, fasthttp.StatusNotFound, fmt.Sprintf("Provider instance not found: %v", providerName))
 		return
 	}
 
@@ -1572,7 +1572,7 @@ func (h *ProviderHandler) getModelsQuota(ctx *fasthttp.RequestCtx) {
 	}
 
 	bifrostCtx := schemas.NewBifrostContext(ctx, schemas.NoDeadline)
-	modelsQuota, bErr := quotaProvider.GetModelsQuota(bifrostCtx, key)
+	modelsQuota, bErr := quotaProvider.GetModelsQuota(bifrostCtx, *key)
 	if bErr != nil {
 		SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("Failed to retrieve models quota: %s", bErr.GetErrorString()))
 		return
