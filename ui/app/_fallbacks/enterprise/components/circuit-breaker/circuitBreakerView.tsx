@@ -38,7 +38,26 @@ function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
 
 	const errorMessage = error ? (typeof error === "object" && "data" in error ? JSON.stringify((error as any).data) : String(error)) : null;
 
-	const modelList = summary?.models ? Object.values(summary.models) : [];
+	const modelList = summary?.models
+		? Object.values(summary.models).sort((a, b) => {
+				const isLimitedA = a.is_limited || a.remaining_fraction <= 0;
+				const isLimitedB = b.is_limited || b.remaining_fraction <= 0;
+				// 1. Put limited/tripped models at the top
+				if (isLimitedA !== isLimitedB) {
+					return isLimitedA ? -1 : 1;
+				}
+				// 2. Put lowest remaining fraction next (ascending)
+				const fracA = a.remaining_fraction ?? 1.0;
+				const fracB = b.remaining_fraction ?? 1.0;
+				if (Math.abs(fracA - fracB) > 0.001) {
+					return fracA - fracB;
+				}
+				// 3. Alphabetical order by display name / model ID
+				const nameA = (a.display_name || a.model || "").toLowerCase();
+				const nameB = (b.display_name || b.model || "").toLowerCase();
+				return nameA.localeCompare(nameB);
+			})
+		: [];
 	const limitedModels = modelList.filter((m) => m.is_limited || m.remaining_fraction <= 0);
 
 	return (
