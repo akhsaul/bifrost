@@ -115,13 +115,20 @@ func (provider *AntigravityProvider) GetKeyQuotaSummary(
 		})
 	}
 
-	return &schemas.KeyQuotaSummary{
+	summary := &schemas.KeyQuotaSummary{
 		KeyID:       key.ID,
 		Provider:    provider.GetProviderKey(),
 		Groups:      groups,
 		FetchedAt:   time.Now(),
 		Description: summaryResp.Description,
-	}, nil
+	}
+
+	// Also populate per-model quota info
+	if modelsQuota, mErr := provider.GetModelsQuota(ctx, key); mErr == nil && len(modelsQuota) > 0 {
+		summary.Models = modelsQuota
+	}
+
+	return summary, nil
 }
 
 // GetModelsQuota fetches per-model quota information from /v1internal:fetchAvailableModels.

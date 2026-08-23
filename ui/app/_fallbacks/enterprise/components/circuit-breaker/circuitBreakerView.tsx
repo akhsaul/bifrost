@@ -38,6 +38,9 @@ function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
 
 	const errorMessage = error ? (typeof error === "object" && "data" in error ? JSON.stringify((error as any).data) : String(error)) : null;
 
+	const modelList = summary?.models ? Object.values(summary.models) : [];
+	const limitedModels = modelList.filter((m) => m.is_limited || m.remaining_fraction <= 0);
+
 	return (
 		<Card className="shadow-sm">
 			<CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -54,12 +57,16 @@ function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
 				<Badge
 					variant="outline"
 					className={
-						isTripped
+						isTripped || limitedModels.length > 0
 							? "bg-rose-500/10 text-rose-600 border-rose-500/20"
 							: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
 					}
 				>
-					{isTripped ? "Circuit Tripped (Cooldown)" : "Healthy"}
+					{isTripped
+						? "Key Rate Limited"
+						: limitedModels.length > 0
+							? `${limitedModels.length} Model${limitedModels.length > 1 ? "s" : ""} Limited`
+							: "Healthy"}
 				</Badge>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
@@ -91,6 +98,70 @@ function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
 							</div>
 							<Progress value={fiveHourFraction * 100} className="h-2" />
 						</div>
+
+						{/* Affected Models / Model Quotas Section */}
+						{modelList.length > 0 && (
+							<div className="rounded-md border p-3 bg-muted/10 flex flex-col gap-2">
+								<div className="flex items-center justify-between pb-1">
+									<span className="text-xs font-semibold text-foreground uppercase tracking-wider">
+										Models & Quota Allocation
+									</span>
+									<span className="text-[11px] text-muted-foreground">
+										{modelList.length} models tracked
+									</span>
+								</div>
+
+								<div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+									{modelList.map((modelInfo) => {
+										const modelDisplayName = modelInfo.display_name?.trim() || modelInfo.model?.trim() || "";
+										if (!modelDisplayName) return null;
+
+										const modelFraction = modelInfo.remaining_fraction ?? 1.0;
+										const isModelLimited = modelInfo.is_limited || modelFraction <= 0;
+
+										return (
+											<div
+												key={modelInfo.model}
+												className="flex items-center justify-between text-xs py-1 px-2 rounded bg-background/60 border border-border/50"
+											>
+												<div className="flex flex-col truncate pr-2">
+													<span className="font-medium truncate text-foreground">
+														{modelDisplayName}
+													</span>
+													{modelInfo.display_name && modelInfo.model && modelInfo.display_name !== modelInfo.model && (
+														<span className="text-[10px] font-mono text-muted-foreground truncate">
+															{modelInfo.model}
+														</span>
+													)}
+												</div>
+
+												<div className="flex items-center gap-2 shrink-0">
+													<span
+														className={`font-mono text-[11px] font-semibold ${
+															isModelLimited
+																? "text-rose-600"
+																: modelFraction < 0.3
+																	? "text-amber-600"
+																	: "text-emerald-600"
+														}`}
+													>
+														{(modelFraction * 100).toFixed(0)}%
+													</span>
+													{isModelLimited && (
+														<Badge
+															variant="outline"
+															className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-[10px] py-0 px-1"
+														>
+															Limited
+														</Badge>
+													)}
+												</div>
+											</div>
+										);
+									})}
+								</div>
+							</div>
+						)}
 
 						<div className="flex items-center justify-between pt-2">
 							<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
