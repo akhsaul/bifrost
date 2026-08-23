@@ -47,6 +47,7 @@ type RoutingContext struct {
 	Headers                  map[string]string                   // Request headers for dynamic routing
 	QueryParams              map[string]string                   // Query parameters for dynamic routing
 	BudgetAndRateLimitStatus *BudgetAndRateLimitStatus           // Budget and rate limit status by provider/model
+	AdaptiveTargetSelector   func(targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, bool) // Optional adaptive target selector
 	computeComplexity        func() *complexity.ComplexityResult // Lazy complexity computation; called at most once when a rule references "complexity_tier"
 }
 
@@ -229,7 +230,13 @@ func (re *RoutingEngine) EvaluateRoutingRules(ctx *schemas.BifrostContext, routi
 					continue
 				}
 
-				target, ok := selectWeightedTarget(rule.Targets)
+				var target configstoreTables.TableRoutingTarget
+				var ok bool
+				if rule.Strategy == "adaptive" && routingCtx.AdaptiveTargetSelector != nil {
+					target, ok = routingCtx.AdaptiveTargetSelector(rule.Targets)
+				} else {
+					target, ok = selectWeightedTarget(rule.Targets)
+				}
 				if !ok {
 					re.logger.Debug("[RoutingEngine] Rule %s matched but has no valid targets (empty list or all-negative weights), skipping — note: all-zero weights use uniform selection and would not reach here", rule.Name)
 					ctx.AppendRoutingEngineLog(schemas.RoutingEngineRoutingRule, schemas.LogLevelError, fmt.Sprintf("Rule '%s' [%s] → matched but no valid targets (empty or all-negative weights), skipping", rule.Name, rule.CelExpression))

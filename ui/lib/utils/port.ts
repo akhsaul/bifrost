@@ -108,7 +108,25 @@ export function getExampleHost(): string {
  * Check if we're in development mode
  */
 export function isDevelopmentMode(): boolean {
-	return getPortConfig().isDevelopment;
+	if (getPortConfig().isDevelopment) {
+		return true;
+	}
+	if (typeof window !== "undefined") {
+		// Vite dev server port
+		if (window.location.port === "3000") {
+			return true;
+		}
+		// Query param override: ?mode=dev or ?dev=true
+		const params = new URLSearchParams(window.location.search);
+		if (params.get("mode") === "dev" || params.get("dev") === "true" || params.get("MODE") === "dev") {
+			return true;
+		}
+		// Localhost development server default
+		if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+			return true;
+		}
+	}
+	return false;
 }
 
 /**

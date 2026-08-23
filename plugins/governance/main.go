@@ -726,6 +726,11 @@ func (p *GovernancePlugin) applyRoutingRules(ctx *schemas.BifrostContext, req *s
 		}
 	}
 
+	var adaptiveTargetSelector func(targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, bool)
+	if fn, ok := ctx.Value(schemas.BifrostContextKeyAdaptiveTargetSelector).(func(targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, bool)); ok {
+		adaptiveTargetSelector = fn
+	}
+
 	routingCtx := &RoutingContext{
 		VirtualKey:               virtualKey,
 		UserID:                   bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeyUserID),
@@ -735,6 +740,7 @@ func (p *GovernancePlugin) applyRoutingRules(ctx *schemas.BifrostContext, req *s
 		Headers:                  headers,
 		QueryParams:              queryParams,
 		BudgetAndRateLimitStatus: p.store.GetBudgetAndRateLimitStatus(ctx, model, provider, virtualKey, nil, nil, nil),
+		AdaptiveTargetSelector:   adaptiveTargetSelector,
 		computeComplexity:        computeComplexity,
 	}
 

@@ -17,6 +17,7 @@ type TableRoutingRule struct {
 	Description   string `gorm:"type:text" json:"description"`
 	Enabled       *bool  `gorm:"not null;default:true" json:"enabled,omitempty"` // nil = DB default (true); use EnabledValue() to read
 	CelExpression string `gorm:"type:text;not null" json:"cel_expression"`
+	Strategy      string `gorm:"type:varchar(50);not null;default:'weighted'" json:"strategy,omitempty"` // "weighted" | "adaptive" | "priority"
 
 	// Routing Targets (output) — 1:many relationship; weights must sum to 1
 	Targets []TableRoutingTarget `gorm:"foreignKey:RuleID;constraint:OnDelete:CASCADE" json:"targets"`

@@ -498,20 +498,35 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 								<div>
 									<Label>Routing Targets</Label>
 									<p className="text-muted-foreground mt-0.5 text-xs">
-										Weights must sum to 1. Leave provider or model empty to use the incoming request value.
+										Choose routing strategy and candidate targets. Leave provider or model empty to use the incoming request value.
 									</p>
 								</div>
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									onClick={addTarget}
-									className="shrink-0 gap-2"
-									data-testid="routing-rule-target-add"
-								>
-									<Plus className="h-4 w-4" />
-									Add Target
-								</Button>
+								<div className="flex items-center gap-2">
+									<Select
+										value={watch("strategy") || "weighted"}
+										onValueChange={(val: "weighted" | "adaptive" | "priority") => setValue("strategy", val)}
+									>
+										<SelectTrigger className="w-[140px] h-8 text-xs">
+											<SelectValue placeholder="Strategy" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="weighted">Static Weighted</SelectItem>
+											<SelectItem value="adaptive">Adaptive (EWMA)</SelectItem>
+											<SelectItem value="priority">Priority Order</SelectItem>
+										</SelectContent>
+									</Select>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={addTarget}
+										className="shrink-0 gap-2"
+										data-testid="routing-rule-target-add"
+									>
+										<Plus className="h-4 w-4" />
+										Add Target
+									</Button>
+								</div>
 							</div>
 
 							<div className="space-y-3">

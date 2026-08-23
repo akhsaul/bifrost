@@ -17,6 +17,7 @@ export interface RoutingRule {
 	name: string;
 	description: string;
 	cel_expression: string;
+	strategy?: "weighted" | "adaptive" | "priority";
 	targets: RoutingTarget[];
 	fallbacks?: string[];
 	scope: "global" | "team" | "customer" | "virtual_key" | "user";
@@ -33,6 +34,7 @@ export interface CreateRoutingRuleRequest {
 	name: string;
 	description?: string;
 	cel_expression?: string;
+	strategy?: "weighted" | "adaptive" | "priority";
 	targets: RoutingTarget[];
 	fallbacks?: string[];
 	scope: string;
@@ -76,6 +78,7 @@ export interface RoutingRuleFormData {
 	name: string;
 	description: string;
 	cel_expression: string;
+	strategy?: "weighted" | "adaptive" | "priority";
 	targets: RoutingTargetFormData[];
 	fallbacks: string[];
 	scope: string;
@@ -115,6 +118,7 @@ export const DEFAULT_ROUTING_RULE_FORM_DATA: RoutingRuleFormData = {
 	name: "",
 	description: "",
 	cel_expression: "",
+	strategy: "weighted",
 	targets: [DEFAULT_ROUTING_TARGET],
 	fallbacks: [],
 	scope: RoutingRuleScope.Global,
