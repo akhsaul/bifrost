@@ -221,6 +221,9 @@ func (h *ProviderHandler) RegisterRoutes(r *router.Router, middlewares ...schema
 	// Antigravity OAuth helper endpoints
 	r.GET("/api/providers/antigravity/oauth/auth-url", lib.ChainMiddlewares(h.getAntigravityAuthURL, middlewares...))
 	r.POST("/api/providers/antigravity/oauth/exchange", lib.ChainMiddlewares(h.exchangeAntigravityAuthCode, middlewares...))
+	// Quota Information endpoints
+	r.GET("/api/providers/{provider}/keys/{key_id}/quota", lib.ChainMiddlewares(h.getKeyQuota, middlewares...))
+	r.GET("/api/providers/{provider}/keys/{key_id}/models-quota", lib.ChainMiddlewares(h.getModelsQuota, middlewares...))
 }
 
 // listProviders handles GET /api/providers - List all providers
@@ -1473,6 +1476,114 @@ func (h *ProviderHandler) exchangeAntigravityAuthCode(ctx *fasthttp.RequestCtx) 
 		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
 		return
 	}
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
+}
+
+// getKeyQuota handles GET /api/providers/{provider}/keys/{key_id}/quota
+func (h *ProviderHandler) getKeyQuota(ctx *fasthttp.RequestCtx) {
+	providerName, err := getProviderFromCtx(ctx)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid provider: %v", err))
+		return
+	}
+
+	keyID, err := getKeyIDFromCtx(ctx)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
+		return
+	}
+
+	key, err := h.inMemoryStore.GetProviderKey(providerName, keyID)
+	if err != nil {
+		if errors.Is(err, lib.ErrNotFound) {
+			SendError(ctx, fasthttp.StatusNotFound, fmt.Sprintf("Provider key not found: %v", err))
+			return
+		}
+		SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("Failed to get provider key: %v", err))
+		return
+	}
+
+	providerInstance, err := h.client.GetProvider(providerName)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusNotFound, fmt.Sprintf("Provider instance not found: %v", err))
+		return
+	}
+
+	quotaProvider, ok := providerInstance.(schemas.QuotaInfoProvider)
+	if !ok {
+		SendError(ctx, fasthttp.StatusNotImplemented, fmt.Sprintf("Provider %s does not support active quota info probing", providerName))
+		return
+	}
+
+	bifrostCtx := schemas.NewBifrostContext(ctx, schemas.NoDeadline)
+	summary, bErr := quotaProvider.GetKeyQuotaSummary(bifrostCtx, key)
+	if bErr != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("Failed to retrieve quota summary: %s", bErr.GetErrorString()))
+		return
+	}
+
+	data, err := sonic.Marshal(summary)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
+}
+
+// getModelsQuota handles GET /api/providers/{provider}/keys/{key_id}/models-quota
+func (h *ProviderHandler) getModelsQuota(ctx *fasthttp.RequestCtx) {
+	providerName, err := getProviderFromCtx(ctx)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid provider: %v", err))
+		return
+	}
+
+	keyID, err := getKeyIDFromCtx(ctx)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
+		return
+	}
+
+	key, err := h.inMemoryStore.GetProviderKey(providerName, keyID)
+	if err != nil {
+		if errors.Is(err, lib.ErrNotFound) {
+			SendError(ctx, fasthttp.StatusNotFound, fmt.Sprintf("Provider key not found: %v", err))
+			return
+		}
+		SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("Failed to get provider key: %v", err))
+		return
+	}
+
+	providerInstance, err := h.client.GetProvider(providerName)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusNotFound, fmt.Sprintf("Provider instance not found: %v", err))
+		return
+	}
+
+	quotaProvider, ok := providerInstance.(schemas.QuotaInfoProvider)
+	if !ok {
+		SendError(ctx, fasthttp.StatusNotImplemented, fmt.Sprintf("Provider %s does not support active quota info probing", providerName))
+		return
+	}
+
+	bifrostCtx := schemas.NewBifrostContext(ctx, schemas.NoDeadline)
+	modelsQuota, bErr := quotaProvider.GetModelsQuota(bifrostCtx, key)
+	if bErr != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("Failed to retrieve models quota: %s", bErr.GetErrorString()))
+		return
+	}
+
+	data, err := sonic.Marshal(modelsQuota)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+
 	ctx.SetContentType("application/json")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBody(data)

@@ -41,6 +41,39 @@ export interface ModelArchitecture {
 	output_modalities?: string[];
 }
 
+export interface QuotaBucket {
+	bucket_id: string;
+	display_name: string;
+	window: string;
+	reset_time: string;
+	description?: string;
+	remaining_fraction: number;
+}
+
+export interface QuotaGroup {
+	display_name: string;
+	description?: string;
+	buckets: QuotaBucket[];
+}
+
+export interface ModelQuotaInfo {
+	model: string;
+	display_name?: string;
+	remaining_fraction: number;
+	reset_time: string;
+	reset_after: number;
+	is_limited: boolean;
+}
+
+export interface KeyQuotaSummary {
+	key_id: string;
+	provider: string;
+	groups?: QuotaGroup[];
+	models?: Record<string, ModelQuotaInfo>;
+	fetched_at: string;
+	description?: string;
+}
+
 // ModelDetails is the shape returned by /api/models/details — used by the
 // model-catalog Models tab to list (model, provider) entries with their
 // capability and pricing metadata.
@@ -516,6 +549,19 @@ export const providersApi = baseApi.injectEndpoints({
 				body,
 			}),
 		}),
+
+		// Active Quota Endpoints
+		getKeyQuota: builder.query<KeyQuotaSummary, { provider: string; key_id: string }>({
+			query: ({ provider, key_id }) => ({
+				url: `/providers/${provider}/keys/${encodeURIComponent(key_id)}/quota`,
+			}),
+		}),
+
+		getModelsQuota: builder.query<Record<string, ModelQuotaInfo>, { provider: string; key_id: string }>({
+			query: ({ provider, key_id }) => ({
+				url: `/providers/${provider}/keys/${encodeURIComponent(key_id)}/models-quota`,
+			}),
+		}),
 	}),
 });
 
@@ -550,4 +596,8 @@ export const {
 	useGetAntigravityAuthUrlQuery,
 	useLazyGetAntigravityAuthUrlQuery,
 	useExchangeAntigravityAuthCodeMutation,
+	useGetKeyQuotaQuery,
+	useLazyGetKeyQuotaQuery,
+	useGetModelsQuotaQuery,
+	useLazyGetModelsQuotaQuery,
 } = providersApi;
