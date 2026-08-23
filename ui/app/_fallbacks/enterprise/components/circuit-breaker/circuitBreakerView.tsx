@@ -10,9 +10,9 @@ import {
 	useLazyGetModelsQuotaQuery,
 	useLazyGetProviderKeysQuery,
 	type KeyQuotaSummary,
-	type ModelProviderKey,
 	type ModelQuotaInfo,
 } from "@/lib/store";
+import type { ModelProviderKey } from "@/lib/types/config";
 
 interface KeyQuotaState {
 	keyId: string;
