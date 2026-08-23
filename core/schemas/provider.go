@@ -772,3 +772,50 @@ type WebSocketCapableProvider interface {
 	// WebSocketHeaders returns the headers required for the upstream WebSocket connection.
 	WebSocketHeaders(key Key) map[string]string
 }
+
+// QuotaBucket represents a specific quota bucket (e.g. 5h window or weekly limit).
+type QuotaBucket struct {
+	BucketID          string    `json:"bucket_id"`
+	DisplayName       string    `json:"display_name"`
+	Window            string    `json:"window"` // "5h", "weekly", "daily", etc.
+	ResetTime         time.Time `json:"reset_time"`
+	Description       string    `json:"description,omitempty"`
+	RemainingFraction float64   `json:"remaining_fraction"` // 0.0 to 1.0 (0.0 = exhausted)
+}
+
+// QuotaGroup represents a group of models sharing quota buckets.
+type QuotaGroup struct {
+	DisplayName string        `json:"display_name"`
+	Description string        `json:"description,omitempty"`
+	Buckets     []QuotaBucket `json:"buckets"`
+}
+
+// ModelQuotaInfo represents quota status for an individual model.
+type ModelQuotaInfo struct {
+	Model             string        `json:"model"`
+	DisplayName       string        `json:"display_name,omitempty"`
+	RemainingFraction float64       `json:"remaining_fraction"`
+	ResetTime         time.Time     `json:"reset_time"`
+	ResetAfter        time.Duration `json:"reset_after"`
+	IsLimited         bool          `json:"is_limited"`
+	RawQuotaData      any           `json:"raw_quota_data,omitempty"`
+}
+
+// KeyQuotaSummary represents complete quota information for an API Key.
+type KeyQuotaSummary struct {
+	KeyID       string                    `json:"key_id"`
+	Provider    ModelProvider             `json:"provider"`
+	Groups      []QuotaGroup              `json:"groups,omitempty"`
+	Models      map[string]ModelQuotaInfo `json:"models,omitempty"`
+	FetchedAt   time.Time                 `json:"fetched_at"`
+	Description string                    `json:"description,omitempty"`
+}
+
+// QuotaInfoProvider is an optional interface that providers can implement to support active quota fetching.
+// Checked via type assertion: provider.(QuotaInfoProvider).
+type QuotaInfoProvider interface {
+	// GetKeyQuotaSummary retrieves aggregated quota/bucket status for an API key.
+	GetKeyQuotaSummary(ctx *BifrostContext, key Key) (*KeyQuotaSummary, *BifrostError)
+	// GetModelsQuota retrieves per-model quota status for an API key.
+	GetModelsQuota(ctx *BifrostContext, key Key) (map[string]ModelQuotaInfo, *BifrostError)
+}

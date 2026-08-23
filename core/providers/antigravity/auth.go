@@ -32,8 +32,9 @@ const (
 	DefaultRuntimeBaseURL  = "https://daily-cloudcode-pa.googleapis.com"
 	GenerateContentPath    = "/v1internal:generateContent"
 	StreamGeneratePath     = "/v1internal:streamGenerateContent?alt=sse"
-	LoadCodeAssistPath     = "/v1internal:loadCodeAssist"
-	FetchModelsPath        = "/v1internal:fetchAvailableModels"
+	LoadCodeAssistPath            = "/v1internal:loadCodeAssist"
+	FetchModelsPath               = "/v1internal:fetchAvailableModels"
+	RetrieveUserQuotaSummaryPath  = "/v1internal:retrieveUserQuotaSummary"
 
 	DefaultClientProfile = "ide"
 	DefaultIDEVersion    = "2.1.1"

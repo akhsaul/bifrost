@@ -86,8 +86,8 @@ func GetStaticModelCapability(modelID string) *schemas.Model {
 	return nil
 }
 
-// FetchAvailableModelsFromAPI calls /v1internal:fetchAvailableModels using the provided credentials.
-func FetchAvailableModelsFromAPI(
+// FetchRawAvailableModelsFromAPI calls /v1internal:fetchAvailableModels and returns the raw AntigravityFetchModelsResponse payload.
+func FetchRawAvailableModelsFromAPI(
 	ctx *schemas.BifrostContext,
 	client *fasthttp.Client,
 	accessToken string,
@@ -95,7 +95,7 @@ func FetchAvailableModelsFromAPI(
 	baseURL string,
 	extraHeaders map[string]string,
 	logger schemas.Logger,
-) ([]schemas.Model, error) {
+) (*AntigravityFetchModelsResponse, error) {
 	if baseURL == "" {
 		baseURL = DefaultRuntimeBaseURL
 	}
@@ -141,6 +141,84 @@ func FetchAvailableModelsFromAPI(
 	var fetchResp AntigravityFetchModelsResponse
 	if err := sonic.Unmarshal(resp.Body(), &fetchResp); err != nil {
 		return nil, fmt.Errorf("failed to decode fetchAvailableModels response: %w", err)
+	}
+
+	return &fetchResp, nil
+}
+
+// RetrieveUserQuotaSummaryFromAPI calls /v1internal:retrieveUserQuotaSummary using the provided credentials.
+func RetrieveUserQuotaSummaryFromAPI(
+	ctx *schemas.BifrostContext,
+	client *fasthttp.Client,
+	accessToken string,
+	projectID string,
+	baseURL string,
+	extraHeaders map[string]string,
+	logger schemas.Logger,
+) (*AntigravityUserQuotaSummaryResponse, error) {
+	if baseURL == "" {
+		baseURL = DefaultRuntimeBaseURL
+	}
+	targetURL := strings.TrimRight(baseURL, "/") + RetrieveUserQuotaSummaryPath
+
+	reqBody, err := sonic.Marshal(map[string]string{
+		"project": projectID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal retrieveUserQuotaSummary request: %w", err)
+	}
+
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseRequest(req)
+	defer fasthttp.ReleaseResponse(resp)
+
+	req.Header.SetMethod(http.MethodPost)
+	req.SetRequestURI(targetURL)
+	req.Header.SetContentType("application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("User-Agent", GetUserAgent("cli"))
+	for k, v := range extraHeaders {
+		req.Header.Set(k, v)
+	}
+	req.SetBody(reqBody)
+
+	var doErr error
+	if client != nil {
+		doErr = client.Do(req, resp)
+	} else {
+		doErr = fasthttp.Do(req, resp)
+	}
+	if doErr != nil {
+		return nil, fmt.Errorf("failed to execute retrieveUserQuotaSummary request: %w", doErr)
+	}
+
+	if resp.StatusCode() != fasthttp.StatusOK {
+		return nil, fmt.Errorf("retrieveUserQuotaSummary returned status %d: %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	var quotaResp AntigravityUserQuotaSummaryResponse
+	if err := sonic.Unmarshal(resp.Body(), &quotaResp); err != nil {
+		return nil, fmt.Errorf("failed to decode retrieveUserQuotaSummary response: %w", err)
+	}
+
+	return &quotaResp, nil
+}
+
+// FetchAvailableModelsFromAPI calls /v1internal:fetchAvailableModels using the provided credentials.
+func FetchAvailableModelsFromAPI(
+	ctx *schemas.BifrostContext,
+	client *fasthttp.Client,
+	accessToken string,
+	projectID string,
+	baseURL string,
+	extraHeaders map[string]string,
+	logger schemas.Logger,
+) ([]schemas.Model, error) {
+	fetchResp, err := FetchRawAvailableModelsFromAPI(ctx, client, accessToken, projectID, baseURL, extraHeaders, logger)
+	if err != nil {
+		return nil, err
 	}
 
 	if len(fetchResp.Models) == 0 {

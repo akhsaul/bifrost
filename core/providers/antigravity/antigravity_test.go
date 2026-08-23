@@ -580,3 +580,97 @@ func TestAntigravityProvider_UnsupportedMethods(t *testing.T) {
 		t.Error("expected CountTokens to return unsupported error")
 	}
 }
+
+func TestAntigravityProvider_QuotaMethods(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "retrieveUserQuotaSummary") {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"groups": [
+					{
+						"displayName": "Gemini Models",
+						"buckets": [
+							{
+								"bucketId": "gemini-5h",
+								"displayName": "Five Hour Limit Remaining",
+								"window": "5h",
+								"resetTime": "2026-08-23T15:30:00Z",
+								"remainingFraction": 0.75
+							}
+						]
+					}
+				],
+				"description": "Quota limits"
+			}`))
+			return
+		}
+
+		if strings.Contains(r.URL.Path, "fetchAvailableModels") {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{
+				"models": {
+					"gemini-3.5-flash-low": {
+						"displayName": "Gemini 3.5 Flash (Medium)",
+						"quotaInfo": {
+							"remainingFraction": 0.85,
+							"resetTime": "2026-08-23T15:30:00Z"
+						}
+					}
+				}
+			}`))
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer mockServer.Close()
+
+	config := &schemas.ProviderConfig{
+		NetworkConfig: schemas.NetworkConfig{
+			BaseURL: mockServer.URL,
+		},
+	}
+	provider, err := NewAntigravityProvider(config, nil)
+	if err != nil {
+		t.Fatalf("failed to create provider: %v", err)
+	}
+
+	key := schemas.Key{
+		ID: "test-quota-key",
+		AntigravityKeyConfig: &schemas.AntigravityKeyConfig{
+			ProjectID:   schemas.NewSecretVar("my-test-proj"),
+			AccessToken: schemas.NewSecretVar("valid-access-token"),
+		},
+	}
+
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+
+	// 1. Test GetKeyQuotaSummary
+	summary, bErr := provider.GetKeyQuotaSummary(ctx, key)
+	if bErr != nil {
+		t.Fatalf("GetKeyQuotaSummary failed: %v", bErr.Error.Message)
+	}
+	if summary == nil || len(summary.Groups) != 1 {
+		t.Fatalf("expected 1 group, got %v", summary)
+	}
+	if summary.Groups[0].Buckets[0].RemainingFraction != 0.75 {
+		t.Errorf("expected remaining fraction 0.75, got %f", summary.Groups[0].Buckets[0].RemainingFraction)
+	}
+
+	// 2. Test GetModelsQuota
+	modelsQuota, bErr := provider.GetModelsQuota(ctx, key)
+	if bErr != nil {
+		t.Fatalf("GetModelsQuota failed: %v", bErr.Error.Message)
+	}
+	if len(modelsQuota) != 1 {
+		t.Fatalf("expected 1 model quota, got %d", len(modelsQuota))
+	}
+	info, ok := modelsQuota["gemini-3.5-flash-low"]
+	if !ok {
+		t.Fatalf("expected gemini-3.5-flash-low in quota map")
+	}
+	if info.RemainingFraction != 0.85 {
+		t.Errorf("expected 0.85, got %f", info.RemainingFraction)
+	}
+}

@@ -72,6 +72,109 @@ func (provider *AntigravityProvider) ListModels(
 	return HandleListModels(ctx, provider.client, keys, provider.networkConfig.BaseURL, provider.networkConfig.ExtraHeaders, provider.logger)
 }
 
+// GetKeyQuotaSummary fetches aggregated quota and limits per bucket from /v1internal:retrieveUserQuotaSummary.
+func (provider *AntigravityProvider) GetKeyQuotaSummary(
+	ctx *schemas.BifrostContext,
+	key schemas.Key,
+) (*schemas.KeyQuotaSummary, *schemas.BifrostError) {
+	accessToken, projectID, authErr := GetAccessTokenAndProject(ctx, provider.client, key, provider.networkConfig.BaseURL, provider.logger)
+	if authErr != nil {
+		return nil, authErr
+	}
+
+	if projectID == "" {
+		return nil, newAuthenticationError("missing Google Cloud project ID for Antigravity account", nil)
+	}
+
+	summaryResp, err := RetrieveUserQuotaSummaryFromAPI(ctx, provider.client, accessToken, projectID, provider.networkConfig.BaseURL, provider.networkConfig.ExtraHeaders, provider.logger)
+	if err != nil {
+		return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderDoRequest, err)
+	}
+
+	groups := make([]schemas.QuotaGroup, 0, len(summaryResp.Groups))
+	for _, g := range summaryResp.Groups {
+		buckets := make([]schemas.QuotaBucket, 0, len(g.Buckets))
+		for _, b := range g.Buckets {
+			var resetTime time.Time
+			if b.ResetTime != "" {
+				resetTime, _ = time.Parse(time.RFC3339, b.ResetTime)
+			}
+			buckets = append(buckets, schemas.QuotaBucket{
+				BucketID:          b.BucketID,
+				DisplayName:       b.DisplayName,
+				Window:            b.Window,
+				ResetTime:         resetTime,
+				Description:       b.Description,
+				RemainingFraction: b.RemainingFraction,
+			})
+		}
+		groups = append(groups, schemas.QuotaGroup{
+			DisplayName: g.DisplayName,
+			Description: g.Description,
+			Buckets:     buckets,
+		})
+	}
+
+	return &schemas.KeyQuotaSummary{
+		KeyID:       key.ID,
+		Provider:    provider.GetProviderKey(),
+		Groups:      groups,
+		FetchedAt:   time.Now(),
+		Description: summaryResp.Description,
+	}, nil
+}
+
+// GetModelsQuota fetches per-model quota information from /v1internal:fetchAvailableModels.
+func (provider *AntigravityProvider) GetModelsQuota(
+	ctx *schemas.BifrostContext,
+	key schemas.Key,
+) (map[string]schemas.ModelQuotaInfo, *schemas.BifrostError) {
+	accessToken, projectID, authErr := GetAccessTokenAndProject(ctx, provider.client, key, provider.networkConfig.BaseURL, provider.logger)
+	if authErr != nil {
+		return nil, authErr
+	}
+
+	if projectID == "" {
+		return nil, newAuthenticationError("missing Google Cloud project ID for Antigravity account", nil)
+	}
+
+	fetchResp, err := FetchRawAvailableModelsFromAPI(ctx, provider.client, accessToken, projectID, provider.networkConfig.BaseURL, provider.networkConfig.ExtraHeaders, provider.logger)
+	if err != nil {
+		return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderDoRequest, err)
+	}
+
+	now := time.Now()
+	res := make(map[string]schemas.ModelQuotaInfo)
+	for modelID, details := range fetchResp.Models {
+		if details.IsInternal {
+			continue
+		}
+		info := schemas.ModelQuotaInfo{
+			Model:             modelID,
+			DisplayName:       details.DisplayName,
+			RemainingFraction: 1.0,
+		}
+		if details.QuotaInfo != nil {
+			info.RemainingFraction = details.QuotaInfo.RemainingFraction
+			if details.QuotaInfo.ResetTime != "" {
+				if t, parseErr := time.Parse(time.RFC3339, details.QuotaInfo.ResetTime); parseErr == nil {
+					info.ResetTime = t
+					if diff := t.Sub(now); diff > 0 {
+						info.ResetAfter = diff
+					}
+				}
+			}
+			// If remaining fraction is 0 or less, mark as limited
+			if info.RemainingFraction <= 0 {
+				info.IsLimited = true
+			}
+		}
+		res[modelID] = info
+	}
+
+	return res, nil
+}
+
 // ChatCompletion performs a chat completion request to the Antigravity API.
 func (provider *AntigravityProvider) ChatCompletion(
 	ctx *schemas.BifrostContext,
