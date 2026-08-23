@@ -74,11 +74,11 @@ export default function CircuitBreakerView() {
 	);
 
 	const refreshAll = useCallback(async () => {
-		if (!providersData?.providers) return;
+		if (!providersData) return;
 		setIsRefreshingAll(true);
 
 		const promises: Promise<void>[] = [];
-		for (const provider of providersData.providers) {
+		for (const provider of providersData) {
 			if (provider.name === "antigravity") {
 				promises.push(loadQuotaForKey(provider.name, "default"));
 			}
@@ -126,7 +126,7 @@ export default function CircuitBreakerView() {
 
 			{/* Provider & Keys Cards */}
 			<div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-				{providersData?.providers
+				{providersData
 					?.filter((p) => p.name === "antigravity")
 					.map((provider) => {
 						const stateKey = `${provider.name}:default`;
