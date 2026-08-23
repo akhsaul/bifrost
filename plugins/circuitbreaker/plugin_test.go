@@ -55,6 +55,13 @@ func TestCircuitBreaker_BasicTripAndFilter(t *testing.T) {
 	filteredDiffModel, err := filter(ctx, schemas.OpenAI, "o1-preview", keys)
 	require.NoError(t, err)
 	assert.Len(t, filteredDiffModel, 2)
+
+	// Check that disabled keys are filtered out even if not tripped
+	disabledKey := schemas.Key{ID: "key-3", Name: "Key 3", Enabled: schemas.Ptr(false)}
+	keysWithDisabled := append(keys, disabledKey)
+	filteredWithDisabled, err := filter(ctx, schemas.OpenAI, "o1-preview", keysWithDisabled)
+	require.NoError(t, err)
+	assert.Len(t, filteredWithDisabled, 2)
 }
 
 func TestCircuitBreaker_DynamicCooldownParsing(t *testing.T) {

@@ -261,6 +261,7 @@ function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
 
 function ProviderKeysSection({ provider }: { provider: string }) {
 	const { data: keys = [], isLoading } = useGetProviderKeysQuery(provider);
+	const enabledKeys = keys.filter((k) => k.enabled ?? true);
 
 	if (isLoading) {
 		return (
@@ -272,7 +273,7 @@ function ProviderKeysSection({ provider }: { provider: string }) {
 		);
 	}
 
-	if (keys.length === 0) {
+	if (enabledKeys.length === 0) {
 		return (
 			<Card className="shadow-sm">
 				<CardHeader className="pb-2">
@@ -280,7 +281,11 @@ function ProviderKeysSection({ provider }: { provider: string }) {
 						<Sparkles className="h-4 w-4 text-amber-500" />
 						No API Keys Configured
 					</CardTitle>
-					<CardDescription>Configure keys for {provider} in the Providers page.</CardDescription>
+					<CardDescription>
+						{keys.length > 0
+							? `All keys for ${provider} are currently disabled. Enable keys in the Providers page.`
+							: `Configure keys for ${provider} in the Providers page.`}
+					</CardDescription>
 				</CardHeader>
 			</Card>
 		);
@@ -288,7 +293,7 @@ function ProviderKeysSection({ provider }: { provider: string }) {
 
 	return (
 		<>
-			{keys.map((keyItem) => (
+			{enabledKeys.map((keyItem) => (
 				<KeyQuotaCard key={keyItem.id} provider={provider} keyItem={keyItem} />
 			))}
 		</>

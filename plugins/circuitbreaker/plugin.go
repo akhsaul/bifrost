@@ -193,6 +193,9 @@ func (p *Plugin) KeyPoolFilter() schemas.KeyPoolFilter {
 		now := time.Now()
 		eligible := make([]schemas.Key, 0, len(keys))
 		for _, k := range keys {
+			if k.Enabled != nil && !*k.Enabled {
+				continue
+			}
 			if !p.store.IsTripped(k.ID, provider, model, now) {
 				eligible = append(eligible, k)
 			}
