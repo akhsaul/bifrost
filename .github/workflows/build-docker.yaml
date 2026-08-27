@@ -53,7 +53,7 @@ jobs:
           context: .
           file: transports/Dockerfile.custom
           build-args: |
-            MODE=bifrost
+            MODE=all
             HERMES_VERSION=${{ env.HERMES_VERSION }}
             VERSION=${{ format('dev-{0}', env.SHORT_SHA) }}
             APP_PORT=2972
