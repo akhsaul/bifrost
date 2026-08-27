@@ -117,22 +117,46 @@ RUN mkdir -p "$APP_DIR/logs" && \
   chmod +x /app/docker-entrypoint.sh
 
 # --- Mode: all (Bifrost Gateway + MinIO + Hermes Agent) ---
-FROM runtime-base AS runtime-all
+FROM debian:bookworm-slim AS runtime-all
+WORKDIR /app
+
+# Copy application artifacts
+COPY --from=builder /app/main .
+COPY --from=builder /build/transports/docker-entrypoint.sh .
+
+# Getting arguments
+ARG ARG_APP_PORT=8080
+ARG ARG_APP_HOST=0.0.0.0
+ARG ARG_LOG_LEVEL=info
+ARG ARG_LOG_STYLE=json
+ARG ARG_APP_DIR=/app/data
+
+# Environment variables with defaults (can be overridden at runtime)
+ENV APP_PORT=$ARG_APP_PORT \
+  APP_HOST=$ARG_APP_HOST \
+  LOG_LEVEL=$ARG_LOG_LEVEL \
+  LOG_STYLE=$ARG_LOG_STYLE \
+  APP_DIR=$ARG_APP_DIR \
+  GOGC="" \
+  GOMEMLIMIT=""
 
 # Install runtime dependencies for MinIO and Hermes Agent
-RUN apk upgrade --no-cache && \
-  apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     curl \
     git \
     ripgrep \
     python3 \
-    py3-pip \
+    python3-pip \
+    python3-venv \
     nodejs \
     npm \
-    build-base \
+    build-essential \
     python3-dev \
-    libffi-dev
+    libffi-dev \
+    ca-certificates \
+    wget \
+  && rm -rf /var/lib/apt/lists/*
 
 # Install uv for Python environment & dependency management
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
@@ -158,10 +182,10 @@ RUN . /opt/hermes-agent/.venv/bin/activate && \
   ln -sf /opt/hermes-agent/.venv/bin/hermes /usr/local/bin/hermes
 
 RUN mkdir -p "$APP_DIR/logs" "$APP_DIR/.hermes" && \
-  adduser -D -s /bin/sh appuser && \
-  chown -R appuser:appuser /app && \
-  chown -R appuser:appuser /opt/hermes-agent && \
-  chown -R appuser:0 "$APP_DIR" && \
+  useradd -u 1000 -s /bin/sh -U appuser 2>/dev/null || true && \
+  chown -R 1000:1000 /app && \
+  chown -R 1000:1000 /opt/hermes-agent && \
+  chown -R 1000:0 "$APP_DIR" && \
   { [ "$APP_DIR" = "/app" ] || chmod -R g=rwX "$APP_DIR"; } && \
   chmod +x /app/docker-entrypoint.sh /usr/local/bin/minio /usr/local/bin/mc /usr/local/bin/hermes
 
