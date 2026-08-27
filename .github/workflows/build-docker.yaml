@@ -19,6 +19,9 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/bifrost
+  IMAGE_HERMES_NAME: ${{ github.repository_owner }}/bifrost-hermes
+  GO_VERSION: "1.27.0"
+  HERMES_VERSION: "v2026.8.27"
 
 jobs:
   test-cli:
@@ -35,7 +38,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.27.0"
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Run CLI tests
         working-directory: cli
@@ -44,10 +47,20 @@ jobs:
       - name: Get short SHA
         run: echo "SHORT_SHA=${GITHUB_SHA::9}" >> $GITHUB_ENV
 
-      - name: Test build docker image
-        run: make docker-image VERSION=dev-${{ env.SHORT_SHA }} LOCAL=1 APP_PORT=2972
+      - name: Test build docker image (bifrost)
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: transports/Dockerfile.custom
+          build-args: |
+            MODE=bifrost
+            HERMES_VERSION=${{ env.HERMES_VERSION }}
+            VERSION=${{ format('dev-{0}', env.SHORT_SHA) }}
+            APP_PORT=2972
+          push: false
+          tags: ${{ format('bifrost:dev-{0}', env.SHORT_SHA) }}
 
-      - name: Check docker image
+      - name: Check docker images
         run: docker image list | grep bifrost
 
   release-cli:
@@ -66,17 +79,29 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.26.5"
+          go-version: ${{ env.GO_VERSION }}
 
       - name: Get short SHA
         run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
 
-      - name: Docker meta
-        id: meta
+      - name: Docker meta (bifrost)
+        id: meta-bifrost
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           context: git
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}},enable=${{ github.ref_type == 'tag' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.ref_type == 'tag' }}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
+            type=raw,value=dev-${{ env.SHORT_SHA }},enable=${{ github.ref_type != 'tag' }}
+
+      - name: Docker meta (bifrost-hermes)
+        id: meta-hermes
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          context: git
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_HERMES_NAME }}
           tags: |
             type=semver,pattern={{version}},enable=${{ github.ref_type == 'tag' }}
             type=semver,pattern={{major}}.{{minor}},enable=${{ github.ref_type == 'tag' }}
@@ -89,15 +114,31 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-        
-      - name: Build and push
+
+      - name: Build and push (bifrost)
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          file: transports/Dockerfile.local
+          file: transports/Dockerfile.custom
           build-args: |
+            MODE=bifrost
+            HERMES_VERSION=${{ env.HERMES_VERSION }}
             VERSION=${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', env.SHORT_SHA) }}
             APP_PORT=2972
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-bifrost.outputs.tags }}
+          labels: ${{ steps.meta-bifrost.outputs.labels }}
+
+      - name: Build and push (bifrost-hermes)
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: transports/Dockerfile.custom
+          build-args: |
+            MODE=all
+            HERMES_VERSION=${{ env.HERMES_VERSION }}
+            VERSION=${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', env.SHORT_SHA) }}
+            APP_PORT=2972
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta-hermes.outputs.tags }}
+          labels: ${{ steps.meta-hermes.outputs.labels }}
