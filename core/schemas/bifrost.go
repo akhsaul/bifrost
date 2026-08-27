@@ -441,6 +441,7 @@ const (
 	RoutingEngineGovernance     = "governance"
 	RoutingEngineRoutingRule    = "routing-rule"
 	RoutingEngineLoadbalancing  = "loadbalancing"
+	RoutingEngineAdaptive       = "adaptive-routing"
 	RoutingEngineModelCatalog   = "model-catalog"
 	RoutingEngineCircuitBreaker = "circuit-breaker"
 	// RoutingEngineCore represents the Bifrost core orchestrator's own

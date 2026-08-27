@@ -2,7 +2,10 @@ package adaptiverouting
 
 import (
 	"context"
+	"fmt"
 	"math/rand/v2"
+	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -10,6 +13,7 @@ import (
 	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/schemas"
 	configstoreTables "github.com/maximhq/bifrost/framework/configstore/tables"
+	"github.com/maximhq/bifrost/framework/modelcatalog"
 )
 
 const (
@@ -20,6 +24,7 @@ const (
 type Plugin struct {
 	config   Config
 	store    Store
+	catalog  *modelcatalog.ModelCatalog
 	snapshot atomic.Pointer[AdaptiveRoutingSnapshot]
 
 	ctx        context.Context
@@ -29,7 +34,7 @@ type Plugin struct {
 }
 
 // New creates a new Adaptive Routing plugin.
-func New(config Config, store Store) (*Plugin, error) {
+func New(config Config, store Store, catalog *modelcatalog.ModelCatalog) (*Plugin, error) {
 	if store == nil {
 		store = NewMemoryStore(config.Alpha)
 	}
@@ -38,6 +43,7 @@ func New(config Config, store Store) (*Plugin, error) {
 	p := &Plugin{
 		config:     config,
 		store:      store,
+		catalog:    catalog,
 		ctx:        ctx,
 		cancelFunc: cancel,
 	}
@@ -136,11 +142,140 @@ func (p *Plugin) recomputeActiveWeights() {
 	p.snapshot.Store(newSnap)
 }
 
-// PreRequestHook records the request start time into the context.
-func (p *Plugin) PreRequestHook(ctx *schemas.BifrostContext, _ *schemas.BifrostRequest) error {
+// PreRequestHook records request start time and automatically resolves the optimal provider for unprefixed models via the model catalog (Level 1 Direction Selection).
+func (p *Plugin) PreRequestHook(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) error {
 	if ctx != nil {
 		ctx.SetValue(adaptiveStartTimeKey, time.Now())
 	}
+	if !p.config.Enabled || req == nil || p.catalog == nil {
+		return nil
+	}
+	if req.RequestType == schemas.PassthroughRequest || req.RequestType == schemas.PassthroughStreamRequest {
+		return nil
+	}
+
+	provider, model, existingFallbacks := req.GetRequestFields()
+	if provider != "" || model == "" {
+		return nil
+	}
+
+	providers := p.catalog.GetProvidersForModel(model)
+	if len(providers) == 0 {
+		return nil
+	}
+
+	// Filter by governance allowlist if set
+	var allowed []schemas.ModelProvider
+	allowlistSet := false
+	if ctx != nil {
+		allowed, allowlistSet = ctx.Value(schemas.BifrostContextKeyRoutingAllowedProviders).([]schemas.ModelProvider)
+	}
+
+	candidates := make([]schemas.ModelProvider, 0, len(providers))
+	for _, prov := range providers {
+		if allowlistSet && !slices.Contains(allowed, prov) {
+			continue
+		}
+		// Ensure provider has active keys if configured in keyconfig
+		if keys := p.catalog.KeysAllowingModel(prov, model); len(keys) == 0 {
+			if entries := p.catalog.KeyConfigEntries(prov); len(entries) > 0 {
+				continue
+			}
+		}
+		candidates = append(candidates, prov)
+	}
+
+	if len(candidates) == 0 {
+		return nil
+	}
+
+	if len(candidates) == 1 {
+		selected := candidates[0]
+		req.SetProvider(selected)
+		if ctx != nil {
+			ctx.AppendRoutingEngineLog(schemas.RoutingEngineAdaptive, schemas.LogLevelInfo, fmt.Sprintf(
+				"Single candidate provider %s for model %s selected via adaptive routing", selected, model,
+			))
+			schemas.AppendToContextList(ctx, schemas.BifrostContextKeyRoutingEnginesUsed, schemas.RoutingEngineAdaptive)
+		}
+		return nil
+	}
+
+	// Multiple candidates: Calculate dynamic weights for Level 1
+	targetCandidates := make([]TargetID, len(candidates))
+	for i, c := range candidates {
+		targetCandidates[i] = TargetID{
+			Provider: c,
+			Model:    model,
+		}
+	}
+
+	window := p.config.WindowSize.D()
+	if window <= 0 {
+		window = 5 * time.Minute
+	}
+	statsMap := make(map[TargetID]TargetStats, len(targetCandidates))
+	for _, tc := range targetCandidates {
+		statsMap[tc] = p.store.GetStats(p.ctx, tc, window)
+	}
+	weights := ComputeDynamicWeights(targetCandidates, statsMap, p.config)
+
+	// Pick target according to computed dynamic weights
+	r := rand.Float64()
+	var pickedTarget TargetID
+	for _, tw := range weights {
+		if r <= tw.CumWeight {
+			pickedTarget = tw.TargetID
+			break
+		}
+	}
+	if pickedTarget.Provider == "" {
+		pickedTarget = weights[len(weights)-1].TargetID
+	}
+
+	selected := pickedTarget.Provider
+	req.SetProvider(selected)
+
+	// Sort candidate weights descending by Score to build ranked fallbacks
+	sortedWeights := make([]TargetWeight, len(weights))
+	copy(sortedWeights, weights)
+	slices.SortFunc(sortedWeights, func(a, b TargetWeight) int {
+		if a.Score > b.Score {
+			return -1
+		} else if a.Score < b.Score {
+			return 1
+		}
+		return 0
+	})
+
+	if len(existingFallbacks) == 0 && len(sortedWeights) > 1 {
+		fallbacks := make([]schemas.Fallback, 0, len(sortedWeights)-1)
+		for _, tw := range sortedWeights {
+			if tw.TargetID.Provider == selected {
+				continue
+			}
+			fallbacks = append(fallbacks, schemas.Fallback{
+				Provider: tw.TargetID.Provider,
+				Model:    model,
+			})
+		}
+		if len(fallbacks) > 0 {
+			req.SetFallbacks(fallbacks)
+		}
+	}
+
+	if ctx != nil {
+		candidateStrs := make([]string, len(weights))
+		for i, tw := range weights {
+			candidateStrs[i] = fmt.Sprintf("%s (weight=%.2f, score=%.1f, latency=%.1fms)", tw.TargetID.Provider, tw.Weight, tw.Score, tw.P90Ms)
+		}
+		ctx.AppendRoutingEngineLog(schemas.RoutingEngineAdaptive, schemas.LogLevelInfo, fmt.Sprintf(
+			"Adaptive routing evaluated %d providers for model %s: [%s]; selected %s",
+			len(weights), model, strings.Join(candidateStrs, ", "), selected,
+		))
+		schemas.AppendToContextList(ctx, schemas.BifrostContextKeyRoutingEnginesUsed, schemas.RoutingEngineAdaptive)
+	}
+
 	return nil
 }
 
@@ -356,7 +491,7 @@ func (p *Plugin) KeyPoolFilter() schemas.KeyPoolFilter {
 		for i, k := range keys {
 			clonedKey := k
 			if w, ok := weightMap[k.ID]; ok {
-				clonedKey.Weight = schemas.Ptr(w)
+				clonedKey.Weight = w
 			}
 			result[i] = clonedKey
 		}

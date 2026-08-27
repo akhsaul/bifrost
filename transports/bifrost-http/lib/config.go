@@ -41,6 +41,7 @@ import (
 	plugins "github.com/maximhq/bifrost/framework/plugins"
 	"github.com/maximhq/bifrost/framework/vault"
 	"github.com/maximhq/bifrost/framework/vectorstore"
+	"github.com/maximhq/bifrost/plugins/adaptiverouting"
 	"github.com/maximhq/bifrost/plugins/compat"
 	"github.com/maximhq/bifrost/plugins/governance"
 	"github.com/maximhq/bifrost/plugins/governance/complexity"
@@ -111,11 +112,54 @@ const (
 	SourceOfTruthConfigJSON = "config.json"
 )
 
-// getWeight safely dereferences a *float64 weight pointer, returning 1.0 as default if nil.
-// This allows distinguishing between "not set" (nil -> 1.0) and "explicitly set to 0" (0.0).
-func getWeight(w *float64) float64 {
+// normalizeWeights converts a slice of pointers to int into a slice of pointers to float64.
+func normalizeWeights(weights []*int) []*float64 {
+	result := make([]*float64, len(weights))
+	for i, w := range weights {
+		if w != nil {
+			val := float64(*w)
+			result[i] = &val
+		}
+	}
+	return result
+}
+
+// derefInt safely dereferences an *int pointer, returning defaultValue if nil.
+func derefInt(ptr *int, defaultValue int) int {
+	if ptr == nil {
+		return defaultValue
+	}
+	return *ptr
+}
+
+// derefFloat64 safely dereferences a *float64 pointer, returning defaultValue if nil.
+func derefFloat64(ptr *float64, defaultValue float64) float64 {
+	if ptr == nil {
+		return defaultValue
+	}
+	return *ptr
+}
+
+// derefString safely dereferences a *string pointer, returning defaultValue if nil.
+func derefString(ptr *string, defaultValue string) string {
+	if ptr == nil {
+		return defaultValue
+	}
+	return *ptr
+}
+
+// derefBool safely dereferences a *bool pointer, returning defaultValue if nil.
+func derefBool(ptr *bool, defaultValue bool) bool {
+	if ptr == nil {
+		return defaultValue
+	}
+	return *ptr
+}
+
+// unwrapInt safely dereferences an int pointer or returns 0 if nil.
+func unwrapInt(w *int) int {
 	if w == nil {
-		return 1.0
+		return 0
 	}
 	return *w
 }
@@ -131,6 +175,7 @@ var builtinPluginNames = []string{
 	semanticcache.PluginName,
 	compat.PluginName,
 	maxim.PluginName,
+	adaptiverouting.PluginName,
 }
 
 func GetBuiltinPluginNames() []string {
@@ -4908,6 +4953,20 @@ func (c *Config) GetPluginOrder() []string {
 func (c *Config) GetLoadedLLMPlugins() []schemas.LLMPlugin {
 	if plugins := c.LLMPlugins.Load(); plugins != nil {
 		return slices.Clone(*plugins)
+	}
+	return nil
+}
+
+// GetKeyPoolFilter returns the first KeyPoolFilter hook provided by any loaded LLM plugin (e.g. adaptive routing).
+func (c *Config) GetKeyPoolFilter() schemas.KeyPoolFilter {
+	if plugins := c.LLMPlugins.Load(); plugins != nil {
+		for _, p := range *plugins {
+			if provider, ok := p.(interface{ KeyPoolFilter() schemas.KeyPoolFilter }); ok {
+				if filter := provider.KeyPoolFilter(); filter != nil {
+					return filter
+				}
+			}
+		}
 	}
 	return nil
 }

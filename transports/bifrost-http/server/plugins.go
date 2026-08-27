@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/maximhq/bifrost/core/schemas"
+	"github.com/maximhq/bifrost/plugins/adaptiverouting"
 	"github.com/maximhq/bifrost/plugins/compat"
 	"github.com/maximhq/bifrost/plugins/governance"
 	"github.com/maximhq/bifrost/plugins/logging"
@@ -125,6 +126,19 @@ func loadBuiltinPlugin(ctx context.Context, name string, pluginConfig any, bifro
 			return nil, fmt.Errorf("failed to marshal compat plugin config: %w", err)
 		}
 		return compat.Init(*compatConfig, logger, bifrostConfig.ModelCatalog)
+
+	case adaptiverouting.PluginName:
+		adaptiveCfg := adaptiverouting.DefaultConfig()
+		if pluginConfig != nil {
+			extraConfig, err := MarshalPluginConfig[adaptiverouting.Config](pluginConfig)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal adaptive routing plugin config: %w", err)
+			}
+			if extraConfig != nil {
+				adaptiveCfg = *extraConfig
+			}
+		}
+		return adaptiverouting.New(adaptiveCfg, nil, bifrostConfig.ModelCatalog)
 
 	case modelcatalogresolver.PluginName:
 		return modelcatalogresolver.Init(bifrostConfig.ModelCatalog, logger)
@@ -266,7 +280,20 @@ func (s *BifrostHTTPServer) loadBuiltinPlugins(ctx context.Context) error {
 	}
 	s.Config.SetPluginOrderInfo(maxim.PluginName, builtinPlacement, schemas.Ptr(8))
 
-	// 9. ModelCatalogResolver (last routing layer — fills req.Provider from catalog only when
+	// 9. Adaptive Routing (default-on in OSS, placed after governance and before model catalog resolver)
+	adaptiveRoutingConfig := s.getPluginConfig(adaptiverouting.PluginName)
+	var adaptivePluginConfig any
+	if adaptiveRoutingConfig != nil {
+		adaptivePluginConfig = adaptiveRoutingConfig.Config
+	}
+	if adaptiveRoutingConfig == nil || adaptiveRoutingConfig.Enabled {
+		s.registerPluginWithStatus(ctx, adaptiverouting.PluginName, nil, adaptivePluginConfig, false)
+	} else {
+		s.markPluginDisabled(adaptiverouting.PluginName)
+	}
+	s.Config.SetPluginOrderInfo(adaptiverouting.PluginName, builtinPlacement, schemas.Ptr(9))
+
+	// 10. ModelCatalogResolver (last routing layer — fills req.Provider from catalog only when
 	// no earlier routing plugin (governance routing rules, governance VK LB, enterprise LB)
 	// already set one. CEL rules can still match on provider == "" because this runs last.
 	// Requires a model catalog; only register when one is configured.

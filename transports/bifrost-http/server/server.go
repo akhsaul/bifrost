@@ -2239,6 +2239,7 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 		Account:            account,
 		InitialPoolSize:    s.Config.ClientConfig.InitialPoolSize,
 		DropExcessRequests: s.Config.ClientConfig.DropExcessRequests,
+		KeyPoolFilter:      s.Config.GetKeyPoolFilter(),
 		LLMPlugins:         s.Config.GetLoadedLLMPlugins(),
 		MCPPlugins:         s.Config.GetLoadedMCPPlugins(),
 		MCPConfig:          mcpConfig,
