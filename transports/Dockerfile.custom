@@ -139,9 +139,11 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 # Install MinIO Server and MinIO Client (mc)
 COPY --from=minio/minio:RELEASE.2025-09-07T16-13-09Z /usr/bin/minio /usr/local/bin/minio
-COPY --from=minio/mc:latest /bin/mc /usr/local/bin/mc=
+COPY --from=minio/mc:latest /usr/bin/mc /usr/local/bin/mc
 
-# Install Hermes Agent (Nous Research) - pinned to latest stable release tag by default
+RUN npx playwright install-deps chromium
+
+# Install Hermes Agent (Nous Research)
 ARG HERMES_VERSION=main
 ENV HERMES_HOME=/app/data/.hermes \
     PATH="/opt/hermes-agent/.venv/bin:$PATH"
@@ -149,7 +151,7 @@ ENV HERMES_HOME=/app/data/.hermes \
 RUN git clone --depth 1 --branch ${HERMES_VERSION} https://github.com/NousResearch/hermes-agent.git /opt/hermes-agent && \
   uv venv /opt/hermes-agent/.venv && \
   . /opt/hermes-agent/.venv/bin/activate && \
-  uv pip install --no-cache -e /opt/hermes-agent && \
+  uv pip install --no-cache -e "/opt/hermes-agent[whatsapp,coding,discord,discord_admin]" && \
   ln -sf /opt/hermes-agent/.venv/bin/hermes /usr/local/bin/hermes
 
 RUN mkdir -p "$APP_DIR/logs" "$APP_DIR/.hermes" && \
