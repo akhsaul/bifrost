@@ -151,7 +151,7 @@ RUN git clone --depth 1 --branch ${HERMES_VERSION} https://github.com/NousResear
 RUN uv venv /opt/hermes-agent/.venv
 
 RUN . /opt/hermes-agent/.venv/bin/activate && \
-  uv pip install --no-cache -e "camoufox[geoip]"
+  uv pip install --no-cache "camoufox[geoip]"
 
 RUN . /opt/hermes-agent/.venv/bin/activate && \
   uv pip install --no-cache -e "/opt/hermes-agent[whatsapp,coding,discord,discord_admin]" && \
