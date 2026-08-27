@@ -138,8 +138,8 @@ RUN apk upgrade --no-cache && \
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
 
 # Install MinIO Server and MinIO Client (mc)
-COPY --from=minio/minio:latest /opt/bin/minio /usr/local/bin/minio
-COPY --from=minio/mc:latest /bin/mc /usr/local/bin/mc
+COPY --from=minio/minio:RELEASE.2025-09-07T16-13-09Z /usr/bin/minio /usr/local/bin/minio
+COPY --from=minio/mc:latest /bin/mc /usr/local/bin/mc=
 
 # Install Hermes Agent (Nous Research) - pinned to latest stable release tag by default
 ARG HERMES_VERSION=main
