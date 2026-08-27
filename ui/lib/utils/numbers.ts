@@ -53,3 +53,9 @@ export function formatTokenLimitFull(tokens?: number): string {
 	if (tokens === undefined || tokens === null || tokens === 0) return "Not available";
 	return `${tokens.toLocaleString()} tokens`;
 }
+
+/** Per-1M like token pricing, but for fields priced per character. */
+export function formatCharacterPriceFull(cost?: number): string {
+	if (cost === undefined || cost === null) return "Not available";
+	return `${formatTokenPriceValue(cost)} / 1M characters`;
+}

@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/maximhq/bifrost/core/mcp"
@@ -135,8 +136,11 @@ func CanProviderKeyValueBeEmpty(providerKey schemas.ModelProvider) bool {
 	return providerKey == schemas.Vertex || providerKey == schemas.Bedrock || providerKey == schemas.BedrockMantle || providerKey == schemas.VLLM || providerKey == schemas.Azure || providerKey == schemas.Ollama || providerKey == schemas.SGL
 }
 
-func isKeySkippingAllowed(providerKey schemas.ModelProvider) bool {
-	return providerKey != schemas.Azure && providerKey != schemas.Bedrock && providerKey != schemas.BedrockMantle && providerKey != schemas.Vertex
+// isKeySkippingAllowed gates SkipKeySelection on the provider this attempt resolved to. The flag
+// is set only for Claude Code OAuth passthrough, where the caller's token is the upstream
+// credential — and only the Anthropic provider forwards it.
+func isKeySkippingAllowed(baseProvider schemas.ModelProvider) bool {
+	return baseProvider == schemas.Anthropic
 }
 
 // calculateBackoff implements exponential backoff with jitter for retry attempts.
@@ -350,6 +354,8 @@ func newBifrostMessageChan(message *schemas.BifrostResponse) chan *schemas.Bifro
 func clearCtxForFallback(ctx *schemas.BifrostContext) {
 	ctx.ClearValue(schemas.BifrostContextKeyAPIKeyID)
 	ctx.ClearValue(schemas.BifrostContextKeyAPIKeyName)
+	ctx.ClearValue(schemas.BifrostContextKeyDirectKey)
+	ctx.ClearValue(schemas.BifrostContextKeyRoutingPinnedAPIKeyID)
 	ctx.ClearValue(schemas.BifrostContextKeyGovernanceIncludeOnlyKeys)
 	ctx.ClearValue(schemas.BifrostContextKeyChangeRequestType)
 	ctx.ClearValue(schemas.BifrostContextKeyAttemptTrail)
@@ -498,11 +504,13 @@ func isContainerRequestType(reqType schemas.RequestType) bool {
 		reqType == schemas.ContainerFileDeleteRequest
 }
 
-// isModellessVideoRequestType returns true if the given request type is a video request that does not require a model.
+// isModellessVideoRequestType returns true if the given request type is a video request that can
+// be served without a model. Callers gate on model == "", so video edit — which takes a model when
+// the source is uploaded and omits it when the source is an existing video ID — belongs here too.
 func isModellessVideoRequestType(reqType schemas.RequestType) bool {
 	switch reqType {
 	case schemas.VideoRetrieveRequest, schemas.VideoDownloadRequest, schemas.VideoListRequest,
-		schemas.VideoDeleteRequest, schemas.VideoRemixRequest:
+		schemas.VideoDeleteRequest, schemas.VideoRemixRequest, schemas.VideoEditRequest:
 		return true
 	default:
 		return false
@@ -697,6 +705,43 @@ func sanitizeSpanName(name string) string {
 	return schemas.SanitizePluginSpanName(name)
 }
 
+// pluginSpanNameSet holds the precomputed "plugin.<name>.<hook>" span names for
+// one plugin. Building them with Sprintf on every hook invocation costs ~2
+// allocs per span at request rate; plugin names are static, so cache them.
+type pluginSpanNameSet struct {
+	prehook            string
+	prerequesthook     string
+	posthook           string
+	mcpPrehook         string
+	mcpPosthook        string
+	mcpConnectPrehook  string
+	mcpConnectPosthook string
+}
+
+// pluginSpanNameCache maps plugin name -> *pluginSpanNameSet. Bounded by the
+// number of distinct registered plugins.
+var pluginSpanNameCache sync.Map
+
+func pluginSpanNamesFor(name string) *pluginSpanNameSet {
+	if v, ok := pluginSpanNameCache.Load(name); ok {
+		return v.(*pluginSpanNameSet)
+	}
+	s := sanitizeSpanName(name)
+	set := &pluginSpanNameSet{
+		prehook:            "plugin." + s + ".prehook",
+		prerequesthook:     "plugin." + s + ".prerequesthook",
+		posthook:           "plugin." + s + ".posthook",
+		mcpPrehook:         "plugin." + s + ".mcp_prehook",
+		mcpPosthook:        "plugin." + s + ".mcp_posthook",
+		mcpConnectPrehook:  "plugin." + s + ".mcp_connect_prehook",
+		mcpConnectPosthook: "plugin." + s + ".mcp_connect_posthook",
+	}
+	if v, loaded := pluginSpanNameCache.LoadOrStore(name, set); loaded {
+		return v.(*pluginSpanNameSet)
+	}
+	return set
+}
+
 // IsCodemodeTool returns true if the given tool name is a codemode tool.
 func IsCodemodeTool(toolName string) bool {
 	return mcp.IsCodeModeTool(toolName)
@@ -727,7 +772,21 @@ func isPromptOptionalImageEditType(t *string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(*t))
 	normalized = strings.ReplaceAll(normalized, "-", "_")
 	return slices.Contains(
-		[]string{"background_removal", "remove_background", "remove_bg", "erase_object", "upscale_fast"},
+		[]string{"background_removal", "remove_background", "remove_bg", "erase_object", "upscale", "upscale_fast", "mask", "segmentation", "vectorize", "controlnet_preprocess", "controlnet", "preprocess"},
+		normalized,
+	)
+}
+
+// isPromptOptionalVideoEditType returns true for video edit task types that are driven purely by
+// the source video and take no text prompt.
+func isPromptOptionalVideoEditType(t *string) bool {
+	if t == nil {
+		return false
+	}
+	normalized := strings.ToLower(strings.TrimSpace(*t))
+	normalized = strings.ReplaceAll(normalized, "-", "_")
+	return slices.Contains(
+		[]string{"background_removal", "remove_background", "remove_bg", "upscale"},
 		normalized,
 	)
 }

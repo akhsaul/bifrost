@@ -544,12 +544,16 @@ func HandleAnthropicChatCompletionRequest(
 	response := AcquireAnthropicMessageResponse()
 	defer ReleaseAnthropicMessageResponse(response)
 
-	rawRequest, rawResponse, bifrostErr := providerUtils.HandleProviderResponse(responseBody, response, jsonBody, providerUtils.ShouldSendBackRawRequest(ctx, config.ShouldSendBackRawRequest), providerUtils.ShouldSendBackRawResponse(ctx, config.ShouldSendBackRawResponse))
+	rawRequest, rawResponse, bifrostErr := providerUtils.HandleProviderResponseCtx(ctx, responseBody, response, jsonBody, providerUtils.ShouldSendBackRawRequest(ctx, config.ShouldSendBackRawRequest), providerUtils.ShouldSendBackRawResponse(ctx, config.ShouldSendBackRawResponse))
 	if bifrostErr != nil {
 		return nil, providerUtils.EnrichError(ctx, bifrostErr, jsonBody, responseBody, config.ShouldSendBackRawRequest, config.ShouldSendBackRawResponse, latency)
 	}
 	// Create final response
+	convTracer, convHandle := providerUtils.StartResponseConvertorSpan(ctx)
 	bifrostResponse := response.ToBifrostChatResponse(ctx)
+	if convTracer != nil {
+		convTracer.EndSpan(convHandle, schemas.SpanStatusOk, "")
+	}
 
 	// Set ExtraFields
 	bifrostResponse.ExtraFields.Latency = latency.Milliseconds()
@@ -634,6 +638,7 @@ func accumulateAnthropicResponsesUsage(usage *schemas.ResponsesResponseUsage, bi
 	if usage == nil || usageToProcess == nil {
 		return
 	}
+	usageToProcess = billableAnthropicUsage(usageToProcess)
 	// Web search request count → billed as search queries (server tool use). The
 	// terminal chunk overwrites Response.Usage with this accumulator, so the count
 	// must live here (not only on the per-event message_delta usage).
@@ -778,7 +783,7 @@ func HandleAnthropicChatCompletionStreaming(
 	providerUtils.SetExtraHeaders(ctx, req, extraHeaders, []string{AnthropicBetaHeader})
 	// OAuth passthrough: forward the caller's raw headers, whose token is the upstream
 	// credential. Skips anthropic-beta — MergeBetaHeaders below owns the final value.
-	providerUtils.SetPassthroughHeaders(ctx, req, providerName, []string{AnthropicBetaHeader})
+	providerUtils.SetPassthroughHeadersForStreaming(ctx, req, providerName, []string{AnthropicBetaHeader})
 
 	if betaHeaders := FilterBetaHeadersForProvider(MergeBetaHeaders(ctx, extraHeaders), providerName, betaHeaderOverrides); len(betaHeaders) > 0 {
 		req.Header.Set(AnthropicBetaHeader, strings.Join(betaHeaders, ","))
@@ -920,7 +925,10 @@ func HandleAnthropicChatCompletionStreaming(
 
 		usage := &schemas.BifrostLLMUsage{}
 		// Served billing modifiers (top-level response fields, not usage) captured
-		// across events and set on the final chunk: fast mode and data residency.
+		// across events and set on the final chunk: served tier, fast mode and data
+		// residency. Anthropic reports service_tier on the message_start usage, which
+		// the per-event converter drops, so it has to be latched here like the rest.
+		var servedServiceTier *schemas.BifrostServiceTier
 		var servedSpeed *string
 		var servedInferenceGeo *string
 		// Model that actually served the turn after a server-side fallback handoff.
@@ -990,8 +998,12 @@ func HandleAnthropicChatCompletionStreaming(
 				continue
 			}
 			var event AnthropicStreamEvent
-			if err := sonic.Unmarshal([]byte(eventData), &event); err != nil {
-				logger.Warn("Failed to parse message_start event: %v", err)
+			// Per-event decode -> "response-parse" (Serialization) stream phase.
+			parseStart := time.Now()
+			umErr := sonic.Unmarshal([]byte(eventData), &event)
+			schemas.AddStreamParse(ctx, time.Since(parseStart))
+			if umErr != nil {
+				logger.Warn("Failed to parse message_start event: %v", umErr)
 				continue
 			}
 			if event.Type == AnthropicStreamEventTypeMessageStart && event.Message != nil && event.Message.ID != "" {
@@ -1006,6 +1018,11 @@ func HandleAnthropicChatCompletionStreaming(
 				usageToProcess = event.Message.Usage
 			}
 			if usageToProcess != nil {
+				if served := usageToProcess.ServerSideFallbackModel(); served != nil {
+					servedFallbackModel = served
+					usage.ServerSideFallbackModel = served
+				}
+				usageToProcess = billableAnthropicUsage(usageToProcess)
 				// Web search request count → billed as search queries (server tool use).
 				if usageToProcess.ServerToolUse != nil && usageToProcess.ServerToolUse.WebSearchRequests > 0 {
 					if usage.CompletionTokensDetails == nil {
@@ -1026,9 +1043,15 @@ func HandleAnthropicChatCompletionStreaming(
 						usage.CompletionTokensDetails.ReasoningTokens = t
 					}
 				}
-				// Capture served fast mode + inference geography (top-level response fields).
-				// Mirror onto the billing usage handle so a mid-stream cancel/timeout can
-				// still apply the served-tier multiplier (billed usage is otherwise bare).
+				// Capture served tier + fast mode + inference geography (top-level response
+				// fields). Speed and InferenceGeo are mirrored onto the billing usage handle
+				// so a mid-stream cancel/timeout can still apply the served-tier multiplier
+				// (billed usage is otherwise bare); BifrostLLMUsage has no service_tier field,
+				// so that one can only ride the final chunk's response envelope.
+				if usageToProcess.ServiceTier != nil {
+					mapped := MapAnthropicServiceTierToBifrost(*usageToProcess.ServiceTier)
+					servedServiceTier = &mapped
+				}
 				if usageToProcess.Speed != nil {
 					servedSpeed = usageToProcess.Speed
 					usage.Speed = usageToProcess.Speed
@@ -1036,10 +1059,6 @@ func HandleAnthropicChatCompletionStreaming(
 				if usageToProcess.InferenceGeo != nil {
 					servedInferenceGeo = usageToProcess.InferenceGeo
 					usage.InferenceGeo = usageToProcess.InferenceGeo
-				}
-				if served := usageToProcess.ServerSideFallbackModel(); served != nil {
-					servedFallbackModel = served
-					usage.ServerSideFallbackModel = served
 				}
 				// Collect usage information and send at the end of the stream
 				// Here in some cases usage comes before final message
@@ -1159,7 +1178,10 @@ func HandleAnthropicChatCompletionStreaming(
 				}
 			}
 
+			// Per-event mapping -> "convertor" (Convertor) stream phase.
+			convStart := time.Now()
 			response, bifrostErr, isLastChunk := event.ToBifrostChatCompletionStream(ctx, structuredOutputToolName, streamState)
+			schemas.AddStreamConvert(ctx, time.Since(convStart))
 			if bifrostErr != nil {
 				ctx.SetValue(schemas.BifrostContextKeyStreamEndIndicator, true)
 				providerUtils.ProcessAndSendBifrostError(ctx, postHookRunner, bifrostErr, responseChan, logger, postHookSpanFinalizer)
@@ -1221,7 +1243,10 @@ func HandleAnthropicChatCompletionStreaming(
 				return
 			}
 		}
-		// Forward served fast mode + data residency so the final chunk bills correctly.
+		// Forward served tier + fast mode + data residency so the final chunk bills correctly.
+		if servedServiceTier != nil {
+			response.ServiceTier = servedServiceTier
+		}
 		if servedSpeed != nil {
 			response.Speed = servedSpeed
 		}
@@ -1301,7 +1326,7 @@ func HandleAnthropicResponsesRequest(
 	if isLargeResp, _ := ctx.Value(schemas.BifrostContextKeyLargeResponseMode).(bool); isLargeResp {
 		preview, _ := ctx.Value(schemas.BifrostContextKeyLargePayloadResponsePreview).(string)
 		return &schemas.BifrostResponsesResponse{
-			ID:        schemas.Ptr("resp_" + providerUtils.GetRandomString(50)),
+			ID:        schemas.Ptr("resp_" + schemas.GetRandomString(50)),
 			Object:    "response",
 			CreatedAt: int(time.Now().Unix()),
 			Model:     request.Model,
@@ -1420,7 +1445,7 @@ func HandleAnthropicResponsesStream(
 	providerUtils.SetExtraHeaders(ctx, req, extraHeaders, []string{AnthropicBetaHeader})
 	// OAuth passthrough: forward the caller's raw headers, whose token is the upstream
 	// credential. Skips anthropic-beta — MergeBetaHeaders below owns the final value.
-	providerUtils.SetPassthroughHeaders(ctx, req, providerName, []string{AnthropicBetaHeader})
+	providerUtils.SetPassthroughHeadersForStreaming(ctx, req, providerName, []string{AnthropicBetaHeader})
 
 	if betaHeaders := FilterBetaHeadersForProvider(MergeBetaHeaders(ctx, extraHeaders), providerName, betaHeaderOverrides); len(betaHeaders) > 0 {
 		req.Header.Set(AnthropicBetaHeader, strings.Join(betaHeaders, ","))
@@ -1590,6 +1615,7 @@ func HandleAnthropicResponsesStream(
 		}
 
 		var modelName string
+		var servedServiceTier *schemas.BifrostServiceTier
 		var servedSpeed *string
 		var servedInferenceGeo *string
 		// Model that served the turn after a server-side fallback handoff. Latched
@@ -1623,8 +1649,11 @@ func HandleAnthropicResponsesStream(
 				continue
 			}
 			var event AnthropicStreamEvent
-			if err := sonic.Unmarshal([]byte(eventData), &event); err != nil {
-				logger.Warn("Failed to parse message_start event: %v", err)
+			parseStart := time.Now()
+			umErr := sonic.Unmarshal([]byte(eventData), &event)
+			schemas.AddStreamParse(ctx, time.Since(parseStart))
+			if umErr != nil {
+				logger.Warn("Failed to parse message_start event: %v", umErr)
 				continue
 			}
 			if event.Message != nil && modelName == "" {
@@ -1649,6 +1678,12 @@ func HandleAnthropicResponsesStream(
 				accumulateAnthropicResponsesUsage(usage, billedUsage, usageToProcess)
 				// Mirror served tier onto billedUsage so a mid-stream cancel/timeout can
 				// still apply the served-tier multiplier (billed usage is otherwise bare).
+				// service_tier has no home on BifrostLLMUsage, so it is latched for the
+				// final chunk's response envelope only.
+				if usageToProcess.ServiceTier != nil {
+					mapped := MapAnthropicServiceTierToBifrost(*usageToProcess.ServiceTier)
+					servedServiceTier = &mapped
+				}
 				if usageToProcess.Speed != nil {
 					servedSpeed = usageToProcess.Speed
 					if billedUsage != nil {
@@ -1669,7 +1704,9 @@ func HandleAnthropicResponsesStream(
 				}
 			}
 
+			convCallStart := time.Now()
 			responses, bifrostErr, isLastChunk := event.ToBifrostResponsesStream(ctx, chunkIndex, streamState)
+			schemas.AddStreamConvert(ctx, time.Since(convCallStart))
 			// Propagate message_delta emission flag to context so the output converter
 			// (ToAnthropicResponsesStreamResponse) can skip synthesizing a duplicate.
 			if streamState.HasEmittedMessageDelta {
@@ -1727,6 +1764,9 @@ func HandleAnthropicResponsesStream(
 							usage.TotalTokens = usage.TotalTokens + usage.InputTokensDetails.CachedReadTokens + usage.InputTokensDetails.CachedWriteTokens
 						}
 						response.Response.Usage = usage
+						if servedServiceTier != nil {
+							response.Response.ServiceTier = servedServiceTier
+						}
 						if servedSpeed != nil {
 							response.Response.Speed = servedSpeed
 						}
@@ -2260,11 +2300,16 @@ func (provider *AnthropicProvider) BatchResults(ctx *schemas.BifrostContext, key
 		})
 
 		batchResultsResp := &schemas.BifrostBatchResultsResponse{
-			BatchID: request.BatchID,
-			Results: results,
+			BatchID:  request.BatchID,
+			Endpoint: schemas.BatchEndpointMessages,
+			Results:  results,
 			ExtraFields: schemas.BifrostResponseExtraFields{
 				Latency: latency.Milliseconds(),
 			},
+		}
+
+		if providerUtils.ShouldSendBackRawResponse(ctx, provider.sendBackRawResponse) {
+			batchResultsResp.ExtraFields.RawResponse = results
 		}
 
 		if len(parseResult.Errors) > 0 {
@@ -2956,6 +3001,11 @@ func (provider *AnthropicProvider) VideoDelete(_ *schemas.BifrostContext, _ sche
 // VideoList is not supported by the Anthropic provider.
 func (provider *AnthropicProvider) VideoList(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoListRequest) (*schemas.BifrostVideoListResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.VideoListRequest, provider.GetProviderKey())
+}
+
+// VideoEdit is not supported by the Anthropic provider.
+func (provider *AnthropicProvider) VideoEdit(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoEditRequest) (*schemas.BifrostVideoEditResponse, *schemas.BifrostError) {
+	return nil, providerUtils.NewUnsupportedOperationError(schemas.VideoEditRequest, provider.GetProviderKey())
 }
 
 // VideoRemix is not supported by the Anthropic provider.

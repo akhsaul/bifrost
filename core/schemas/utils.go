@@ -3,14 +3,13 @@ package schemas
 import (
 	"encoding/json"
 	"fmt"
-	"math/rand"
+	"math/rand/v2"
 	"net/url"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 // Ptr creates a pointer to any value.
@@ -19,16 +18,19 @@ func Ptr[T any](v T) *T {
 	return &v
 }
 
-// GetRandomString generates a random alphanumeric string of the given length.
+// letters is the hex alphabet GetRandomString draws from.
+const letters = "abcdef0123456789"
+
+// GetRandomString generates a random hex string of the given length.
+// Uses rand/v2 (seedless, per-thread): the old per-call time-seeded source cost
+// ~7µs per call and could mint identical strings for same-tick calls.
 func GetRandomString(length int) string {
 	if length <= 0 {
 		return ""
 	}
-	randomSource := rand.New(rand.NewSource(time.Now().UnixNano()))
-	letters := []rune("abcdef0123456789")
-	b := make([]rune, length)
+	b := make([]byte, length)
 	for i := range b {
-		b[i] = letters[randomSource.Intn(len(letters))]
+		b[i] = letters[rand.IntN(len(letters))]
 	}
 	return string(b)
 }
@@ -142,7 +144,9 @@ func ParseFallbacks(fallbacks []string) []Fallback {
 
 // dataURIRegex is a precompiled regex for matching data URI format patterns.
 // It matches patterns like: data:image/png;base64,iVBORw0KGgo...
-var dataURIRegex = regexp.MustCompile(`^data:([^;]+)(;base64)?,(.+)$`)
+// Group 1 is the header (media type plus any parameters, e.g. ";charset=utf-8;base64"),
+// group 2 the payload.
+var dataURIRegex = regexp.MustCompile(`^data:([^,]*),([\s\S]+)$`)
 
 // base64Regex is a precompiled regex for matching base64 strings.
 // It matches strings containing only valid base64 characters with optional padding.
@@ -207,7 +211,7 @@ func sanitizeImageURL(rawURL string, allowedSchemes []string) (string, error) {
 	// Check if it's already a proper data URL
 	if strings.HasPrefix(rawURL, "data:") {
 		// Validate data URL format
-		if !dataURIRegex.MatchString(rawURL) {
+		if _, _, _, ok := ParseDataURL(rawURL); !ok {
 			return rawURL, fmt.Errorf("invalid data URL format")
 		}
 		return rawURL, nil
@@ -267,21 +271,41 @@ func ExtractURLTypeInfo(sanitizedURL string) URLTypeInfo {
 	return extractRegularURLInfo(sanitizedURL)
 }
 
+// ParseDataURL splits a data URL (data:[<mediatype>][;<param>=<value>][;base64],<data>)
+// into its media type, base64 flag and payload. Media type parameters such as
+// ";charset=utf-8" are dropped from mediaType and the payload is returned as-is
+// (still base64-encoded when isBase64 is true, percent-encoded otherwise).
+// ok is false when the input is not a data URL carrying both a media type and a payload.
+func ParseDataURL(dataURL string) (mediaType string, isBase64 bool, payload string, ok bool) {
+	matches := dataURIRegex.FindStringSubmatch(dataURL)
+	if len(matches) != 3 {
+		return "", false, "", false
+	}
+
+	segments := strings.Split(matches[1], ";")
+	mediaType = strings.ToLower(strings.TrimSpace(segments[0]))
+	if mediaType == "" {
+		return "", false, "", false
+	}
+	for _, segment := range segments[1:] {
+		if strings.EqualFold(strings.TrimSpace(segment), "base64") {
+			isBase64 = true
+		}
+	}
+
+	return mediaType, isBase64, matches[2], true
+}
+
 // extractDataURLInfo extracts information from a data URL
 func extractDataURLInfo(dataURL string) URLTypeInfo {
-	// Parse data URL: data:[<mediatype>][;base64],<data>
-	matches := dataURIRegex.FindStringSubmatch(dataURL)
-
-	if len(matches) != 4 {
+	mediaType, isBase64, payload, ok := ParseDataURL(dataURL)
+	if !ok {
 		return URLTypeInfo{Type: ImageContentTypeBase64}
 	}
 
-	mediaType := matches[1]
-	isBase64 := matches[2] == ";base64"
-
 	dataURLWithoutPrefix := dataURL
 	if isBase64 {
-		dataURLWithoutPrefix = dataURL[len("data:")+len(mediaType)+len(";base64,"):]
+		dataURLWithoutPrefix = payload
 	}
 
 	info := URLTypeInfo{
@@ -676,6 +700,22 @@ func SafeExtractOrderedMap(value interface{}) (*OrderedMap, bool) {
 		return nil, false
 	case OrderedMap:
 		return &v, true
+	case json.RawMessage:
+		// Schemas forwarded verbatim are carried as raw JSON; decode on demand,
+		// preserving the key order of the document.
+		//
+		// The object-shape check comes first because OrderedMap.UnmarshalJSON accepts the
+		// null literal by design -- it clears the map and returns no error. Without this,
+		// a null raw schema decoded "successfully" into an empty map and reported ok, so
+		// callers treating ok as "a schema was present" got an empty one rather than a miss.
+		if strings.TrimSpace(string(v)) == "" || strings.TrimSpace(string(v))[0] != '{' {
+			return nil, false
+		}
+		decoded := NewOrderedMap()
+		if err := decoded.UnmarshalJSON(v); err != nil {
+			return nil, false
+		}
+		return decoded, true
 	}
 	return nil, false
 }
@@ -1663,15 +1703,15 @@ func IsOpenAIModel(model string) bool {
 	// OpenAI reasoning families (o1, o3, o4, ...). Match the bare id or a
 	// version-suffixed variant (e.g. "o3", "o4-mini", "o1-preview") while
 	// avoiding false matches on substrings like "co1" or "model-o3x".
-	return isOpenAIReasoningModel(model)
+	return isOSeriesModel(model)
 }
 
-// isOpenAIReasoningModel reports whether model names an OpenAI o-series
-// reasoning model. It strips any provider prefix (e.g. "openai/o3") and matches
-// an "o" followed by a single digit, where the next character is either end of
-// string or a "-" separator, so "o3" and "o4-mini" match but "co1" and "o3x"
-// do not.
-func isOpenAIReasoningModel(model string) bool {
+// isOSeriesModel reports whether model names an OpenAI o-series model. It
+// strips any provider prefix (e.g. "openai/o3") and matches an "o" followed by
+// a single digit, where the next character is either end of string or a "-"
+// separator, so "o3" and "o4-mini" match but "co1" and "o3x" do not. Narrower
+// than IsOpenAIReasoningModel, which also covers GPT-5.x and gpt-oss.
+func isOSeriesModel(model string) bool {
 	name := model
 	if idx := strings.LastIndexAny(name, "/:"); idx >= 0 {
 		name = name[idx+1:]
@@ -1706,6 +1746,33 @@ func BedrockModelSupportsCachePoints(model string) bool {
 // "Extended TTL prompt caching is only supported for Anthropic models".
 func BedrockModelSupportsExtendedCacheTTL(model string) bool {
 	return IsAnthropicModel(model)
+}
+
+// BedrockModelSupportsS3Location reports whether the model's Converse backend actually
+// resolves the s3Location member of an image/document/video source union.
+//
+// s3Location is part of the Converse schema for every model, but the API reference is
+// explicit that reading it is not: "To see which models support S3 uploads, see Supported
+// models and features for Converse."
+// https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_DocumentSource.html
+//
+// The gate has to exist because an unsupported model does not produce an s3Location error.
+// Converse validates the union, translates the request into the model's native format, and
+// drops the member when that format has no S3 source type. Anthropic's does not, so the
+// model receives an empty source and answers in its own vocabulary:
+//
+//	messages.0.content.0.document.source.type: Field required
+//
+// naming a field Converse has never had. Nothing upstream of the model ever touches S3, so
+// the object's existence and the caller's permissions are irrelevant to that failure.
+//
+// Allowlist rather than a denylist: AWS folded the per-model matrix into its model cards
+// and no longer publishes an S3 column, so "supported" is only knowable where it has been
+// observed. Nova is the family AWS's own Converse S3 examples use. Add families here as
+// they are confirmed - a model missing from this list is refused with an actionable error
+// rather than silently mangled, which is the safer way to be wrong.
+func BedrockModelSupportsS3Location(model string) bool {
+	return IsNovaModel(model)
 }
 
 // IsMistralModel checks if the model is a Mistral or Codestral model.

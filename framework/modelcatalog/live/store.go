@@ -19,6 +19,7 @@ import (
 	"maps"
 	"slices"
 	"sync"
+	"sync/atomic"
 
 	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/schemas"
@@ -53,6 +54,11 @@ type Store struct {
 	// look current again after the provider was re-added.
 	gen    map[schemas.ModelProvider]uint64
 	logger schemas.Logger
+
+	// writeGen counts entry mutations across all providers; the composer's
+	// model→provider memo stamps it to detect staleness. Distinct from gen,
+	// which is per-provider and guards in-flight fetch races.
+	writeGen atomic.Uint64
 }
 
 func New(logger schemas.Logger) *Store {
@@ -100,6 +106,12 @@ func (s *Store) UpsertWithDetails(provider schemas.ModelProvider, keyID string, 
 	s.mu.Lock()
 	s.entries[k] = Entry{Models: cp, Details: detailsCp}
 	s.mu.Unlock()
+	s.writeGen.Add(1)
+}
+
+// WriteGen returns the monotonic count of entry mutations across all providers.
+func (s *Store) WriteGen() uint64 {
+	return s.writeGen.Load()
 }
 
 // Generation returns the provider's current invalidation counter. Read it
@@ -153,6 +165,7 @@ func (s *Store) UpsertIfCurrentWithDetails(provider schemas.ModelProvider, keyID
 		return false
 	}
 	s.entries[k] = Entry{Models: cp, Details: detailsCp}
+	s.writeGen.Add(1)
 	return true
 }
 
@@ -190,6 +203,7 @@ func (s *Store) GetModelCapability(provider schemas.ModelProvider, model string)
 // nothing cached yet, and that is the write this has to stop.
 func (s *Store) bumpLocked(provider schemas.ModelProvider) {
 	s.gen[provider]++
+	s.writeGen.Add(1)
 }
 
 // Invalidate drops both filtered and unfiltered entries for one key. Called

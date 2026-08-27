@@ -117,6 +117,23 @@ const MODALITIES = [
 
 const REASONING_ON_BUDGET = 512;
 
+// Credential gate, distinct from the capability SKIP matrix below. The Vertex direct legs
+// authenticate with a gcloud-minted OAuth access token ({{vertexAccessToken}}, see the Makefile).
+// When gcloud cannot mint one, the Makefile omits the Newman env var entirely, Newman leaves the
+// placeholder unresolved, and every direct leg posts the literal string "Bearer
+// {{vertexAccessToken}}" -- which Google rejects with 401 ACCESS_TOKEN_TYPE_UNSUPPORTED. One run
+// produced 33 hard failures that way, burying the real defects underneath them, while the report
+// itself silently dropped both Vertex backends and still read as all-green.
+//
+// A parity cell whose direct leg cannot authenticate has nothing to compare Bifrost against, so
+// skip the pair and record why. The Makefile exports VERTEX_ACCESS_TOKEN_VAL to this script.
+const VERTEX_TOKEN_MISSING =
+  "no gcloud-minted vertexAccessToken in the environment (run 'gcloud auth login'); the direct leg cannot authenticate, so there is nothing to compare Bifrost against.";
+const CREDENTIAL_GATES = {
+  vertex: () => (process.env.VERTEX_ACCESS_TOKEN_VAL ? null : VERTEX_TOKEN_MISSING),
+  vertex_claude: () => (process.env.VERTEX_ACCESS_TOKEN_VAL ? null : VERTEX_TOKEN_MISSING),
+};
+
 // backend -> modality -> citation string (falsy = supported). Both legs share one SKIP matrix:
 // if the provider genuinely can't do it, Bifrost can't manufacture the capability either.
 const REASONING_ON_SKIP = "Only gemini/vertex use a reasoning-capable model in this matrix (gpt-4o-mini/claude-haiku-4-5 are non-reasoning); reasoning-on parity is only meaningful where reasoning is actually in play.";
@@ -941,6 +958,10 @@ function buildGeminiFamilyDirect(backendKey, backendLabel, modality) {
 // same builder covers both the existing Claude-on-Bedrock backend and the "one more model per
 // provider" OpenAI-family (gpt-oss)-on-Bedrock addition below - Bedrock's Converse API is
 // model-family-agnostic, so nothing else about the direct call changes.
+//
+// This leg hits bedrock-runtime, where OpenAI-family models are only reachable through a
+// cross-Region inference profile, so its modelVar is not always the same one the bifrost leg
+// uses. See the BACKENDS entry for bedrock_openai.
 function buildBedrockDirect(backendKey, backendLabel, modelVar, modality) {
   return buildLegItems({
     leg: "direct",
@@ -1159,20 +1180,64 @@ const BACKENDS = [
     bifrost: (m) => buildBedrockBifrost("bedrock", "Bedrock (Claude)", "bedrockModel", m),
   },
   // "One more model per provider": Bedrock and Vertex both host more than one model family.
+  // The two legs take DIFFERENT model ids because they reach different AWS endpoints, and each
+  // endpoint accepts only one of the two forms (model-card-openai-gpt-56-sol.html, "Programmatic
+  // Access"): bedrock-runtime lists in-region as "Not supported" and requires a cross-Region
+  // profile (us./global.), while bedrock-mantle lists Geo and Global as "Not supported" and takes
+  // the bare id. The direct leg calls bedrock-runtime converse, so it needs the profile form. The
+  // bifrost leg goes through Bifrost's `bedrock` provider, which routes every OpenAI-family model
+  // to mantle (isMantleModel in core/providers/bedrock/mantle.go), so it needs the bare form -
+  // a profile-prefixed id 404s there with "The model '...' does not exist".
   {
     key: "bedrock_openai",
     label: "Bedrock (OpenAI/gpt-oss)",
-    direct: (m) => buildBedrockDirect("bedrock_openai", "Bedrock (OpenAI/gpt-oss)", "bedrockOpenaiModel", m),
+    direct: (m) => buildBedrockDirect("bedrock_openai", "Bedrock (OpenAI/gpt-oss)", "bedrockOpenaiDirectModel", m),
     bifrost: (m) => buildBedrockBifrost("bedrock_openai", "Bedrock (OpenAI/gpt-oss)", "bedrockOpenaiModel", m),
   },
   { key: "vertex_claude", label: "Vertex AI (Claude)", direct: buildVertexClaudeDirect, bifrost: buildVertexClaudeBifrost },
 ];
+
+// expectedTokenParityCells enumerates every (backend, modality) pair the matrix knows about and
+// says what should have happened to it: "run" (a row is expected in the report), "skip" (a
+// documented capability gap) or "gated" (credentials unavailable this run).
+//
+// The report renderer builds its per-backend summary from the cells that returned data, so a
+// backend whose every cell errored out used to vanish from the report rather than show as failing.
+// Exporting the census lets the renderer tell "not attempted" apart from "passed".
+export function expectedTokenParityCells() {
+  const cells = [];
+  for (const backend of BACKENDS) {
+    const gateReason = CREDENTIAL_GATES[backend.key] ? CREDENTIAL_GATES[backend.key]() : null;
+    for (const modality of MODALITIES) {
+      const skipReason = SKIP[backend.key] && SKIP[backend.key][modality.key];
+      // The credential gate is evaluated FIRST, and deliberately outranks a capability
+      // skip. buildTokenParityMatrix drops a gated backend whole - before it ever reads
+      // the SKIP matrix - so a census that checked skipReason first reported some of
+      // those never-built cells as documented capability gaps. That is the one mistake
+      // this census exists to prevent: it understates the coverage a run actually lost,
+      // which is how a report with three absent backends came to read as all-green.
+      if (gateReason) {
+        cells.push({ backend: backend.key, modality: modality.key, status: "gated", reason: gateReason });
+      } else if (skipReason) {
+        cells.push({ backend: backend.key, modality: modality.key, status: "skip", reason: skipReason });
+      } else {
+        cells.push({ backend: backend.key, modality: modality.key, status: "run", reason: null });
+      }
+    }
+  }
+  return cells;
+}
 
 export function buildTokenParityMatrix() {
   const items = [];
   const skipNotes = [];
 
   for (const backend of BACKENDS) {
+    const gateReason = CREDENTIAL_GATES[backend.key] ? CREDENTIAL_GATES[backend.key]() : null;
+    if (gateReason) {
+      skipNotes.push(`${backend.key}/* (all modalities): ${gateReason}`);
+      continue;
+    }
     for (const modality of MODALITIES) {
       const skipReason = SKIP[backend.key] && SKIP[backend.key][modality.key];
       if (skipReason) {

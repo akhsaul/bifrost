@@ -57,6 +57,7 @@ import (
 	"mime/multipart"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream"
 	"github.com/bytedance/sonic"
@@ -428,6 +429,7 @@ type StreamConfig struct {
 	TranscriptionStreamResponseConverter   TranscriptionStreamResponseConverter   // Function to convert BifrostTranscriptionResponse to streaming format
 	ImageGenerationStreamResponseConverter ImageGenerationStreamResponseConverter // Function to convert BifrostImageGenerationStreamResponse to streaming format
 	ErrorConverter                         StreamErrorConverter                   // Function to convert BifrostError to streaming error format
+	HeartbeatFraming                       lib.SSEHeartbeatFraming                // Wire framing for no-op SSE heartbeat comments
 }
 
 type RouteConfigType string
@@ -509,6 +511,18 @@ type PassthroughConfig struct {
 	Provider         schemas.ModelProvider                                              // which provider's key pool to draw from
 	ProviderDetector func(ctx *fasthttp.RequestCtx, model string) schemas.ModelProvider // optional: dynamic provider detection
 	StripPrefix      []string                                                           // e.g. "/openai" — stripped before forwarding
+	UpstreamURL      string                                                             // optional upstream base URL override
+	// AllowedRoutes, when non-empty, restricts the passthrough catch-all to exactly
+	// these method+path pairs instead of forwarding every request under StripPrefix.
+	AllowedRoutes []PassthroughRoute
+}
+
+// PassthroughRoute is an exact method+path pair a restricted passthrough router
+// (see PassthroughConfig.AllowedRoutes) will forward; any other request under
+// StripPrefix gets no route match (404) instead of being forwarded upstream.
+type PassthroughRoute struct {
+	Method string
+	Path   string // full path including the StripPrefix, matched exactly — no wildcard
 }
 
 // LargePayloadHook is called before body parsing to detect and set up large payload streaming.
@@ -646,10 +660,17 @@ func (g *GenericRouter) RegisterRoutes(r *router.Router, middlewares ...schemas.
 
 	if g.passthroughCfg != nil {
 		catchAll := lib.ChainMiddlewares(g.handlePassthrough, middlewares...)
-		// Register for all methods that need forwarding
-		for _, method := range []string{fasthttp.MethodGet, fasthttp.MethodPost, fasthttp.MethodPut, fasthttp.MethodDelete, fasthttp.MethodPatch, fasthttp.MethodHead} {
-			for _, prefix := range g.passthroughCfg.StripPrefix {
-				r.Handle(method, prefix+"/{path:*}", catchAll)
+		if len(g.passthroughCfg.AllowedRoutes) > 0 {
+			// Restricted mode: only the explicitly allowed method+path pairs are forwarded.
+			for _, allowed := range g.passthroughCfg.AllowedRoutes {
+				r.Handle(strings.ToUpper(allowed.Method), allowed.Path, catchAll)
+			}
+		} else {
+			// Register for all methods that need forwarding
+			for _, method := range []string{fasthttp.MethodGet, fasthttp.MethodPost, fasthttp.MethodPut, fasthttp.MethodDelete, fasthttp.MethodPatch, fasthttp.MethodHead} {
+				for _, prefix := range g.passthroughCfg.StripPrefix {
+					r.Handle(method, prefix+"/{path:*}", catchAll)
+				}
 			}
 		}
 	}
@@ -854,11 +875,24 @@ func (g *GenericRouter) createHandler(config RouteConfig) fasthttp.RequestHandle
 			return
 		}
 
-		// Convert the integration-specific request to Bifrost format (inference requests)
+		// Convert the integration-specific request to Bifrost format (inference requests).
+		// Timed as a "convertor" overhead phase (nests under the root span via the tracer
+		// on the request ctx); folds into core when no trace is active.
+		convTracer, _ := ctx.UserValue(schemas.BifrostContextKeyTracer).(schemas.Tracer)
+		var convHandle schemas.SpanHandle
+		if convTracer != nil {
+			_, convHandle = convTracer.StartSpanID(ctx, "convertor", schemas.SpanKindInternal)
+		}
 		bifrostReq, err := config.RequestConverter(bifrostCtx, req)
 		if err != nil {
+			if convTracer != nil {
+				convTracer.EndSpan(convHandle, schemas.SpanStatusError, err.Error())
+			}
 			g.sendError(ctx, bifrostCtx, config.ErrorConverter, newBifrostError(err, "failed to convert request to Bifrost format"))
 			return
+		}
+		if convTracer != nil {
+			convTracer.EndSpan(convHandle, schemas.SpanStatusOk, "")
 		}
 		if bifrostReq == nil {
 			g.sendError(ctx, bifrostCtx, config.ErrorConverter, newBifrostError(nil, "invalid request"))
@@ -1305,6 +1339,32 @@ func (g *GenericRouter) handleNonStreamingRequest(ctx *fasthttp.RequestCtx, conf
 
 		response, err = config.VideoGenerationResponseConverter(bifrostCtx, videoGenerationResponse)
 		bifrostExtraFields = videoGenerationResponse.ExtraFields
+	case bifrostReq.VideoEditRequest != nil:
+		videoEditResponse, bifrostErr := g.client.VideoEditRequest(bifrostCtx, bifrostReq.VideoEditRequest)
+		if bifrostErr != nil {
+			g.sendError(ctx, bifrostCtx, config.ErrorConverter, bifrostErr)
+			return
+		}
+
+		if config.PostCallback != nil {
+			if err := config.PostCallback(ctx, req, videoEditResponse); err != nil {
+				g.sendError(ctx, bifrostCtx, config.ErrorConverter, newBifrostError(err, "failed to execute post-request callback"))
+				return
+			}
+		}
+
+		if videoEditResponse == nil {
+			g.sendError(ctx, bifrostCtx, config.ErrorConverter, newBifrostError(nil, "Bifrost response is nil after post-request callback"))
+			return
+		}
+
+		if config.VideoGenerationResponseConverter == nil {
+			g.sendError(ctx, bifrostCtx, config.ErrorConverter, newBifrostError(nil, "missing VideoGenerationResponseConverter for integration"))
+			return
+		}
+
+		response, err = config.VideoGenerationResponseConverter(bifrostCtx, videoEditResponse)
+		bifrostExtraFields = videoEditResponse.ExtraFields
 	case bifrostReq.VideoRetrieveRequest != nil:
 		videoRetrieveResponse, bifrostErr := g.client.VideoRetrieveRequest(bifrostCtx, bifrostReq.VideoRetrieveRequest)
 		if bifrostErr != nil {
@@ -2737,6 +2797,12 @@ func (g *GenericRouter) handleStreaming(ctx *fasthttp.RequestCtx, bifrostCtx *sc
 
 	// Producer goroutine: processes the stream channel, formats events, sends to reader
 	go func() {
+		// Transport-side overhead split (streaming): (B) outbound convert+marshal CPU
+		// and (A) client-socket write wait. Accumulated across the send loop below and
+		// stamped on the root span before trace completion; the breakdown uses their
+		// ratio to split the provider-side backpressure into its client vs Bifrost parts.
+		var transportCPUNs, clientWriteNs int64
+
 		// Create encoder for AWS Event Stream if needed
 		var eventStreamEncoder *eventstream.Encoder
 		if config.Type == RouteConfigTypeBedrock {
@@ -2757,7 +2823,14 @@ func (g *GenericRouter) handleStreaming(ctx *fasthttp.RequestCtx, bifrostCtx *sc
 		var heartbeatDone chan struct{}
 		var heartbeatExited <-chan struct{}
 		if config.Type != RouteConfigTypeBedrock {
-			heartbeatDone, heartbeatExited = lib.StartSSEHeartbeat(lib.DefaultSSEHeartbeatInterval, reader.SendHeartbeat, cancel)
+			heartbeatFraming := lib.SSEHeartbeatBareCommentLine
+			if config.StreamConfig != nil {
+				heartbeatFraming = config.StreamConfig.HeartbeatFraming
+			}
+			sendHeartbeat := func() bool {
+				return reader.SendHeartbeatWithFraming(heartbeatFraming)
+			}
+			heartbeatDone, heartbeatExited = lib.StartSSEHeartbeat(lib.DefaultSSEHeartbeatInterval, sendHeartbeat, cancel)
 		}
 
 		defer func() {
@@ -2769,6 +2842,10 @@ func (g *GenericRouter) handleStreaming(ctx *fasthttp.RequestCtx, bifrostCtx *sc
 			}
 			schemas.ReleaseHTTPRequest(httpReq)
 			reader.Done()
+			// Split the provider-side backpressure into (A) client-write vs (B) transport
+			// CPU using what the send loop just measured. Before traceCompleter so the
+			// attributes are on the root span when the trace exports.
+			bifrostCtx.StampStreamTransport(time.Duration(transportCPUNs), time.Duration(clientWriteNs))
 			// Complete the trace after streaming finishes
 			// This ensures all spans (including llm.call) are properly ended before the trace is sent to OTEL
 			if traceCompleter != nil {
@@ -2916,6 +2993,7 @@ func (g *GenericRouter) handleStreaming(ctx *fasthttp.RequestCtx, bifrostCtx *sc
 				var convertedResponse interface{}
 				var err error
 
+				cpuStart := time.Now()
 				switch {
 				case chunk.BifrostTextCompletionResponse != nil:
 					eventType, convertedResponse, err = config.StreamConfig.TextStreamResponseConverter(bifrostCtx, chunk.BifrostTextCompletionResponse)
@@ -2933,6 +3011,7 @@ func (g *GenericRouter) handleStreaming(ctx *fasthttp.RequestCtx, bifrostCtx *sc
 					requestType := safeGetRequestType(chunk)
 					convertedResponse, err = nil, fmt.Errorf("no response converter found for request type: %s", requestType)
 				}
+				transportCPUNs += time.Since(cpuStart).Nanoseconds()
 
 				if convertedResponse == nil && err == nil {
 					// Skip streaming chunk if no response is available and no error is returned
@@ -2958,7 +3037,12 @@ func (g *GenericRouter) handleStreaming(ctx *fasthttp.RequestCtx, bifrostCtx *sc
 					continue
 				}
 
-				// Build and send SSE event
+				// Build and send SSE event. Time the whole build+send: for the common
+				// pre-formatted-SSE path (Anthropic) the buf build is trivial and this is
+				// essentially the reader.Send socket-write wait; integrations that marshal
+				// here fold a small marshal CPU into this figure, which is acceptable for
+				// the A/B ratio the breakdown derives from it.
+				writeStart := time.Now()
 				var buf []byte
 				var sent bool
 				if sseString, ok := convertedResponse.(string); ok {
@@ -2997,6 +3081,7 @@ func (g *GenericRouter) handleStreaming(ctx *fasthttp.RequestCtx, bifrostCtx *sc
 					}
 					return
 				}
+				clientWriteNs += time.Since(writeStart).Nanoseconds()
 			}
 		}
 
@@ -3267,6 +3352,7 @@ func (g *GenericRouter) handlePassthrough(ctx *fasthttp.RequestCtx) {
 		Method:      string(ctx.Method()),
 		Path:        path,
 		RawQuery:    string(ctx.URI().QueryString()),
+		UpstreamURL: cfg.UpstreamURL,
 		Body:        body,
 		SafeHeaders: safeHeaders,
 		Provider:    provider,

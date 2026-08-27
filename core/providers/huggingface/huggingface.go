@@ -554,12 +554,9 @@ func (provider *HuggingFaceProvider) ChatCompletionStream(ctx *schemas.BifrostCo
 	}
 
 	customRequestConverter := func(request *schemas.BifrostChatRequest) (providerUtils.RequestBodyWithExtraParams, error) {
-		reqBody, err := ToHuggingFaceChatCompletionRequest(request)
+		reqBody, err := ToHuggingFaceChatCompletionStreamRequest(request)
 		if err != nil {
 			return nil, err
-		}
-		if reqBody != nil {
-			reqBody.Stream = schemas.Ptr(true)
 		}
 		return reqBody, nil
 	}
@@ -1685,6 +1682,11 @@ func (provider *HuggingFaceProvider) VideoDelete(_ *schemas.BifrostContext, _ sc
 // VideoList is not supported by the Hugging Face provider.
 func (provider *HuggingFaceProvider) VideoList(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoListRequest) (*schemas.BifrostVideoListResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.VideoListRequest, provider.GetProviderKey())
+}
+
+// VideoEdit is not supported by the HuggingFace provider.
+func (provider *HuggingFaceProvider) VideoEdit(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoEditRequest) (*schemas.BifrostVideoEditResponse, *schemas.BifrostError) {
+	return nil, providerUtils.NewUnsupportedOperationError(schemas.VideoEditRequest, provider.GetProviderKey())
 }
 
 // VideoRemix is not supported by the Hugging Face provider.
