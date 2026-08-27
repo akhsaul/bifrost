@@ -1545,7 +1545,7 @@ func (h *ProviderHandler) getAntigravityAuthURL(ctx *fasthttp.RequestCtx) {
 	authURL := antigravity.BuildAntigravityAuthURL(redirectURI, state)
 	resp := map[string]string{
 		"auth_url":  authURL,
-		"client_id": antigravity.DefaultAntigravityClientID,
+		"client_id": antigravity.GetAntigravityClientID(),
 	}
 	data, err := sonic.Marshal(resp)
 	if err != nil {

@@ -20,9 +20,9 @@ import (
 )
 
 const (
-	// DefaultAntigravityClientID is the public Google OAuth client ID used by the Antigravity CLI / Cloud Code.
+	// DefaultAntigravityClientID is empty by default and loaded dynamically via GetAntigravityClientID().
 	DefaultAntigravityClientID = ""
-	// DefaultAntigravityClientSecret is the public Google OAuth client secret for Antigravity.
+	// DefaultAntigravityClientSecret is empty by default and loaded dynamically via GetAntigravityClientSecret().
 	DefaultAntigravityClientSecret = ""
 
 	GoogleOAuthAuthURL     = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -42,6 +42,22 @@ const (
 	DefaultOS            = "darwin"
 	DefaultArch          = "arm64"
 )
+
+// GetAntigravityClientID returns the Google OAuth client ID from environment variables (ANTIGRAVITY_CLIENT_ID or ANTIGRAVITY_OAUTH_CLIENT_ID).
+func GetAntigravityClientID() string {
+	if val := os.Getenv("ANTIGRAVITY_CLIENT_ID"); val != "" {
+		return strings.TrimSpace(val)
+	}
+	return strings.TrimSpace(os.Getenv("ANTIGRAVITY_OAUTH_CLIENT_ID"))
+}
+
+// GetAntigravityClientSecret returns the Google OAuth client secret from environment variables (ANTIGRAVITY_CLIENT_SECRET or ANTIGRAVITY_OAUTH_CLIENT_SECRET).
+func GetAntigravityClientSecret() string {
+	if val := os.Getenv("ANTIGRAVITY_CLIENT_SECRET"); val != "" {
+		return strings.TrimSpace(val)
+	}
+	return strings.TrimSpace(os.Getenv("ANTIGRAVITY_OAUTH_CLIENT_SECRET"))
+}
 
 // CachedToken holds access token, expiration time, and discovered project ID for a credential set.
 type CachedToken struct {
@@ -169,19 +185,11 @@ func GetCredentials(key schemas.Key) *AntigravityCredentials {
 	}
 
 	if creds.ClientID == "" {
-		if envID := os.Getenv("ANTIGRAVITY_OAUTH_CLIENT_ID"); envID != "" {
-			creds.ClientID = envID
-		} else {
-			creds.ClientID = DefaultAntigravityClientID
-		}
+		creds.ClientID = GetAntigravityClientID()
 	}
 
 	if creds.ClientSecret == "" {
-		if envSec := os.Getenv("ANTIGRAVITY_OAUTH_CLIENT_SECRET"); envSec != "" {
-			creds.ClientSecret = envSec
-		} else {
-			creds.ClientSecret = DefaultAntigravityClientSecret
-		}
+		creds.ClientSecret = GetAntigravityClientSecret()
 	}
 
 	return creds
@@ -411,7 +419,10 @@ func EnsureProjectID(
 // BuildAntigravityAuthURL generates the Google OAuth authorization URL for Antigravity.
 func BuildAntigravityAuthURL(redirectURI, state string) string {
 	params := url.Values{}
-	params.Set("client_id", DefaultAntigravityClientID)
+	clientID := GetAntigravityClientID()
+	if clientID != "" {
+		params.Set("client_id", clientID)
+	}
 	params.Set("response_type", "code")
 	if redirectURI != "" {
 		params.Set("redirect_uri", redirectURI)
@@ -442,10 +453,10 @@ func ExchangeAuthCode(
 	logger schemas.Logger,
 ) (*AntigravityCredentials, error) {
 	if clientID == "" {
-		clientID = DefaultAntigravityClientID
+		clientID = GetAntigravityClientID()
 	}
 	if clientSecret == "" {
-		clientSecret = DefaultAntigravityClientSecret
+		clientSecret = GetAntigravityClientSecret()
 	}
 
 	req := fasthttp.AcquireRequest()

@@ -53,7 +53,7 @@ func TestGetCredentials(t *testing.T) {
 	if creds2.RefreshToken != "json-refresh" {
 		t.Errorf("expected refresh_token json-refresh, got %s", creds2.RefreshToken)
 	}
-	if creds2.ClientID != DefaultAntigravityClientID {
+	if creds2.ClientID != GetAntigravityClientID() {
 		t.Errorf("expected default client_id, got %s", creds2.ClientID)
 	}
 
