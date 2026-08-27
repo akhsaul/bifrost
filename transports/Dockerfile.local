@@ -40,6 +40,7 @@
   RUN go work init && \
     go work use ./core && \
     go work use ./framework && \
+    go work use ./plugins/adaptiverouting && \
     go work use ./plugins/compat && \
     go work use ./plugins/governance && \
     go work use ./plugins/jsonparser && \
