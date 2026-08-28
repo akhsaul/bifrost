@@ -62,7 +62,6 @@ jobs:
         uses: MaxymVlasov/dive-action@9bfaea6c0b1e49111459b2cb3f9275fa4094a63e # v2.0.1
         with:
           image: ${{ format('bifrost-hermes:dev-{0}', env.SHORT_SHA) }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           highest-user-wasted-ratio: 1.0
           lowest-efficiency-ratio: 0.0
 
@@ -70,7 +69,6 @@ jobs:
         uses: MaxymVlasov/dive-action@9bfaea6c0b1e49111459b2cb3f9275fa4094a63e # v2.0.1
         with:
           image: nousresearch/hermes-agent:v2026.8.27
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           highest-user-wasted-ratio: 1.0
           lowest-efficiency-ratio: 0.0
 

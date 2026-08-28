@@ -70,7 +70,8 @@
   # Verify build succeeded
   RUN test -f /app/main || (echo "Build failed" && exit 1)
 
-  # --- Runtime Stage: Minimal runtime image ---
+  # --- Runtime Stage: Runtime image ---
+  # include s6-overlay, playwright chromium, nodejs, uv, python, ffmpeg
   FROM nousresearch/hermes-agent:v2026.8.27
   WORKDIR /app
 
@@ -79,29 +80,13 @@
   # Install runtime dependencies for CGO-enabled binary
   # libgcc: GCC runtime library
   # ca-certificates: For HTTPS connections
-  RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgcc-s1 \
-    ca-certificates \
-    zlib1g \
-    wget \
-    xz-utils \
-    && rm -rf /var/lib/apt/lists/*
-
-  ARG S6_OVERLAY_VERSION=3.2.3.2
-  ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
-  RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz
-  ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-x86_64.tar.xz /tmp
-  RUN tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz
-  COPY transports/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
+  RUN apt-get update && \
+    apt-get install -y --no-install-recommends libgcc-s1 ca-certificates zlib1g wget xz-utils && \
+    rm -rf /var/lib/apt/lists/*
 
   ENV S6_KEEP_ENV=1
   ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0
-
-  COPY --from=minio/minio:RELEASE.2025-09-07T16-13-09Z /usr/bin/minio /usr/local/bin/minio
-  COPY --from=minio/mc:latest /usr/bin/mc /usr/local/bin/mc
-
-  # Create data directory and set up user
-  COPY --from=builder /app/main .
+  COPY transports/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
 
   # Getting arguments
   ARG ARG_APP_PORT=8080
@@ -129,15 +114,22 @@
   # /app itself (e.g. --build-arg ARG_APP_DIR=/app), which would make the binary
   # group-0-writable.
   RUN mkdir -p "$APP_DIR/logs" "$MINIO_DIR" && \
-    useradd -u 1000 -g 0 -m -s /bin/bash appuser && \
-    chown -R appuser:0 /app && \
+    useradd -u 1000 -g 0 -m -s /bin/bash appuser
+
+  RUN chown -R appuser:0 /app && \
     chown -R appuser:0 "$APP_DIR" && \
     chown -R appuser:0 "$MINIO_DIR" && \
     { [ "$APP_DIR" = "/app" ] || chmod -R g=rwX "$APP_DIR"; } && \
     { [ "$MINIO_DIR" = "/app" ] || chmod -R g=rwX "$MINIO_DIR"; } && \
-    chmod +x /app/main /usr/local/bin/minio /usr/local/bin/mc && \
     mkdir -p /run /var/run /command && \
     chmod -R g+rwX /run /var/run /etc/s6-overlay /command
+
+  COPY --chown=1000:0 --from=minio/minio:RELEASE.2025-09-07T16-13-09Z /usr/bin/minio /usr/local/bin/minio
+  COPY --chown=1000:0 --from=minio/mc:latest /usr/bin/mc /usr/local/bin/mc
+
+  # Create data directory and set up user
+  COPY --chown=1000:0 --from=builder /app/main .
+
   # Numeric USER (uid:gid) so kubelet can verify runAsNonRoot; group 0 grants
   # write access to the group-0-owned data dir under arbitrary OpenShift UIDs.
   USER 1000:0
