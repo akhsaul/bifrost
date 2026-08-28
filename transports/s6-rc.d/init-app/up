@@ -1,30 +1,3 @@
-#!/command/with-contenv sh
-set -e
+#!/command/execlineb -P
 
-export APP_DIR=${APP_DIR:-/app/data}
-export MINIO_DIR=${MINIO_DIR:-/app/data/minio-data}
-
-mkdir -p "$APP_DIR" "$APP_DIR/logs" "$MINIO_DIR" 2>/dev/null || true
-
-CURRENT_UID=$(id -u)
-CURRENT_GID=$(id -g)
-
-fix_permissions() {
-    local TARGET_DIR="$1"
-    if [ "$CURRENT_UID" = "0" ]; then
-        DATA_UID=$(stat -c '%u' "$TARGET_DIR" 2>/dev/null)
-        DATA_GID=$(stat -c '%g' "$TARGET_DIR" 2>/dev/null)
-
-        if [ "$DATA_UID:$DATA_GID" != "$CURRENT_UID:$CURRENT_GID" ]; then
-            echo "Fixing permissions for $TARGET_DIR..."
-            chown -R "$CURRENT_UID:$CURRENT_GID" "$TARGET_DIR" 2>/dev/null && \
-            chmod -R g=rwX "$TARGET_DIR" 2>/dev/null || true
-        fi
-    fi
-}
-
-fix_permissions "$APP_DIR"
-fix_permissions "$MINIO_DIR"
-
-chmod g+rwX "$APP_DIR/logs" 2>/dev/null || true
-echo "Directory initialization complete."
+/bin/sh -c "mkdir -p ${APP_DIR:-/app/data} ${APP_DIR:-/app/data}/logs ${MINIO_DIR:-/app/data/minio-data} 2>/dev/null || true

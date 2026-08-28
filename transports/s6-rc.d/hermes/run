@@ -1,4 +1,0 @@
-#!/command/with-contenv sh
-
-echo "Starting Hermes Agent..."
-exec hermes-agent
