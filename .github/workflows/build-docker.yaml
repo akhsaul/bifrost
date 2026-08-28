@@ -59,6 +59,72 @@ jobs:
           tags: ${{ format('bifrost-hermes:dev-{0}', env.SHORT_SHA) }}
           load: true
 
+      - name: Test run bifrost-hermes container
+        run: |
+          IMAGE_TAG="${{ format('bifrost-hermes:dev-{0}', env.SHORT_SHA) }}"
+          CONTAINER_NAME="bifrost-hermes-test"
+          
+          echo "Starting test container $CONTAINER_NAME..."
+          docker run -d --name "$CONTAINER_NAME" \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            -e MINIO_PORT=9000 \
+            -e MINIO_CONSOLE_PORT=9001 \
+            -e MINIO_BUCKET=bifrost-logs \
+            -e APP_PORT=2972 \
+            -e APP_HOST=0.0.0.0 \
+            -e LOG_LEVEL=warn \
+            -e BIFROST_ENCRYPTION_KEY=test_encryption_key_32_bytes_len! \
+            -e BIFROST_ADMIN_USERNAME=admin \
+            -e BIFROST_ADMIN_PASSWORD=adminpass \
+            -p 2972:2972 \
+            -p 9000:9000 \
+            "$IMAGE_TAG"
+          
+          echo "Waiting for container and services to initialize..."
+          SUCCESS=0
+          for i in $(seq 1 30); do
+            if ! docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null | grep -q true; then
+              echo "ERROR: Container stopped unexpectedly!"
+              docker logs "$CONTAINER_NAME"
+              exit 1
+            fi
+            
+            if curl -sf http://127.0.0.1:2972/health >/dev/null 2>&1; then
+              echo "Bifrost health check passed at ${i}s!"
+              SUCCESS=1
+              break
+            fi
+            sleep 1
+          done
+          
+          echo "=== Container Logs (Runtime Diagnostics) ==="
+          docker logs "$CONTAINER_NAME"
+          
+          if [ "$SUCCESS" -ne 1 ]; then
+            echo "ERROR: Bifrost failed to become healthy within 30 seconds!"
+            docker stop "$CONTAINER_NAME" || true
+            docker rm "$CONTAINER_NAME" || true
+            exit 1
+          fi
+          
+          echo "Verifying MinIO readiness endpoint..."
+          curl -fv http://127.0.0.1:9000/minio/health/ready || (echo "MinIO health check failed!" && exit 1)
+          
+          echo "Checking container logs for startup errors..."
+          LOGS=$(docker logs "$CONTAINER_NAME" 2>&1)
+          if echo "$LOGS" | grep -iE 's6-rc-oneshot-run: fatal:|\[stage2\] ERROR:|Permission denied: '\''/opt/data|exited [1-9]|command exited 12[67]'; then
+            echo "ERROR: Found fatal errors in container startup logs!"
+            docker stop "$CONTAINER_NAME" || true
+            docker rm "$CONTAINER_NAME" || true
+            exit 1
+          fi
+          
+          echo "Stopping and cleaning up test container..."
+          docker stop "$CONTAINER_NAME"
+          docker rm "$CONTAINER_NAME"
+          echo "All container runtime tests passed successfully!"
+
       - name: Check docker images by dive
         uses: MaxymVlasov/dive-action@9bfaea6c0b1e49111459b2cb3f9275fa4094a63e # v2.0.1
         with:
