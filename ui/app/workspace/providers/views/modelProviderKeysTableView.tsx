@@ -344,7 +344,14 @@ export default function ModelProviderKeysTableView({ provider, className, header
 															</Tooltip>
 														);
 													})()}
-												<span className="truncate font-mono text-sm">{key.name}</span>
+												<div className="flex flex-col min-w-0">
+													<span className="truncate font-mono text-sm">{key.name}</span>
+													{Boolean(key.antigravity_key_config?.project_id?.value) && (
+														<span className="text-xs text-muted-foreground truncate font-mono">
+															Project: {key.antigravity_key_config?.project_id?.value}
+														</span>
+													)}
+												</div>
 											</div>
 										</TableCell>
 										<TableCell data-testid="key-weight-value">

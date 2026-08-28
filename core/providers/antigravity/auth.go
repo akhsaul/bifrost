@@ -41,6 +41,9 @@ const (
 	DefaultCLIVersion    = "1.1.18"
 	DefaultOS            = "darwin"
 	DefaultArch          = "arm64"
+
+	// DefaultAntigravityRedirectURI is the default loopback redirect URI for Google Antigravity / Cloud Code OAuth.
+	DefaultAntigravityRedirectURI = "http://localhost:8085"
 )
 
 // GetAntigravityClientID returns the Google OAuth client ID from environment variables (ANTIGRAVITY_CLIENT_ID or ANTIGRAVITY_OAUTH_CLIENT_ID).
@@ -418,6 +421,9 @@ func EnsureProjectID(
 
 // BuildAntigravityAuthURL generates the Google OAuth authorization URL for Antigravity.
 func BuildAntigravityAuthURL(redirectURI, state string) string {
+	if strings.TrimSpace(redirectURI) == "" {
+		redirectURI = DefaultAntigravityRedirectURI
+	}
 	params := url.Values{}
 	clientID := GetAntigravityClientID()
 	if clientID != "" {
@@ -452,6 +458,9 @@ func ExchangeAuthCode(
 	clientSecret string,
 	logger schemas.Logger,
 ) (*AntigravityCredentials, error) {
+	if strings.TrimSpace(redirectURI) == "" {
+		redirectURI = DefaultAntigravityRedirectURI
+	}
 	if clientID == "" {
 		clientID = GetAntigravityClientID()
 	}

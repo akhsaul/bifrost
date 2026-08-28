@@ -163,6 +163,7 @@ func schemaKeyFromTableKey(dbKey tables.TableKey) schemas.Key {
 		ReplicateKeyConfig:     dbKey.ReplicateKeyConfig,
 		OllamaKeyConfig:        dbKey.OllamaKeyConfig,
 		SGLKeyConfig:           dbKey.SGLKeyConfig,
+		AntigravityKeyConfig:   dbKey.AntigravityKeyConfig,
 		ConfigHash:             dbKey.ConfigHash,
 		Status:                 schemas.KeyStatusType(dbKey.Status),
 		Description:            dbKey.Description,
@@ -192,6 +193,7 @@ func tableKeyFromSchemaKey(provider tables.TableProvider, key schemas.Key) (tabl
 		ReplicateKeyConfig:     key.ReplicateKeyConfig,
 		OllamaKeyConfig:        key.OllamaKeyConfig,
 		SGLKeyConfig:           key.SGLKeyConfig,
+		AntigravityKeyConfig:   key.AntigravityKeyConfig,
 		ConfigHash:             key.ConfigHash,
 		Status:                 string(key.Status),
 		Description:            key.Description,
@@ -235,6 +237,15 @@ func tableKeyFromSchemaKey(provider tables.TableProvider, key schemas.Key) (tabl
 			s := string(data)
 			dbKey.BedrockEndpointsJSON = &s
 		}
+	}
+
+	if key.AntigravityKeyConfig != nil {
+		dbKey.AntigravityProjectID = key.AntigravityKeyConfig.ProjectID
+		dbKey.AntigravityRefreshToken = key.AntigravityKeyConfig.RefreshToken
+		dbKey.AntigravityAccessToken = key.AntigravityKeyConfig.AccessToken
+		dbKey.AntigravityClientID = key.AntigravityKeyConfig.ClientID
+		dbKey.AntigravityClientSecret = key.AntigravityKeyConfig.ClientSecret
+		dbKey.AntigravityClientProfile = key.AntigravityKeyConfig.ClientProfile
 	}
 
 	return dbKey, nil
@@ -757,6 +768,7 @@ func (s *RDBConfigStore) UpdateProvidersConfig(ctx context.Context, providers ma
 				ReplicateKeyConfig:     key.ReplicateKeyConfig,
 				OllamaKeyConfig:        key.OllamaKeyConfig,
 				SGLKeyConfig:           key.SGLKeyConfig,
+				AntigravityKeyConfig:   key.AntigravityKeyConfig,
 				ConfigHash:             keyHash,
 				Status:                 string(key.Status),
 				Description:            key.Description,
@@ -806,6 +818,16 @@ func (s *RDBConfigStore) UpdateProvidersConfig(ctx context.Context, providers ma
 			} else {
 				dbKey.BedrockBatchS3ConfigJSON = nil
 				dbKey.BedrockEndpointsJSON = nil
+			}
+
+			// Handle Antigravity config
+			if key.AntigravityKeyConfig != nil {
+				dbKey.AntigravityProjectID = key.AntigravityKeyConfig.ProjectID
+				dbKey.AntigravityRefreshToken = key.AntigravityKeyConfig.RefreshToken
+				dbKey.AntigravityAccessToken = key.AntigravityKeyConfig.AccessToken
+				dbKey.AntigravityClientID = key.AntigravityKeyConfig.ClientID
+				dbKey.AntigravityClientSecret = key.AntigravityKeyConfig.ClientSecret
+				dbKey.AntigravityClientProfile = key.AntigravityKeyConfig.ClientProfile
 			}
 
 			dbKeys = append(dbKeys, dbKey)
@@ -998,6 +1020,7 @@ func (s *RDBConfigStore) UpdateProvider(ctx context.Context, provider schemas.Mo
 			ReplicateKeyConfig:     key.ReplicateKeyConfig,
 			OllamaKeyConfig:        key.OllamaKeyConfig,
 			SGLKeyConfig:           key.SGLKeyConfig,
+			AntigravityKeyConfig:   key.AntigravityKeyConfig,
 			ConfigHash:             keyHash,
 			Status:                 string(key.Status),
 			Description:            key.Description,
@@ -1048,6 +1071,16 @@ func (s *RDBConfigStore) UpdateProvider(ctx context.Context, provider schemas.Mo
 			} else {
 				dbKey.BedrockEndpointsJSON = nil
 			}
+		}
+
+		// Handle Antigravity config
+		if key.AntigravityKeyConfig != nil {
+			dbKey.AntigravityProjectID = key.AntigravityKeyConfig.ProjectID
+			dbKey.AntigravityRefreshToken = key.AntigravityKeyConfig.RefreshToken
+			dbKey.AntigravityAccessToken = key.AntigravityKeyConfig.AccessToken
+			dbKey.AntigravityClientID = key.AntigravityKeyConfig.ClientID
+			dbKey.AntigravityClientSecret = key.AntigravityKeyConfig.ClientSecret
+			dbKey.AntigravityClientProfile = key.AntigravityKeyConfig.ClientProfile
 		}
 
 		// Check if this key already exists
@@ -1151,6 +1184,7 @@ func (s *RDBConfigStore) AddProvider(ctx context.Context, provider schemas.Model
 			ReplicateKeyConfig:     key.ReplicateKeyConfig,
 			OllamaKeyConfig:        key.OllamaKeyConfig,
 			SGLKeyConfig:           key.SGLKeyConfig,
+			AntigravityKeyConfig:   key.AntigravityKeyConfig,
 			ConfigHash:             key.ConfigHash,
 			Status:                 string(key.Status),
 			Description:            key.Description,
@@ -1198,6 +1232,16 @@ func (s *RDBConfigStore) AddProvider(ctx context.Context, provider schemas.Model
 			} else {
 				dbKey.BedrockEndpointsJSON = nil
 			}
+		}
+
+		// Handle Antigravity config
+		if key.AntigravityKeyConfig != nil {
+			dbKey.AntigravityProjectID = key.AntigravityKeyConfig.ProjectID
+			dbKey.AntigravityRefreshToken = key.AntigravityKeyConfig.RefreshToken
+			dbKey.AntigravityAccessToken = key.AntigravityKeyConfig.AccessToken
+			dbKey.AntigravityClientID = key.AntigravityKeyConfig.ClientID
+			dbKey.AntigravityClientSecret = key.AntigravityKeyConfig.ClientSecret
+			dbKey.AntigravityClientProfile = key.AntigravityKeyConfig.ClientProfile
 		}
 
 		// Create the key

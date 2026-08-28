@@ -57,8 +57,26 @@ export default function ProviderKeyForm({ provider, keyId, onCancel, onSave }: P
 	// Skip reset if user has unsaved edits to avoid discarding changes during background refetches
 	useEffect(() => {
 		if (!isEditing || !currentKey || form.formState.isDirty) return;
-		form.reset({ key: currentKey as ProviderKeyFormValues });
-	}, [isEditing, currentKey, form]);
+		const keyToReset = { ...currentKey };
+		if (provider.name === "antigravity") {
+			if (!keyToReset.antigravity_key_config) {
+				keyToReset.antigravity_key_config = {};
+			}
+			const rawVal = keyToReset.value?.value || "";
+			if (rawVal.startsWith("{")) {
+				try {
+					const parsed = JSON.parse(rawVal);
+					if (parsed.project_id && !keyToReset.antigravity_key_config.project_id?.value) {
+						keyToReset.antigravity_key_config.project_id = { value: parsed.project_id, type: "plain_text" };
+					}
+					if (parsed.refresh_token && !keyToReset.antigravity_key_config.refresh_token?.value) {
+						keyToReset.antigravity_key_config.refresh_token = { value: parsed.refresh_token, type: "plain_text" };
+					}
+				} catch {}
+			}
+		}
+		form.reset({ key: keyToReset as ProviderKeyFormValues });
+	}, [isEditing, currentKey, form, provider.name]);
 
 	// Trigger validation on mount when editing existing data
 	useEffect(() => {
@@ -99,6 +117,10 @@ export default function ProviderKeyForm({ provider, keyId, onCancel, onSave }: P
 		if (key.bedrock_mantle_key_config) {
 			const { _auth_type, ...rest } = key.bedrock_mantle_key_config;
 			key.bedrock_mantle_key_config = rest;
+		}
+		if (key.antigravity_key_config) {
+			const { _auth_type, ...rest } = key.antigravity_key_config;
+			key.antigravity_key_config = rest;
 		}
 		const mutation = isEditing
 			? updateProviderKey({

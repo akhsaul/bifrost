@@ -684,6 +684,29 @@ func (p *ProviderConfig) Redacted() *ProviderConfig {
 			sglConfig.URL = *key.SGLKeyConfig.URL.Redacted()
 			redactedConfig.Keys[i].SGLKeyConfig = sglConfig
 		}
+
+		if key.AntigravityKeyConfig != nil {
+			antigravityConfig := &schemas.AntigravityKeyConfig{
+				ClientProfile: key.AntigravityKeyConfig.ClientProfile,
+			}
+			// Project ID is an identifier, not a credential — surface it in plaintext.
+			if key.AntigravityKeyConfig.ProjectID != nil {
+				antigravityConfig.ProjectID = key.AntigravityKeyConfig.ProjectID
+			}
+			if key.AntigravityKeyConfig.RefreshToken != nil {
+				antigravityConfig.RefreshToken = key.AntigravityKeyConfig.RefreshToken.Redacted()
+			}
+			if key.AntigravityKeyConfig.AccessToken != nil {
+				antigravityConfig.AccessToken = key.AntigravityKeyConfig.AccessToken.Redacted()
+			}
+			if key.AntigravityKeyConfig.ClientID != nil {
+				antigravityConfig.ClientID = key.AntigravityKeyConfig.ClientID.Redacted()
+			}
+			if key.AntigravityKeyConfig.ClientSecret != nil {
+				antigravityConfig.ClientSecret = key.AntigravityKeyConfig.ClientSecret.Redacted()
+			}
+			redactedConfig.Keys[i].AntigravityKeyConfig = antigravityConfig
+		}
 	}
 	return &redactedConfig
 }
@@ -869,6 +892,14 @@ func GenerateKeyHash(key schemas.Key) (string, error) {
 	// Hash SGLKeyConfig
 	if key.SGLKeyConfig != nil {
 		data, err := sonic.Marshal(key.SGLKeyConfig)
+		if err != nil {
+			return "", err
+		}
+		hash.Write(data)
+	}
+	// Hash AntigravityKeyConfig
+	if key.AntigravityKeyConfig != nil {
+		data, err := sonic.Marshal(key.AntigravityKeyConfig)
 		if err != nil {
 			return "", err
 		}

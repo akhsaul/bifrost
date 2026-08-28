@@ -228,3 +228,34 @@ func TestProviderConfig_Redacted_FullJSONHasNoLeakedEnvSecrets(t *testing.T) {
 			"env var reference %q missing from redacted JSON output", ref)
 	}
 }
+
+// TestProviderConfig_Redacted_PreservesAntigravityProjectID ensures Antigravity Project ID
+// remains plaintext in the redacted output while the refresh token is properly masked.
+func TestProviderConfig_Redacted_PreservesAntigravityProjectID(t *testing.T) {
+	config := ProviderConfig{
+		Keys: []schemas.Key{{
+			ID:    "ag-1",
+			Name:  "oauth-antigravity",
+			Value: *schemas.NewSecretVar("1//04_secret_refresh_token_abcdef123456"),
+			AntigravityKeyConfig: &schemas.AntigravityKeyConfig{
+				ProjectID:    schemas.NewSecretVar("my-gcp-project-123"),
+				RefreshToken: schemas.NewSecretVar("1//04_secret_refresh_token_abcdef123456"),
+			},
+		}},
+	}
+
+	redacted := config.Redacted()
+	require.NotNil(t, redacted)
+	require.Len(t, redacted.Keys, 1)
+	require.NotNil(t, redacted.Keys[0].AntigravityKeyConfig)
+
+	// Project ID must be plaintext
+	require.NotNil(t, redacted.Keys[0].AntigravityKeyConfig.ProjectID)
+	assert.Equal(t, "my-gcp-project-123", redacted.Keys[0].AntigravityKeyConfig.ProjectID.GetValue())
+
+	// Refresh token must be masked
+	require.NotNil(t, redacted.Keys[0].AntigravityKeyConfig.RefreshToken)
+	assert.True(t, redacted.Keys[0].AntigravityKeyConfig.RefreshToken.IsRedacted())
+	assert.NotEqual(t, "1//04_secret_refresh_token_abcdef123456", redacted.Keys[0].AntigravityKeyConfig.RefreshToken.GetValue())
+}
+

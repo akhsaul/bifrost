@@ -3,6 +3,7 @@ package tables
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/bytedance/sonic"
@@ -84,6 +85,14 @@ type TableKey struct {
 	// SGL config fields (embedded)
 	SGLUrl *schemas.SecretVar `gorm:"type:text" json:"sgl_url,omitempty"`
 
+	// Antigravity config fields (embedded)
+	AntigravityProjectID     *schemas.SecretVar `gorm:"type:text" json:"antigravity_project_id,omitempty"`
+	AntigravityRefreshToken  *schemas.SecretVar `gorm:"type:text" json:"antigravity_refresh_token,omitempty"`
+	AntigravityAccessToken   *schemas.SecretVar `gorm:"type:text" json:"antigravity_access_token,omitempty"`
+	AntigravityClientID      *schemas.SecretVar `gorm:"type:text" json:"antigravity_client_id,omitempty"`
+	AntigravityClientSecret  *schemas.SecretVar `gorm:"type:text" json:"antigravity_client_secret,omitempty"`
+	AntigravityClientProfile *string            `gorm:"type:varchar(50)" json:"antigravity_client_profile,omitempty"`
+
 	// Batch API configuration
 	UseForBatchAPI *bool `gorm:"default:false" json:"use_for_batch_api,omitempty"` // Whether this key can be used for batch API operations
 
@@ -108,6 +117,7 @@ type TableKey struct {
 	ReplicateKeyConfig     *schemas.ReplicateKeyConfig     `gorm:"-" json:"replicate_key_config,omitempty"`
 	OllamaKeyConfig        *schemas.OllamaKeyConfig        `gorm:"-" json:"ollama_key_config,omitempty"`
 	SGLKeyConfig           *schemas.SGLKeyConfig           `gorm:"-" json:"sgl_key_config,omitempty"`
+	AntigravityKeyConfig   *schemas.AntigravityKeyConfig   `gorm:"-" json:"antigravity_key_config,omitempty"`
 }
 
 // TableName sets the table name for each model
@@ -449,6 +459,52 @@ func (k *TableKey) BeforeSave(tx *gorm.DB) error {
 		k.SGLUrl = nil
 	}
 
+	if k.AntigravityKeyConfig != nil {
+		if k.AntigravityKeyConfig.ProjectID != nil && k.AntigravityKeyConfig.ProjectID.IsSet() {
+			pid := *k.AntigravityKeyConfig.ProjectID
+			k.AntigravityProjectID = &pid
+		} else {
+			k.AntigravityProjectID = nil
+		}
+		if k.AntigravityKeyConfig.RefreshToken != nil && k.AntigravityKeyConfig.RefreshToken.IsSet() {
+			rt := *k.AntigravityKeyConfig.RefreshToken
+			k.AntigravityRefreshToken = &rt
+		} else {
+			k.AntigravityRefreshToken = nil
+		}
+		if k.AntigravityKeyConfig.AccessToken != nil && k.AntigravityKeyConfig.AccessToken.IsSet() {
+			at := *k.AntigravityKeyConfig.AccessToken
+			k.AntigravityAccessToken = &at
+		} else {
+			k.AntigravityAccessToken = nil
+		}
+		if k.AntigravityKeyConfig.ClientID != nil && k.AntigravityKeyConfig.ClientID.IsSet() {
+			cid := *k.AntigravityKeyConfig.ClientID
+			k.AntigravityClientID = &cid
+		} else {
+			k.AntigravityClientID = nil
+		}
+		if k.AntigravityKeyConfig.ClientSecret != nil && k.AntigravityKeyConfig.ClientSecret.IsSet() {
+			cs := *k.AntigravityKeyConfig.ClientSecret
+			k.AntigravityClientSecret = &cs
+		} else {
+			k.AntigravityClientSecret = nil
+		}
+		if k.AntigravityKeyConfig.ClientProfile != nil && *k.AntigravityKeyConfig.ClientProfile != "" {
+			cp := *k.AntigravityKeyConfig.ClientProfile
+			k.AntigravityClientProfile = &cp
+		} else {
+			k.AntigravityClientProfile = nil
+		}
+	} else {
+		k.AntigravityProjectID = nil
+		k.AntigravityRefreshToken = nil
+		k.AntigravityAccessToken = nil
+		k.AntigravityClientID = nil
+		k.AntigravityClientSecret = nil
+		k.AntigravityClientProfile = nil
+	}
+
 	// Store plaintext SecretVar columns into the vault and rewrite them to vault refs.
 	// This must run after the columns are populated (above) and before encryption (below):
 	// encryptSecretVar skips fields that are already vault refs, so vault-owned secrets are
@@ -573,6 +629,19 @@ func (k *TableKey) BeforeSave(tx *gorm.DB) error {
 		if err := encryptSecretVarPtr(&k.SGLUrl); err != nil {
 			return fmt.Errorf("failed to encrypt sgl url: %w", err)
 		}
+		// Antigravity
+		if err := encryptSecretVarPtr(&k.AntigravityRefreshToken); err != nil {
+			return fmt.Errorf("failed to encrypt antigravity refresh token: %w", err)
+		}
+		if err := encryptSecretVarPtr(&k.AntigravityAccessToken); err != nil {
+			return fmt.Errorf("failed to encrypt antigravity access token: %w", err)
+		}
+		if err := encryptSecretVarPtr(&k.AntigravityClientID); err != nil {
+			return fmt.Errorf("failed to encrypt antigravity client id: %w", err)
+		}
+		if err := encryptSecretVarPtr(&k.AntigravityClientSecret); err != nil {
+			return fmt.Errorf("failed to encrypt antigravity client secret: %w", err)
+		}
 		k.EncryptionStatus = EncryptionStatusEncrypted
 	}
 	return nil
@@ -694,6 +763,19 @@ func (k *TableKey) AfterFind(tx *gorm.DB) error {
 		if err := decryptSecretVarPtr(&k.SGLUrl); err != nil {
 			return fmt.Errorf("failed to decrypt sgl url: %w", err)
 		}
+		// Antigravity
+		if err := decryptSecretVarPtr(&k.AntigravityRefreshToken); err != nil {
+			return fmt.Errorf("failed to decrypt antigravity refresh token: %w", err)
+		}
+		if err := decryptSecretVarPtr(&k.AntigravityAccessToken); err != nil {
+			return fmt.Errorf("failed to decrypt antigravity access token: %w", err)
+		}
+		if err := decryptSecretVarPtr(&k.AntigravityClientID); err != nil {
+			return fmt.Errorf("failed to decrypt antigravity client id: %w", err)
+		}
+		if err := decryptSecretVarPtr(&k.AntigravityClientSecret); err != nil {
+			return fmt.Errorf("failed to decrypt antigravity client secret: %w", err)
+		}
 	}
 
 	if k.ModelsJSON != "" {
@@ -755,12 +837,15 @@ func (k *TableKey) AfterFind(tx *gorm.DB) error {
 		if k.VertexRegion != nil {
 			config.Region = *k.VertexRegion
 		}
+
 		if k.VertexAuthCredentials != nil {
 			config.AuthCredentials = *k.VertexAuthCredentials
 		}
+
 		if k.VertexForceSingleRegion != nil {
 			config.ForceSingleRegion = *k.VertexForceSingleRegion
 		}
+
 		k.VertexKeyConfig = config
 	}
 	// Reconstruct Bedrock config if fields are present
@@ -872,6 +957,55 @@ func (k *TableKey) AfterFind(tx *gorm.DB) error {
 		}
 	} else {
 		k.SGLKeyConfig = nil
+	}
+	// Reconstruct Antigravity config if fields are present
+	if k.AntigravityProjectID != nil || k.AntigravityRefreshToken != nil || k.AntigravityAccessToken != nil || k.AntigravityClientID != nil || k.AntigravityClientSecret != nil || k.AntigravityClientProfile != nil {
+		k.AntigravityKeyConfig = &schemas.AntigravityKeyConfig{
+			ProjectID:     k.AntigravityProjectID,
+			RefreshToken:  k.AntigravityRefreshToken,
+			AccessToken:   k.AntigravityAccessToken,
+			ClientID:      k.AntigravityClientID,
+			ClientSecret:  k.AntigravityClientSecret,
+			ClientProfile: k.AntigravityClientProfile,
+		}
+		if (k.AntigravityKeyConfig.ProjectID == nil || !k.AntigravityKeyConfig.ProjectID.IsSet()) && k.Provider == string(schemas.Antigravity) {
+			val := k.Value.GetValue()
+			if strings.HasPrefix(val, "{") {
+				var jsonCreds struct {
+					ProjectID string `json:"project_id"`
+				}
+				if err := sonic.Unmarshal([]byte(val), &jsonCreds); err == nil && jsonCreds.ProjectID != "" {
+					k.AntigravityKeyConfig.ProjectID = schemas.NewSecretVar(jsonCreds.ProjectID)
+				}
+			}
+		}
+	} else if k.Provider == string(schemas.Antigravity) {
+		k.AntigravityKeyConfig = &schemas.AntigravityKeyConfig{}
+		val := k.Value.GetValue()
+		if strings.HasPrefix(val, "{") {
+			var jsonCreds struct {
+				ProjectID    string `json:"project_id"`
+				RefreshToken string `json:"refresh_token"`
+				AccessToken  string `json:"access_token"`
+			}
+			if err := sonic.Unmarshal([]byte(val), &jsonCreds); err == nil {
+				if jsonCreds.ProjectID != "" {
+					k.AntigravityKeyConfig.ProjectID = schemas.NewSecretVar(jsonCreds.ProjectID)
+				}
+				if jsonCreds.RefreshToken != "" {
+					k.AntigravityKeyConfig.RefreshToken = schemas.NewSecretVar(jsonCreds.RefreshToken)
+				}
+				if jsonCreds.AccessToken != "" {
+					k.AntigravityKeyConfig.AccessToken = schemas.NewSecretVar(jsonCreds.AccessToken)
+				}
+			}
+		} else if strings.HasPrefix(val, "ya29.") {
+			k.AntigravityKeyConfig.AccessToken = &k.Value
+		} else if val != "" {
+			k.AntigravityKeyConfig.RefreshToken = &k.Value
+		}
+	} else {
+		k.AntigravityKeyConfig = nil
 	}
 	return nil
 }

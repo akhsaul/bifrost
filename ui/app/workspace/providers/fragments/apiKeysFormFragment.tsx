@@ -11,7 +11,7 @@ import { TagInput } from "@/components/ui/tagInput";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLazyGetAntigravityAuthUrlQuery, useExchangeAntigravityAuthCodeMutation } from "@/lib/store/apis/providersApi";
 import { isRedacted } from "@/lib/utils/validation";
-import { CheckCircle2, Info, Loader2, RefreshCw } from "lucide-react";
+import { CheckCircle2, Info, Loader2, RefreshCw, Copy, Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Control, UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
@@ -171,6 +171,9 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 	// Auth type state for Antigravity: 'oauth' or 'manual'
 	const [antigravityAuthType, setAntigravityAuthType] = useState<"oauth" | "manual">("oauth");
 	const [manualCode, setManualCode] = useState("");
+	const [manualRedirectUri, setManualRedirectUri] = useState<string>("http://localhost:8085");
+	const [hasCopiedLink, setHasCopiedLink] = useState(false);
+	const [isCopyingUrl, setIsCopyingUrl] = useState(false);
 	const [authError, setAuthError] = useState<string | null>(null);
 	const [getAuthUrl, { isLoading: isFetchingUrl }] = useLazyGetAntigravityAuthUrlQuery();
 	const [exchangeCode, { isLoading: isExchanging }] = useExchangeAntigravityAuthCodeMutation();
@@ -182,9 +185,21 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			const authType = form.getValues("key.antigravity_key_config._auth_type");
 			if (authType) {
 				setAntigravityAuthType(authType);
+			} else {
+				const hasManualCreds = Boolean(
+					form.getValues("key.antigravity_key_config.client_id")?.value ||
+					form.getValues("key.antigravity_key_config.client_secret")?.value
+				);
+				if (hasManualCreds) {
+					setAntigravityAuthType("manual");
+					form.setValue("key.antigravity_key_config._auth_type", "manual");
+				} else {
+					setAntigravityAuthType("oauth");
+					form.setValue("key.antigravity_key_config._auth_type", "oauth");
+				}
 			}
 		}
-	}, [isAntigravity, form]);
+	}, [isAntigravity, form, form.formState.defaultValues]);
 
 	const handleGoogleLogin = async () => {
 		setAuthError(null);
@@ -213,6 +228,27 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			window.addEventListener("message", handleMessage);
 		} catch (err: any) {
 			setAuthError(err?.data?.error || err?.message || "Failed to start Google OAuth flow");
+		}
+	};
+
+	const handleCopyGoogleLoginUrl = async () => {
+		setAuthError(null);
+		setIsCopyingUrl(true);
+		try {
+			const redirectUri = "http://localhost:8085";
+			const res = await getAuthUrl({ redirect_uri: redirectUri }).unwrap();
+			if (!res.auth_url) throw new Error("No authorization URL returned");
+
+			await navigator.clipboard.writeText(res.auth_url);
+			setManualRedirectUri("http://localhost:8085");
+			setHasCopiedLink(true);
+			setTimeout(() => setHasCopiedLink(false), 2500);
+			toast.success("Google OAuth URL copied to clipboard! Open it in your local browser, then paste the redirect URL below.");
+		} catch (err: any) {
+			setAuthError(err?.data?.error || err?.message || "Failed to generate Google OAuth URL");
+			toast.error("Failed to copy Google OAuth URL");
+		} finally {
+			setIsCopyingUrl(false);
 		}
 	};
 
@@ -1446,83 +1482,154 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 										<CheckCircle2 className="h-5 w-5 shrink-0" />
 										<div className="text-sm">
 											<div className="font-semibold">Google Account Connected</div>
-											<div className="text-xs opacity-90">
-												{form.watch("key.antigravity_key_config.project_id")?.value
-													? `Google Cloud Project ID: ${form.watch("key.antigravity_key_config.project_id")?.value}`
-													: "OAuth Refresh Token loaded and auto-refreshed"}
+											<div className="text-xs opacity-90 mt-0.5">
+												{form.watch("key.antigravity_key_config.project_id")?.value ? (
+													<span>
+														Google Cloud Project ID:{" "}
+														<span className="font-mono font-medium">{form.watch("key.antigravity_key_config.project_id")?.value}</span>
+													</span>
+												) : (
+													"OAuth Refresh Token loaded and auto-refreshed"
+												)}
 											</div>
 										</div>
 									</div>
-									<Button
-										type="button"
-										variant="outline"
-										size="sm"
-										className="self-start text-xs"
-										onClick={handleGoogleLogin}
-										disabled={isFetchingUrl || isExchanging}
-									>
-										{isFetchingUrl || isExchanging ? (
-											<Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-										) : (
-											<RefreshCw className="mr-2 h-3.5 w-3.5" />
-										)}
-										Reconnect / Switch Google Account
-									</Button>
+									<div className="flex items-center gap-2">
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											className="text-xs"
+											onClick={handleGoogleLogin}
+											disabled={isFetchingUrl || isExchanging || isCopyingUrl}
+										>
+											{isFetchingUrl || isExchanging ? (
+												<Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+											) : (
+												<RefreshCw className="mr-2 h-3.5 w-3.5" />
+											)}
+											Reconnect / Switch Google Account
+										</Button>
+										<TooltipProvider>
+											<Tooltip>
+												<TooltipTrigger asChild>
+													<Button
+														type="button"
+														variant="outline"
+														size="sm"
+														className="text-xs"
+														onClick={handleCopyGoogleLoginUrl}
+														disabled={isFetchingUrl || isExchanging || isCopyingUrl}
+													>
+														{isCopyingUrl ? (
+															<Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+														) : hasCopiedLink ? (
+															<Check className="mr-2 h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+														) : (
+															<Copy className="mr-2 h-3.5 w-3.5" />
+														)}
+														{hasCopiedLink ? "Copied!" : "Copy Link"}
+													</Button>
+												</TooltipTrigger>
+												<TooltipContent className="max-w-xs">
+													<p>
+														Copy Google OAuth URL (redirecting to localhost:8085) to open in your local browser.
+													</p>
+												</TooltipContent>
+											</Tooltip>
+										</TooltipProvider>
+									</div>
 								</div>
 							) : (
 								<div className="space-y-3">
 									<p className="text-muted-foreground text-sm">
-										Click below to sign in with your Google account. Bifrost will automatically retrieve the OAuth tokens and discover your Cloud Code project.
+										Sign in with your Google account. Bifrost will automatically retrieve the OAuth tokens and discover your Cloud Code project.
 									</p>
-									<Button
-										type="button"
-										variant="default"
-										data-testid="antigravity-oauth-login-btn"
-										className="w-full flex items-center justify-center gap-2"
-										onClick={handleGoogleLogin}
-										disabled={isFetchingUrl || isExchanging}
-									>
-										{isFetchingUrl || isExchanging ? (
-											<Loader2 className="h-4 w-4 animate-spin" />
-										) : (
-											<svg className="h-4 w-4" viewBox="0 0 24 24">
-												<path
-													fill="#EA4335"
-													d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"
-												/>
-												<path
-													fill="#4285F4"
-													d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"
-												/>
-												<path
-													fill="#FBBC05"
-													d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9z"
-												/>
-												<path
-													fill="#34A853"
-													d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z"
-												/>
-											</svg>
-										)}
-										Sign in with Google (OAuth)
-									</Button>
+									<div className="flex flex-col sm:flex-row gap-2">
+										<Button
+											type="button"
+											variant="default"
+											data-testid="antigravity-oauth-login-btn"
+											className="flex-1 flex items-center justify-center gap-2"
+											onClick={handleGoogleLogin}
+											disabled={isFetchingUrl || isExchanging || isCopyingUrl}
+										>
+											{isFetchingUrl || isExchanging ? (
+												<Loader2 className="h-4 w-4 animate-spin" />
+											) : (
+												<svg className="h-4 w-4" viewBox="0 0 24 24">
+													<path
+														fill="#EA4335"
+														d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"
+													/>
+													<path
+														fill="#4285F4"
+														d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"
+													/>
+													<path
+														fill="#FBBC05"
+														d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9z"
+													/>
+													<path
+														fill="#34A853"
+														d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z"
+													/>
+												</svg>
+											)}
+											Sign in with Google (OAuth)
+										</Button>
+										<TooltipProvider>
+											<Tooltip>
+												<TooltipTrigger asChild>
+													<Button
+														type="button"
+														variant="outline"
+														data-testid="antigravity-oauth-copy-link-btn"
+														className="flex items-center justify-center gap-2"
+														onClick={handleCopyGoogleLoginUrl}
+														disabled={isFetchingUrl || isExchanging || isCopyingUrl}
+													>
+														{isCopyingUrl ? (
+															<Loader2 className="h-4 w-4 animate-spin" />
+														) : hasCopiedLink ? (
+															<Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+														) : (
+															<Copy className="h-4 w-4" />
+														)}
+														<span>{hasCopiedLink ? "Copied Link!" : "Copy Login Link"}</span>
+													</Button>
+												</TooltipTrigger>
+												<TooltipContent className="max-w-xs">
+													<p>
+														Recommended for VPS, Docker, or Hugging Face Space. Copy the link, open it in your local browser, then paste the resulting redirect URL below.
+													</p>
+												</TooltipContent>
+											</Tooltip>
+										</TooltipProvider>
+									</div>
 
 									<div className="mt-4 pt-4 border-t space-y-2">
 										<FormLabel className="text-xs text-muted-foreground">
-											Alternative: Paste Authorization Code or Redirect URL
+											Alternative / Remote: Paste Authorization Code or Redirect URL
 										</FormLabel>
 										<div className="flex gap-2">
 											<Input
-												placeholder="4/0A... or http://localhost/oauth-callback?code=..."
+												placeholder="4/0A... or http://localhost:8085/?code=..."
 												value={manualCode}
 												onChange={(e) => {
 													const val = e.target.value;
 													if (val.includes("code=")) {
 														try {
-															const urlObj = new URL(val.startsWith("http") ? val : `http://localhost/${val}`);
+															const urlObj = new URL(val.startsWith("http") ? val : `http://localhost:8085/${val}`);
 															const c = urlObj.searchParams.get("code");
 															if (c) {
 																setManualCode(c);
+																const detectedRedirect = urlObj.origin + (urlObj.pathname === "/" ? "" : urlObj.pathname);
+																if (detectedRedirect && detectedRedirect !== "http://localhost") {
+																	setManualRedirectUri(detectedRedirect);
+																} else if (urlObj.origin) {
+																	setManualRedirectUri(urlObj.origin);
+																}
 																return;
 															}
 														} catch {}
@@ -1535,7 +1642,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 												type="button"
 												variant="secondary"
 												size="sm"
-												onClick={() => completeExchange(manualCode)}
+												onClick={() => completeExchange(manualCode, manualRedirectUri || "http://localhost:8085")}
 												disabled={!manualCode.trim() || isExchanging}
 											>
 												{isExchanging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Exchange"}
@@ -1577,7 +1684,12 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 							<FormItem>
 								<FormLabel>Google Cloud Project ID (Optional override)</FormLabel>
 								<FormControl>
-									<SecretVarInput placeholder="Auto-discovered or custom GCP project ID" {...field} />
+									<SecretVarInput
+										placeholder="Auto-discovered or custom GCP project ID"
+										maskNonEnvValue={false}
+										type="text"
+										{...field}
+									/>
 								</FormControl>
 								<FormDescription>
 									Leave blank to use the project ID discovered automatically via Cloud Code assist.
