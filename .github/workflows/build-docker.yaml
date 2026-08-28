@@ -21,7 +21,6 @@ env:
   IMAGE_NAME: ${{ github.repository_owner }}/bifrost
   IMAGE_HERMES_NAME: ${{ github.repository_owner }}/bifrost-hermes
   GO_VERSION: "1.27.0"
-  HERMES_VERSION: "v2026.8.27"
 
 jobs:
   test-cli:
@@ -64,6 +63,7 @@ jobs:
         with:
           image: ${{ format('bifrost-hermes:dev-{0}', env.SHORT_SHA) }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          highest-wasted-bytes: 1KB
 
   release-cli:
     needs: [test-cli]
@@ -125,7 +125,7 @@ jobs:
           build-args: |
             VERSION=${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', env.SHORT_SHA) }}
             APP_PORT=2972
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' }}
           tags: ${{ steps.meta-bifrost.outputs.tags }}
           labels: ${{ steps.meta-bifrost.outputs.labels }}
 
@@ -137,6 +137,6 @@ jobs:
           build-args: |
             VERSION=${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', env.SHORT_SHA) }}
             APP_PORT=2972
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' }}
           tags: ${{ steps.meta-hermes.outputs.tags }}
           labels: ${{ steps.meta-hermes.outputs.labels }}
