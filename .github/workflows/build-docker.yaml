@@ -1,0 +1,150 @@
+name: Build Docker for me (Akhsaul)
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - feature/**
+    tags:
+      - '**'
+
+# Prevent concurrent runs
+concurrency:
+  group: build-docker
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/bifrost
+  IMAGE_HERMES_NAME: ${{ github.repository_owner }}/bifrost-hermes
+  GO_VERSION: "1.27.0"
+
+jobs:
+  test-cli:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Run CLI tests
+        working-directory: cli
+        run: go test ./...
+
+      - name: Get short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::9}" >> $GITHUB_ENV
+
+      - name: Test build docker image (bifrost-hermes)
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: transports/Dockerfile.hermes
+          build-args: |
+            VERSION=${{ format('dev-{0}', env.SHORT_SHA) }}
+            APP_PORT=2972
+          no-cache: true
+          push: false
+          tags: ${{ format('bifrost-hermes:dev-{0}', env.SHORT_SHA) }}
+          load: true
+
+      - name: Check docker images by dive
+        uses: MaxymVlasov/dive-action@9bfaea6c0b1e49111459b2cb3f9275fa4094a63e # v2.0.1
+        with:
+          image: ${{ format('bifrost-hermes:dev-{0}', env.SHORT_SHA) }}
+          highest-user-wasted-ratio: 1.0
+          lowest-efficiency-ratio: 0.0
+
+      - name: Check docker images
+        run: |
+          docker image list | grep bifrost
+          docker history ${{ format('bifrost-hermes:dev-{0}', env.SHORT_SHA) }} --no-trunc
+
+  release-cli:
+    needs: [test-cli]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Get short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Docker meta (bifrost)
+        id: meta-bifrost
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          context: git
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}},enable=${{ github.ref_type == 'tag' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.ref_type == 'tag' }}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
+            type=raw,value=dev-${{ env.SHORT_SHA }},enable=${{ github.ref_type != 'tag' }}
+
+      - name: Docker meta (bifrost-hermes)
+        id: meta-hermes
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          context: git
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_HERMES_NAME }}
+          tags: |
+            type=semver,pattern={{version}},enable=${{ github.ref_type == 'tag' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.ref_type == 'tag' }}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
+            type=raw,value=dev-${{ env.SHORT_SHA }},enable=${{ github.ref_type != 'tag' }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push (bifrost)
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: transports/Dockerfile.custom
+          build-args: |
+            VERSION=${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', env.SHORT_SHA) }}
+            APP_PORT=2972
+          no-cache: true
+          push: ${{ github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' }}
+          tags: ${{ steps.meta-bifrost.outputs.tags }}
+          labels: ${{ steps.meta-bifrost.outputs.labels }}
+
+      - name: Build and push (bifrost-hermes)
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: transports/Dockerfile.hermes
+          build-args: |
+            VERSION=${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', env.SHORT_SHA) }}
+            APP_PORT=2972
+          no-cache: true
+          push: ${{ github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' }}
+          tags: ${{ steps.meta-hermes.outputs.tags }}
+          labels: ${{ steps.meta-hermes.outputs.labels }}
