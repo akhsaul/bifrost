@@ -1,5 +1,10 @@
 #!/command/with-contenv sh
 
+if [ -z "$MINIO_ROOT_USER" ] || [ -z "$MINIO_ROOT_PASSWORD" ]; then
+    echo "ERROR: MINIO_ROOT_USER and MINIO_ROOT_PASSWORD environment variables are required!"
+    exit 1
+fi
+
 echo "Starting MinIO..."
 exec /usr/local/bin/minio server "${MINIO_DIR}" --address ":${MINIO_PORT}" --console-address ":${MINIO_CONSOLE_PORT}"
 

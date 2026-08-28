@@ -113,8 +113,6 @@
   ARG ARG_MINIO_BUCKET=bifrost-logs
   ARG ARG_MINIO_PORT=9000
   ARG ARG_MINIO_CONSOLE_PORT=9001
-  ARG ARG_MINIO_ROOT_USER=minioadmin
-  ARG ARG_MINIO_ROOT_PASSWORD=minioadmin
 
   # Environment variables with defaults (can be overridden at runtime)
   ENV APP_PORT=$ARG_APP_PORT \
@@ -125,9 +123,7 @@
     MINIO_DIR=$ARG_MINIO_DIR \
     MINIO_PORT=$ARG_MINIO_PORT \
     MINIO_BUCKET=$ARG_MINIO_BUCKET \
-    MINIO_CONSOLE_PORT=$ARG_MINIO_CONSOLE_PORT \
-    MINIO_ROOT_USER=$ARG_MINIO_ROOT_USER \
-    MINIO_ROOT_PASSWORD=$ARG_MINIO_ROOT_PASSWORD
+    MINIO_CONSOLE_PORT=$ARG_MINIO_CONSOLE_PORT
 
   # Guard the group-writable chmod so it never applies when APP_DIR resolves to
   # /app itself (e.g. --build-arg ARG_APP_DIR=/app), which would make the binary
