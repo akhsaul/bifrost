@@ -1,0 +1,14 @@
+#!/command/with-contenv sh
+
+echo "Starting MinIO..."
+exec /usr/local/bin/minio server "${MINIO_DIR}" --address ":${MINIO_PORT}" --console-address ":${MINIO_CONSOLE_PORT}"
+
+while ! wget -q -O /dev/null http://127.0.0.1:$MINIO_PORT/minio/health/ready; do
+    echo 'MinIO client is waiting for MinIO API to be ready...';
+    sleep 1;
+done;
+
+echo 'MinIO is ready'
+
+/app/mc alias set local http://127.0.0.1:$MINIO_PORT $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD
+/app/mc mb local/$MINIO_BUCKET --ignore-existing || true

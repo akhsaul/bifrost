@@ -47,18 +47,16 @@ jobs:
       - name: Get short SHA
         run: echo "SHORT_SHA=${GITHUB_SHA::9}" >> $GITHUB_ENV
 
-      - name: Test build docker image (bifrost)
+      - name: Test build docker image (bifrost-hermes)
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          file: transports/Dockerfile.custom
+          file: transports/Dockerfile.hermes
           build-args: |
-            MODE=all
-            HERMES_VERSION=${{ env.HERMES_VERSION }}
             VERSION=${{ format('dev-{0}', env.SHORT_SHA) }}
             APP_PORT=2972
           push: false
-          tags: ${{ format('bifrost:dev-{0}', env.SHORT_SHA) }}
+          tags: ${{ format('bifrost-hermes:dev-{0}', env.SHORT_SHA) }}
 
       - name: Check docker images
         run: docker image list | grep bifrost
@@ -121,8 +119,6 @@ jobs:
           context: .
           file: transports/Dockerfile.custom
           build-args: |
-            MODE=bifrost
-            HERMES_VERSION=${{ env.HERMES_VERSION }}
             VERSION=${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', env.SHORT_SHA) }}
             APP_PORT=2972
           push: ${{ github.event_name != 'pull_request' }}
@@ -133,10 +129,8 @@ jobs:
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          file: transports/Dockerfile.custom
+          file: transports/Dockerfile.hermes
           build-args: |
-            MODE=all
-            HERMES_VERSION=${{ env.HERMES_VERSION }}
             VERSION=${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', env.SHORT_SHA) }}
             APP_PORT=2972
           push: ${{ github.event_name != 'pull_request' }}
