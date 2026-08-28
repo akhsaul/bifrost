@@ -63,7 +63,8 @@ jobs:
         with:
           image: ${{ format('bifrost-hermes:dev-{0}', env.SHORT_SHA) }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          highest-wasted-bytes: 1KB
+          highest-user-wasted-ratio: 1.0
+          lowest-efficiency-ratio: 0.0
 
   release-cli:
     needs: [test-cli]
