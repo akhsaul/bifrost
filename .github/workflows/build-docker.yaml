@@ -60,7 +60,7 @@ jobs:
           load: true
 
       - name: Check docker images
-        uses: MaxymVlasov/dive-action@v2
+        uses: MaxymVlasov/dive-action@9bfaea6c0b1e49111459b2cb3f9275fa4094a63e # v2.0.1
         with:
           image: ${{ format('bifrost-hermes:dev-{0}', env.SHORT_SHA) }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
