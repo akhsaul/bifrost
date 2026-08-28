@@ -67,6 +67,7 @@ jobs:
 
       - name: Check docker images
         run: |
+          docker pull nousresearch/hermes-agent:v2026.8.27 --quiet
           docker history nousresearch/hermes-agent:v2026.8.27 --no-trunc
           docker history ${{ format('bifrost-hermes:dev-{0}', env.SHORT_SHA) }} --no-trunc
 
