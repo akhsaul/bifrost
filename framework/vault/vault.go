@@ -350,8 +350,15 @@ func (m *VaultManager) buildCandidateLookups(path string) []secretLookupCandidat
 func (m *VaultManager) resolveStoreTarget(path string) (project, config, name string) {
 	clean := strings.TrimPrefix(path, "/")
 	prefix := m.GetPrefix()
-	trimmed := strings.TrimPrefix(clean, prefix+"/")
 
+	// If the path starts with the configured vault prefix (e.g. "bifrost/..."),
+	// it is an auto-managed secret (table/row/column). Store it in the default
+	// project and config with the full normalized path as the secret name.
+	if prefix != "" && (clean == prefix || strings.HasPrefix(clean, prefix+"/")) {
+		return "", "", normalizeSecretName(clean)
+	}
+
+	trimmed := strings.TrimPrefix(clean, prefix+"/")
 	segments := strings.Split(trimmed, "/")
 	if len(segments) >= 3 {
 		return segments[0], segments[1], normalizeSecretName(strings.Join(segments[2:], "_"))

@@ -25,6 +25,8 @@ func NewVaultHandler(config *lib.Config) *VaultHandler {
 
 // RegisterRoutes registers the vault-related routes.
 func (h *VaultHandler) RegisterRoutes(r *router.Router, middlewares ...schemas.BifrostHTTPMiddleware) {
+	r.GET("/api/vault/doppler/status", lib.ChainMiddlewares(h.getDopplerStatus, middlewares...))
+	r.POST("/api/vault/flush-cache", lib.ChainMiddlewares(h.flushCache, middlewares...))
 	r.GET("/vault/doppler/status", lib.ChainMiddlewares(h.getDopplerStatus, middlewares...))
 	r.POST("/vault/flush-cache", lib.ChainMiddlewares(h.flushCache, middlewares...))
 }
@@ -55,7 +57,7 @@ func (h *VaultHandler) getDopplerStatus(ctx *fasthttp.RequestCtx) {
 			resp["config"] = dopplerProvider.Config()
 			resp["base_url"] = dopplerProvider.BaseURL()
 
-			reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			reqCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 
 			authInfo, err := dopplerProvider.GetAuthInfo(reqCtx)

@@ -16,6 +16,8 @@ func TestVaultManager_ResolveAndHooks(t *testing.T) {
 	// Mock Doppler server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost && r.URL.Path == "/v3/configs/config/secrets" {
+			assert.Equal(t, "bifrost-app", r.URL.Query().Get("project"))
+			assert.Equal(t, "prd", r.URL.Query().Get("config"))
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
 			return
@@ -107,10 +109,10 @@ func TestVaultManager_ResolveAndHooks(t *testing.T) {
 
 	// 6. StoreVaultSecretVar in ReadAndWrite mode
 	newPlainSV := &schemas.SecretVar{Val: "my-plain-secret"}
-	err = schemas.StoreVaultSecretVar(context.Background(), "bifrost/tbl/row/NEW_STORED_KEY", newPlainSV)
+	err = schemas.StoreVaultSecretVar(context.Background(), "bifrost/config_keys/key_1/value", newPlainSV)
 	require.NoError(t, err)
 	assert.True(t, newPlainSV.IsFromVault())
-	assert.Equal(t, "vault.bifrost/tbl/row/NEW_STORED_KEY", newPlainSV.GetRawRef())
+	assert.Equal(t, "vault.bifrost/config_keys/key_1/value", newPlainSV.GetRawRef())
 }
 
 func TestVaultManager_ReadOnlyRejectsStore(t *testing.T) {
