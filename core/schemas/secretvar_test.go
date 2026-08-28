@@ -1,6 +1,7 @@
 package schemas
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"testing"
@@ -811,3 +812,33 @@ func TestSecretVar_MarshalJSON(t *testing.T) {
 		})
 	}
 }
+
+func TestSecretVar_GetValue_LazyResolve(t *testing.T) {
+	// 1. Vault lazy resolution
+	VaultResolveHook = func(ctx context.Context, s *string) error {
+		if *s == "vault.MY_LAZY_SECRET" {
+			*s = "resolved-lazy-vault-value"
+			return nil
+		}
+		return nil
+	}
+	defer func() { VaultResolveHook = nil }()
+
+	svVault := &SecretVar{ref: "vault.MY_LAZY_SECRET", SecretType: SecretTypeVault}
+	if svVault.Val != "" {
+		t.Fatalf("initial Val = %q, want empty", svVault.Val)
+	}
+	if got := svVault.GetValue(); got != "resolved-lazy-vault-value" {
+		t.Errorf("GetValue() = %q, want %q", got, "resolved-lazy-vault-value")
+	}
+
+	// 2. Env lazy resolution
+	os.Setenv("TEST_LAZY_ENV_VAR", "resolved-lazy-env-value")
+	defer os.Unsetenv("TEST_LAZY_ENV_VAR")
+
+	svEnv := &SecretVar{ref: "env.TEST_LAZY_ENV_VAR", SecretType: SecretTypeEnv}
+	if got := svEnv.GetValue(); got != "resolved-lazy-env-value" {
+		t.Errorf("GetValue() = %q, want %q", got, "resolved-lazy-env-value")
+	}
+}
+

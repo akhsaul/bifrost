@@ -512,6 +512,16 @@ func (e *SecretVar) GetValue() string {
 	if e == nil {
 		return ""
 	}
+	if e.Val == "" && e.SecretType == SecretTypeVault && e.ref != "" {
+		if vaultValue, ok := LookupVault(e.ref); ok {
+			e.Val = vaultValue
+		}
+	}
+	if e.Val == "" && e.SecretType == SecretTypeEnv && e.ref != "" {
+		if envValue, ok := os.LookupEnv(e.EnvKey()); ok {
+			e.Val = envValue
+		}
+	}
 	return e.Val
 }
 
@@ -520,7 +530,8 @@ func (e *SecretVar) GetValuePtr() *string {
 	if e == nil {
 		return nil
 	}
-	return &e.Val
+	val := e.GetValue()
+	return &val
 }
 
 // CoerceInt coerces value to int
