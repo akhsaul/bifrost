@@ -54,6 +54,7 @@ jobs:
           build-args: |
             VERSION=${{ format('dev-{0}', env.SHORT_SHA) }}
             APP_PORT=2972
+          no-cache: true
           push: false
           tags: ${{ format('bifrost-hermes:dev-{0}', env.SHORT_SHA) }}
           load: true
@@ -131,6 +132,7 @@ jobs:
           build-args: |
             VERSION=${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', env.SHORT_SHA) }}
             APP_PORT=2972
+          no-cache: true
           push: ${{ github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' }}
           tags: ${{ steps.meta-bifrost.outputs.tags }}
           labels: ${{ steps.meta-bifrost.outputs.labels }}
@@ -143,6 +145,7 @@ jobs:
           build-args: |
             VERSION=${{ github.ref_type == 'tag' && github.ref_name || format('dev-{0}', env.SHORT_SHA) }}
             APP_PORT=2972
+          no-cache: true
           push: ${{ github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' }}
           tags: ${{ steps.meta-hermes.outputs.tags }}
           labels: ${{ steps.meta-hermes.outputs.labels }}
