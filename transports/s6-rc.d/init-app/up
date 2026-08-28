@@ -1,3 +1,2 @@
 #!/command/execlineb -P
-
-/bin/sh -c "mkdir -p ${APP_DIR:-/app/data} ${APP_DIR:-/app/data}/logs ${MINIO_DIR:-/app/data/minio-data} 2>/dev/null || true
+with-contenv /etc/s6-overlay/s6-rc.d/init-app/init.sh
