@@ -138,4 +138,5 @@
     CMD wget -q -O /dev/null http://127.0.0.1:${APP_PORT}/health || exit 1
 
   # Use entrypoint script that handles volume permissions and argument processing
-  ENTRYPOINT ["/init"]
+  ENTRYPOINT [ "/init", "/opt/hermes/docker/main-wrapper.sh" ]
+  CMD [ "gateway", "run" ]
