@@ -89,6 +89,7 @@ const (
 	VyceAI        ModelProvider = "vyceai"
 	Hcnsec        ModelProvider = "hcnsec"
 	Neuralwatt    ModelProvider = "neuralwatt"
+	Bai           ModelProvider = "bai"
 	Antigravity   ModelProvider = "antigravity"
 )
 
@@ -152,6 +153,7 @@ var StandardProviders = []ModelProvider{
 	VyceAI,
 	Hcnsec,
 	Neuralwatt,
+	Bai,
 	Antigravity,
 }
 
