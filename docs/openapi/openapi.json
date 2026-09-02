@@ -97042,6 +97042,16 @@
             "type": "string",
             "description": "CEL (Common Expression Language) expression for matching"
           },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "weighted",
+              "adaptive",
+              "priority"
+            ],
+            "description": "Target selection strategy: weighted distribution (weights sum to 1), adaptive latency-based selection (EWMA), or strict priority order (weight carries an integer priority, lower = higher precedence, must be >= 1)",
+            "default": "weighted"
+          },
           "targets": {
             "type": "array",
             "description": "Weighted routing targets; weights must sum to 1; target is selected probabilistically at request time",
@@ -97226,6 +97236,16 @@
             "type": "string",
             "description": "CEL expression for matching"
           },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "weighted",
+              "adaptive",
+              "priority"
+            ],
+            "description": "Target selection strategy: weighted distribution (weights sum to 1), adaptive latency-based selection (EWMA), or strict priority order (weight carries an integer priority, lower = higher precedence, must be >= 1)",
+            "default": "weighted"
+          },
           "targets": {
             "type": "array",
             "minItems": 1,
@@ -97363,6 +97383,15 @@
           },
           "cel_expression": {
             "type": "string"
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "weighted",
+              "adaptive",
+              "priority"
+            ],
+            "description": "Target selection strategy: weighted, adaptive (EWMA), or priority (weight carries an integer priority, lower = higher precedence, must be >= 1)"
           },
           "targets": {
             "type": "array",
