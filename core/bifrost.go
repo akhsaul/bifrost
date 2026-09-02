@@ -24,6 +24,7 @@ import (
 	"github.com/maximhq/bifrost/core/providers/aisure"
 	"github.com/maximhq/bifrost/core/providers/anthropic"
 	"github.com/maximhq/bifrost/core/providers/antigravity"
+	"github.com/maximhq/bifrost/core/providers/bai"
 	"github.com/maximhq/bifrost/core/providers/azure"
 	"github.com/maximhq/bifrost/core/providers/bedrock"
 	"github.com/maximhq/bifrost/core/providers/bedrockmantle"
@@ -4552,6 +4553,8 @@ func (bifrost *Bifrost) createBaseProvider(providerKey schemas.ModelProvider, co
 		return neuralwatt.NewNeuralwattProvider(config, bifrost.logger)
 	case schemas.Antigravity:
 		return antigravity.NewAntigravityProvider(config, bifrost.logger)
+	case schemas.Bai:
+		return bai.NewBAIProvider(config, bifrost.logger)
 	case schemas.OpencodeGo:
 		return opencode.NewOpencodeGoProvider(config, bifrost.logger)
 	case schemas.OpencodeZen:
