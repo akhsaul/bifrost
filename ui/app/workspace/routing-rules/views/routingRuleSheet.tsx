@@ -149,6 +149,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 			setValue("name", editingRule.name);
 			setValue("description", editingRule.description);
 			setValue("cel_expression", editingRule.cel_expression);
+			setValue("strategy", editingRule.strategy ?? "weighted");
 			setValue("fallbacks", editingRule.fallbacks || []);
 			setValue("scope", editingRule.scope);
 			setValue("scope_id", editingRule.scope_id || "");
@@ -199,6 +200,13 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 	}, []);
 
 	const addTarget = () => {
+		const currentStrategy = watch("strategy") || "weighted";
+		if (currentStrategy === "priority") {
+			// Priority strategy: default a new target to one after the current max.
+			const maxPriority = targets.reduce((max, t) => Math.max(max, t.weight || 0), 0);
+			setTargets((prev) => [...prev, { ...DEFAULT_ROUTING_TARGET, weight: maxPriority + 1 }]);
+			return;
+		}
 		const remaining = 1 - targets.reduce((sum, t) => sum + (t.weight || 0), 0);
 		setTargets((prev) => [...prev, { ...DEFAULT_ROUTING_TARGET, weight: Math.max(0, parseFloat(remaining.toFixed(4))) }]);
 	};
@@ -224,20 +232,32 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 			return;
 		}
 
-		// Validate targets
+		// Validate targets — semantics depend on strategy: priority uses integer priorities
+		// (lower number = higher precedence, must be ≥ 1), weighted/adaptive use probability
+		// weights that must sum to 1.
 		if (targets.length === 0) {
 			toast.error("At least one routing target is required");
 			return;
 		}
-		for (const t of targets) {
-			if (t.weight <= 0) {
-				toast.error("Each target weight must be greater than 0");
+		const currentStrategy = data.strategy || "weighted";
+		if (currentStrategy === "priority") {
+			for (const t of targets) {
+				if (!Number.isInteger(t.weight) || t.weight < 1) {
+					toast.error("Each target priority must be an integer ≥ 1 (lower number = higher priority)");
+					return;
+				}
+			}
+		} else {
+			for (const t of targets) {
+				if (t.weight <= 0) {
+					toast.error("Each target weight must be greater than 0");
+					return;
+				}
+			}
+			if (Math.abs(totalWeight - 1) > 0.001) {
+				toast.error(`Target weights must sum to 1, current total: ${totalWeight.toFixed(4)}`);
 				return;
 			}
-		}
-		if (Math.abs(totalWeight - 1) > 0.001) {
-			toast.error(`Target weights must sum to 1, current total: ${totalWeight.toFixed(4)}`);
-			return;
 		}
 
 		// Builder-only validation: these inspect the visual query, which does not exist in
@@ -268,6 +288,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 			name: data.name,
 			description: data.description,
 			cel_expression: data.cel_expression,
+			strategy: data.strategy || "weighted",
 			targets: targets.map(({ provider, model, key_id, weight }) => ({
 				provider: provider || undefined,
 				model: model || undefined,
@@ -535,6 +556,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 										key={index}
 										target={target}
 										index={index}
+										strategy={watch("strategy") || "weighted"}
 										providerOptions={providerOptions}
 										allKeys={allKeysData}
 										showRemove={targets.length > 1}
@@ -544,13 +566,19 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 								))}
 							</div>
 
-							{/* Weight sum indicator */}
-							<div
-								className={`flex items-center justify-end gap-2 text-xs font-medium ${Math.abs(totalWeight - 1) > 0.001 ? "text-destructive" : "text-muted-foreground"}`}
-							>
-								Total weight: {totalWeight.toFixed(4)}
-								{Math.abs(totalWeight - 1) > 0.001 && <span className="text-destructive">(must equal 1)</span>}
-							</div>
+							{/* Weight sum indicator / priority hint — semantics depend on strategy */}
+							{watch("strategy") === "priority" ? (
+								<div className="flex items-center justify-end gap-2 text-xs font-medium text-muted-foreground">
+									Priority: lower number = higher precedence (1 is highest)
+								</div>
+							) : (
+								<div
+									className={`flex items-center justify-end gap-2 text-xs font-medium ${Math.abs(totalWeight - 1) > 0.001 ? "text-destructive" : "text-muted-foreground"}`}
+								>
+									Total weight: {totalWeight.toFixed(4)}
+									{Math.abs(totalWeight - 1) > 0.001 && <span className="text-destructive">(must equal 1)</span>}
+								</div>
+							)}
 						</div>
 
 						{/* Fallbacks */}
@@ -663,6 +691,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 interface TargetRowProps {
 	target: RoutingTargetFormData;
 	index: number;
+	strategy: "weighted" | "adaptive" | "priority";
 	providerOptions: Array<{ label: string; value: string; icon: React.ReactNode }>;
 	allKeys: Array<{ key_id: string; name: string; provider: string }>;
 	showRemove: boolean;
@@ -670,10 +699,12 @@ interface TargetRowProps {
 	onRemove: (index: number) => void;
 }
 
-function TargetRow({ target, index, providerOptions, allKeys, showRemove, onUpdate, onRemove }: TargetRowProps) {
+function TargetRow({ target, index, strategy, providerOptions, allKeys, showRemove, onUpdate, onRemove }: TargetRowProps) {
 	const availableKeys = target.provider
 		? allKeys.filter((k) => k.provider === target.provider).map((k) => ({ id: k.key_id, name: k.name }))
 		: [];
+	// Priority strategy reuses the weight field as an integer priority: lower number = higher precedence.
+	const isPriority = strategy === "priority";
 
 	return (
 		<div className="space-y-3 rounded-lg border p-3" data-testid={`routing-target-${index}`}>
@@ -682,16 +713,18 @@ function TargetRow({ target, index, providerOptions, allKeys, showRemove, onUpda
 				<div className="flex items-center gap-2">
 					<div className="flex items-center gap-1.5">
 						<Label htmlFor={`routing-target-${index}-weight-input`} className="text-muted-foreground shrink-0 text-xs">
-							Weight
+							{isPriority ? "Priority" : "Weight"}
 						</Label>
 						<Input
 							id={`routing-target-${index}-weight-input`}
 							type="number"
-							min={0.001}
-							max={1}
-							step={0.001}
+							min={isPriority ? 1 : 0.001}
+							max={isPriority ? undefined : 1}
+							step={isPriority ? 1 : 0.001}
 							value={target.weight}
-							onChange={(e) => onUpdate(index, "weight", parseFloat(e.target.value) || 0)}
+							onChange={(e) =>
+								onUpdate(index, "weight", isPriority ? Number.parseInt(e.target.value, 10) || 1 : parseFloat(e.target.value) || 0)
+							}
 							className="h-8 w-24 text-sm"
 							data-testid={`routing-target-${index}-weight-input`}
 						/>
