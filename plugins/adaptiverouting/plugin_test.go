@@ -401,5 +401,43 @@ func TestAdaptiveRouting_ExistingFallbacksPreserved(t *testing.T) {
 	assert.Equal(t, schemas.Bedrock, fallbacks[0].Provider)
 }
 
+// TestAdaptiveRouting_SelectorInjectedInPreRequestHook verifies that the AdaptiveTargetSelector
+// is available on the BifrostContext immediately after PreRequestHook — not deferred to
+// PreLLMHook. This is required so the routing plugin (which evaluates rules in its own
+// PreRequestHook, running after this plugin) can consult the selector for strategy="adaptive" rules.
+func TestAdaptiveRouting_SelectorInjectedInPreRequestHook(t *testing.T) {
+	config := DefaultConfig()
+	plugin, err := New(config, nil, nil)
+	require.NoError(t, err)
+	defer func() { _ = plugin.Cleanup() }()
+
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	req := &schemas.BifrostRequest{
+		RequestType: schemas.ChatCompletionRequest,
+		ChatRequest: &schemas.BifrostChatRequest{Model: "gpt-4o"},
+	}
+
+	// Before PreRequestHook the selector must be absent
+	assert.Nil(t, ctx.Value(schemas.BifrostContextKeyAdaptiveTargetSelector))
+
+	err = plugin.PreRequestHook(ctx, req)
+	require.NoError(t, err)
+
+	// After PreRequestHook the selector must be present and callable
+	selectorVal := ctx.Value(schemas.BifrostContextKeyAdaptiveTargetSelector)
+	require.NotNil(t, selectorVal, "AdaptiveTargetSelector must be set on context after PreRequestHook")
+
+	selector, ok := selectorVal.(func(targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, bool))
+	require.True(t, ok, "selector must have the correct function signature")
+
+	// Calling it with a single target should return that target
+	prov := "openai"
+	model := "gpt-4o"
+	targets := []configstoreTables.TableRoutingTarget{{Provider: &prov, Model: &model, Weight: 1.0}}
+	picked, ok := selector(targets)
+	require.True(t, ok)
+	assert.Equal(t, "openai", *picked.Provider)
+}
+
 
 

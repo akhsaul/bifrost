@@ -142,10 +142,17 @@ func (p *Plugin) recomputeActiveWeights() {
 	p.snapshot.Store(newSnap)
 }
 
-// PreRequestHook records request start time and automatically resolves the optimal provider for unprefixed models via the model catalog (Level 1 Direction Selection).
+// PreRequestHook records request start time, injects the adaptive target selector for routing
+// rules (must happen here — before the routing plugin's own PreRequestHook evaluates rules —
+// rather than in PreLLMHook, which runs too late), and automatically resolves the optimal
+// provider for unprefixed models via the model catalog (Level 1 Direction Selection).
 func (p *Plugin) PreRequestHook(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) error {
 	if ctx != nil {
 		ctx.SetValue(adaptiveStartTimeKey, time.Now())
+		// Inject adaptive target selector so routing rules with strategy="adaptive" can pick
+		// targets dynamically. Runs in this hook because the routing plugin evaluates rules
+		// during its own PreRequestHook and reads the selector from the context.
+		ctx.SetValue(schemas.BifrostContextKeyAdaptiveTargetSelector, p.AdaptiveTargetSelector())
 	}
 	if !p.config.Enabled || req == nil || p.catalog == nil {
 		return nil
@@ -279,14 +286,14 @@ func (p *Plugin) PreRequestHook(ctx *schemas.BifrostContext, req *schemas.Bifros
 	return nil
 }
 
-// PreLLMHook records the request start time if not already present and injects the adaptive target selector.
+// PreLLMHook records the request start time if not already present. The adaptive target
+// selector is injected in PreRequestHook (see above) — running it here as well would be
+// redundant for routing rules and too late anyway.
 func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) (*schemas.BifrostRequest, *schemas.LLMPluginShortCircuit, error) {
 	if ctx != nil {
 		if ctx.Value(adaptiveStartTimeKey) == nil {
 			ctx.SetValue(adaptiveStartTimeKey, time.Now())
 		}
-		// Inject adaptive target selector function for governance routing rules
-		ctx.SetValue(schemas.BifrostContextKeyAdaptiveTargetSelector, p.AdaptiveTargetSelector())
 	}
 	return req, nil, nil
 }
