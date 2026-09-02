@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { mapAppToClientApp, mapUserAgentToApp, RequestTypeColors, RequestTypeLabels, RequestTypes } from "./logs";
+import {
+	KnownProvidersNames,
+	mapAppToClientApp,
+	mapUserAgentToApp,
+	RequestTypeColors,
+	RequestTypeLabels,
+	RequestTypes,
+} from "./logs";
 
 describe("logs constants", () => {
 	it("registers realtime turn as a known request type", () => {
@@ -18,5 +25,12 @@ describe("logs constants", () => {
 
 	it("maps versioned user agents as a fallback for older rows", () => {
 		expect(mapUserAgentToApp("claude-cli/2.1.168 (external, cli)").name).toBe("Claude Code");
+	});
+});
+
+describe("known provider ordering", () => {
+	it("dropdown-facing provider list is alphabetical", () => {
+		const sorted = [...KnownProvidersNames].sort((a, b) => a.localeCompare(b));
+		expect(KnownProvidersNames).toEqual(sorted);
 	});
 });
