@@ -323,6 +323,7 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_tool_sync_interval_columns"}, run: migrationAddToolSyncIntervalColumns},
 	{IDs: []string{"add_mcp_client_config_to_oauth_config"}, run: migrationAddMCPClientConfigToOAuthConfig},
 	{IDs: []string{"add_routing_rules_table"}, run: migrationAddRoutingRulesTable},
+	{IDs: []string{"add_strategy_column_to_routing_rules"}, run: migrationAddStrategyColumnToRoutingRules},
 	{IDs: []string{"add_base_model_pricing_column"}, run: migrationAddBaseModelPricingColumn},
 	{IDs: []string{"add_azure_scopes_column"}, run: migrationAddAzureScopesColumn},
 	{IDs: []string{"add_replicate_deployments_json_column"}, run: migrationAddReplicateDeploymentsJSONColumn},
@@ -4735,6 +4736,41 @@ func migrationAddRoutingRulesTable(ctx context.Context, db *gorm.DB, logger sche
 	err := m.Migrate()
 	if err != nil {
 		return fmt.Errorf("error while running routing_rules_table migration: %s", err.Error())
+	}
+	return nil
+}
+
+// migrationAddStrategyColumnToRoutingRules adds the target-selection strategy column
+// ("weighted" | "adaptive" | "priority") to the routing rules table, and backfills any
+// NULL/empty values with "weighted" (the historical behavior for pre-existing rules).
+func migrationAddStrategyColumnToRoutingRules(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "add_strategy_column_to_routing_rules"
+	logger.Info("[configstore] starting migration %s", migrationName)
+	defer logger.Info("[configstore] finished migration %s", migrationName)
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: migrationName,
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			if err := addColumnIfNotExists(tx, logger, &tables.TableRoutingRule{}, "strategy"); err != nil {
+				return fmt.Errorf("failed to add strategy column: %w", err)
+			}
+			if err := tx.Model(&tables.TableRoutingRule{}).
+				Where("strategy IS NULL OR strategy = ''").
+				Update("strategy", "weighted").Error; err != nil {
+				return fmt.Errorf("failed to backfill strategy column: %w", err)
+			}
+			return nil
+		},
+		Rollback: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			if err := dropColumnIfExists(tx, logger, &tables.TableRoutingRule{}, "strategy"); err != nil {
+				return fmt.Errorf("failed to drop strategy column: %w", err)
+			}
+			return nil
+		},
+	}})
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error running add_strategy_column_to_routing_rules migration: %s", err.Error())
 	}
 	return nil
 }

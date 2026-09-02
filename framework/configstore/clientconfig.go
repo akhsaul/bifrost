@@ -1469,6 +1469,9 @@ func GenerateRoutingRuleHash(r tables.TableRoutingRule) (string, error) {
 		hash.Write([]byte("chain_rule:false"))
 	}
 
+	// Hash Strategy (target-selection strategy: weighted | adaptive | priority)
+	hash.Write([]byte(r.Strategy))
+
 	// Hash Scope
 	hash.Write([]byte(r.Scope))
 
