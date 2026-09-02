@@ -855,6 +855,10 @@ export const ProviderIcons = {
 		const resolvedSize = resolveSize(size);
 		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Neuralwatt"><title>Neuralwatt</title><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>;
 	},
+	bai: ({ size = "md", className = "" }: IconProps) => {
+		const resolvedSize = resolveSize(size);
+		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="B.ai"><title>B.ai</title><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" /><path d="M9 8v8M9 8h3a2 2 0 010 4H9m3 0a2 2 0 010 4H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>;
+	},
 	antigravity: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
 		return (

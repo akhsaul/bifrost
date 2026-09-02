@@ -46,6 +46,7 @@ export const KnownProvidersNames = [
 	"vyceai",
 	"hcnsec",
 	"neuralwatt",
+	"bai",
 	"antigravity",
 ] as const;
 
@@ -189,6 +190,7 @@ export const ProviderLabels: Record<ProviderName, string> = {
 	vyceai: "VyceAI",
 	hcnsec: "HCNSEC",
 	neuralwatt: "Neuralwatt",
+	bai: "B.ai",
 	antigravity: "Antigravity",
 } as const;
 

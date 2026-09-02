@@ -82,6 +82,7 @@ export const ModelPlaceholders = {
 	vyceai: "e.g. vyceai-model-name",
 	hcnsec: "e.g. hcnsec-model-name",
 	neuralwatt: "e.g. neuralwatt-model-name",
+	bai: "e.g. bai-model-name",
 	antigravity: "e.g. gemini-3.6-flash-medium, claude-sonnet-4-6, gemini-2.5-flash",
 };
 
@@ -132,6 +133,7 @@ export const isKeyRequiredByProvider: Record<ProviderName, boolean> = {
 	vyceai: true,
 	hcnsec: true,
 	neuralwatt: true,
+	bai: true,
 	antigravity: true,
 };
 
