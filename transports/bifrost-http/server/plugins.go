@@ -266,7 +266,7 @@ func (s *BifrostHTTPServer) loadBuiltinPlugins(ctx context.Context) error {
 	} else {
 		s.markPluginDisabled(routing.PluginName)
 	}
-	s.Config.SetPluginOrderInfo(routing.PluginName, builtinPlacement, schemas.Ptr(5))
+	s.Config.SetPluginOrderInfo(routing.PluginName, builtinPlacement, schemas.Ptr(6))
 
 	// 6. OTEL (if configured in PluginConfigs)
 	otelConfig := s.getPluginConfig(otel.PluginName)
@@ -306,7 +306,9 @@ func (s *BifrostHTTPServer) loadBuiltinPlugins(ctx context.Context) error {
 	}
 	s.Config.SetPluginOrderInfo(maxim.PluginName, builtinPlacement, schemas.Ptr(9))
 
-	// 10. Adaptive Routing (default-on in OSS, placed after governance and before model catalog resolver)
+	// 5. Adaptive Routing (default-on in OSS). Runs BEFORE the routing plugin so its
+	// PreRequestHook injects the AdaptiveTargetSelector into the context before routing
+	// rules are evaluated — strategy="adaptive" rules need it at evaluation time.
 	adaptiveRoutingConfig := s.getPluginConfig(adaptiverouting.PluginName)
 	var adaptivePluginConfig any
 	if adaptiveRoutingConfig != nil {
@@ -317,7 +319,7 @@ func (s *BifrostHTTPServer) loadBuiltinPlugins(ctx context.Context) error {
 	} else {
 		s.markPluginDisabled(adaptiverouting.PluginName)
 	}
-	s.Config.SetPluginOrderInfo(adaptiverouting.PluginName, builtinPlacement, schemas.Ptr(10))
+	s.Config.SetPluginOrderInfo(adaptiverouting.PluginName, builtinPlacement, schemas.Ptr(5))
 
 	// 10. ModelCatalogResolver (last routing layer — fills req.Provider from catalog only when
 	// no earlier routing plugin (governance routing rules, governance VK LB, enterprise LB)
