@@ -460,6 +460,9 @@
         "neuralwatt": {
           "$ref": "#/$defs/provider"
         },
+        "bai": {
+          "$ref": "#/$defs/provider"
+        },
         "antigravity": {
           "$ref": "#/$defs/provider"
         },
@@ -3673,6 +3676,12 @@
         "cel_expression": {
           "type": "string",
           "description": "CEL (Common Expression Language) expression for rule evaluation"
+        },
+        "strategy": {
+          "type": "string",
+          "enum": ["weighted", "adaptive", "priority"],
+          "description": "Target selection strategy: weighted distribution, adaptive latency-based selection, or strict priority order",
+          "default": "weighted"
         },
         "chain_rule": {
           "type": "boolean",
@@ -7685,6 +7694,7 @@
 			"vyceai",
 			"hcnsec",
 			"neuralwatt",
+			"bai",
 			"antigravity",
             "opencode-go",
             "opencode-zen",
