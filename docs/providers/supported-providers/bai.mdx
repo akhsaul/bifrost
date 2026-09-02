@@ -1,0 +1,18 @@
+---
+title: "B.ai"
+description: "Configure B.ai through its OpenAI-compatible API"
+---
+
+B.ai exposes an OpenAI-compatible API at `https://api.b.ai/v1`. Bifrost uses `/chat/completions` and `/models`.
+
+```json
+{
+  "providers": {
+    "bai": {
+      "keys": [{ "name": "bai", "value": "env.BAI_API_KEY" }]
+    }
+  }
+}
+```
+
+Requests use Bearer authentication. Chat completions, streaming, model listing, and the native OpenAI Responses API are supported.
