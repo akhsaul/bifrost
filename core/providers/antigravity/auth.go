@@ -25,20 +25,20 @@ const (
 	// DefaultAntigravityClientSecret is empty by default and loaded dynamically via GetAntigravityClientSecret().
 	DefaultAntigravityClientSecret = ""
 
-	GoogleOAuthAuthURL     = "https://accounts.google.com/o/oauth2/v2/auth"
-	GoogleOAuthTokenURL    = "https://oauth2.googleapis.com/token"
-	GoogleUserInfoURL      = "https://www.googleapis.com/oauth2/v2/userinfo"
-	CloudCodeAssistBaseURL = "https://cloudcode-pa.googleapis.com"
-	DefaultRuntimeBaseURL  = "https://daily-cloudcode-pa.googleapis.com"
-	GenerateContentPath    = "/v1internal:generateContent"
-	StreamGeneratePath     = "/v1internal:streamGenerateContent?alt=sse"
-	LoadCodeAssistPath            = "/v1internal:loadCodeAssist"
-	FetchModelsPath               = "/v1internal:fetchAvailableModels"
-	RetrieveUserQuotaSummaryPath  = "/v1internal:retrieveUserQuotaSummary"
+	GoogleOAuthAuthURL           = "https://accounts.google.com/o/oauth2/v2/auth"
+	GoogleOAuthTokenURL          = "https://oauth2.googleapis.com/token"
+	GoogleUserInfoURL            = "https://www.googleapis.com/oauth2/v2/userinfo"
+	CloudCodeAssistBaseURL       = "https://cloudcode-pa.googleapis.com"
+	DefaultRuntimeBaseURL        = "https://daily-cloudcode-pa.googleapis.com"
+	GenerateContentPath          = "/v1internal:generateContent"
+	StreamGeneratePath           = "/v1internal:streamGenerateContent?alt=sse"
+	LoadCodeAssistPath           = "/v1internal:loadCodeAssist"
+	FetchModelsPath              = "/v1internal:fetchAvailableModels"
+	RetrieveUserQuotaSummaryPath = "/v1internal:retrieveUserQuotaSummary"
 
-	DefaultClientProfile = "ide"
+	DefaultClientProfile = "cli"
 	DefaultIDEVersion    = "2.1.1"
-	DefaultCLIVersion    = "1.1.18"
+	DefaultCLIVersion    = "1.1.22"
 	DefaultOS            = "darwin"
 	DefaultArch          = "arm64"
 
@@ -84,9 +84,20 @@ func ClearTokenCache() {
 // GetUserAgent returns the appropriate User-Agent string for the given Antigravity client profile.
 func GetUserAgent(profile string) string {
 	if strings.ToLower(profile) == "cli" {
-		return "antigravity/cli/1.1.18 (aidev_client; os_type=linux; arch=amd64; cl=968774718; auth_method=consumer)"
+		return fmt.Sprintf("antigravity/cli/%s (aidev_client; os_type=linux; arch=amd64; cl=971564011; auth_method=consumer)", DefaultCLIVersion)
 	}
 	return fmt.Sprintf("antigravity/ide/%s %s/%s", DefaultIDEVersion, DefaultOS, DefaultArch)
+}
+
+// resolveUserAgent returns the user-supplied User-Agent from reqHeaders (ctx/config extra headers)
+// if present, otherwise the profile default from GetUserAgent.
+func resolveUserAgent(profile string, reqHeaders map[string]string) string {
+	for k, v := range reqHeaders {
+		if strings.EqualFold(k, "User-Agent") && v != "" {
+			return v
+		}
+	}
+	return GetUserAgent(profile)
 }
 
 func uuidFromSeed(seed string) string {

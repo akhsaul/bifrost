@@ -206,7 +206,7 @@ func (provider *AntigravityProvider) ChatCompletion(
 	targetURL := provider.networkConfig.BaseURL + providerUtils.GetPathFromContext(ctx, GenerateContentPath)
 	headers := map[string]string{
 		"Authorization": "Bearer " + accessToken,
-		"User-Agent":    GetUserAgent(creds.ClientProfile),
+		"User-Agent":    resolveUserAgent(creds.ClientProfile, provider.networkConfig.ExtraHeaders),
 	}
 
 	return HandleAntigravityChatCompletion(
@@ -249,7 +249,7 @@ func (provider *AntigravityProvider) ChatCompletionStream(
 	targetURL := provider.networkConfig.BaseURL + providerUtils.GetPathFromContext(ctx, StreamGeneratePath)
 	headers := map[string]string{
 		"Authorization": "Bearer " + accessToken,
-		"User-Agent":    GetUserAgent(creds.ClientProfile),
+		"User-Agent":    resolveUserAgent(creds.ClientProfile, provider.networkConfig.ExtraHeaders),
 	}
 
 	return HandleAntigravityChatCompletionStream(
@@ -409,7 +409,6 @@ func (provider *AntigravityProvider) VideoList(_ *schemas.BifrostContext, _ sche
 func (provider *AntigravityProvider) VideoEdit(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoEditRequest) (*schemas.BifrostVideoEditResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.VideoEditRequest, provider.GetProviderKey())
 }
-
 
 // VideoRemix is not supported by the Antigravity provider.
 func (provider *AntigravityProvider) VideoRemix(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoRemixRequest) (*schemas.BifrostVideoGenerationResponse, *schemas.BifrostError) {

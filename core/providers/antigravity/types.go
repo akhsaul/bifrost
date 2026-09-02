@@ -36,30 +36,30 @@ type AntigravityModelQuotaInfo struct {
 
 // AntigravityModelDetails represents individual model metadata in fetchAvailableModels.
 type AntigravityModelDetails struct {
-	DisplayName                                  string                     `json:"displayName"`
-	MaxTokens                                    int                        `json:"maxTokens"`
-	MaxOutputTokens                              int                        `json:"maxOutputTokens"`
-	SupportsImages                               bool                       `json:"supportsImages"`
-	SupportsThinking                             bool                       `json:"supportsThinking"`
-	SupportsVideo                                bool                       `json:"supportsVideo"`
-	IsInternal                                   bool                       `json:"isInternal"`
-	ThinkingBudget                               int                        `json:"thinkingBudget,omitempty"`
-	MinThinkingBudget                            int                        `json:"minThinkingBudget,omitempty"`
-	Recommended                                  bool                       `json:"recommended,omitempty"`
-	TagTitle                                     string                     `json:"tagTitle,omitempty"`
-	TagDescription                               string                     `json:"tagDescription,omitempty"`
-	Model                                        string                     `json:"model,omitempty"`
-	APIProvider                                  string                     `json:"apiProvider,omitempty"`
-	ModelProvider                                string                     `json:"modelProvider,omitempty"`
-	VertexModelID                                string                     `json:"vertexModelId,omitempty"`
-	QuotaInfo                                    *AntigravityModelQuotaInfo `json:"quotaInfo,omitempty"`
-	SupportedMimeTypes                           map[string]bool            `json:"supportedMimeTypes,omitempty"`
-	SupportsCumulativeContext                    bool                       `json:"supportsCumulativeContext,omitempty"`
-	SupportsEstimateTokenCounter                 bool                       `json:"supportsEstimateTokenCounter,omitempty"`
-	PromptTemplaterType                          string                     `json:"promptTemplaterType,omitempty"`
-	ToolFormatterType                            string                     `json:"toolFormatterType,omitempty"`
-	RequiresLeadInGeneration                     bool                       `json:"requiresLeadInGeneration,omitempty"`
-	RequiresNoXmlToolExamples                    bool                       `json:"requiresNoXmlToolExamples,omitempty"`
+	DisplayName                                 string                     `json:"displayName"`
+	MaxTokens                                   int                        `json:"maxTokens"`
+	MaxOutputTokens                             int                        `json:"maxOutputTokens"`
+	SupportsImages                              bool                       `json:"supportsImages"`
+	SupportsThinking                            bool                       `json:"supportsThinking"`
+	SupportsVideo                               bool                       `json:"supportsVideo"`
+	IsInternal                                  bool                       `json:"isInternal"`
+	ThinkingBudget                              int                        `json:"thinkingBudget,omitempty"`
+	MinThinkingBudget                           int                        `json:"minThinkingBudget,omitempty"`
+	Recommended                                 bool                       `json:"recommended,omitempty"`
+	TagTitle                                    string                     `json:"tagTitle,omitempty"`
+	TagDescription                              string                     `json:"tagDescription,omitempty"`
+	Model                                       string                     `json:"model,omitempty"`
+	APIProvider                                 string                     `json:"apiProvider,omitempty"`
+	ModelProvider                               string                     `json:"modelProvider,omitempty"`
+	VertexModelID                               string                     `json:"vertexModelId,omitempty"`
+	QuotaInfo                                   *AntigravityModelQuotaInfo `json:"quotaInfo,omitempty"`
+	SupportedMimeTypes                          map[string]bool            `json:"supportedMimeTypes,omitempty"`
+	SupportsCumulativeContext                   bool                       `json:"supportsCumulativeContext,omitempty"`
+	SupportsEstimateTokenCounter                bool                       `json:"supportsEstimateTokenCounter,omitempty"`
+	PromptTemplaterType                         string                     `json:"promptTemplaterType,omitempty"`
+	ToolFormatterType                           string                     `json:"toolFormatterType,omitempty"`
+	RequiresLeadInGeneration                    bool                       `json:"requiresLeadInGeneration,omitempty"`
+	RequiresNoXmlToolExamples                   bool                       `json:"requiresNoXmlToolExamples,omitempty"`
 	RequiresImageOutputOutsideFunctionResponses bool                       `json:"requiresImageOutputOutsideFunctionResponses,omitempty"`
 }
 

@@ -674,3 +674,61 @@ func TestAntigravityProvider_QuotaMethods(t *testing.T) {
 		t.Errorf("expected 0.85, got %f", info.RemainingFraction)
 	}
 }
+
+var serverUA string
+
+func TestGetUserAgent_CLI(t *testing.T) {
+	ua := GetUserAgent("cli")
+	if !strings.Contains(ua, "antigravity/cli/1.1.22") {
+		t.Errorf("GetUserAgent(cli) = %q, want version 1.1.22", ua)
+	}
+	if !strings.Contains(ua, "cl=971564011") {
+		t.Errorf("GetUserAgent(cli) = %q, want cl=971564011", ua)
+	}
+}
+
+func TestAntigravityProvider_ChatCompletion_UserAgentPrecedence(t *testing.T) {
+	ClearTokenCache()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serverUA = r.Header.Get("User-Agent")
+		if strings.Contains(r.URL.Path, "generateContent") {
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.WriteHeader(http.StatusOK)
+			chunk := `{"response":{"candidates":[{"content":{"parts":[{"text":"hi"}],"role":"model"},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":1,"candidatesTokenCount":1,"totalTokenCount":2}}}`
+			_, _ = fmt.Fprintf(w, "data: %s\n\ndata: [DONE]\n\n", chunk)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	config := &schemas.ProviderConfig{
+		NetworkConfig: schemas.NetworkConfig{
+			BaseURL:      server.URL,
+			ExtraHeaders: map[string]string{"User-Agent": "my-custom-ua/2.0"},
+		},
+	}
+	provider, err := NewAntigravityProvider(config, nil)
+	if err != nil {
+		t.Fatalf("failed to create provider: %v", err)
+	}
+
+	key := schemas.Key{
+		ID: "test-ua-key",
+		AntigravityKeyConfig: &schemas.AntigravityKeyConfig{
+			ProjectID:   schemas.NewSecretVar("test-proj"),
+			AccessToken: schemas.NewSecretVar("mock-access-token"),
+		},
+	}
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	req := &schemas.BifrostChatRequest{
+		Model: "gemini-3.6-flash-high",
+		Input: []schemas.ChatMessage{{Role: schemas.ChatMessageRoleUser, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("Hello")}}},
+	}
+	if _, bErr := provider.ChatCompletion(ctx, key, req); bErr != nil {
+		t.Fatalf("ChatCompletion failed: %v", bErr.Error.Message)
+	}
+	if got := serverUA; got != "my-custom-ua/2.0" {
+		t.Errorf("User-Agent = %q, want user override %q (default is %q)", got, "my-custom-ua/2.0", GetUserAgent("cli"))
+	}
+}
