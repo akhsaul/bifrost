@@ -253,9 +253,12 @@ func (re *Engine) EvaluateRoutingRules(ctx *schemas.BifrostContext, routingCtx *
 
 				var target configstoreTables.TableRoutingTarget
 				var ok bool
-				if rule.Strategy == "adaptive" && routingCtx.AdaptiveTargetSelector != nil {
+				switch {
+				case rule.Strategy == "adaptive" && routingCtx.AdaptiveTargetSelector != nil:
 					target, ok = routingCtx.AdaptiveTargetSelector(rule.Targets)
-				} else {
+				case rule.Strategy == "priority":
+					target, ok = selectPriorityTarget(rule.Targets)
+				default:
 					target, ok = selectWeightedTarget(rule.Targets)
 				}
 				if !ok {
@@ -376,6 +379,24 @@ func selectWeightedTarget(targets []configstoreTables.TableRoutingTarget) (confi
 		}
 	}
 	return valid[len(valid)-1], true
+}
+
+// selectPriorityTarget picks the target with the lowest priority number (highest precedence).
+// Used by the "priority" strategy: the Weight field carries an integer priority (≥ 1) and
+// selection is fully deterministic — no randomness. Ties are broken by declaration order
+// (the first target with the lowest priority wins).
+// Returns ok=false only when len(targets)==0.
+func selectPriorityTarget(targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, bool) {
+	if len(targets) == 0 {
+		return configstoreTables.TableRoutingTarget{}, false
+	}
+	best := targets[0]
+	for _, t := range targets[1:] {
+		if t.Weight < best.Weight {
+			best = t
+		}
+	}
+	return best, true
 }
 
 // buildScopeChain builds the scope evaluation chain based on organizational hierarchy
