@@ -31,7 +31,7 @@ var InterfaceCheck = schemas.Provider((*baiProvider)(nil)) != nil
 // NewBAIProvider creates a new B.ai provider instance.
 // B.ai exposes an OpenAI-compatible API at https://api.b.ai/v1.
 func NewBAIProvider(config *schemas.ProviderConfig, logger schemas.Logger) (*baiProvider, error) {
-	return newBAIProvider(config, schemas.Bai, "https://api.b.ai/v1", logger)
+	return newBAIProvider(config, schemas.Bai, "https://api.b.ai", logger)
 }
 
 // newBAIProvider initializes the shared provider infrastructure.
