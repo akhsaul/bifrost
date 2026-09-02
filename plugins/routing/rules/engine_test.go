@@ -365,6 +365,90 @@ func TestEvaluateRoutingRules_MultiTargetDeterministicWithPinnedKey(t *testing.T
 	assert.Equal(t, pinnedKeyID, decision.KeyID)
 }
 
+// TestEvaluateRoutingRules_PriorityStrategy tests that strategy="priority" picks the target
+// with the lowest priority number deterministically (no randomness). Lower number = higher
+// precedence; the same target must win on every run.
+func TestEvaluateRoutingRules_PriorityStrategy(t *testing.T) {
+	store, err := newTestRuleStore()
+	require.NoError(t, err)
+	bgCtx := schemas.NewBifrostContext(context.Background(), time.Now())
+
+	engine, err := NewEngine(store, NewMockGovernanceStore(), NewMockLogger(), schemas.Ptr(10))
+	require.NoError(t, err)
+
+	rule := &configstoreTables.TableRoutingRule{
+		ID:            "prio-1",
+		Name:          "Priority Rule",
+		CelExpression: "true",
+		Strategy:      "priority",
+		Targets: []configstoreTables.TableRoutingTarget{
+			{Provider: bifrost.Ptr("groq"), Model: bifrost.Ptr("llama"), Weight: 3},    // priority 3
+			{Provider: bifrost.Ptr("azure"), Model: bifrost.Ptr("gpt-4-turbo"), Weight: 2}, // priority 2
+			{Provider: bifrost.Ptr("openai"), Model: bifrost.Ptr("gpt-4o"), Weight: 1},     // priority 1 — must win
+		},
+		Enabled:  bifrost.Ptr(true),
+		Scope:    "global",
+		Priority: 0,
+	}
+	require.NoError(t, store.UpsertRule(context.Background(), rule))
+
+	routingCtx := &EvaluationContext{
+		Provider:    schemas.OpenAI,
+		Model:       "gpt-4o",
+		Headers:     map[string]string{},
+		QueryParams: map[string]string{},
+	}
+
+	// Run repeatedly: priority selection is deterministic, unlike weighted random.
+	for i := 0; i < 20; i++ {
+		decision, err := engine.EvaluateRoutingRules(bgCtx, routingCtx)
+		require.NoError(t, err)
+		require.NotNil(t, decision)
+		assert.Equal(t, "openai", decision.Provider, "priority-1 target must always win (run %d)", i)
+		assert.Equal(t, "gpt-4o", decision.Model)
+	}
+}
+
+// TestEvaluateRoutingRules_PriorityStrategyTieBrokenByOrder tests that with equal priority
+// numbers the first target in declaration order wins (stable, no shuffle).
+func TestEvaluateRoutingRules_PriorityStrategyTieBrokenByOrder(t *testing.T) {
+	store, err := newTestRuleStore()
+	require.NoError(t, err)
+	bgCtx := schemas.NewBifrostContext(context.Background(), time.Now())
+
+	engine, err := NewEngine(store, NewMockGovernanceStore(), NewMockLogger(), schemas.Ptr(10))
+	require.NoError(t, err)
+
+	rule := &configstoreTables.TableRoutingRule{
+		ID:            "prio-2",
+		Name:          "Priority Tie Rule",
+		CelExpression: "true",
+		Strategy:      "priority",
+		Targets: []configstoreTables.TableRoutingTarget{
+			{Provider: bifrost.Ptr("azure"), Model: bifrost.Ptr("gpt-4-turbo"), Weight: 1},
+			{Provider: bifrost.Ptr("openai"), Model: bifrost.Ptr("gpt-4o"), Weight: 1},
+		},
+		Enabled:  bifrost.Ptr(true),
+		Scope:    "global",
+		Priority: 0,
+	}
+	require.NoError(t, store.UpsertRule(context.Background(), rule))
+
+	routingCtx := &EvaluationContext{
+		Provider:    schemas.OpenAI,
+		Model:       "gpt-4o",
+		Headers:     map[string]string{},
+		QueryParams: map[string]string{},
+	}
+
+	for i := 0; i < 20; i++ {
+		decision, err := engine.EvaluateRoutingRules(bgCtx, routingCtx)
+		require.NoError(t, err)
+		require.NotNil(t, decision)
+		assert.Equal(t, "azure", decision.Provider, "first declared target must win on tie (run %d)", i)
+	}
+}
+
 // TestEvaluateRoutingRules_ScopePrecedence tests virtual_key scope takes precedence over global
 func TestEvaluateRoutingRules_ScopePrecedence(t *testing.T) {
 	store, err := newTestRuleStore()
