@@ -101,7 +101,8 @@ type CreateRoutingRuleRequest struct {
 	Enabled       *bool           `json:"enabled,omitempty"`    // nil = use DB default (true)
 	ChainRule     *bool           `json:"chain_rule,omitempty"` // nil = use DB default (false)
 	CelExpression string          `json:"cel_expression"`
-	Targets       []RoutingTarget `json:"targets"` // Required; weights must sum to 1
+	Strategy      string          `json:"strategy,omitempty"` // "weighted" (default) | "adaptive" | "priority"
+	Targets       []RoutingTarget `json:"targets"`            // Required; weights must sum to 1
 	Fallbacks     []string        `json:"fallbacks,omitempty"`
 	Scope         string          `json:"scope,omitempty"` // Defaults to "global" if not provided
 	ScopeID       *string         `json:"scope_id,omitempty"`
@@ -116,7 +117,8 @@ type UpdateRoutingRuleRequest struct {
 	Enabled       *bool           `json:"enabled,omitempty"`
 	ChainRule     *bool           `json:"chain_rule,omitempty"`
 	CelExpression *string         `json:"cel_expression,omitempty"`
-	Targets       []RoutingTarget `json:"targets,omitempty"` // If provided, replaces all existing targets; weights must sum to 1
+	Strategy      *string         `json:"strategy,omitempty"` // "weighted" | "adaptive" | "priority"
+	Targets       []RoutingTarget `json:"targets,omitempty"`  // If provided, replaces all existing targets; weights must sum to 1
 	Fallbacks     []string        `json:"fallbacks,omitempty"`
 	Query         map[string]any  `json:"query,omitempty"`
 	Priority      *int            `json:"priority,omitempty"`
@@ -193,6 +195,25 @@ func validateRoutingScope(scope string) error {
 	}
 	if !validRoutingScopes[scope] {
 		return fmt.Errorf("invalid scope %q: must be one of: global, team, customer, virtual_key, user", scope)
+	}
+	return nil
+}
+
+// validRoutingStrategies contains the allowed target-selection strategy values
+var validRoutingStrategies = map[string]bool{
+	"weighted": true,
+	"adaptive": true,
+	"priority": true,
+}
+
+// validateRoutingStrategy checks that the strategy value is allowed. Empty is valid
+// (defaults to "weighted" at persistence time).
+func validateRoutingStrategy(strategy string) error {
+	if strategy == "" {
+		return nil
+	}
+	if !validRoutingStrategies[strategy] {
+		return fmt.Errorf("invalid strategy %q: must be one of: weighted, adaptive, priority", strategy)
 	}
 	return nil
 }
@@ -481,6 +502,16 @@ func (h *RoutingHandler) createRoutingRule(ctx *fasthttp.RequestCtx) {
 		SendError(ctx, 400, err.Error())
 		return
 	}
+
+	// Validate strategy; empty defaults to "weighted" at persistence time
+	if err := validateRoutingStrategy(req.Strategy); err != nil {
+		SendError(ctx, 400, err.Error())
+		return
+	}
+	strategy := req.Strategy
+	if strategy == "" {
+		strategy = "weighted"
+	}
 	if err := validateRoutingFallbacks(req.Fallbacks); err != nil {
 		SendError(ctx, 400, err.Error())
 		return
@@ -543,6 +574,7 @@ func (h *RoutingHandler) createRoutingRule(ctx *fasthttp.RequestCtx) {
 		Enabled:         enabled,
 		ChainRule:       chainRule,
 		CelExpression:   req.CelExpression,
+		Strategy:        strategy,
 		Targets:         targets,
 		Scope:           scope,
 		ScopeID:         req.ScopeID,
@@ -632,6 +664,13 @@ func (h *RoutingHandler) updateRoutingRule(ctx *fasthttp.RequestCtx) {
 			})
 		}
 		rule.Targets = newTargets
+	}
+	if req.Strategy != nil {
+		if err := validateRoutingStrategy(*req.Strategy); err != nil {
+			SendError(ctx, 400, err.Error())
+			return
+		}
+		rule.Strategy = *req.Strategy
 	}
 	if req.Priority != nil {
 		rule.Priority = *req.Priority
