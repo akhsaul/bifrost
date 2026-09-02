@@ -192,7 +192,7 @@ func TestConvertFunctionParametersToSchema_AnyOfNullable(t *testing.T) {
 		Nullable: boolPtr(true),
 	}
 
-	schema := convertFunctionParametersToSchema(params)
+	schema := ConvertFunctionParametersToSchema(params)
 	require.NotNil(t, schema)
 	require.Len(t, schema.AnyOf, 3)
 	assert.Equal(t, Type("integer"), schema.AnyOf[0].Type)

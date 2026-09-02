@@ -83,18 +83,46 @@ func TestResolveModel(t *testing.T) {
 		input    string
 		expected string
 	}{
+		// Real server model IDs (from /v1internal:fetchAvailableModels) must
+		// pass through UNCHANGED — rewriting them breaks the server request.
+		{"gemini-3.6-flash-low", "gemini-3.6-flash-low"},
+		{"gemini-3.6-flash-high", "gemini-3.6-flash-high"},
+		{"gemini-3.7-flash-medium", "gemini-3.7-flash-medium"},
+		{"gemini-3.6-flash-tiered", "gemini-3.6-flash-tiered"},
+		{"gemini-3-flash-agent", "gemini-3-flash-agent"},
+		{"gemini-pro-agent", "gemini-pro-agent"},
+		// Routing prefix is stripped, nothing else.
+		{"antigravity/gemini-3.6-flash-low", "gemini-3.6-flash-low"},
+		// Convenience aliases for names the server does not know.
 		{"gemini-claude-sonnet-4-5", "claude-sonnet-4-6"},
 		{"gemini-claude-opus-4-5-thinking", "claude-opus-4-6-thinking"},
-		{"antigravity/gemini-3.6-flash-high", "gemini-3.6-flash-tiered(high)"},
-		{"gemini-3-pro-image-preview", "gemini-3-pro-image"},
-		{"gemini-3.6-flash-high", "gemini-3.6-flash-tiered(high)"},
-		{"gemini-3.5-flash-low", "gemini-3.5-flash-low"},
+		{"", ""},
 	}
 
 	for _, tt := range tests {
 		got := ResolveModel(tt.input)
 		if got != tt.expected {
 			t.Errorf("ResolveModel(%q) = %q, want %q", tt.input, got, tt.expected)
+		}
+	}
+}
+
+// TestAntigravityAliasesNeverShadowServerModels pins the bug class: an alias
+// key must never be a public model ID (rewriting a valid server model breaks
+// the request), and every alias target must be a real public model ID the
+// server accepts.
+func TestAntigravityAliasesNeverShadowServerModels(t *testing.T) {
+	public := make(map[string]bool, len(AntigravityPublicModels))
+	for _, m := range AntigravityPublicModels {
+		public[m.ID] = true
+	}
+
+	for key, target := range AntigravityModelAliases {
+		if public[key] {
+			t.Errorf("alias key %q is itself a public model ID — rewriting it corrupts a valid server model", key)
+		}
+		if !public[target] {
+			t.Errorf("alias target %q (from key %q) is not a known public model — the server would reject it", target, key)
 		}
 	}
 }

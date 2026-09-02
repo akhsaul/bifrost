@@ -63,7 +63,6 @@ func defaultCanDisableReasoning(model string) bool {
 	return !strings.Contains(strings.ToLower(model), "gemini-2.5-pro")
 }
 
-
 // defaultEffortControl is the thinkingLevel surface for Gemini 3+, taken from
 // the per-model rung table below. nil for models that take a budget instead,
 // which is what tells callers to convert an effort into thinkingBudget.
@@ -1472,8 +1471,10 @@ func convertBifrostToolsToGemini(bifrostTools []schemas.ChatTool) ([]Tool, error
 	return []Tool{}, nil
 }
 
-// convertFunctionParametersToSchema converts Bifrost function parameters to Gemini Schema
-func convertFunctionParametersToSchema(params schemas.ToolFunctionParameters) *Schema {
+// ConvertFunctionParametersToSchema converts Bifrost function parameters to Gemini Schema.
+// Exported for the antigravity provider, whose internal Google endpoint requires the
+// proto Schema form ("parameters") rather than the parametersJsonSchema passthrough.
+func ConvertFunctionParametersToSchema(params schemas.ToolFunctionParameters) *Schema {
 	schema := &Schema{
 		Type: Type(params.Type),
 	}

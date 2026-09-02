@@ -46,6 +46,18 @@ func ToAntigravityChatRequest(
 
 	sanitizeAntigravityRequest(geminiReq, resolvedModel)
 
+	// The Antigravity internal API only accepts the Gemini proto Schema form
+	// ("parameters" with UPPERCASE types), not parametersJsonSchema.
+	if err := convertToolsToAntigravityFormat(geminiReq.Tools); err != nil {
+		return nil, nil, err
+	}
+
+	// The agy CLI always sends a thinkingConfig; the Antigravity endpoint
+	// expects one even when the client sends no reasoning parameters. Inject
+	// the agy default (dynamic budget) only when none was derived from the
+	// client request.
+	applyDefaultThinkingConfig(geminiReq)
+
 	var sysInstruction *gemini.Content
 	if geminiReq.SystemInstruction != nil && len(geminiReq.SystemInstruction.Parts) > 0 {
 		sysInstruction = geminiReq.SystemInstruction
@@ -115,6 +127,18 @@ func ToAntigravityResponsesRequest(
 	}
 
 	sanitizeAntigravityRequest(geminiReq, resolvedModel)
+
+	// The Antigravity internal API only accepts the Gemini proto Schema form
+	// ("parameters" with UPPERCASE types), not parametersJsonSchema.
+	if err := convertToolsToAntigravityFormat(geminiReq.Tools); err != nil {
+		return nil, nil, err
+	}
+
+	// The agy CLI always sends a thinkingConfig; the Antigravity endpoint
+	// expects one even when the client sends no reasoning parameters. Inject
+	// the agy default (dynamic budget) only when none was derived from the
+	// client request.
+	applyDefaultThinkingConfig(geminiReq)
 
 	var sysInstruction *gemini.Content
 	if geminiReq.SystemInstruction != nil && len(geminiReq.SystemInstruction.Parts) > 0 {
