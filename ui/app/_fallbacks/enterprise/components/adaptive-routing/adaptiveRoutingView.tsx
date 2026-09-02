@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { isDevelopmentMode } from "@/lib/utils/port";
 import { Link } from "@tanstack/react-router";
 import { Activity, Gauge, RefreshCw, Server, Settings, Shuffle, Zap } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -79,9 +78,14 @@ const mockTargetsDev: TargetMetricRow[] = [
 
 export default function AdaptiveRoutingView() {
 	const [searchQuery, setSearchQuery] = useState("");
-	const isDev = useMemo(() => isDevelopmentMode(), []);
+	// Mock data shows ONLY when the URL carries ?mode=dev — no other trigger
+	// (not localhost, not NODE_ENV, not any other query param).
+	const isDev = useMemo(() => {
+		if (typeof window === "undefined") return false;
+		return new URLSearchParams(window.location.search).get("mode") === "dev";
+	}, []);
 
-	// Data mock/dummy only rendered in dev mode (make dev / MODE=dev)
+	// Mock/dummy data only rendered with ?mode=dev in the URL
 	const targets = isDev ? mockTargetsDev : [];
 
 	const filteredTargets = targets.filter((t) =>
