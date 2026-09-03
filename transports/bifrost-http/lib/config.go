@@ -1003,7 +1003,9 @@ func LoadConfig(ctx context.Context, configDirPath string) (*Config, error) {
 		return nil, err
 	}
 	// 1a. Vault config acknowledgement (initialization handled by enterprise layer)
-	initVault(&configData)
+	if err := initVault(&configData); err != nil {
+		return nil, err
+	}
 	// 1b. Bootstrap setup token (from config file or BIFROST_SETUP_TOKEN env var)
 	config.SetupToken = resolveSetupToken(&configData)
 	// 2. Stores (config, logs, vector) — creates defaults for absent configs
@@ -5152,14 +5154,17 @@ func initEncryption(configData *ConfigData) error {
 	return nil
 }
 
-// initVault initializes the vault store if configured.
-func initVault(configData *ConfigData) {
+// initVault initializes the vault store if configured. Returns an error when the
+// vault_store configuration is invalid so startup fails fast instead of running
+// with a silently broken secret store.
+func initVault(configData *ConfigData) error {
 	if configData == nil || configData.ConfigStoreConfig == nil || configData.ConfigStoreConfig.VaultStore == nil || !configData.ConfigStoreConfig.VaultStore.Enabled {
-		return
+		return nil
 	}
 	if _, err := vault.InitVaultManager(configData.ConfigStoreConfig.VaultStore, logger); err != nil {
-		logger.Error("failed to initialize vault store: %v", err)
+		return fmt.Errorf("failed to initialize vault store: %w", err)
 	}
+	return nil
 }
 
 // resolveSetupToken resolves the bootstrap setup token required to create the very
