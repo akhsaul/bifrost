@@ -6,8 +6,6 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 )
 
-func ptr(s string) *string { return &s }
-
 func chatReq(texts ...string) *schemas.BifrostRequest {
 	msgs := make([]schemas.ChatMessage, 0, len(texts))
 	for _, s := range texts {
