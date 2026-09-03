@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/maximhq/bifrost/core/schemas"
@@ -113,6 +114,97 @@ func TestVaultManager_ResolveAndHooks(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, newPlainSV.IsFromVault())
 	assert.Equal(t, "vault.bifrost/config_keys/key_1/value", newPlainSV.GetRawRef())
+}
+
+func TestVaultManager_ResolveAutoManagedPathPrefersStoreTarget(t *testing.T) {
+	var mu sync.Mutex
+	var getNames []string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/v3/configs/config/secret" {
+			name := r.URL.Query().Get("name")
+			mu.Lock()
+			getNames = append(getNames, name)
+			mu.Unlock()
+			if name == "BF_CONFIG_KEYS_7047594D_498A_4700_BE0D_C38A4CD7D37A_VALUE" {
+				w.WriteHeader(http.StatusOK)
+				_ = json.NewEncoder(w).Encode(DopplerSecretSingleResponse{
+					Name:  name,
+					Value: DopplerSecretItem{Computed: "«redacted:sk-…»"},
+				})
+				return
+			}
+			// Real Doppler behavior for unknown names: 200 + null values.
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"name": name, "value": map[string]any{"raw": nil, "computed": nil}, "success": true,
+			})
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{"name": "test-token"})
+	}))
+	defer server.Close()
+
+	cfg := &Config{
+		Enabled:    true,
+		Type:       VaultTypeDoppler,
+		Prefix:     "bf",
+		AccessMode: AccessModeReadOnly,
+		Doppler: &DopplerConfig{
+			Token:   schemas.NewSecretVar("dp.st.test"),
+			Project: schemas.NewSecretVar("main-proj"),
+			Config:  schemas.NewSecretVar("dev"),
+			BaseURL: schemas.NewSecretVar(server.URL),
+		},
+	}
+
+	mgr, err := InitVaultManager(cfg, nil)
+	require.NoError(t, err)
+	defer mgr.Close()
+
+	val, err := mgr.Resolve(context.Background(), "vault.bf/config_keys/7047594d-498a-4700-be0d-c38a4cd7d37a/value")
+	require.NoError(t, err)
+	assert.Equal(t, "«redacted:sk-…»", val)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.NotEmpty(t, getNames)
+	assert.Equal(t, "BF_CONFIG_KEYS_7047594D_498A_4700_BE0D_C38A4CD7D37A_VALUE", getNames[0],
+		"first lookup must mirror resolveStoreTarget's normalized name")
+}
+
+func TestVaultManager_ResolveDoesNotCacheEmpty(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"name": r.URL.Query().Get("name"), "value": map[string]any{"raw": nil, "computed": nil}, "success": true,
+		})
+	}))
+	defer server.Close()
+
+	cfg := &Config{
+		Enabled:    true,
+		Type:       VaultTypeDoppler,
+		Prefix:     "bifrost",
+		AccessMode: AccessModeReadOnly,
+		Doppler: &DopplerConfig{
+			Token:   schemas.NewSecretVar("dp.st.test"),
+			Project: schemas.NewSecretVar("main-proj"),
+			Config:  schemas.NewSecretVar("dev"),
+			BaseURL: schemas.NewSecretVar(server.URL),
+		},
+	}
+
+	mgr, err := InitVaultManager(cfg, nil)
+	require.NoError(t, err)
+	defer mgr.Close()
+
+	_, err = mgr.Resolve(context.Background(), "vault.MISSING_SECRET")
+	assert.ErrorIs(t, err, ErrSecretNotFound)
+
+	_, found := mgr.getFromCache("MISSING_SECRET")
+	assert.False(t, found, "empty resolve results must not be cached")
 }
 
 func TestVaultManager_ReadOnlyRejectsStore(t *testing.T) {

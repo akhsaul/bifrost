@@ -203,7 +203,9 @@ func (m *VaultManager) Resolve(ctx context.Context, rawRef string) (string, erro
 		}
 
 		rawSecret = resolvedVal
-		m.setCache(basePath, rawSecret)
+		if rawSecret != "" {
+			m.setCache(basePath, rawSecret)
+		}
 	}
 
 	// If no fragment requested, return full value
@@ -306,6 +308,16 @@ func (m *VaultManager) buildCandidateLookups(path string) []secretLookupCandidat
 				name:    name,
 			})
 		}
+	}
+
+	// 0. Auto-managed paths (prefixed table/row/column refs written by
+	// resolveStoreTarget) resolve under the default project/config with the full
+	// normalized path as the secret name. Mirror resolveStoreTarget exactly and
+	// try this FIRST: the segmented candidates below assume the path is
+	// project/config/name, which is wrong for auto-managed refs and wastes a
+	// doomed lookup on every cold resolve.
+	if prefix != "" && (clean == prefix || strings.HasPrefix(clean, prefix+"/")) {
+		addCandidate("", "", normalizeSecretName(clean))
 	}
 
 	// 1. If path has explicit project/config/name (e.g. my-proj/prd/KEY)
