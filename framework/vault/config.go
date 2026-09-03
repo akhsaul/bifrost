@@ -106,6 +106,14 @@ func (c *Config) Validate() error {
 		return nil
 	}
 
+	switch c.AccessMode {
+	case "", AccessModeReadOnly, AccessModeReadAndWrite:
+		// "" defaults to read_only via GetAccessMode; both named values are valid.
+	default:
+		return fmt.Errorf("%w: %q (must be \"read_only\" or \"read_and_write\"; empty defaults to \"read_only\")",
+			ErrInvalidAccessMode, c.AccessMode)
+	}
+
 	switch c.Type {
 	case VaultTypeDoppler:
 		if c.Doppler == nil {

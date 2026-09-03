@@ -29,4 +29,8 @@ var (
 
 	// ErrRateLimited is returned when the Doppler API rate limit is exceeded.
 	ErrRateLimited = errors.New("vault: doppler api rate limited")
+
+	// ErrInvalidAccessMode is returned when vault_store.access_mode is not one of
+	// the supported values ("read_only", "read_and_write").
+	ErrInvalidAccessMode = errors.New("vault: invalid access_mode")
 )
