@@ -251,8 +251,20 @@ func (m *VaultManager) StoreString(ctx context.Context, path string, value *stri
 		return err
 	}
 
-	// Update cache
-	m.setCache(path, *value)
+	// Read the secret back from the vault and cache only what the vault actually
+	// returns. This guarantees the ref we persist points at a value the vault can
+	// serve after a restart — the exact failure mode where SetSecret succeeded,
+	// the plaintext lived on in the in-memory cache, and the ref resolved to ""
+	// after a restart.
+	stored, err := m.provider.GetSecret(ctx, project, config, name)
+	if err != nil {
+		return fmt.Errorf("vault: post-store readback failed for %q: %w", name, err)
+	}
+	if stored == "" {
+		return fmt.Errorf("vault: post-store readback returned empty value for %q", name)
+	}
+
+	m.setCache(path, stored)
 
 	*value = "vault." + path
 	return nil

@@ -51,6 +51,13 @@ func TestVaultManager_ResolveAndHooks(t *testing.T) {
 					Computed: `{"db_password": "super-secret-pwd", "api_key": "nested-api-key"}`,
 				},
 			})
+		case "BIFROST_CONFIG_KEYS_KEY_1_VALUE":
+			// Readback after StoreVaultSecretVar (store-then-fetch round trip).
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(DopplerSecretSingleResponse{
+				Name:  "BIFROST_CONFIG_KEYS_KEY_1_VALUE",
+				Value: DopplerSecretItem{Computed: "my-plain-secret"},
+			})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 			_ = json.NewEncoder(w).Encode(DopplerErrorResponse{Messages: []string{"not found"}})
@@ -205,6 +212,70 @@ func TestVaultManager_ResolveDoesNotCacheEmpty(t *testing.T) {
 
 	_, found := mgr.getFromCache("MISSING_SECRET")
 	assert.False(t, found, "empty resolve results must not be cached")
+}
+
+func TestVaultManager_StoreStringVerifiesReadback(t *testing.T) {
+	secretName := "BIFROST_CONFIG_KEYS_KEY_1_VALUE"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v3/configs/config/secrets":
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+		case r.Method == http.MethodGet && r.URL.Path == "/v3/configs/config/secret":
+			if r.URL.Query().Get("name") != secretName {
+				// 200 + null for unknown names (real Doppler behavior).
+				w.WriteHeader(http.StatusOK)
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"name":    r.URL.Query().Get("name"),
+					"value":   map[string]any{"raw": nil, "computed": nil},
+					"success": true,
+				})
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(DopplerSecretSingleResponse{
+				Name:  secretName,
+				Value: DopplerSecretItem{Computed: "sk-from-doppler"},
+			})
+		default:
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{"name": "test-token"})
+		}
+	}))
+	defer server.Close()
+
+	cfg := &Config{
+		Enabled:    true,
+		Type:       VaultTypeDoppler,
+		Prefix:     "bifrost",
+		AccessMode: AccessModeReadAndWrite,
+		Doppler: &DopplerConfig{
+			Token:   schemas.NewSecretVar("dp.st.test"),
+			Project: schemas.NewSecretVar("bifrost-app"),
+			Config:  schemas.NewSecretVar("prd"),
+			BaseURL: schemas.NewSecretVar(server.URL),
+		},
+	}
+
+	mgr, err := InitVaultManager(cfg, nil)
+	require.NoError(t, err)
+	defer mgr.Close()
+
+	// Happy path: store succeeds and the cache holds the value READ BACK from
+	// the vault, not the local plaintext.
+	val := "sk-plain-new-key"
+	require.NoError(t, mgr.StoreString(context.Background(), "bifrost/config_keys/key_1/value", &val))
+	assert.Equal(t, "vault.bifrost/config_keys/key_1/value", val)
+	cached, found := mgr.getFromCache("bifrost/config_keys/key_1/value")
+	assert.True(t, found)
+	assert.Equal(t, "sk-from-doppler", cached, "cache must hold the vault readback value")
+
+	// Failure path: readback empty -> StoreString must fail loudly so a broken
+	// ref never reaches the database.
+	val2 := "sk-second"
+	err = mgr.StoreString(context.Background(), "bifrost/config_keys/key_2/value", &val2)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "post-store readback")
 }
 
 func TestVaultManager_ReadOnlyRejectsStore(t *testing.T) {
