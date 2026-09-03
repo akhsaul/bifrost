@@ -151,6 +151,13 @@ func (d *DopplerProvider) GetSecret(ctx context.Context, project, config, name s
 		return "", fmt.Errorf("vault: failed to parse doppler secret response: %w", err)
 	}
 
+	// Doppler returns HTTP 200 with success:true and null raw/computed for secret
+	// names that do not exist (it does NOT return 404). Returning ("", nil) here
+	// stops VaultManager's candidate loop at a wrong candidate, so surface it as
+	// ErrSecretNotFound instead.
+	if result.Value.Computed == "" && result.Value.Raw == "" {
+		return "", fmt.Errorf("%w: secret %q (project=%q, config=%q)", ErrSecretNotFound, name, proj, cfg)
+	}
 	if result.Value.Computed != "" {
 		return result.Value.Computed, nil
 	}

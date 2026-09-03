@@ -57,6 +57,18 @@ func TestDopplerProvider_GetSecret(t *testing.T) {
 			return
 		}
 
+		if name == "GHOST_SECRET" {
+			// Real Doppler behavior for a name that does not exist:
+			// HTTP 200 + success:true with null raw/computed (NOT 404).
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"name":    name,
+				"value":   map[string]any{"raw": nil, "computed": nil},
+				"success": true,
+			})
+			return
+		}
+
 		w.WriteHeader(http.StatusNotFound)
 		_ = json.NewEncoder(w).Encode(DopplerErrorResponse{
 			Messages: []string{project + "/" + config + "/" + name + " not found"},
@@ -101,6 +113,10 @@ func TestDopplerProvider_GetSecret(t *testing.T) {
 	_, err = provider.GetSecret(ctx, "", "", "RATE_LIMITED")
 	require.Error(t, err)
 	assert.ErrorIs(t, err, ErrRateLimited)
+
+	// 6. Doppler returns 200 with null values for names that do not exist
+	_, err = provider.GetSecret(ctx, "", "", "GHOST_SECRET")
+	assert.ErrorIs(t, err, ErrSecretNotFound)
 }
 
 func TestDopplerProvider_ListSecrets(t *testing.T) {
