@@ -1400,3 +1400,77 @@ export type GlobalHeaderFilterConfigSchema = z.infer<typeof globalHeaderFilterCo
 export type GlobalHeaderFilterFormSchema = z.infer<typeof globalHeaderFilterFormSchema>;
 export type RoutingRuleSchema = z.infer<typeof routingRuleSchema>;
 export type BudgetOverrideFormSchema = z.infer<typeof budgetOverrideFormSchema>;
+
+// ---- OSS Guardrails (regex) ----
+
+export const guardrailPatternSchema = z.object({
+	pattern: z.string().min(1, "Regex pattern is required"),
+	description: z.string().max(255, "Description must be less than 255 characters").optional(),
+	entity_type: z.string().max(64, "Entity type must be less than 64 characters").optional(),
+	flags: z
+		.string()
+		.regex(/^[ims]{0,3}$/, "Flags can only combine i (case-insensitive), m (multiline), s (dot matches newline)")
+		.optional(),
+	action: z.enum(["detect_only", "block", "redact"]).default("block"),
+	redaction_strategy: z.enum(["replace", "mask", "hash"]).default("replace"),
+});
+
+export const guardrailProviderSchema = z.object({
+	id: z.number().int().positive("Provider id is required"),
+	provider_name: z.literal("regex"),
+	policy_name: z.string().min(1, "Configuration name is required").max(255),
+	enabled: z.boolean(),
+	timeout: z.number().int().min(0).optional(),
+	config: z.object({
+		patterns: z.array(guardrailPatternSchema).min(1, "At least one pattern is required"),
+	}),
+});
+
+export const guardrailRuleSchema = z.object({
+	id: z.number().int().positive("Rule id is required"),
+	name: z.string().min(1, "Rule name is required").max(255),
+	enabled: z.boolean(),
+	cel_expression: z.string().optional(),
+	apply_to: z.enum(["input", "output", "both"]),
+	sampling_rate: z.number().int().min(0).max(100).optional(),
+	timeout: z.number().int().min(0).optional(),
+	provider_config_ids: z.array(z.number().int()).min(1, "Attach at least one guardrail provider"),
+});
+
+export const guardrailsConfigSchema = z
+	.object({
+		guardrail_providers: z.array(guardrailProviderSchema),
+		guardrail_rules: z.array(guardrailRuleSchema),
+	})
+	.refine(
+		(data) => {
+			const providerIds = new Set(data.guardrail_providers.map((p) => p.id));
+			return data.guardrail_rules.every((r) => r.provider_config_ids.every((id) => providerIds.has(id)));
+		},
+		{
+			message: "A rule references a guardrail provider that does not exist",
+			path: ["guardrail_rules"],
+		},
+	)
+	.refine(
+		(data) => {
+			const providerIds = data.guardrail_providers.map((p) => p.id);
+			return new Set(providerIds).size === providerIds.length;
+		},
+		{
+			message: "Provider ids must be unique",
+			path: ["guardrail_providers"],
+		},
+	)
+	.refine(
+		(data) => {
+			const ruleIds = data.guardrail_rules.map((r) => r.id);
+			return new Set(ruleIds).size === ruleIds.length;
+		},
+		{
+			message: "Rule ids must be unique",
+			path: ["guardrail_rules"],
+		},
+	);
+
+export type GuardrailsConfigSchema = z.infer<typeof guardrailsConfigSchema>;
