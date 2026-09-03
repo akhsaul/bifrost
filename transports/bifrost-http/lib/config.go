@@ -44,6 +44,7 @@ import (
 	"github.com/maximhq/bifrost/plugins/adaptiverouting"
 	"github.com/maximhq/bifrost/plugins/compat"
 	"github.com/maximhq/bifrost/plugins/governance"
+	"github.com/maximhq/bifrost/plugins/guardrails"
 	"github.com/maximhq/bifrost/plugins/logging"
 	"github.com/maximhq/bifrost/plugins/maxim"
 	"github.com/maximhq/bifrost/plugins/otel"
@@ -188,6 +189,7 @@ var builtinPluginNames = []string{
 	maxim.PluginName,
 	adaptiverouting.PluginName,
 	routing.PluginName,
+	guardrails.PluginName,
 }
 
 func GetBuiltinPluginNames() []string {

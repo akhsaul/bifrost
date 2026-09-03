@@ -10,6 +10,7 @@ import (
 	"github.com/maximhq/bifrost/plugins/adaptiverouting"
 	"github.com/maximhq/bifrost/plugins/compat"
 	"github.com/maximhq/bifrost/plugins/governance"
+	"github.com/maximhq/bifrost/plugins/guardrails"
 	"github.com/maximhq/bifrost/plugins/logging"
 	"github.com/maximhq/bifrost/plugins/maxim"
 	"github.com/maximhq/bifrost/plugins/modelcatalogresolver"
@@ -156,6 +157,16 @@ func loadBuiltinPlugin(ctx context.Context, name string, pluginConfig any, bifro
 
 	case modelcatalogresolver.PluginName:
 		return modelcatalogresolver.Init(bifrostConfig.ModelCatalog, logger)
+
+	case guardrails.PluginName:
+		guardrailsConfig, err := MarshalPluginConfig[guardrails.Config](pluginConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal guardrails plugin config: %w", err)
+		}
+		if guardrailsConfig == nil {
+			guardrailsConfig = &guardrails.Config{}
+		}
+		return guardrails.Init(guardrailsConfig, logger)
 
 	default:
 		return nil, fmt.Errorf("unknown built-in plugin: %s", name)
@@ -320,6 +331,21 @@ func (s *BifrostHTTPServer) loadBuiltinPlugins(ctx context.Context) error {
 		s.markPluginDisabled(adaptiverouting.PluginName)
 	}
 	s.Config.SetPluginOrderInfo(adaptiverouting.PluginName, builtinPlacement, schemas.Ptr(5))
+
+	// 11. Guardrails (OSS regex guardrails; disabled when the enterprise build
+	// provides its own guardrails implementation). Opt-in: only registered when
+	// an enabled "guardrails" plugin entry exists in config.json / DB.
+	if ctx.Value(schemas.BifrostContextKeyIsEnterprise) == nil {
+		guardrailsConfig := s.getPluginConfig(guardrails.PluginName)
+		if guardrailsConfig != nil && guardrailsConfig.Enabled {
+			s.registerPluginWithStatus(ctx, guardrails.PluginName, nil, guardrailsConfig.Config, false)
+		} else {
+			s.markPluginDisabled(guardrails.PluginName)
+		}
+	} else {
+		s.markPluginDisabled(guardrails.PluginName)
+	}
+	s.Config.SetPluginOrderInfo(guardrails.PluginName, builtinPlacement, schemas.Ptr(11))
 
 	// 10. ModelCatalogResolver (last routing layer — fills req.Provider from catalog only when
 	// no earlier routing plugin (governance routing rules, governance VK LB, enterprise LB)
