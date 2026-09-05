@@ -18,7 +18,7 @@ func celCtx(headers map[string]string) *schemas.BifrostContext {
 func TestRuleMatches_TrueExpression(t *testing.T) {
 	p := &Plugin{config: compiledConfig{programs: map[int]celProgram{201: mustCompileCEL(t, "true")}}}
 	rule := &Rule{ID: 201, CELExpression: "true"}
-	if !p.ruleMatches(rule, celCtx(nil), chatReq("hi")) {
+	if !p.ruleMatches(rule, celCtx(nil), chatReq("hi"), nil) {
 		t.Fatal("true expression should match")
 	}
 }
@@ -26,7 +26,7 @@ func TestRuleMatches_TrueExpression(t *testing.T) {
 func TestRuleMatches_FalseExpression(t *testing.T) {
 	p := &Plugin{config: compiledConfig{programs: map[int]celProgram{201: mustCompileCEL(t, "false")}}}
 	rule := &Rule{ID: 201, CELExpression: "false"}
-	if p.ruleMatches(rule, celCtx(nil), chatReq("hi")) {
+	if p.ruleMatches(rule, celCtx(nil), chatReq("hi"), nil) {
 		t.Fatal("false expression should not match")
 	}
 }
@@ -37,13 +37,13 @@ func TestRuleMatches_HeaderCondition(t *testing.T) {
 	}}}
 	rule := &Rule{ID: 201, CELExpression: `headers["x-bf-tenant"] == "external"`}
 
-	if !p.ruleMatches(rule, celCtx(map[string]string{"x-bf-tenant": "external"}), chatReq("hi")) {
+	if !p.ruleMatches(rule, celCtx(map[string]string{"x-bf-tenant": "external"}), chatReq("hi"), nil) {
 		t.Fatal("matching header should pass")
 	}
-	if p.ruleMatches(rule, celCtx(map[string]string{"x-bf-tenant": "internal"}), chatReq("hi")) {
+	if p.ruleMatches(rule, celCtx(map[string]string{"x-bf-tenant": "internal"}), chatReq("hi"), nil) {
 		t.Fatal("non-matching header should fail")
 	}
-	if p.ruleMatches(rule, celCtx(nil), chatReq("hi")) {
+	if p.ruleMatches(rule, celCtx(nil), chatReq("hi"), nil) {
 		t.Fatal("missing headers map should fail the condition, not error")
 	}
 }
@@ -53,12 +53,12 @@ func TestRuleMatches_ModelCondition(t *testing.T) {
 		201: mustCompileCEL(t, `model == "gpt-4o"`),
 	}}}
 	rule := &Rule{ID: 201, CELExpression: `model == "gpt-4o"`}
-	if !p.ruleMatches(rule, celCtx(nil), chatReq("hi")) {
+	if !p.ruleMatches(rule, celCtx(nil), chatReq("hi"), nil) {
 		t.Fatal("gpt-4o request should match")
 	}
 	other := chatReq("hi")
 	other.ChatRequest.Model = "claude-3"
-	if p.ruleMatches(rule, celCtx(nil), other) {
+	if p.ruleMatches(rule, celCtx(nil), other, nil) {
 		t.Fatal("other model should not match")
 	}
 }
@@ -66,7 +66,7 @@ func TestRuleMatches_ModelCondition(t *testing.T) {
 func TestRuleMatches_MissingProgramFailsClosed(t *testing.T) {
 	p := &Plugin{config: compiledConfig{programs: map[int]celProgram{}}}
 	rule := &Rule{ID: 999, CELExpression: "true"}
-	if p.ruleMatches(rule, celCtx(nil), chatReq("hi")) {
+	if p.ruleMatches(rule, celCtx(nil), chatReq("hi"), nil) {
 		t.Fatal("missing compiled program should fail closed")
 	}
 }

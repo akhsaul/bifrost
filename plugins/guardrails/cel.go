@@ -87,9 +87,9 @@ func evaluateCEL(p celProgram, vars map[string]any) (bool, error) {
 	return matched, nil
 }
 
-// ruleMatches reports whether the rule's CEL gate passes for this request.
+// ruleMatches reports whether the rule's CEL gate passes for this request or response.
 // Fails closed (false) on any evaluation error, logging a warning.
-func (p *Plugin) ruleMatches(rule *Rule, ctx *schemas.BifrostContext, req *schemas.BifrostRequest) bool {
+func (p *Plugin) ruleMatches(rule *Rule, ctx *schemas.BifrostContext, req *schemas.BifrostRequest, resp *schemas.BifrostResponse) bool {
 	prog, ok := p.config.programs[rule.ID]
 	if !ok {
 		if p.logger != nil {
@@ -97,7 +97,7 @@ func (p *Plugin) ruleMatches(rule *Rule, ctx *schemas.BifrostContext, req *schem
 		}
 		return false
 	}
-	vars := buildCELVars(ctx, req)
+	vars := buildCELVars(ctx, req, resp)
 	matched, err := evaluateCEL(prog, vars)
 	if err != nil {
 		if p.logger != nil {
@@ -111,7 +111,11 @@ func (p *Plugin) ruleMatches(rule *Rule, ctx *schemas.BifrostContext, req *schem
 // buildCELVars gathers the CEL variables from the request context. Every
 // declared variable is always set (empty values when absent) so expressions
 // referencing them evaluate instead of erroring.
-func buildCELVars(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) map[string]any {
+//
+// When req is non-nil (PreLLMHook), model and provider are read from the incoming
+// request. When resp is non-nil (PostLLMHook), model and provider are read from
+// the serving response choices/extra fields.
+func buildCELVars(ctx *schemas.BifrostContext, req *schemas.BifrostRequest, resp *schemas.BifrostResponse) map[string]any {
 	vars := map[string]any{
 		"model":            "",
 		"provider":         "",
@@ -123,6 +127,9 @@ func buildCELVars(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) map[
 	if req != nil && req.ChatRequest != nil {
 		vars["model"] = req.ChatRequest.Model
 		vars["provider"] = string(req.ChatRequest.Provider)
+	} else if resp != nil && resp.ChatResponse != nil {
+		vars["model"] = resp.ChatResponse.Model
+		vars["provider"] = string(resp.ChatResponse.ExtraFields.Provider)
 	}
 	if ctx != nil {
 		if h, ok := ctx.Value(schemas.BifrostContextKeyRequestHeaders).(map[string]string); ok && h != nil {
@@ -131,7 +138,11 @@ func buildCELVars(ctx *schemas.BifrostContext, req *schemas.BifrostRequest) map[
 		if q, ok := ctx.Value(schemas.BifrostContextKeyRequestQuery).(map[string]string); ok && q != nil {
 			vars["query"] = q
 		}
-		if vk, ok := ctx.Value(schemas.BifrostContextKeyVirtualKey).(string); ok {
+		// Prefer the governance-published virtual key ID when present; fall back to
+		// the raw x-bf-vk header value on non-governance deployments.
+		if gvk, ok := ctx.Value(schemas.BifrostContextKeyGovernanceVirtualKeyID).(string); ok && gvk != "" {
+			vars["virtual_key_id"] = gvk
+		} else if vk, ok := ctx.Value(schemas.BifrostContextKeyVirtualKey).(string); ok {
 			vars["virtual_key_id"] = vk
 		}
 		if vkn, ok := ctx.Value(schemas.BifrostContextKeyGovernanceVirtualKeyName).(string); ok {

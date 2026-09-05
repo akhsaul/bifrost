@@ -80,7 +80,7 @@ func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostReq
 		if !rule.Enabled || (rule.ApplyTo != ApplyToInput && rule.ApplyTo != ApplyToBoth) {
 			continue
 		}
-		if !p.sampled(rule) || !p.ruleMatches(rule, ctx, req) {
+		if !p.sampled(rule) || !p.ruleMatches(rule, ctx, req, nil) {
 			continue
 		}
 		if shortCircuit := p.applyRulesToRequest(rule, req); shortCircuit != nil {
@@ -103,7 +103,7 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 		if !rule.Enabled || (rule.ApplyTo != ApplyToOutput && rule.ApplyTo != ApplyToBoth) {
 			continue
 		}
-		if !p.sampled(rule) || !p.ruleMatches(rule, ctx, nil) {
+		if !p.sampled(rule) || !p.ruleMatches(rule, ctx, nil, resp) {
 			continue
 		}
 		if shortCircuit := p.applyRulesToResponse(rule, resp); shortCircuit != nil {
