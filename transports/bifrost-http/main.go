@@ -115,6 +115,12 @@ func main() {
 	// Parse command line flags
 	flag.Parse()
 
+	// -version prints the ldflags-injected build version and exits before
+	// any server startup, so operators can verify which build is deployed.
+	if *versionFlag {
+		printVersionAndExit()
+	}
+
 	// Printing version
 	versionLine := fmt.Sprintf("║%s%s%s║", strings.Repeat(" ", (61-2-len(Version))/2), Version, strings.Repeat(" ", (61-2-len(Version)+1)/2))
 	// Welcome to bifrost!
