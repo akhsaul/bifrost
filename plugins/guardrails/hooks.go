@@ -3,6 +3,7 @@ package guardrails
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 
 	"github.com/maximhq/bifrost/core/schemas"
 )
@@ -22,6 +23,8 @@ func Init(cfg *Config, logger schemas.Logger) (*Plugin, error) {
 	compiled := compiledConfig{
 		cfg:      *cfg,
 		patterns: make(map[int][]compiledPattern, len(cfg.GuardrailProviders)),
+		secrets:  make(map[int]*betterleaksDetector, len(cfg.GuardrailProviders)),
+		judges:   make(map[int]*promptJudge, len(cfg.GuardrailProviders)),
 		programs: make(map[int]celProgram, len(cfg.GuardrailRules)),
 	}
 	for i := range cfg.GuardrailProviders {
@@ -29,12 +32,29 @@ func Init(cfg *Config, logger schemas.Logger) (*Plugin, error) {
 		if !p.Enabled {
 			continue
 		}
-		for j := range p.Config.Patterns {
-			re, err := compilePattern(&p.Config.Patterns[j])
-			if err != nil {
-				return nil, fmt.Errorf("guardrails: provider %d pattern %d: %w", p.ID, j, err)
+		switch p.ProviderName {
+		case supportedProviderRegex:
+			for j := range p.Config.Patterns {
+				re, err := compilePattern(&p.Config.Patterns[j])
+				if err != nil {
+					return nil, fmt.Errorf("guardrails: provider %d pattern %d: %w", p.ID, j, err)
+				}
+				compiled.patterns[p.ID] = append(compiled.patterns[p.ID], compiledPattern{re: re, cfg: p.Config.Patterns[j]})
 			}
-			compiled.patterns[p.ID] = append(compiled.patterns[p.ID], compiledPattern{re: re, cfg: p.Config.Patterns[j]})
+		case supportedProviderSecrets:
+			secCfg := SecretsConfig{Action: PatternActionBlock, RedactionStrategy: RedactionReplace}
+			if p.Config.SecretsConfig != nil {
+				secCfg = *p.Config.SecretsConfig
+			}
+			detector, err := newBetterleaksDetector(secCfg)
+			if err != nil {
+				return nil, fmt.Errorf("guardrails: provider %d (secrets): %w", p.ID, err)
+			}
+			compiled.secrets[p.ID] = detector
+		case supportedProviderPromptGuard, supportedProviderPromptGuardAlt:
+			if p.Config.PromptGuardrailConfig != nil {
+				compiled.judges[p.ID] = newPromptJudge(*p.Config.PromptGuardrailConfig, nil)
+			}
 		}
 	}
 	for i := range cfg.GuardrailRules {
@@ -83,7 +103,7 @@ func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostReq
 		if !p.sampled(rule) || !p.ruleMatches(rule, ctx, req, nil) {
 			continue
 		}
-		if shortCircuit := p.applyRulesToRequest(rule, req); shortCircuit != nil {
+		if shortCircuit := p.applyRulesToRequest(ctx, rule, req); shortCircuit != nil {
 			return req, shortCircuit, nil
 		}
 	}
@@ -106,10 +126,13 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 		if !p.sampled(rule) || !p.ruleMatches(rule, ctx, nil, resp) {
 			continue
 		}
-		if shortCircuit := p.applyRulesToResponse(rule, resp); shortCircuit != nil {
+		if shortCircuit := p.applyRulesToResponse(ctx, rule, resp); shortCircuit != nil {
 			return nil, shortCircuit, nil
 		}
 	}
+	// Restore reversible placeholders in tool_calls arguments so bash/script
+	// executions on the client receive the real secret.
+	detokenizeToolCalls(resp, ctx)
 	return resp, bifrostErr, nil
 }
 
@@ -121,42 +144,98 @@ func (p *Plugin) sampled(rule *Rule) bool {
 	return randSource(100) < rule.SamplingRate
 }
 
+// SetChatRequestExecutor wires the bifrost chat executor to the plugin for judge evaluations.
+func (p *Plugin) SetChatRequestExecutor(fn ChatRequestExecutor) {
+	for _, j := range p.config.judges {
+		j.exec = fn
+	}
+}
+
 // applyRulesToRequest evaluates every enabled provider of the rule against the
 // request text. Block stops on the first hit; redact rewrites messages in place.
-func (p *Plugin) applyRulesToRequest(rule *Rule, req *schemas.BifrostRequest) *schemas.LLMPluginShortCircuit {
+func (p *Plugin) applyRulesToRequest(ctx *schemas.BifrostContext, rule *Rule, req *schemas.BifrostRequest) *schemas.LLMPluginShortCircuit {
 	for _, pid := range rule.ProviderConfigIDs {
-		patterns := p.config.patterns[pid]
-		for i := range req.ChatRequest.Input {
-			msg := &req.ChatRequest.Input[i]
-			if msg.Content == nil {
-				continue
-			}
-			if msg.Content.ContentStr != nil {
-				blocked, newText, detected := evaluatePatterns(patterns, *msg.Content.ContentStr)
-				if len(detected) > 0 {
-					p.logWarn("guardrails: rule %q detected %d match(es) on input: %v", rule.Name, len(detected), detected)
+		// 1. Regex patterns
+		if patterns, ok := p.config.patterns[pid]; ok && len(patterns) > 0 {
+			for i := range req.ChatRequest.Input {
+				msg := &req.ChatRequest.Input[i]
+				if msg.Content == nil {
+					continue
 				}
-				if len(blocked) > 0 {
-					return blockShortCircuit(rule, blocked)
-				}
-				if newText != *msg.Content.ContentStr {
-					msg.Content.ContentStr = ptr(newText)
-				}
-			}
-			for j := range msg.Content.ContentBlocks {
-				blk := &msg.Content.ContentBlocks[j]
-				if blk.Text != nil {
-					blocked, newText, detected := evaluatePatterns(patterns, *blk.Text)
+				if msg.Content.ContentStr != nil {
+					blocked, newText, detected := evaluatePatterns(patterns, *msg.Content.ContentStr)
 					if len(detected) > 0 {
-						p.logWarn("guardrails: rule %q detected %d match(es) on input block: %v", rule.Name, len(detected), detected)
+						p.logWarn("guardrails: rule %q detected %d match(es) on input: %v", rule.Name, len(detected), detected)
 					}
 					if len(blocked) > 0 {
 						return blockShortCircuit(rule, blocked)
 					}
-					if newText != *blk.Text {
-						blk.Text = ptr(newText)
+					if newText != *msg.Content.ContentStr {
+						msg.Content.ContentStr = ptr(newText)
 					}
 				}
+				for j := range msg.Content.ContentBlocks {
+					blk := &msg.Content.ContentBlocks[j]
+					if blk.Text != nil {
+						blocked, newText, detected := evaluatePatterns(patterns, *blk.Text)
+						if len(detected) > 0 {
+							p.logWarn("guardrails: rule %q detected %d match(es) on input block: %v", rule.Name, len(detected), detected)
+						}
+						if len(blocked) > 0 {
+							return blockShortCircuit(rule, blocked)
+						}
+						if newText != *blk.Text {
+							blk.Text = ptr(newText)
+						}
+					}
+				}
+			}
+		}
+
+		// 2. Betterleaks secrets detection
+		if sec, ok := p.config.secrets[pid]; ok && sec != nil {
+			for i := range req.ChatRequest.Input {
+				msg := &req.ChatRequest.Input[i]
+				if msg.Content == nil {
+					continue
+				}
+				if msg.Content.ContentStr != nil {
+					blocked, newText, detected := sec.evaluate(*msg.Content.ContentStr)
+					if len(detected) > 0 {
+						p.logWarn("guardrails: rule %q (secrets) detected %d secret(s): %v", rule.Name, len(detected), detected)
+					}
+					if len(blocked) > 0 {
+						return blockShortCircuitSimple(rule, fmt.Sprintf("detected secrets (%s)", strings.Join(blocked, ", ")))
+					}
+					if newText != *msg.Content.ContentStr {
+						msg.Content.ContentStr = ptr(newText)
+					}
+				}
+				for j := range msg.Content.ContentBlocks {
+					blk := &msg.Content.ContentBlocks[j]
+					if blk.Text != nil {
+						blocked, newText, detected := sec.evaluate(*blk.Text)
+						if len(detected) > 0 {
+							p.logWarn("guardrails: rule %q (secrets) detected %d secret(s) on input block: %v", rule.Name, len(detected), detected)
+						}
+						if len(blocked) > 0 {
+							return blockShortCircuitSimple(rule, fmt.Sprintf("detected secrets (%s)", strings.Join(blocked, ", ")))
+						}
+						if newText != *blk.Text {
+							blk.Text = ptr(newText)
+						}
+					}
+				}
+			}
+		}
+
+		// 3. Prompt Guardrails (LLM Judge)
+		if judge, ok := p.config.judges[pid]; ok && judge != nil {
+			text := extractRequestText(req)
+			if blocked, reason, err := judge.evaluate(ctx, text); err != nil {
+				p.logWarn("guardrails: rule %q prompt judge error: %v", rule.Name, err)
+			} else if blocked {
+				return blockShortCircuitSimple(rule, reason)
 			}
 		}
 	}
@@ -164,42 +243,93 @@ func (p *Plugin) applyRulesToRequest(rule *Rule, req *schemas.BifrostRequest) *s
 }
 
 // applyRulesToResponse evaluates every enabled provider of the rule against the response text.
-func (p *Plugin) applyRulesToResponse(rule *Rule, resp *schemas.BifrostResponse) *schemas.BifrostError {
+func (p *Plugin) applyRulesToResponse(ctx *schemas.BifrostContext, rule *Rule, resp *schemas.BifrostResponse) *schemas.BifrostError {
 	for _, pid := range rule.ProviderConfigIDs {
-		patterns := p.config.patterns[pid]
-		for i := range resp.ChatResponse.Choices {
-			c := &resp.ChatResponse.Choices[i]
-			if c.ChatNonStreamResponseChoice != nil && c.ChatNonStreamResponseChoice.Message != nil {
-				msg := c.ChatNonStreamResponseChoice.Message
-				if msg.Content != nil && msg.Content.ContentStr != nil {
-					blocked, newText, detected := evaluatePatterns(patterns, *msg.Content.ContentStr)
+		// 1. Regex patterns
+		if patterns, ok := p.config.patterns[pid]; ok && len(patterns) > 0 {
+			for i := range resp.ChatResponse.Choices {
+				c := &resp.ChatResponse.Choices[i]
+				if c.ChatNonStreamResponseChoice != nil && c.ChatNonStreamResponseChoice.Message != nil {
+					msg := c.ChatNonStreamResponseChoice.Message
+					if msg.Content != nil && msg.Content.ContentStr != nil {
+						blocked, newText, detected := evaluatePatterns(patterns, *msg.Content.ContentStr)
+						if len(detected) > 0 {
+							p.logWarn("guardrails: rule %q detected %d match(es) on output: %v", rule.Name, len(detected), detected)
+						}
+						if len(blocked) > 0 {
+							return blockError(rule, blocked)
+						}
+						if newText != *msg.Content.ContentStr {
+							msg.Content.ContentStr = ptr(newText)
+						}
+					}
+				}
+				if c.TextCompletionResponseChoice != nil && c.TextCompletionResponseChoice.Text != nil {
+					txt := *c.TextCompletionResponseChoice.Text
+					blocked, newText, detected := evaluatePatterns(patterns, txt)
 					if len(detected) > 0 {
-						p.logWarn("guardrails: rule %q detected %d match(es) on output: %v", rule.Name, len(detected), detected)
+						p.logWarn("guardrails: rule %q detected %d match(es) on output text: %v", rule.Name, len(detected), detected)
 					}
 					if len(blocked) > 0 {
 						return blockError(rule, blocked)
 					}
-					if newText != *msg.Content.ContentStr {
-						msg.Content.ContentStr = ptr(newText)
+					if newText != txt {
+						c.TextCompletionResponseChoice.Text = ptr(newText)
 					}
 				}
 			}
-			if c.TextCompletionResponseChoice != nil && c.TextCompletionResponseChoice.Text != nil {
-				txt := *c.TextCompletionResponseChoice.Text
-				blocked, newText, detected := evaluatePatterns(patterns, txt)
-				if len(detected) > 0 {
-					p.logWarn("guardrails: rule %q detected %d match(es) on output text: %v", rule.Name, len(detected), detected)
+		}
+
+		// 2. Betterleaks secrets detection
+		if sec, ok := p.config.secrets[pid]; ok && sec != nil {
+			for i := range resp.ChatResponse.Choices {
+				c := &resp.ChatResponse.Choices[i]
+				if c.ChatNonStreamResponseChoice != nil && c.ChatNonStreamResponseChoice.Message != nil {
+					msg := c.ChatNonStreamResponseChoice.Message
+					if msg.Content != nil && msg.Content.ContentStr != nil {
+						blocked, newText, detected := sec.evaluate(*msg.Content.ContentStr)
+						if len(detected) > 0 {
+							p.logWarn("guardrails: rule %q (secrets) detected %d secret(s) on output: %v", rule.Name, len(detected), detected)
+						}
+						if len(blocked) > 0 {
+							return blockErrorSimple(rule, fmt.Sprintf("detected secrets (%s)", strings.Join(blocked, ", ")))
+						}
+						if newText != *msg.Content.ContentStr {
+							msg.Content.ContentStr = ptr(newText)
+						}
+					}
 				}
-				if len(blocked) > 0 {
-					return blockError(rule, blocked)
-				}
-				if newText != txt {
-					c.TextCompletionResponseChoice.Text = ptr(newText)
-				}
+			}
+		}
+
+		// 3. Prompt Guardrails (LLM Judge)
+		if judge, ok := p.config.judges[pid]; ok && judge != nil {
+			text := extractResponseText(resp)
+			if blocked, reason, err := judge.evaluate(ctx, text); err != nil {
+				p.logWarn("guardrails: rule %q prompt judge error on output: %v", rule.Name, err)
+			} else if blocked {
+				return blockErrorSimple(rule, reason)
 			}
 		}
 	}
 	return nil
+}
+
+// blockShortCircuitSimple builds an error short-circuit with a custom reason string.
+func blockShortCircuitSimple(rule *Rule, reason string) *schemas.LLMPluginShortCircuit {
+	return &schemas.LLMPluginShortCircuit{Error: blockErrorSimple(rule, reason)}
+}
+
+// blockErrorSimple builds a BifrostError with a custom reason string.
+func blockErrorSimple(rule *Rule, reason string) *schemas.BifrostError {
+	return &schemas.BifrostError{
+		IsBifrostError: true,
+		StatusCode:     schemas.Ptr(400),
+		Error: &schemas.ErrorField{
+			Message: fmt.Sprintf("request blocked by guardrail rule %q: %s", rule.Name, reason),
+		},
+		AllowFallbacks: schemas.Ptr(false),
+	}
 }
 
 // blockShortCircuit builds the PreLLMHook short-circuit for a blocked request.
