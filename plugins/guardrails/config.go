@@ -120,6 +120,12 @@ func validateConfig(cfg *Config) error {
 		if strings.TrimSpace(r.Name) == "" {
 			return fmt.Errorf("guardrail_rules[%d] (id %d): name is required", i, r.ID)
 		}
+		if r.Target == "" {
+			r.Target = "llm"
+		}
+		if r.Target != "llm" && r.Target != "mcp" {
+			return fmt.Errorf("guardrail_rules[%d] (id %d): target must be 'llm' or 'mcp', got %q", i, r.ID, r.Target)
+		}
 		switch r.ApplyTo {
 		case ApplyToInput, ApplyToOutput, ApplyToBoth:
 		default:

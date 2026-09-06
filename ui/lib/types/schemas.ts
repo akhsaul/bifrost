@@ -1429,11 +1429,14 @@ export const guardrailProviderSchema = z.object({
 export const guardrailRuleSchema = z.object({
 	id: z.number().int().positive("Rule id is required"),
 	name: z.string().min(1, "Rule name is required").max(255),
+	description: z.string().max(1000).optional(),
 	enabled: z.boolean(),
+	target: z.enum(["llm", "mcp"]).default("llm").optional(),
 	cel_expression: z.string().optional(),
 	apply_to: z.enum(["input", "output", "both"]),
 	sampling_rate: z.number().int().min(0).max(100).optional(),
 	timeout: z.number().int().min(0).optional(),
+	max_turns_to_send: z.number().int().min(0).optional(),
 	provider_config_ids: z.array(z.number().int()).min(1, "Attach at least one guardrail provider"),
 });
 

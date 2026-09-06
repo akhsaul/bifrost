@@ -58,11 +58,14 @@ type RegexProviderConfig struct {
 type Rule struct {
 	ID                int    `json:"id"`
 	Name              string `json:"name"`
+	Description       string `json:"description,omitempty"`
 	Enabled           bool   `json:"enabled"`
+	Target            string `json:"target,omitempty"` // "llm" | "mcp" (default: "llm")
 	CELExpression     string `json:"cel_expression,omitempty"` // empty => always true
 	ApplyTo           string `json:"apply_to"`                 // input | output | both
 	SamplingRate      int    `json:"sampling_rate,omitempty"`  // default 100
 	Timeout           int    `json:"timeout,omitempty"`        // accepted for schema parity, ignored
+	MaxTurnsToSend    int    `json:"max_turns_to_send,omitempty"`
 	ProviderConfigIDs []int  `json:"provider_config_ids"`
 }
 

@@ -4,6 +4,7 @@
 export type PatternAction = "detect_only" | "block" | "redact";
 export type RedactionStrategy = "replace" | "mask" | "hash";
 export type RuleApplyTo = "input" | "output" | "both";
+export type RuleTarget = "llm" | "mcp";
 
 export interface GuardrailPattern {
 	pattern: string;
@@ -28,11 +29,14 @@ export interface GuardrailProvider {
 export interface GuardrailRule {
 	id: number;
 	name: string;
+	description?: string;
 	enabled: boolean;
+	target?: RuleTarget; // default: "llm"
 	cel_expression?: string;
 	apply_to: RuleApplyTo;
 	sampling_rate?: number;
 	timeout?: number;
+	max_turns_to_send?: number;
 	provider_config_ids: number[];
 }
 
