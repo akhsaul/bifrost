@@ -21,7 +21,16 @@ import { toast } from "sonner";
 
 const ACTIONS: PatternAction[] = ["block", "redact", "detect_only"];
 const STRATEGIES: RedactionStrategy[] = ["replace", "mask", "hash"];
-const FLAGS = ["", "i", "m", "s", "im", "is", "ms", "ims"];
+const FLAG_OPTIONS = [
+	{ value: "none", label: "none" },
+	{ value: "i", label: "i" },
+	{ value: "m", label: "m" },
+	{ value: "s", label: "s" },
+	{ value: "im", label: "im" },
+	{ value: "is", label: "is" },
+	{ value: "ms", label: "ms" },
+	{ value: "ims", label: "ims" },
+];
 
 function parseConfig(raw: any): GuardrailsPluginConfig {
 	if (!raw || typeof raw !== "object") return defaultGuardrailsConfig();
@@ -40,7 +49,7 @@ function newPattern(): GuardrailPattern {
 	return { pattern: "", description: "", action: "block", redaction_strategy: "replace" };
 }
 
-export default function guardrailsProviderView() {
+export default function GuardrailsProviderView() {
 	const { data: plugin, isLoading } = useGetPluginQuery(GUARDRAILS_PLUGIN_NAME);
 	const [updatePlugin, { isLoading: isSaving }] = useUpdatePluginMutation();
 	const [providers, setProviders] = useState<GuardrailProvider[]>([]);
@@ -212,14 +221,17 @@ export default function guardrailsProviderView() {
 										<Input value={pat.entity_type ?? ""} onChange={(e) => updatePattern(pIdx, patIdx, { entity_type: e.target.value })} />
 									</TableCell>
 									<TableCell>
-										<Select value={pat.flags ?? ""} onValueChange={(v) => updatePattern(pIdx, patIdx, { flags: v || undefined })}>
+										<Select
+											value={pat.flags || "none"}
+											onValueChange={(v) => updatePattern(pIdx, patIdx, { flags: v === "none" ? undefined : v })}
+										>
 											<SelectTrigger className="w-20">
 												<SelectValue />
 											</SelectTrigger>
 											<SelectContent>
-												{FLAGS.map((f) => (
-													<SelectItem key={f || "none"} value={f}>
-														{f || "none"}
+												{FLAG_OPTIONS.map((opt) => (
+													<SelectItem key={opt.value} value={opt.value}>
+														{opt.label}
 													</SelectItem>
 												))}
 											</SelectContent>
