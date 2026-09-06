@@ -59,14 +59,29 @@ export default function GuardrailsConfigurationView() {
 
 	const providers = useMemo(() => parseConfig(plugin?.config).guardrail_providers, [plugin]);
 
-	const dirty = useMemo(() => JSON.stringify(rules) !== JSON.stringify(parseConfig(plugin?.config).guardrail_rules), [rules, plugin]);
+	const dirty = useMemo(() => {
+		const savedRules = parseConfig(plugin?.config).guardrail_rules;
+		const savedEnabled = Boolean(plugin?.enabled);
+		return pluginEnabled !== savedEnabled || JSON.stringify(rules) !== JSON.stringify(savedRules);
+	}, [rules, pluginEnabled, plugin]);
 
-	const buildPayload = () => {
+	const buildPayload = (overrideEnabled?: boolean) => {
 		const cfg = parseConfig(plugin?.config);
 		return {
-			enabled: pluginEnabled,
+			enabled: overrideEnabled !== undefined ? overrideEnabled : pluginEnabled,
 			config: { ...cfg, guardrail_rules: rules } satisfies GuardrailsPluginConfig,
 		};
+	};
+
+	const handleTogglePlugin = async (newVal: boolean) => {
+		setPluginEnabled(newVal);
+		try {
+			await updatePlugin({ name: GUARDRAILS_PLUGIN_NAME, data: buildPayload(newVal) }).unwrap();
+			toast.success(`Guardrails plugin ${newVal ? "enabled" : "disabled"}`);
+		} catch (error) {
+			setPluginEnabled(!newVal);
+			toast.error(getErrorMessage(error));
+		}
 	};
 
 	const save = async () => {
@@ -132,7 +147,7 @@ export default function GuardrailsConfigurationView() {
 				</div>
 				<div className="flex items-center gap-3">
 					<div className="flex items-center gap-2">
-						<Switch checked={pluginEnabled} onCheckedChange={setPluginEnabled} data-testid="guardrails-rules-plugin-enabled-switch" />
+						<Switch checked={pluginEnabled} onCheckedChange={handleTogglePlugin} data-testid="guardrails-rules-plugin-enabled-switch" />
 						<Label>Plugin enabled</Label>
 					</div>
 					<Button variant="outline" onClick={addRule} data-testid="guardrails-rule-add">
