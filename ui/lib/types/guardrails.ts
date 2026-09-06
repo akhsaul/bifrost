@@ -3,8 +3,10 @@
 
 export type PatternAction = "detect_only" | "block" | "redact";
 export type RedactionStrategy = "replace" | "mask" | "hash";
+export type RedactionMode = "runtime" | "runtime_reversible" | "logs_only";
 export type RuleApplyTo = "input" | "output" | "both";
 export type RuleTarget = "llm" | "mcp";
+export type GuardrailProviderType = "regex" | "secrets" | "prompt-guardrail" | "prompt_guardrail";
 
 export interface GuardrailPattern {
 	pattern: string;
@@ -13,16 +15,42 @@ export interface GuardrailPattern {
 	flags?: string; // subset of "ims"
 	action?: PatternAction;
 	redaction_strategy?: RedactionStrategy;
+	redaction_mode?: RedactionMode;
+}
+
+export interface SecretsProviderConfig {
+	ignored_secret_keywords?: string[];
+	action?: PatternAction;
+	redaction_strategy?: RedactionStrategy;
+	redaction_mode?: RedactionMode;
+}
+
+export interface PromptGuardrailProviderConfig {
+	judge_provider: string;
+	judge_model: string;
+	rule: string;
+	prompt_template?: string;
+	timeout?: number;
+	max_output_tokens?: number;
 }
 
 export interface GuardrailProvider {
 	id: number;
-	provider_name: "regex";
+	provider_name: GuardrailProviderType;
 	policy_name: string;
 	enabled: boolean;
 	timeout?: number;
 	config: {
-		patterns: GuardrailPattern[];
+		patterns?: GuardrailPattern[];
+		ignored_secret_keywords?: string[];
+		action?: PatternAction;
+		redaction_strategy?: RedactionStrategy;
+		redaction_mode?: RedactionMode;
+		judge_provider?: string;
+		judge_model?: string;
+		rule?: string;
+		prompt_template?: string;
+		max_output_tokens?: number;
 	};
 }
 

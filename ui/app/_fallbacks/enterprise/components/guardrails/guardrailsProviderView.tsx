@@ -7,18 +7,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { getErrorMessage, useGetPluginQuery, useUpdatePluginMutation } from "@/lib/store";
 import {
 	GUARDRAILS_PLUGIN_NAME,
 	defaultGuardrailsConfig,
 	type GuardrailPattern,
 	type GuardrailProvider,
+	type GuardrailProviderType,
 	type GuardrailRule,
 	type GuardrailsPluginConfig,
 	type PatternAction,
+	type RedactionMode,
 	type RedactionStrategy,
 } from "@/lib/types/guardrails";
-import { ChevronDown, Code, Key, MoreHorizontal, Pencil, Plus, Shield, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ChevronDown, Code, Key, MoreHorizontal, Pencil, Plus, Shield, ShieldCheck, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -45,6 +49,11 @@ const STRATEGY_OPTIONS: { value: RedactionStrategy; label: string }[] = [
 	{ value: "hash", label: "Hash (SHA-256)" },
 ];
 
+const REDACTION_MODE_OPTIONS: { value: RedactionMode; label: string }[] = [
+	{ value: "runtime", label: "Permanent (Masked to LLM & Client)" },
+	{ value: "runtime_reversible", label: "Reversible (Restored in Tool Calls)" },
+];
+
 const PII_TEMPLATE_PATTERNS: GuardrailPattern[] = [
 	{
 		pattern: "\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b",
@@ -53,6 +62,7 @@ const PII_TEMPLATE_PATTERNS: GuardrailPattern[] = [
 		flags: "i",
 		action: "block",
 		redaction_strategy: "replace",
+		redaction_mode: "runtime",
 	},
 	{
 		pattern: "\\b(?:\\+?1[-.\\s]?)?(?:\\(?\\d{3}\\)?[-.\\s]?)\\d{3}[-.\\s]?\\d{4}\\b",
@@ -60,6 +70,7 @@ const PII_TEMPLATE_PATTERNS: GuardrailPattern[] = [
 		entity_type: "PHONE_NUMBER",
 		action: "block",
 		redaction_strategy: "replace",
+		redaction_mode: "runtime",
 	},
 	{
 		pattern: "\\b\\d{3}-\\d{2}-\\d{4}\\b",
@@ -67,6 +78,7 @@ const PII_TEMPLATE_PATTERNS: GuardrailPattern[] = [
 		entity_type: "US_SSN",
 		action: "block",
 		redaction_strategy: "replace",
+		redaction_mode: "runtime",
 	},
 	{
 		pattern: "\\b(?:\\d[ -]?){13,19}\\b",
@@ -74,6 +86,7 @@ const PII_TEMPLATE_PATTERNS: GuardrailPattern[] = [
 		entity_type: "CREDIT_CARD",
 		action: "block",
 		redaction_strategy: "replace",
+		redaction_mode: "runtime",
 	},
 	{
 		pattern: "\\b(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}\\b",
@@ -81,6 +94,7 @@ const PII_TEMPLATE_PATTERNS: GuardrailPattern[] = [
 		entity_type: "IP_ADDRESS",
 		action: "block",
 		redaction_strategy: "replace",
+		redaction_mode: "runtime",
 	},
 ];
 
@@ -99,12 +113,19 @@ function nextProviderId(providers: GuardrailProvider[]): number {
 }
 
 function emptyPattern(): GuardrailPattern {
-	return { pattern: "", description: "", action: "block", redaction_strategy: "replace" };
+	return {
+		pattern: "",
+		description: "",
+		action: "block",
+		redaction_strategy: "replace",
+		redaction_mode: "runtime",
+	};
 }
 
 interface SheetState {
 	open: boolean;
-	provider: GuardrailProvider | null; // null = create mode
+	provider: GuardrailProvider | null;
+	providerType: GuardrailProviderType;
 }
 
 export default function GuardrailsProviderView() {
@@ -112,7 +133,8 @@ export default function GuardrailsProviderView() {
 	const [updatePlugin, { isLoading: isSaving }] = useUpdatePluginMutation();
 	const [providers, setProviders] = useState<GuardrailProvider[]>([]);
 	const [pluginEnabled, setPluginEnabled] = useState(false);
-	const [sheet, setSheet] = useState<SheetState>({ open: false, provider: null });
+	const [activeTab, setActiveTab] = useState<GuardrailProviderType>("regex");
+	const [sheet, setSheet] = useState<SheetState>({ open: false, provider: null, providerType: "regex" });
 
 	useEffect(() => {
 		const cfg = parseConfig(plugin?.config);
@@ -147,7 +169,7 @@ export default function GuardrailsProviderView() {
 				data: { enabled: pluginEnabled, config: { ...cfg, guardrail_providers: next } satisfies GuardrailsPluginConfig },
 			}).unwrap();
 			setProviders(next);
-			setSheet({ open: false, provider: null });
+			setSheet({ open: false, provider: null, providerType: activeTab });
 			toast.success(`Guardrail configuration ${isNew ? "created" : "updated"}`);
 		} catch (error) {
 			toast.error(getErrorMessage(error));
@@ -183,22 +205,54 @@ export default function GuardrailsProviderView() {
 		}
 	};
 
-	const handleCreate = () => {
+	const handleCreate = (type: GuardrailProviderType) => {
+		let initialConfig: GuardrailProvider["config"] = {};
+		if (type === "regex") {
+			initialConfig = { patterns: [emptyPattern()] };
+		} else if (type === "secrets") {
+			initialConfig = {
+				action: "block",
+				redaction_strategy: "replace",
+				redaction_mode: "runtime",
+				ignored_secret_keywords: [],
+			};
+		} else {
+			initialConfig = {
+				judge_provider: "",
+				judge_model: "",
+				rule: "",
+				timeout: 30,
+				max_output_tokens: 200,
+			};
+		}
+
 		setSheet({
 			open: true,
+			providerType: type,
 			provider: {
 				id: nextProviderId(providers),
-				provider_name: "regex",
+				provider_name: type,
 				policy_name: "",
 				enabled: true,
-				config: { patterns: [emptyPattern()] },
+				config: initialConfig,
 			},
 		});
 	};
 
 	const handleEdit = (provider: GuardrailProvider) => {
-		setSheet({ open: true, provider: structuredClone(provider) });
+		setSheet({
+			open: true,
+			providerType: provider.provider_name,
+			provider: structuredClone(provider),
+		});
 	};
+
+	const currentProviders = providers.filter((p) => {
+		if (activeTab === "prompt-guardrail") {
+			return p.provider_name === "prompt-guardrail" || p.provider_name === "prompt_guardrail";
+		}
+		return p.provider_name === activeTab;
+	});
 
 	if (isLoading) {
 		return <div className="text-muted-foreground p-8 text-sm">Loading guardrails…</div>;
@@ -207,14 +261,67 @@ export default function GuardrailsProviderView() {
 	return (
 		<div className="flex flex-col gap-6 md:flex-row">
 			{/* Left Navigation Sidebar: Providers */}
-			<div className="w-full shrink-0 space-y-2 md:w-56">
+			<div className="w-full shrink-0 space-y-2 md:w-60">
 				<div className="text-muted-foreground mb-2 px-2 text-xs font-semibold tracking-wider uppercase">Providers</div>
 				<nav className="space-y-1">
-					<div className="bg-secondary flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium">
-						<Code className="text-primary h-4 w-4" />
-						<span>Custom Regex</span>
-					</div>
-					<div className="text-muted-foreground flex items-center justify-between rounded-md px-3 py-2 text-sm opacity-60">
+					{/* Custom Regex */}
+					<button
+						type="button"
+						onClick={() => setActiveTab("regex")}
+						className={cn(
+							"w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors text-left",
+							activeTab === "regex" ? "bg-secondary text-primary" : "hover:bg-muted/50 text-muted-foreground hover:text-foreground",
+						)}
+					>
+						<div className="flex items-center gap-2.5">
+							<Code className="h-4 w-4" />
+							<span>Custom Regex</span>
+						</div>
+						<Badge variant="outline" className="px-1 py-0 font-mono text-[10px]">
+							RE2
+						</Badge>
+					</button>
+
+					{/* Secrets Detection (Betterleaks) */}
+					<button
+						type="button"
+						onClick={() => setActiveTab("secrets")}
+						className={cn(
+							"w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors text-left",
+							activeTab === "secrets" ? "bg-secondary text-primary" : "hover:bg-muted/50 text-muted-foreground hover:text-foreground",
+						)}
+					>
+						<div className="flex items-center gap-2.5">
+							<Key className="h-4 w-4" />
+							<span>Secrets Detection</span>
+						</div>
+						<Badge variant="outline" className="px-1 py-0 text-[10px] text-emerald-600 dark:text-emerald-400">
+							Betterleaks
+						</Badge>
+					</button>
+
+					{/* Prompt Guardrails (LLM Judge) */}
+					<button
+						type="button"
+						onClick={() => setActiveTab("prompt-guardrail")}
+						className={cn(
+							"w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors text-left",
+							activeTab === "prompt-guardrail"
+								? "bg-secondary text-primary"
+								: "hover:bg-muted/50 text-muted-foreground hover:text-foreground",
+						)}
+					>
+						<div className="flex items-center gap-2.5">
+							<ShieldCheck className="h-4 w-4" />
+							<span>Prompt Guardrails</span>
+						</div>
+						<Badge variant="outline" className="px-1 py-0 text-[10px] text-purple-600 dark:text-purple-400">
+							Judge
+						</Badge>
+					</button>
+
+					{/* Coming soon providers */}
+					<div className="text-muted-foreground flex items-center justify-between rounded-md px-3 py-2 text-sm opacity-50 select-none">
 						<div className="flex items-center gap-2.5">
 							<Shield className="h-4 w-4" />
 							<span>AWS Bedrock</span>
@@ -223,7 +330,7 @@ export default function GuardrailsProviderView() {
 							Soon
 						</Badge>
 					</div>
-					<div className="text-muted-foreground flex items-center justify-between rounded-md px-3 py-2 text-sm opacity-60">
+					<div className="text-muted-foreground flex items-center justify-between rounded-md px-3 py-2 text-sm opacity-50 select-none">
 						<div className="flex items-center gap-2.5">
 							<Shield className="h-4 w-4" />
 							<span>Azure Safety</span>
@@ -232,25 +339,23 @@ export default function GuardrailsProviderView() {
 							Soon
 						</Badge>
 					</div>
-					<div className="text-muted-foreground flex items-center justify-between rounded-md px-3 py-2 text-sm opacity-60">
-						<div className="flex items-center gap-2.5">
-							<Key className="h-4 w-4" />
-							<span>Secrets Scan</span>
-						</div>
-						<Badge variant="outline" className="px-1 py-0 text-[10px]">
-							Soon
-						</Badge>
-					</div>
 				</nav>
 			</div>
 
-			{/* Main Content Area: Regex Guardrail Configurations Table */}
+			{/* Main Content Area */}
 			<div className="min-w-0 flex-1 space-y-4">
+				{/* Top Header */}
 				<div className="flex flex-wrap items-center justify-between gap-4">
 					<div>
-						<h1 className="text-xl font-bold tracking-tight">Regex Guardrail Configurations</h1>
+						<h1 className="text-xl font-bold tracking-tight">
+							{activeTab === "regex" && "Regex Guardrail Configurations"}
+							{activeTab === "secrets" && "Secrets Detection Configurations (Betterleaks)"}
+							{activeTab === "prompt-guardrail" && "Prompt Guardrail Configurations (LLM Judge)"}
+						</h1>
 						<p className="text-muted-foreground text-sm">
-							Define custom regex configurations to evaluate and moderate LLM prompts and completions.
+							{activeTab === "regex" && "Define deterministic regex patterns to evaluate and moderate prompts and completions."}
+							{activeTab === "secrets" && "Scans credentials, tokens, API keys, and private keys using the embedded Betterleaks engine."}
+							{activeTab === "prompt-guardrail" && "Natural-language policies evaluated by a configured Bifrost LLM judge model."}
 						</p>
 					</div>
 					<div className="flex items-center gap-3">
@@ -258,32 +363,37 @@ export default function GuardrailsProviderView() {
 							<Switch checked={pluginEnabled} onCheckedChange={handleTogglePlugin} data-testid="guardrails-plugin-enabled-switch" />
 							<Label className="text-xs">Plugin enabled</Label>
 						</div>
-						<Button onClick={handleCreate} data-testid="guardrails-provider-add">
+						<Button onClick={() => handleCreate(activeTab)} data-testid="guardrails-provider-add">
 							<Plus className="mr-1.5 h-4 w-4" /> Add Configuration
 						</Button>
 					</div>
 				</div>
 
+				{/* Table */}
 				<div className="bg-card rounded-md border">
 					<Table>
 						<TableHeader>
 							<TableRow>
 								<TableHead className="w-16">ID</TableHead>
 								<TableHead>Name</TableHead>
-								<TableHead className="w-32">Patterns</TableHead>
+								<TableHead className="w-36">
+									{activeTab === "regex" && "Patterns"}
+									{activeTab === "secrets" && "Action / Mode"}
+									{activeTab === "prompt-guardrail" && "Judge Model"}
+								</TableHead>
 								<TableHead className="w-28">Is Enabled</TableHead>
 								<TableHead className="w-24 text-right">Actions</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
-							{providers.length === 0 ? (
+							{currentProviders.length === 0 ? (
 								<TableRow>
 									<TableCell colSpan={5} className="text-muted-foreground h-32 text-center text-sm">
-										No regex configurations found. Click <strong>Add Configuration</strong> to create one.
+										No configurations found for this provider. Click <strong>Add Configuration</strong> to create one.
 									</TableCell>
 								</TableRow>
 							) : (
-								providers.map((p) => (
+								currentProviders.map((p) => (
 									<TableRow
 										key={p.id}
 										className="hover:bg-muted/50 cursor-pointer"
@@ -291,8 +401,30 @@ export default function GuardrailsProviderView() {
 										data-testid={`guardrails-provider-row-${p.id}`}
 									>
 										<TableCell className="font-mono text-xs">{p.id}</TableCell>
-										<TableCell className="font-medium">{p.policy_name || "Untitled"}</TableCell>
-										<TableCell className="text-muted-foreground text-xs">{p.config.patterns.length} pattern(s)</TableCell>
+										<TableCell className="font-medium">
+											{p.policy_name || "Untitled"}
+											{activeTab === "prompt-guardrail" && p.config.rule && (
+												<div className="text-muted-foreground max-w-sm truncate text-[11px] font-normal">{p.config.rule}</div>
+											)}
+										</TableCell>
+										<TableCell className="text-muted-foreground text-xs">
+											{activeTab === "regex" && `${p.config.patterns?.length ?? 0} pattern(s)`}
+											{activeTab === "secrets" && (
+												<div className="space-y-0.5">
+													<Badge variant="outline" className="text-[10px] capitalize">
+														{p.config.action || "block"}
+													</Badge>
+													{p.config.redaction_mode === "runtime_reversible" && (
+														<Badge variant="secondary" className="ml-1 text-[10px]">
+															Reversible
+														</Badge>
+													)}
+												</div>
+											)}
+											{activeTab === "prompt-guardrail" && (
+												<code className="bg-muted/60 rounded px-1 py-0.5 text-xs">{p.config.judge_model || "Not set"}</code>
+											)}
+										</TableCell>
 										<TableCell onClick={(e) => e.stopPropagation()}>
 											<Switch
 												checked={p.enabled}
@@ -329,23 +461,45 @@ export default function GuardrailsProviderView() {
 				</div>
 			</div>
 
-			{/* Slide-over Sheet: Configuration Editor */}
-			<RegexConfigSheet
-				open={sheet.open}
-				onOpenChange={(open) => !open && setSheet({ open: false, provider: null })}
-				provider={sheet.provider}
-				onSave={handleSheetSave}
-				isSaving={isSaving}
-			/>
+			{/* Slide-over Sheets */}
+			{sheet.open && sheet.providerType === "regex" && (
+				<RegexConfigSheet
+					open={sheet.open}
+					onOpenChange={(open) => !open && setSheet({ open: false, provider: null, providerType: activeTab })}
+					provider={sheet.provider}
+					onSave={handleSheetSave}
+					isSaving={isSaving}
+				/>
+			)}
+
+			{sheet.open && sheet.providerType === "secrets" && (
+				<SecretsConfigSheet
+					open={sheet.open}
+					onOpenChange={(open) => !open && setSheet({ open: false, provider: null, providerType: activeTab })}
+					provider={sheet.provider}
+					onSave={handleSheetSave}
+					isSaving={isSaving}
+				/>
+			)}
+
+			{sheet.open && (sheet.providerType === "prompt-guardrail" || sheet.providerType === "prompt_guardrail") && (
+				<PromptJudgeConfigSheet
+					open={sheet.open}
+					onOpenChange={(open) => !open && setSheet({ open: false, provider: null, providerType: activeTab })}
+					provider={sheet.provider}
+					onSave={handleSheetSave}
+					isSaving={isSaving}
+				/>
+			)}
 		</div>
 	);
 }
 
 // ---------------------------------------------------------------------------
-// Slide-over Sheet Component for Regex Configuration
+// 1. Regex Configuration Sheet
 // ---------------------------------------------------------------------------
 
-interface RegexConfigSheetProps {
+interface SheetProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	provider: GuardrailProvider | null;
@@ -353,7 +507,7 @@ interface RegexConfigSheetProps {
 	isSaving: boolean;
 }
 
-function RegexConfigSheet({ open, onOpenChange, provider, onSave, isSaving }: RegexConfigSheetProps) {
+function RegexConfigSheet({ open, onOpenChange, provider, onSave, isSaving }: SheetProps) {
 	const [formState, setFormState] = useState<GuardrailProvider | null>(null);
 
 	useEffect(() => {
@@ -364,13 +518,15 @@ function RegexConfigSheet({ open, onOpenChange, provider, onSave, isSaving }: Re
 
 	if (!formState) return null;
 
+	const patterns = formState.config.patterns ?? [];
+
 	const handleAddCustom = () => {
-		setFormState((prev) => (prev ? { ...prev, config: { patterns: [...prev.config.patterns, emptyPattern()] } } : prev));
+		setFormState((prev) => (prev ? { ...prev, config: { ...prev.config, patterns: [...patterns, emptyPattern()] } } : prev));
 	};
 
 	const handleAddPIITemplate = () => {
 		setFormState((prev) =>
-			prev ? { ...prev, config: { patterns: [...prev.config.patterns, ...structuredClone(PII_TEMPLATE_PATTERNS)] } } : prev,
+			prev ? { ...prev, config: { ...prev.config, patterns: [...patterns, ...structuredClone(PII_TEMPLATE_PATTERNS)] } } : prev,
 		);
 	};
 
@@ -380,7 +536,8 @@ function RegexConfigSheet({ open, onOpenChange, provider, onSave, isSaving }: Re
 				? {
 						...prev,
 						config: {
-							patterns: prev.config.patterns.map((pat, i) => (i === idx ? { ...pat, ...patch } : pat)),
+							...prev.config,
+							patterns: patterns.map((pat, i) => (i === idx ? { ...pat, ...patch } : pat)),
 						},
 					}
 				: prev,
@@ -393,7 +550,8 @@ function RegexConfigSheet({ open, onOpenChange, provider, onSave, isSaving }: Re
 				? {
 						...prev,
 						config: {
-							patterns: prev.config.patterns.filter((_, i) => i !== idx),
+							...prev.config,
+							patterns: patterns.filter((_, i) => i !== idx),
 						},
 					}
 				: prev,
@@ -405,12 +563,12 @@ function RegexConfigSheet({ open, onOpenChange, provider, onSave, isSaving }: Re
 			toast.error("Configuration name is required");
 			return;
 		}
-		if (formState.config.patterns.length === 0) {
+		if (patterns.length === 0) {
 			toast.error("At least one pattern is required");
 			return;
 		}
-		for (let i = 0; i < formState.config.patterns.length; i++) {
-			if (!formState.config.patterns[i].pattern.trim()) {
+		for (let i = 0; i < patterns.length; i++) {
+			if (!patterns[i].pattern.trim()) {
 				toast.error(`Pattern #${i + 1}: regex expression is required`);
 				return;
 			}
@@ -427,13 +585,12 @@ function RegexConfigSheet({ open, onOpenChange, provider, onSave, isSaving }: Re
 				</SheetHeader>
 
 				<div className="flex-1 space-y-6 overflow-y-auto p-6">
-					{/* Name field */}
 					<div className="space-y-1.5">
-						<Label htmlFor="regex-config-name">
+						<Label htmlFor="regex-name">
 							Name <span className="text-destructive">*</span>
 						</Label>
 						<Input
-							id="regex-config-name"
+							id="regex-name"
 							value={formState.policy_name}
 							onChange={(e) => setFormState({ ...formState, policy_name: e.target.value })}
 							placeholder="e.g. PII Detection"
@@ -441,7 +598,6 @@ function RegexConfigSheet({ open, onOpenChange, provider, onSave, isSaving }: Re
 						/>
 					</div>
 
-					{/* Patterns section */}
 					<div className="space-y-3">
 						<div className="flex items-center justify-between">
 							<div>
@@ -467,9 +623,8 @@ function RegexConfigSheet({ open, onOpenChange, provider, onSave, isSaving }: Re
 							</DropdownMenu>
 						</div>
 
-						{/* Pattern cards stack */}
 						<div className="space-y-3">
-							{formState.config.patterns.map((pat, idx) => (
+							{patterns.map((pat, idx) => (
 								<div key={idx} className="bg-card space-y-3 rounded-lg border p-4 shadow-xs" data-testid={`guardrails-pattern-card-${idx}`}>
 									<div className="flex items-start gap-3">
 										<div className="flex-1 space-y-1">
@@ -545,18 +700,18 @@ function RegexConfigSheet({ open, onOpenChange, provider, onSave, isSaving }: Re
 
 											{pat.action === "redact" && (
 												<div className="flex-1 space-y-1">
-													<Label className="text-muted-foreground text-xs">Strategy</Label>
+													<Label className="text-muted-foreground text-xs">Mode</Label>
 													<Select
-														value={pat.redaction_strategy ?? "replace"}
-														onValueChange={(v) => updatePattern(idx, { redaction_strategy: v as RedactionStrategy })}
+														value={pat.redaction_mode || "runtime"}
+														onValueChange={(v) => updatePattern(idx, { redaction_mode: v as RedactionMode })}
 													>
 														<SelectTrigger className="h-8 text-xs">
 															<SelectValue />
 														</SelectTrigger>
 														<SelectContent>
-															{STRATEGY_OPTIONS.map((s) => (
-																<SelectItem key={s.value} value={s.value} className="text-xs">
-																	{s.label}
+															{REDACTION_MODE_OPTIONS.map((m) => (
+																<SelectItem key={m.value} value={m.value} className="text-xs">
+																	{m.label}
 																</SelectItem>
 															))}
 														</SelectContent>
@@ -571,31 +726,383 @@ function RegexConfigSheet({ open, onOpenChange, provider, onSave, isSaving }: Re
 					</div>
 				</div>
 
-				{/* Sticky footer */}
 				<div className="bg-background flex items-center justify-between border-t p-4">
 					<div className="flex items-center gap-2">
 						<Switch
-							id="sheet-enabled-switch"
+							id="regex-sheet-enabled"
 							checked={formState.enabled}
 							onCheckedChange={(v) => setFormState({ ...formState, enabled: v })}
-							data-testid="guardrails-sheet-enabled"
 						/>
-						<Label htmlFor="sheet-enabled-switch" className="text-xs">
+						<Label htmlFor="regex-sheet-enabled" className="text-xs">
 							Enabled
 						</Label>
 					</div>
 
 					<div className="flex items-center gap-2">
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() => provider && setFormState(structuredClone(provider))}
-							data-testid="guardrails-sheet-reset"
-						>
+						<Button variant="ghost" size="sm" onClick={() => provider && setFormState(structuredClone(provider))}>
 							Reset
 						</Button>
-						<Button size="sm" onClick={handleSubmit} disabled={isSaving} data-testid="guardrails-sheet-save">
-							Save Guardrail Configuration
+						<Button size="sm" onClick={handleSubmit} disabled={isSaving}>
+							Save Configuration
+						</Button>
+					</div>
+				</div>
+			</SheetContent>
+		</Sheet>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// 2. Secrets Detection (Betterleaks) Sheet
+// ---------------------------------------------------------------------------
+
+function SecretsConfigSheet({ open, onOpenChange, provider, onSave, isSaving }: SheetProps) {
+	const [formState, setFormState] = useState<GuardrailProvider | null>(null);
+	const [keywordsStr, setKeywordsStr] = useState("");
+
+	useEffect(() => {
+		if (provider) {
+			setFormState(structuredClone(provider));
+			setKeywordsStr((provider.config.ignored_secret_keywords ?? []).join(", "));
+		}
+	}, [provider]);
+
+	if (!formState) return null;
+
+	const handleSubmit = () => {
+		if (!formState.policy_name.trim()) {
+			toast.error("Configuration name is required");
+			return;
+		}
+		const kws = keywordsStr
+			.split(",")
+			.map((k) => k.trim())
+			.filter(Boolean);
+		onSave({
+			...formState,
+			config: {
+				...formState.config,
+				ignored_secret_keywords: kws,
+			},
+		});
+	};
+
+	return (
+		<Sheet open={open} onOpenChange={onOpenChange}>
+			<SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-xl md:max-w-2xl">
+				<SheetHeader className="border-b p-6">
+					<SheetTitle>Secrets Detection Configuration</SheetTitle>
+					<SheetDescription>Configure the embedded Betterleaks engine to scan for API keys, tokens, and credentials.</SheetDescription>
+				</SheetHeader>
+
+				<div className="flex-1 space-y-6 overflow-y-auto p-6">
+					<div className="space-y-1.5">
+						<Label htmlFor="secrets-name">
+							Name <span className="text-destructive">*</span>
+						</Label>
+						<Input
+							id="secrets-name"
+							value={formState.policy_name}
+							onChange={(e) => setFormState({ ...formState, policy_name: e.target.value })}
+							placeholder="e.g. betterleaks-scanner"
+						/>
+					</div>
+
+					<div className="space-y-1.5">
+						<Label>Action</Label>
+						<Select
+							value={formState.config.action || "block"}
+							onValueChange={(v) =>
+								setFormState({
+									...formState,
+									config: { ...formState.config, action: v as PatternAction },
+								})
+							}
+						>
+							<SelectTrigger>
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{ACTION_OPTIONS.map((a) => (
+									<SelectItem key={a.value} value={a.value}>
+										{a.label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<p className="text-muted-foreground text-xs">
+							Choose whether detected secrets should immediately block the request or be redacted.
+						</p>
+					</div>
+
+					{formState.config.action === "redact" && (
+						<>
+							<div className="space-y-1.5">
+								<Label>Redaction Strategy</Label>
+								<Select
+									value={formState.config.redaction_strategy || "replace"}
+									onValueChange={(v) =>
+										setFormState({
+											...formState,
+											config: { ...formState.config, redaction_strategy: v as RedactionStrategy },
+										})
+									}
+								>
+									<SelectTrigger>
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{STRATEGY_OPTIONS.map((s) => (
+											<SelectItem key={s.value} value={s.value}>
+												{s.label}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+							</div>
+
+							<div className="space-y-1.5">
+								<Label>Redaction Mode</Label>
+								<Select
+									value={formState.config.redaction_mode || "runtime"}
+									onValueChange={(v) =>
+										setFormState({
+											...formState,
+											config: { ...formState.config, redaction_mode: v as RedactionMode },
+										})
+									}
+								>
+									<SelectTrigger>
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{REDACTION_MODE_OPTIONS.map((m) => (
+											<SelectItem key={m.value} value={m.value}>
+												{m.label}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								<p className="text-muted-foreground text-xs">
+									Reversible mode restores secrets inside <code>tool_calls</code> arguments (e.g. bash scripts) on response.
+								</p>
+							</div>
+						</>
+					)}
+
+					<div className="space-y-1.5">
+						<Label htmlFor="secrets-ignore">Ignored Secret Keywords</Label>
+						<Textarea
+							id="secrets-ignore"
+							rows={3}
+							value={keywordsStr}
+							onChange={(e) => setKeywordsStr(e.target.value)}
+							placeholder="example, dummy_key, test_token"
+							className="font-mono text-xs"
+						/>
+						<p className="text-muted-foreground text-xs">
+							Comma-separated substrings. Any secret containing these keywords will be ignored (reduces false positives).
+						</p>
+					</div>
+				</div>
+
+				<div className="bg-background flex items-center justify-between border-t p-4">
+					<div className="flex items-center gap-2">
+						<Switch
+							id="secrets-sheet-enabled"
+							checked={formState.enabled}
+							onCheckedChange={(v) => setFormState({ ...formState, enabled: v })}
+						/>
+						<Label htmlFor="secrets-sheet-enabled" className="text-xs">
+							Enabled
+						</Label>
+					</div>
+
+					<div className="flex items-center gap-2">
+						<Button variant="ghost" size="sm" onClick={() => provider && setFormState(structuredClone(provider))}>
+							Reset
+						</Button>
+						<Button size="sm" onClick={handleSubmit} disabled={isSaving}>
+							Save Configuration
+						</Button>
+					</div>
+				</div>
+			</SheetContent>
+		</Sheet>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// 3. Prompt Guardrail (LLM Judge) Sheet
+// ---------------------------------------------------------------------------
+
+function PromptJudgeConfigSheet({ open, onOpenChange, provider, onSave, isSaving }: SheetProps) {
+	const [formState, setFormState] = useState<GuardrailProvider | null>(null);
+
+	useEffect(() => {
+		if (provider) {
+			setFormState(structuredClone(provider));
+		}
+	}, [provider]);
+
+	if (!formState) return null;
+
+	const handleSubmit = () => {
+		if (!formState.policy_name.trim()) {
+			toast.error("Configuration name is required");
+			return;
+		}
+		if (!formState.config.judge_provider?.trim()) {
+			toast.error("Judge provider is required");
+			return;
+		}
+		if (!formState.config.judge_model?.trim()) {
+			toast.error("Judge model is required");
+			return;
+		}
+		if (!formState.config.rule?.trim()) {
+			toast.error("Natural-language policy rule is required");
+			return;
+		}
+		onSave(formState);
+	};
+
+	return (
+		<Sheet open={open} onOpenChange={onOpenChange}>
+			<SheetContent className="flex w-full flex-col overflow-hidden p-0 sm:max-w-xl md:max-w-2xl">
+				<SheetHeader className="border-b p-6">
+					<SheetTitle>Prompt Guardrail Configuration (LLM Judge)</SheetTitle>
+					<SheetDescription>
+						Configure an LLM as a judge to evaluate requests and responses against natural-language policies.
+					</SheetDescription>
+				</SheetHeader>
+
+				<div className="flex-1 space-y-6 overflow-y-auto p-6">
+					<div className="space-y-1.5">
+						<Label htmlFor="judge-name">
+							Name <span className="text-destructive">*</span>
+						</Label>
+						<Input
+							id="judge-name"
+							value={formState.policy_name}
+							onChange={(e) => setFormState({ ...formState, policy_name: e.target.value })}
+							placeholder="e.g. block-medical-diagnoses"
+						/>
+					</div>
+
+					<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+						<div className="space-y-1.5">
+							<Label htmlFor="judge-provider">
+								Judge Provider <span className="text-destructive">*</span>
+							</Label>
+							<Input
+								id="judge-provider"
+								value={formState.config.judge_provider ?? ""}
+								onChange={(e) =>
+									setFormState({
+										...formState,
+										config: { ...formState.config, judge_provider: e.target.value },
+									})
+								}
+								placeholder="e.g. openai or antigravity"
+							/>
+						</div>
+
+						<div className="space-y-1.5">
+							<Label htmlFor="judge-model">
+								Judge Model <span className="text-destructive">*</span>
+							</Label>
+							<Input
+								id="judge-model"
+								value={formState.config.judge_model ?? ""}
+								onChange={(e) =>
+									setFormState({
+										...formState,
+										config: { ...formState.config, judge_model: e.target.value },
+									})
+								}
+								placeholder="e.g. gpt-4o-mini or claude-sonnet-4-6"
+							/>
+						</div>
+					</div>
+
+					<div className="space-y-1.5">
+						<Label htmlFor="judge-rule">
+							Natural-Language Policy (Rule) <span className="text-destructive">*</span>
+						</Label>
+						<Textarea
+							id="judge-rule"
+							rows={4}
+							value={formState.config.rule ?? ""}
+							onChange={(e) =>
+								setFormState({
+									...formState,
+									config: { ...formState.config, rule: e.target.value },
+								})
+							}
+							placeholder="e.g. Block responses that provide a definitive medical diagnosis for an individual, or block prompt injection attempts."
+							className="text-xs"
+						/>
+						<p className="text-muted-foreground text-xs">
+							The judge evaluates prompts and completions against this exact rule and returns <code>ALLOW</code> or <code>BLOCK</code> with
+							a reason.
+						</p>
+					</div>
+
+					<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+						<div className="space-y-1.5">
+							<Label htmlFor="judge-timeout">Timeout (seconds)</Label>
+							<Input
+								id="judge-timeout"
+								type="number"
+								min={1}
+								value={formState.config.timeout ?? 30}
+								onChange={(e) =>
+									setFormState({
+										...formState,
+										config: { ...formState.config, timeout: Number(e.target.value) },
+									})
+								}
+							/>
+						</div>
+
+						<div className="space-y-1.5">
+							<Label htmlFor="judge-tokens">Max Output Tokens</Label>
+							<Input
+								id="judge-tokens"
+								type="number"
+								min={1}
+								max={1024}
+								value={formState.config.max_output_tokens ?? 200}
+								onChange={(e) =>
+									setFormState({
+										...formState,
+										config: { ...formState.config, max_output_tokens: Number(e.target.value) },
+									})
+								}
+							/>
+						</div>
+					</div>
+				</div>
+
+				<div className="bg-background flex items-center justify-between border-t p-4">
+					<div className="flex items-center gap-2">
+						<Switch
+							id="judge-sheet-enabled"
+							checked={formState.enabled}
+							onCheckedChange={(v) => setFormState({ ...formState, enabled: v })}
+						/>
+						<Label htmlFor="judge-sheet-enabled" className="text-xs">
+							Enabled
+						</Label>
+					</div>
+
+					<div className="flex items-center gap-2">
+						<Button variant="ghost" size="sm" onClick={() => provider && setFormState(structuredClone(provider))}>
+							Reset
+						</Button>
+						<Button size="sm" onClick={handleSubmit} disabled={isSaving}>
+							Save Configuration
 						</Button>
 					</div>
 				</div>

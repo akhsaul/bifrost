@@ -32,6 +32,7 @@ import (
 	"github.com/maximhq/bifrost/framework/tracing"
 	"github.com/maximhq/bifrost/framework/webhooks"
 	"github.com/maximhq/bifrost/plugins/governance"
+	"github.com/maximhq/bifrost/plugins/guardrails"
 	"github.com/maximhq/bifrost/plugins/logging"
 	"github.com/maximhq/bifrost/plugins/otel"
 	"github.com/maximhq/bifrost/plugins/prompts"
@@ -1969,6 +1970,9 @@ func (s *BifrostHTTPServer) ReloadPlugin(ctx context.Context, name string, path 
 	if semanticCachePlugin, ok := plugin.(*semanticcache.Plugin); ok {
 		semanticCachePlugin.SetEmbeddingRequestExecutor(s.Client.EmbeddingRequest)
 	}
+	if guardrailsPlugin, ok := plugin.(*guardrails.Plugin); ok {
+		guardrailsPlugin.SetChatRequestExecutor(s.Client.ChatCompletionRequest)
+	}
 	return s.SyncLoadedPlugin(ctx, name, plugin, placement, order)
 }
 
@@ -2608,6 +2612,13 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 	semanticCachePlugin, err := lib.FindPluginAs[*semanticcache.Plugin](s.Config, semanticcache.PluginName)
 	if err == nil && semanticCachePlugin != nil {
 		semanticCachePlugin.SetEmbeddingRequestExecutor(s.Client.EmbeddingRequest)
+	}
+
+	// Wire the chat executor onto the guardrails plugin so prompt-judge
+	// providers can make internal judge calls through Bifrost core.
+	guardrailsPlugin, err := lib.FindPluginAs[*guardrails.Plugin](s.Config, guardrails.PluginName)
+	if err == nil && guardrailsPlugin != nil {
+		guardrailsPlugin.SetChatRequestExecutor(s.Client.ChatCompletionRequest)
 	}
 
 	// Initialize Sidekiq runner for background jobs

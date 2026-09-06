@@ -16,7 +16,21 @@ import {
 	type GuardrailsPluginConfig,
 } from "@/lib/types/guardrails";
 import { cn } from "@/lib/utils";
-import { Boxes, ChevronDown, Info, MoreHorizontal, Pencil, Plus, Search, Sparkles, Trash2, Wrench, X } from "lucide-react";
+import {
+	Boxes,
+	ChevronDown,
+	Info,
+	Key,
+	MoreHorizontal,
+	Pencil,
+	Plus,
+	Search,
+	ShieldCheck,
+	Sparkles,
+	Trash2,
+	Wrench,
+	X,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -549,6 +563,18 @@ function RuleSheet({ open, onOpenChange, rule, providers, onSave, isSaving }: Ru
 							)}
 							{formState.provider_config_ids.map((pid) => {
 								const prov = providers.find((p) => p.id === pid);
+								const ProviderIcon =
+									prov?.provider_name === "secrets"
+										? Key
+										: prov?.provider_name === "prompt-guardrail" || prov?.provider_name === "prompt_guardrail"
+											? ShieldCheck
+											: Boxes;
+								const providerPrefix =
+									prov?.provider_name === "secrets"
+										? "Secrets"
+										: prov?.provider_name === "prompt-guardrail" || prov?.provider_name === "prompt_guardrail"
+											? "Prompt Guardrail"
+											: "Custom Regex";
 								return (
 									<Badge
 										key={pid}
@@ -556,8 +582,10 @@ function RuleSheet({ open, onOpenChange, rule, providers, onSave, isSaving }: Ru
 										className="gap-1.5 px-2.5 py-1 text-xs font-medium"
 										data-testid={`guardrails-profile-chip-${pid}`}
 									>
-										<Boxes className="text-primary h-3.5 w-3.5" />
-										<span>Custom Regex: {prov ? prov.policy_name : `#${pid}`}</span>
+										<ProviderIcon className="text-primary h-3.5 w-3.5" />
+										<span>
+											{providerPrefix}: {prov ? prov.policy_name : `#${pid}`}
+										</span>
 										<button
 											type="button"
 											onClick={(e) => {
@@ -585,9 +613,17 @@ function RuleSheet({ open, onOpenChange, rule, providers, onSave, isSaving }: Ru
 									) : (
 										providers.map((p) => {
 											const selected = formState.provider_config_ids.includes(p.id);
+											const dropdownPrefix =
+												p.provider_name === "secrets"
+													? "Secrets"
+													: p.provider_name === "prompt-guardrail" || p.provider_name === "prompt_guardrail"
+														? "Prompt Guardrail"
+														: "Custom Regex";
 											return (
 												<DropdownMenuItem key={p.id} onClick={() => toggleProvider(p.id)} className="justify-between">
-													<span className="truncate">Custom Regex: {p.policy_name || `#${p.id}`}</span>
+													<span className="truncate">
+														{dropdownPrefix}: {p.policy_name || `#${p.id}`}
+													</span>
 													{selected && (
 														<Badge variant="secondary" className="text-[10px]">
 															Selected

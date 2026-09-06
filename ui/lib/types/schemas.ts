@@ -1413,16 +1413,26 @@ export const guardrailPatternSchema = z.object({
 		.optional(),
 	action: z.enum(["detect_only", "block", "redact"]).default("block"),
 	redaction_strategy: z.enum(["replace", "mask", "hash"]).default("replace"),
+	redaction_mode: z.enum(["runtime", "runtime_reversible", "logs_only"]).default("runtime").optional(),
 });
 
 export const guardrailProviderSchema = z.object({
 	id: z.number().int().positive("Provider id is required"),
-	provider_name: z.literal("regex"),
+	provider_name: z.enum(["regex", "secrets", "prompt-guardrail", "prompt_guardrail"]),
 	policy_name: z.string().min(1, "Configuration name is required").max(255),
 	enabled: z.boolean(),
 	timeout: z.number().int().min(0).optional(),
 	config: z.object({
-		patterns: z.array(guardrailPatternSchema).min(1, "At least one pattern is required"),
+		patterns: z.array(guardrailPatternSchema).optional(),
+		ignored_secret_keywords: z.array(z.string()).optional(),
+		action: z.enum(["detect_only", "block", "redact"]).optional(),
+		redaction_strategy: z.enum(["replace", "mask", "hash"]).optional(),
+		redaction_mode: z.enum(["runtime", "runtime_reversible", "logs_only"]).optional(),
+		judge_provider: z.string().optional(),
+		judge_model: z.string().optional(),
+		rule: z.string().optional(),
+		prompt_template: z.string().optional(),
+		max_output_tokens: z.number().int().optional(),
 	}),
 });
 
