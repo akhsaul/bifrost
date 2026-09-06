@@ -50,6 +50,7 @@ export interface GuardrailProvider {
 		judge_model?: string;
 		rule?: string;
 		prompt_template?: string;
+		timeout?: number;
 		max_output_tokens?: number;
 	};
 }

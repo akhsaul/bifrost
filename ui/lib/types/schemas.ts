@@ -1432,6 +1432,7 @@ export const guardrailProviderSchema = z.object({
 		judge_model: z.string().optional(),
 		rule: z.string().optional(),
 		prompt_template: z.string().optional(),
+		timeout: z.number().int().positive().max(600, "Timeout must be 600 seconds or less").optional(),
 		max_output_tokens: z.number().int().optional(),
 	}),
 });
