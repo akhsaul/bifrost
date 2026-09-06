@@ -75,7 +75,7 @@ func TestValidateConfig_UnsupportedProviderName(t *testing.T) {
 	if err == nil {
 		t.Fatal("non-regex provider should be rejected")
 	}
-	if !strings.Contains(err.Error(), `"regex"`) {
-		t.Fatalf("error should mention only regex is supported, got: %v", err)
+	if !strings.Contains(err.Error(), "not supported in OSS guardrails") {
+		t.Fatalf("error should mention supported providers, got: %v", err)
 	}
 }

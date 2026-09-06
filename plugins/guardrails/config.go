@@ -14,7 +14,12 @@ const (
 )
 
 // supportedProviderName is the only guardrail provider type implemented in OSS.
-const supportedProviderName = "regex"
+const (
+	supportedProviderRegex          = "regex"
+	supportedProviderSecrets        = "secrets"
+	supportedProviderPromptGuard    = "prompt-guardrail"
+	supportedProviderPromptGuardAlt = "prompt_guardrail"
+)
 
 // validFlags is the set of allowed RE2 inline flag characters.
 const validFlags = "ims"
@@ -71,38 +76,92 @@ func validateConfig(cfg *Config) error {
 			return fmt.Errorf("guardrail_providers[%d]: duplicate id %d", i, p.ID)
 		}
 		providerIDs[p.ID] = true
-		if p.ProviderName != supportedProviderName {
-			return fmt.Errorf("guardrail_providers[%d] (id %d): only provider_name %q is supported in OSS guardrails, got %q",
-				i, p.ID, supportedProviderName, p.ProviderName)
+		switch p.ProviderName {
+		case supportedProviderRegex, supportedProviderSecrets, supportedProviderPromptGuard, supportedProviderPromptGuardAlt:
+		default:
+			return fmt.Errorf("guardrail_providers[%d] (id %d): provider_name %q is not supported in OSS guardrails (supported: regex, secrets, prompt-guardrail)",
+				i, p.ID, p.ProviderName)
 		}
 		if strings.TrimSpace(p.PolicyName) == "" {
 			return fmt.Errorf("guardrail_providers[%d] (id %d): policy_name is required", i, p.ID)
 		}
 		if !p.Enabled {
-			// Disabled providers never compile patterns at runtime; skip strict checks
-			// so half-edited configs do not block startup.
 			continue
 		}
-		for j := range p.Config.Patterns {
-			pat := &p.Config.Patterns[j]
-			if pat.Action == "" {
-				pat.Action = PatternActionBlock
+
+		switch p.ProviderName {
+		case supportedProviderRegex:
+			for j := range p.Config.Patterns {
+				pat := &p.Config.Patterns[j]
+				if pat.Action == "" {
+					pat.Action = PatternActionBlock
+				}
+				switch pat.Action {
+				case PatternActionDetectOnly, PatternActionBlock, PatternActionRedact:
+				default:
+					return fmt.Errorf("guardrail_providers[%d] pattern[%d]: unknown action %q (allowed: detect_only, block, redact)", i, j, pat.Action)
+				}
+				if pat.RedactionStrategy == "" {
+					pat.RedactionStrategy = RedactionReplace
+				}
+				switch pat.RedactionStrategy {
+				case RedactionReplace, RedactionMask, RedactionHash:
+				default:
+					return fmt.Errorf("guardrail_providers[%d] pattern[%d]: unknown redaction_strategy %q (allowed: replace, mask, hash)", i, j, pat.RedactionStrategy)
+				}
+				if pat.RedactionMode == "" {
+					pat.RedactionMode = RedactionModeRuntime
+				}
+				switch pat.RedactionMode {
+				case RedactionModeRuntime, RedactionModeRuntimeReversible, RedactionModeLogsOnly:
+				default:
+					return fmt.Errorf("guardrail_providers[%d] pattern[%d]: unknown redaction_mode %q", i, j, pat.RedactionMode)
+				}
+				if _, err := compilePattern(pat); err != nil {
+					return fmt.Errorf("guardrail_providers[%d] pattern[%d]: %w", i, j, err)
+				}
 			}
-			switch pat.Action {
+
+		case supportedProviderSecrets:
+			sec := p.Config.SecretsConfig
+			if sec == nil {
+				sec = &SecretsConfig{Action: PatternActionBlock, RedactionStrategy: RedactionReplace, RedactionMode: RedactionModeRuntime}
+				p.Config.SecretsConfig = sec
+			}
+			if sec.Action == "" {
+				sec.Action = PatternActionBlock
+			}
+			switch sec.Action {
 			case PatternActionDetectOnly, PatternActionBlock, PatternActionRedact:
 			default:
-				return fmt.Errorf("guardrail_providers[%d] pattern[%d]: unknown action %q (allowed: detect_only, block, redact)", i, j, pat.Action)
+				return fmt.Errorf("guardrail_providers[%d] (id %d): unknown secrets action %q", i, p.ID, sec.Action)
 			}
-			if pat.RedactionStrategy == "" {
-				pat.RedactionStrategy = RedactionReplace
+			if sec.RedactionStrategy == "" {
+				sec.RedactionStrategy = RedactionReplace
 			}
-			switch pat.RedactionStrategy {
-			case RedactionReplace, RedactionMask, RedactionHash:
-			default:
-				return fmt.Errorf("guardrail_providers[%d] pattern[%d]: unknown redaction_strategy %q (allowed: replace, mask, hash)", i, j, pat.RedactionStrategy)
+			if sec.RedactionMode == "" {
+				sec.RedactionMode = RedactionModeRuntime
 			}
-			if _, err := compilePattern(pat); err != nil {
-				return fmt.Errorf("guardrail_providers[%d] pattern[%d]: %w", i, j, err)
+
+		case supportedProviderPromptGuard, supportedProviderPromptGuardAlt:
+			pg := p.Config.PromptGuardrailConfig
+			if pg == nil {
+				return fmt.Errorf("guardrail_providers[%d] (id %d): prompt-guardrail configuration is required", i, p.ID)
+			}
+			if strings.TrimSpace(pg.JudgeProvider) == "" {
+				return fmt.Errorf("guardrail_providers[%d] (id %d): judge_provider is required", i, p.ID)
+			}
+			if strings.TrimSpace(pg.JudgeModel) == "" {
+				return fmt.Errorf("guardrail_providers[%d] (id %d): judge_model is required", i, p.ID)
+			}
+			if strings.TrimSpace(pg.Rule) == "" {
+				return fmt.Errorf("guardrail_providers[%d] (id %d): rule policy is required", i, p.ID)
+			}
+			if pg.Timeout <= 0 {
+				pg.Timeout = 30
+			}
+			if pg.MaxOutputTokens <= 0 {
+				pg.MaxOutputTokens = 200
 			}
 		}
 	}
