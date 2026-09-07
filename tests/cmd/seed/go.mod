@@ -1,6 +1,6 @@
 module github.com/maximhq/bifrost/tests/cmd/seed
 
-go 1.27.0
+go 1.26.5
 
 replace (
 	github.com/maximhq/bifrost/core => ../../../core
@@ -8,7 +8,7 @@ replace (
 )
 
 require (
-	github.com/maximhq/bifrost/core v1.7.11
+	github.com/maximhq/bifrost/core v1.8.3
 	github.com/maximhq/bifrost/framework v1.3.16
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/driver/sqlite v1.6.0
@@ -92,7 +92,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-sqlite3 v1.14.32 // indirect
 	github.com/paulmach/orb v0.11.1 // indirect
-	github.com/pierrec/lz4/v4 v4.1.22 // indirect
+	github.com/pierrec/lz4/v4 v4.1.26 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect

@@ -27,7 +27,7 @@ ECHO := printf '%b\n'
 # nvm requires bash-compatible shell semantics; /bin/sh is dash on some Linux distros.
 SHELL := /usr/bin/env bash
 
-# Ensures the Node version pinned in .nvmrc is active before any npm/node call.
+# Ensures the Node version pinned in .nvmrc is active before any pnpm/node call.
 # nvm is a shell function, so each recipe that needs it must inline this snippet
 # via `$(USE_NODE); <your command>`.
 USE_NODE = NVM_SH="$${NVM_DIR:-$$HOME/.nvm}/nvm.sh"; \
@@ -108,11 +108,11 @@ cleanup-enterprise: ## Clean up enterprise directories if present
 install-ui: cleanup-enterprise
 	@$(USE_NODE); \
 	 which node > /dev/null || ($(ECHO) "$(RED)Error: Node.js is not installed. Please install Node.js first.$(NC)" && exit 1); \
-	 which npm > /dev/null || ($(ECHO) "$(RED)Error: npm is not installed. Please install npm first.$(NC)" && exit 1); \
-	 $(ECHO) "$(GREEN)Node.js $$(node -v) and npm $$(npm -v) are installed$(NC)"; \
-	 if [ ! -d "ui/node_modules" ] || [ "ui/package.json" -nt "ui/node_modules/.package-lock.json" ] || [ "ui/package-lock.json" -nt "ui/node_modules/.package-lock.json" ]; then \
-	   $(ECHO) "$(YELLOW)Dependencies changed, running npm ci...$(NC)"; \
-	   cd ui && npm ci; \
+	 which pnpm > /dev/null || ($(ECHO) "$(RED)Error: pnpm is not installed. Please install pnpm first.$(NC)" && exit 1); \
+	 $(ECHO) "$(GREEN)Node.js $$(node -v) and pnpm $$(pnpm -v) are installed$(NC)"; \
+	 if [ ! -d "ui/node_modules" ] || [ "ui/package.json" -nt "ui/node_modules" ] || [ "ui/.npmrc" -nt "ui/node_modules" ] || { [ -f "ui/pnpm-lock.yaml" ] && [ "ui/pnpm-lock.yaml" -nt "ui/node_modules" ]; }; then \
+	   $(ECHO) "$(YELLOW)Dependencies changed, running pnpm install...$(NC)"; \
+	   cd ui && pnpm install; \
 	 else \
 	   $(ECHO) "$(GREEN)UI dependencies up to date, skipping install$(NC)"; \
 	 fi
@@ -141,11 +141,11 @@ install-junit-viewer: ## Install junit-viewer for HTML report generation (if not
 		else \
 			$(ECHO) "$(YELLOW)Installing junit-viewer for HTML reports...$(NC)"; \
 			$(USE_NODE); \
-			if npm install -g junit-viewer 2>&1; then \
+			if pnpm add -g junit-viewer 2>&1; then \
 				$(ECHO) "$(GREEN)junit-viewer installed successfully$(NC)"; \
 			else \
 				$(ECHO) "$(RED)Failed to install junit-viewer. HTML reports will be skipped.$(NC)"; \
-				$(ECHO) "$(YELLOW)You can install it manually: npm install -g junit-viewer$(NC)"; \
+				$(ECHO) "$(YELLOW)You can install it manually: pnpm add -g junit-viewer$(NC)"; \
 				exit 0; \
 			fi; \
 		fi; \
@@ -229,9 +229,9 @@ dev: install-ui install-air setup-workspace $(if $(DEBUG),install-delve) ## Star
 	$(ECHO) "$(YELLOW)Starting UI development server...$(NC)"; \
 	$(USE_NODE); if [ -n "$(DISABLE_PROFILER)" ]; then \
 		$(ECHO) "$(CYAN)DevProfiler disabled for testing$(NC)"; \
-		(cd ui && BIFROST_DISABLE_PROFILER=1 npm run dev) & \
+		(cd ui && BIFROST_DISABLE_PROFILER=1 pnpm run dev) & \
 	else \
-		(cd ui && npm run dev) & \
+		(cd ui && pnpm run dev) & \
 	fi; \
 	ui_pid="$$!"; \
 	$(ECHO) "$(YELLOW)[make dev] UI dev server started with pid $$ui_pid$(NC)"; \
@@ -315,9 +315,9 @@ dev-pulse: install-ui install-pulse setup-workspace $(if $(DEBUG),install-delve)
 	$(ECHO) "$(YELLOW)Starting UI development server...$(NC)"; \
 	$(USE_NODE); if [ -n "$(DISABLE_PROFILER)" ]; then \
 		$(ECHO) "$(CYAN)DevProfiler disabled for testing$(NC)"; \
-		(cd ui && BIFROST_DISABLE_PROFILER=1 npm run dev) & \
+		(cd ui && BIFROST_DISABLE_PROFILER=1 pnpm run dev) & \
 	else \
-		(cd ui && npm run dev) & \
+		(cd ui && pnpm run dev) & \
 	fi; \
 	ui_pid="$$!"; \
 	$(ECHO) "$(YELLOW)[make dev-pulse] UI dev server started with pid $$ui_pid$(NC)"; \
@@ -343,7 +343,7 @@ dev-pulse: install-ui install-pulse setup-workspace $(if $(DEBUG),install-delve)
 build-ui: install-ui ## Build ui
 	@$(ECHO) "$(GREEN)Building ui...$(NC)"
 	@rm -rf ui/.next
-	@$(USE_NODE); cd ui && npm run build && npm run copy-build
+	@$(USE_NODE); cd ui && pnpm run build && pnpm run copy-build
 
 build: build-ui ## Build bifrost-http binary
 	@if [ -n "$(LOCAL)" ]; then \
@@ -1122,7 +1122,7 @@ setup-mcp-tests: ## Build all MCP test servers in examples/mcps/ (Go and TypeScr
 				fi; \
 			elif [ -f "$$mcp_dir/package.json" ]; then \
 				$(ECHO) "$(CYAN)Building $$mcp_name (TypeScript)...$(NC)"; \
-				if cd "$$mcp_dir" && npm install --silent && npm run build && cd - > /dev/null; then \
+				if cd "$$mcp_dir" && pnpm install --silent && pnpm run build && cd - > /dev/null; then \
 					$(ECHO) "$(GREEN)  ✓ $$mcp_name$(NC)"; \
 				else \
 					$(ECHO) "$(RED)  ✗ $$mcp_name failed$(NC)"; \
@@ -1541,37 +1541,37 @@ test-integrations-ts: ## Run TypeScript integration tests (Usage: make test-inte
 	fi; \
 	TEST_FAILED=0; \
 	$(USE_NODE); \
-	if ! which npm > /dev/null 2>&1; then \
-		$(ECHO) "$(RED)Error: npm not found$(NC)"; \
-		$(ECHO) "$(YELLOW)Install Node.js: https://nodejs.org/$(NC)"; \
+	if ! which pnpm > /dev/null 2>&1; then \
+		$(ECHO) "$(RED)Error: pnpm not found$(NC)"; \
+		$(ECHO) "$(YELLOW)Install Node.js & pnpm: https://pnpm.io/installation$(NC)"; \
 		[ $$BIFROST_STARTED -eq 1 ] && [ -n "$$BIFROST_PID" ] && kill $$BIFROST_PID 2>/dev/null; \
 		[ -n "$$TAIL_PID" ] && kill $$TAIL_PID 2>/dev/null; \
 		exit 1; \
 	fi; \
-	$(ECHO) "$(CYAN)Using npm$(NC)"; \
+	$(ECHO) "$(CYAN)Using pnpm$(NC)"; \
 	cd tests/integrations/typescript && \
 	if [ ! -d "node_modules" ]; then \
 		$(ECHO) "$(YELLOW)Installing dependencies...$(NC)"; \
-		npm install; \
+		pnpm install; \
 	fi; \
 	if [ -n "$(INTEGRATION)" ]; then \
 		if [ -n "$(TESTCASE)" ]; then \
 			$(ECHO) "$(CYAN)Running $(INTEGRATION) integration test: $(TESTCASE)...$(NC)"; \
-			npm test -- tests/test-$(INTEGRATION).test.ts -t "$(TESTCASE)" $(if $(VERBOSE),--reporter=verbose,) || TEST_FAILED=1; \
+			pnpm test -- tests/test-$(INTEGRATION).test.ts -t "$(TESTCASE)" $(if $(VERBOSE),--reporter=verbose,) || TEST_FAILED=1; \
 		elif [ -n "$(PATTERN)" ]; then \
 			$(ECHO) "$(CYAN)Running $(INTEGRATION) integration tests matching '$(PATTERN)'...$(NC)"; \
-			npm test -- tests/test-$(INTEGRATION).test.ts -t "$(PATTERN)" $(if $(VERBOSE),--reporter=verbose,) || TEST_FAILED=1; \
+			pnpm test -- tests/test-$(INTEGRATION).test.ts -t "$(PATTERN)" $(if $(VERBOSE),--reporter=verbose,) || TEST_FAILED=1; \
 		else \
 			$(ECHO) "$(CYAN)Running $(INTEGRATION) integration tests...$(NC)"; \
-			npm test -- tests/test-$(INTEGRATION).test.ts $(if $(VERBOSE),--reporter=verbose,) || TEST_FAILED=1; \
+			pnpm test -- tests/test-$(INTEGRATION).test.ts $(if $(VERBOSE),--reporter=verbose,) || TEST_FAILED=1; \
 		fi; \
 	else \
 		if [ -n "$(PATTERN)" ]; then \
 			$(ECHO) "$(CYAN)Running all integration tests matching '$(PATTERN)'...$(NC)"; \
-			npm test -- -t "$(PATTERN)" $(if $(VERBOSE),--reporter=verbose,) || TEST_FAILED=1; \
+			pnpm test -- -t "$(PATTERN)" $(if $(VERBOSE),--reporter=verbose,) || TEST_FAILED=1; \
 		else \
 			$(ECHO) "$(CYAN)Running all integration tests...$(NC)"; \
-			npm test $(if $(VERBOSE),-- --reporter=verbose,) || TEST_FAILED=1; \
+			pnpm test $(if $(VERBOSE),-- --reporter=verbose,) || TEST_FAILED=1; \
 		fi; \
 	fi; \
 	if [ $$BIFROST_STARTED -eq 1 ] && [ -n "$$BIFROST_PID" ]; then \
@@ -1598,8 +1598,8 @@ test-integrations-ts: ## Run TypeScript integration tests (Usage: make test-inte
 install-playwright: ## Install Playwright test dependencies
 	@$(ECHO) "$(GREEN)Installing Playwright dependencies...$(NC)"
 	@which node > /dev/null || ($(ECHO) "$(RED)Error: Node.js is not installed. Please install Node.js first.$(NC)" && exit 1)
-	@which npm > /dev/null || ($(ECHO) "$(RED)Error: npm is not installed. Please install npm first.$(NC)" && exit 1)
-	@$(USE_NODE); cd tests/e2e && npm ci
+	@which pnpm > /dev/null || ($(ECHO) "$(RED)Error: pnpm is not installed. Please install pnpm first.$(NC)" && exit 1)
+	@$(USE_NODE); cd tests/e2e && pnpm install
 	@cd tests/e2e && if npx playwright install --list 2>/dev/null | grep -q "chromium"; then \
 		$(ECHO) "$(CYAN)Chromium is already installed, skipping download$(NC)"; \
 	else \
@@ -1691,7 +1691,7 @@ fmt: ## Format Go code
 format: ## Format code (Usage: make format ui)
 ifeq (ui,$(filter ui,$(MAKECMDGOALS)))
 	@$(ECHO) "$(GREEN)Formatting UI code...$(NC)"
-	@cd ui && $(USE_NODE); npm run format
+	@cd ui && $(USE_NODE); pnpm run format
 else
 	@$(ECHO) "$(YELLOW)Usage: make format ui$(NC)"
 endif
@@ -1838,7 +1838,7 @@ run-cli-harness-test: ## Run the Claude Code + Codex + OpenCode E2E harness (non
 		if [ "$(CLI)" = "" ] || [ "$(CLI)" = "$$bin" ] || { [ "$$bin" = opencode ] && [ "$(CLI)" = opencode-responses ]; }; then \
 			if ! command -v $$bin >/dev/null 2>&1; then \
 				$(ECHO) "$(YELLOW)Warning: $$bin not on PATH; matrix cells for $$bin will fail.$(NC)"; \
-				$(ECHO) "$(YELLOW)  Install: npm i -g $$( [ $$bin = claude ] && echo @anthropic-ai/claude-code || { [ $$bin = codex ] && echo @openai/codex || echo opencode-ai; } )$(NC)"; \
+				$(ECHO) "$(YELLOW)  Install: pnpm add -g $$( [ $$bin = claude ] && echo @anthropic-ai/claude-code || { [ $$bin = codex ] && echo @openai/codex || echo opencode-ai; } )$(NC)"; \
 			fi; \
 		fi; \
 	done; \
@@ -1964,10 +1964,10 @@ HARNESS_JOBS ?= 100
 
 # Echoes are suppressed under CI so run-provider-harness-test, which takes this
 # as a prerequisite, really does emit nothing but its status table. Install
-# failures still surface: npm's own stderr is untouched and the recipe still fails.
+# failures still surface: pnpm's own stderr is untouched and the recipe still fails.
 install-newman: ## Install newman + htmlextra reporter if not already installed (pinned via NEWMAN_VERSION / NEWMAN_HTMLEXTRA_VERSION)
-	@$(USE_NODE); which newman > /dev/null 2>&1 || ([ -n "$$CI" ] || $(ECHO) "$(YELLOW)Installing newman@$(NEWMAN_VERSION)...$(NC)"; npm install -g newman@$(NEWMAN_VERSION))
-	@$(USE_NODE); npm list -g newman-reporter-htmlextra > /dev/null 2>&1 || ([ -n "$$CI" ] || $(ECHO) "$(YELLOW)Installing newman-reporter-htmlextra@$(NEWMAN_HTMLEXTRA_VERSION)...$(NC)"; npm install -g newman-reporter-htmlextra@$(NEWMAN_HTMLEXTRA_VERSION))
+	@$(USE_NODE); which newman > /dev/null 2>&1 || ([ -n "$$CI" ] || $(ECHO) "$(YELLOW)Installing newman@$(NEWMAN_VERSION)...$(NC)"; pnpm add -g newman@$(NEWMAN_VERSION))
+	@$(USE_NODE); pnpm list -g newman-reporter-htmlextra > /dev/null 2>&1 || ([ -n "$$CI" ] || $(ECHO) "$(YELLOW)Installing newman-reporter-htmlextra@$(NEWMAN_HTMLEXTRA_VERSION)...$(NC)"; pnpm add -g newman-reporter-htmlextra@$(NEWMAN_HTMLEXTRA_VERSION))
 	@[ -n "$$CI" ] || $(ECHO) "$(GREEN)Newman + htmlextra are ready$(NC)"
 
 run-provider-harness-test: $(if $(HELP),,install-newman) ## Run the Bifrost provider-harness Postman collection. HELP=1 prints full parameter docs. Filter via PROVIDER=openai|anthropic|bedrock|gemini|vertex|azure|passthrough|openrouter, FEATURE="<kw>" or FEATURE="<kw1>,<kw2>" (AND across substrings; matches request name/URL/body), RERUN_FAILED=1 (re-run only items that failed last run). INCLUDE_PREVIEW=1 to run [PREVIEW]-tagged account/region-scoped cases. SKIP_STREAM_CANCEL=1 skips stream cancellation probes. USE_INFISICAL=1 to source from Infisical (Usage: make run-provider-harness-test [HELP=1] [PROVIDER=anthropic] [FEATURE="web search"] [FEATURE="cross-cut,structured output"] [RERUN_FAILED=1] [INCLUDE_PREVIEW=1] [BASE_URL=...] [FOLDER="..."] [ENV_FILE=...] [VIEWER_PORT=8090] [CI=1])
@@ -2216,11 +2216,11 @@ run-provider-harness-test: $(if $(HELP),,install-newman) ## Run the Bifrost prov
 		if [ -s "$$cand" ]; then TIMINGS_FILE="$$cand"; break; fi; \
 	done; \
 	DBVERIFY_REPORTER=""; DBVERIFY_ARGS=""; DBVERIFY_READY=0; E2E_DEPS_READY=0; \
-	if [ -d tests/e2e/api/node_modules ] && npm --prefix tests/e2e/api ls --depth=0 >/dev/null 2>&1; then \
+	if [ -d tests/e2e/api/node_modules ] && pnpm --prefix tests/e2e/api ls --depth=0 >/dev/null 2>&1; then \
 		E2E_DEPS_READY=1; \
 	else \
 		say "$(YELLOW)Installing e2e reporter deps (dbverify, token-parity)...$(NC)"; \
-		if (cd tests/e2e/api && run_quiet npm install --silent); then \
+		if (cd tests/e2e/api && run_quiet pnpm install --silent); then \
 			E2E_DEPS_READY=1; \
 		else \
 			say "$(YELLOW)e2e reporter dep install failed; dbverify cost checks and the token-parity reporter are disabled for this run$(NC)"; \
