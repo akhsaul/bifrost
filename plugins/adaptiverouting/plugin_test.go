@@ -439,5 +439,119 @@ func TestAdaptiveRouting_SelectorInjectedInPreRequestHook(t *testing.T) {
 	assert.Equal(t, "openai", *picked.Provider)
 }
 
+func TestAdaptiveRouting_StreamingRecordsOnlyOnFinalChunk(t *testing.T) {
+	config := DefaultConfig()
+	plugin, err := New(config, nil, nil)
+	require.NoError(t, err)
+	defer func() { _ = plugin.Cleanup() }()
 
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	ctx.SetValue(adaptiveStartTimeKey, time.Now().Add(-100*time.Millisecond))
 
+	targetID := TargetID{Provider: schemas.OpenAI, Model: "gpt-4o"}
+
+	// Simulate intermediate chunks (indices 0 to 3) with isFinalChunk = false
+	for i := 0; i < 4; i++ {
+		resp := &schemas.BifrostResponse{
+			ChatResponse: &schemas.BifrostChatResponse{
+				ExtraFields: schemas.BifrostResponseExtraFields{
+					RequestType:       schemas.ChatCompletionStreamRequest,
+					Provider:          schemas.OpenAI,
+					ResolvedModelUsed: "gpt-4o",
+					ChunkIndex:        i,
+					Latency:           25, // TTFT on chunk 0
+				},
+			},
+		}
+		_, _, err := plugin.PostLLMHook(ctx, resp, nil)
+		require.NoError(t, err)
+
+		// After intermediate chunks, stats must still be 0 (no record yet)
+		stats := plugin.store.GetStats(context.Background(), targetID, 5*time.Minute)
+		assert.Equal(t, int64(0), stats.TotalRequests)
+	}
+
+	// Final chunk: stream end indicator is true
+	ctx.SetValue(schemas.BifrostContextKeyStreamEndIndicator, true)
+	finalResp := &schemas.BifrostResponse{
+		ChatResponse: &schemas.BifrostChatResponse{
+			ExtraFields: schemas.BifrostResponseExtraFields{
+				RequestType:       schemas.ChatCompletionStreamRequest,
+				Provider:          schemas.OpenAI,
+				ResolvedModelUsed: "gpt-4o",
+				ChunkIndex:        4,
+			},
+		},
+	}
+	_, _, err = plugin.PostLLMHook(ctx, finalResp, nil)
+	require.NoError(t, err)
+
+	// Now exactly 1 request sample should be recorded
+	stats := plugin.store.GetStats(context.Background(), targetID, 5*time.Minute)
+	assert.Equal(t, int64(1), stats.TotalRequests)
+	assert.Equal(t, int64(1), stats.SuccessCount)
+	assert.InDelta(t, 25.0, stats.TTFTMs, 0.1, "TTFT from chunk 0 must be preserved")
+}
+
+func TestAdaptiveRouting_BaseWeightRespectedWhenLatencyEqual(t *testing.T) {
+	config := DefaultConfig()
+	config.ExplorationFloor = 0.0
+
+	targetA := TargetID{Provider: schemas.OpenAI, Model: "model-a"}
+	targetB := TargetID{Provider: schemas.Anthropic, Model: "model-b"}
+
+	candidates := []CandidateTarget{
+		{TargetID: targetA, BaseWeight: 0.8},
+		{TargetID: targetB, BaseWeight: 0.2},
+	}
+
+	// Equal latencies
+	statsMap := map[TargetID]TargetStats{
+		targetA: {EWMALatencyMs: 100.0, TotalRequests: 10, SuccessCount: 10},
+		targetB: {EWMALatencyMs: 100.0, TotalRequests: 10, SuccessCount: 10},
+	}
+
+	weights := ComputeDynamicWeightsWithBaseWeights(candidates, statsMap, config)
+	require.Len(t, weights, 2)
+
+	// With equal latencies, weights should reflect the 0.8 / 0.2 ratio (80% vs 20%)
+	assert.InDelta(t, 0.8, weights[0].Weight, 0.01)
+	assert.InDelta(t, 0.2, weights[1].Weight, 0.01)
+}
+
+func TestAdaptiveRouting_GetMetricsSummary(t *testing.T) {
+	config := DefaultConfig()
+	plugin, err := New(config, nil, nil)
+	require.NoError(t, err)
+	defer func() { _ = plugin.Cleanup() }()
+
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	ctx.SetValue(adaptiveStartTimeKey, time.Now().Add(-50*time.Millisecond))
+
+	resp := &schemas.BifrostResponse{
+		ChatResponse: &schemas.BifrostChatResponse{
+			ExtraFields: schemas.BifrostResponseExtraFields{
+				RequestType:       schemas.ChatCompletionRequest,
+				Provider:          schemas.OpenAI,
+				ResolvedModelUsed: "gpt-4o",
+			},
+		},
+	}
+	_, _, err = plugin.PostLLMHook(ctx, resp, nil)
+	require.NoError(t, err)
+
+	summary := plugin.GetMetricsSummary()
+	assert.GreaterOrEqual(t, summary.Summary.TotalTargets, 1)
+	assert.Equal(t, int64(0), summary.Summary.Total429s)
+
+	found := false
+	for _, m := range summary.Metrics {
+		if m.Provider == "openai" && m.Model == "gpt-4o" {
+			found = true
+			assert.Equal(t, int64(1), m.TotalRequests)
+			assert.Equal(t, 100.0, m.SuccessRate)
+			assert.Equal(t, "optimal", m.Status)
+		}
+	}
+	assert.True(t, found, "openai/gpt-4o target metric must be present in summary")
+}

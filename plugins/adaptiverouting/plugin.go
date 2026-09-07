@@ -17,7 +17,8 @@ import (
 )
 
 const (
-	adaptiveStartTimeKey schemas.BifrostContextKey = "bf-adaptive-start-time"
+	adaptiveStartTimeKey  schemas.BifrostContextKey = "bf-adaptive-start-time"
+	adaptiveStreamTTFTKey schemas.BifrostContextKey = "bf-adaptive-stream-ttft"
 )
 
 // Plugin implements LLMPlugin, providing telemetry metrics collection and adaptive routing / key selection.
@@ -304,7 +305,7 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 		return resp, bifrostErr, nil
 	}
 
-	_, provider, originalModel, resolvedModel := bifrost.GetResponseFields(resp, bifrostErr)
+	requestType, provider, originalModel, resolvedModel := bifrost.GetResponseFields(resp, bifrostErr)
 	model := resolvedModel
 	if model == "" {
 		model = originalModel
@@ -320,21 +321,46 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 		KeyID:    keyID,
 	}
 
+	isStreaming := bifrost.IsStreamRequestType(requestType)
+
+	// In streaming mode, capture TTFT on chunk 0
+	if isStreaming && resp != nil {
+		extraFields := resp.GetExtraFields()
+		if extraFields != nil && extraFields.ChunkIndex == 0 && extraFields.Latency > 0 {
+			ttft := time.Duration(extraFields.Latency) * time.Millisecond
+			ctx.SetValue(adaptiveStreamTTFTKey, ttft)
+		}
+	}
+
+	// For streams, only record metric on error or when the stream has ended (final chunk)
+	if isStreaming && bifrostErr == nil {
+		streamEndVal := ctx.Value(schemas.BifrostContextKeyStreamEndIndicator)
+		isFinalChunk, isFinalChunkBool := streamEndVal.(bool)
+		if !isFinalChunkBool || !isFinalChunk {
+			// Intermediate chunk: do not record sample to prevent inflating request counts
+			return resp, bifrostErr, nil
+		}
+	}
+
 	var duration time.Duration
 	if start, ok := ctx.Value(adaptiveStartTimeKey).(time.Time); ok {
 		duration = time.Since(start)
 	}
 
 	var ttft time.Duration
-	statusCode := 200
-	isError := false
-
-	if resp != nil {
+	if isStreaming {
+		if cachedTTFT, ok := ctx.Value(adaptiveStreamTTFTKey).(time.Duration); ok {
+			ttft = cachedTTFT
+		}
+	} else if resp != nil {
 		extraFields := resp.GetExtraFields()
-		if extraFields.Latency > 0 && extraFields.ChunkIndex == 0 {
+		if extraFields != nil && extraFields.Latency > 0 && extraFields.ChunkIndex == 0 {
 			ttft = time.Duration(extraFields.Latency) * time.Millisecond
 		}
 	}
+
+	statusCode := 200
+	isError := false
 
 	if bifrostErr != nil {
 		isError = true
@@ -354,6 +380,24 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 			Model:    model,
 		}
 		p.store.RecordMetric(p.ctx, targetNoKey, duration, ttft, statusCode, isError)
+	}
+
+	// If resolved model differs from requested original model, also record for original model
+	// to ensure routing rules matching originalModel find accurate telemetry
+	if originalModel != "" && originalModel != model {
+		targetOriginal := TargetID{
+			Provider: provider,
+			Model:    originalModel,
+			KeyID:    keyID,
+		}
+		p.store.RecordMetric(p.ctx, targetOriginal, duration, ttft, statusCode, isError)
+		if keyID != "" {
+			targetOriginalNoKey := TargetID{
+				Provider: provider,
+				Model:    originalModel,
+			}
+			p.store.RecordMetric(p.ctx, targetOriginalNoKey, duration, ttft, statusCode, isError)
+		}
 	}
 
 	return resp, bifrostErr, nil
@@ -392,6 +436,39 @@ func (p *Plugin) SelectOptimalTarget(candidates []TargetID) (TargetID, bool) {
 	return weights[len(weights)-1].TargetID, true
 }
 
+// SelectOptimalTargetWithBaseWeights chooses the best TargetID among candidates with base weights.
+func (p *Plugin) SelectOptimalTargetWithBaseWeights(candidates []CandidateTarget) (TargetID, bool) {
+	if len(candidates) == 0 {
+		return TargetID{}, false
+	}
+	if len(candidates) == 1 {
+		return candidates[0].TargetID, true
+	}
+
+	window := p.config.WindowSize.D()
+	if window <= 0 {
+		window = 5 * time.Minute
+	}
+
+	statsMap := make(map[TargetID]TargetStats, len(candidates))
+	for _, c := range candidates {
+		statsMap[c.TargetID] = p.store.GetStats(p.ctx, c.TargetID, window)
+	}
+
+	weights := ComputeDynamicWeightsWithBaseWeights(candidates, statsMap, p.config)
+	if len(weights) == 0 {
+		return candidates[0].TargetID, true
+	}
+
+	r := rand.Float64()
+	for _, tw := range weights {
+		if r <= tw.CumWeight {
+			return tw.TargetID, true
+		}
+	}
+	return weights[len(weights)-1].TargetID, true
+}
+
 // AdaptiveTargetSelector returns a selector closure for selecting between TableRoutingTarget options dynamically.
 func (p *Plugin) AdaptiveTargetSelector() func(targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, bool) {
 	return func(targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, bool) {
@@ -402,7 +479,7 @@ func (p *Plugin) AdaptiveTargetSelector() func(targets []configstoreTables.Table
 			return targets[0], true
 		}
 
-		candidates := make([]TargetID, 0, len(targets))
+		candidates := make([]CandidateTarget, 0, len(targets))
 		for _, t := range targets {
 			prov := ""
 			if t.Provider != nil {
@@ -417,14 +494,22 @@ func (p *Plugin) AdaptiveTargetSelector() func(targets []configstoreTables.Table
 				keyID = *t.KeyID
 			}
 
-			candidates = append(candidates, TargetID{
-				Provider: schemas.ModelProvider(prov),
-				Model:    model,
-				KeyID:    keyID,
+			baseW := t.Weight
+			if baseW <= 0 {
+				baseW = 1.0
+			}
+
+			candidates = append(candidates, CandidateTarget{
+				TargetID: TargetID{
+					Provider: schemas.ModelProvider(prov),
+					Model:    model,
+					KeyID:    keyID,
+				},
+				BaseWeight: baseW,
 			})
 		}
 
-		pickedTarget, ok := p.SelectOptimalTarget(candidates)
+		pickedTarget, ok := p.SelectOptimalTargetWithBaseWeights(candidates)
 		if !ok {
 			return targets[0], true
 		}
@@ -505,4 +590,117 @@ func (p *Plugin) KeyPoolFilter() schemas.KeyPoolFilter {
 
 		return result, nil
 	}
+}
+
+// GetMetricsSummary generates a complete telemetry snapshot and summary statistics for real-time monitoring.
+func (p *Plugin) GetMetricsSummary() AdaptiveMetricsSummary {
+	window := p.config.WindowSize.D()
+	if window <= 0 {
+		window = 5 * time.Minute
+	}
+
+	allStats := p.store.GetAllStats(p.ctx, window)
+	snapshot := p.GetSnapshot()
+
+	// Build lookup for active dynamic weights from latest snapshot
+	dynamicWeightMap := make(map[string]float64)
+	if snapshot != nil && snapshot.Weights != nil {
+		for _, twSlice := range snapshot.Weights {
+			for _, tw := range twSlice {
+				dynamicWeightMap[tw.TargetID.String()] = tw.Weight
+			}
+		}
+	}
+
+	metricsList := make([]TargetMetricView, 0, len(allStats))
+	var totalEWMA float64
+	var totalTTFT float64
+	var ttftCount int
+	var total429s int64
+
+	for target, stats := range allStats {
+		// Only display targets that have a provider
+		if target.Provider == "" {
+			continue
+		}
+
+		var successRate float64 = 100.0
+		if stats.TotalRequests > 0 {
+			successRate = (float64(stats.SuccessCount) / float64(stats.TotalRequests)) * 100.0
+		}
+
+		status := "healthy"
+		if stats.RateLimit429Count > 0 || stats.Error5xxCount > 0 || successRate < 95.0 {
+			status = "degraded"
+		} else if stats.EWMALatencyMs > 0 && stats.EWMALatencyMs <= 100.0 {
+			status = "optimal"
+		}
+
+		dynW, hasDynW := dynamicWeightMap[target.String()]
+		if !hasDynW {
+			dynW = 0.0
+		}
+
+		total429s += stats.RateLimit429Count
+		totalEWMA += stats.EWMALatencyMs
+		if stats.TTFTMs > 0 {
+			totalTTFT += stats.TTFTMs
+			ttftCount++
+		}
+
+		metricsList = append(metricsList, TargetMetricView{
+			Target:            target.String(),
+			Provider:          string(target.Provider),
+			Model:             target.Model,
+			KeyID:             target.KeyID,
+			EWMALatencyMs:     stats.EWMALatencyMs,
+			TTFTMs:            stats.TTFTMs,
+			P90LatencyMs:      stats.P90LatencyMs,
+			SuccessRate:       successRate,
+			RateLimit429Count: stats.RateLimit429Count,
+			ErrorCount:        stats.Error5xxCount,
+			TotalRequests:     stats.TotalRequests,
+			DynamicWeight:     dynW,
+			Status:            status,
+		})
+	}
+
+	// Sort metrics by Target string for stable ordering
+	slices.SortFunc(metricsList, func(a, b TargetMetricView) int {
+		return strings.Compare(a.Target, b.Target)
+	})
+
+	var avgEWMA float64
+	if len(metricsList) > 0 {
+		avgEWMA = totalEWMA / float64(len(metricsList))
+	}
+	var avgTTFT float64
+	if ttftCount > 0 {
+		avgTTFT = totalTTFT / float64(ttftCount)
+	}
+
+	var res AdaptiveMetricsSummary
+	res.Metrics = metricsList
+	res.Summary.AvgEWMALatencyMs = avgEWMA
+	res.Summary.AvgTTFTMs = avgTTFT
+	res.Summary.TotalTargets = len(metricsList)
+	res.Summary.Total429s = total429s
+
+	return res
+}
+
+// GetConfig returns the current plugin configuration.
+func (p *Plugin) GetConfig() Config {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.config
+}
+
+// UpdateConfig safely updates the configuration and triggers an immediate weight recalculation.
+func (p *Plugin) UpdateConfig(cfg Config) {
+	p.mu.Lock()
+	p.config = cfg
+	p.mu.Unlock()
+
+	p.recomputeActiveWeights()
 }

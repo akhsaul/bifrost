@@ -31,6 +31,7 @@ import (
 	"github.com/maximhq/bifrost/framework/temptoken"
 	"github.com/maximhq/bifrost/framework/tracing"
 	"github.com/maximhq/bifrost/framework/webhooks"
+	"github.com/maximhq/bifrost/plugins/adaptiverouting"
 	"github.com/maximhq/bifrost/plugins/governance"
 	"github.com/maximhq/bifrost/plugins/guardrails"
 	"github.com/maximhq/bifrost/plugins/logging"
@@ -2195,6 +2196,16 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 	if skillsHandler != nil {
 		skillsHandler.RegisterRoutes(s.Router, middlewares...)
 	}
+	// Adaptive Routing dashboard endpoints. The plugin is resolved per request so
+	// plugin reloads via /api/plugins are honored — same pattern as cacheHandler above.
+	adaptiveRoutingHandler := handlers.NewAdaptiveRoutingHandler(func() *adaptiverouting.Plugin {
+		p, err := lib.FindPluginAs[*adaptiverouting.Plugin](s.Config, adaptiverouting.PluginName)
+		if err != nil || p == nil {
+			return nil
+		}
+		return p
+	}, s.Config.ConfigStore)
+	adaptiveRoutingHandler.RegisterRoutes(s.Router, middlewares...)
 	webhookHandler := handlers.NewWebhookHandler(callbacks, s.Config, s.WebhookDispatcher)
 	webhookHandler.RegisterRoutes(s.Router, middlewares...)
 	skillsServingHandler := handlers.NewSkillsServingHandler(s.Config.ConfigStore, s.Config.ObjectStore)

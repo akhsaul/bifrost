@@ -48,6 +48,40 @@ type TargetWeight struct {
 	P90Ms     float64  `json:"p90_ms"`
 }
 
+// CandidateTarget specifies a target candidate and its optional base configured weight (default 1.0).
+type CandidateTarget struct {
+	TargetID   TargetID `json:"target_id"`
+	BaseWeight float64  `json:"base_weight,omitempty"`
+}
+
+// TargetMetricView represents a flattened real-time telemetry entry for the API and dashboard.
+type TargetMetricView struct {
+	Target            string  `json:"target"`
+	Provider          string  `json:"provider"`
+	Model             string  `json:"model"`
+	KeyID             string  `json:"key_id,omitempty"`
+	EWMALatencyMs     float64 `json:"ewma_latency_ms"`
+	TTFTMs            float64 `json:"ttft_ms"`
+	P90LatencyMs      float64 `json:"p90_latency_ms"`
+	SuccessRate       float64 `json:"success_rate"`
+	RateLimit429Count int64   `json:"rate_limit_count"`
+	ErrorCount        int64   `json:"error_count"`
+	TotalRequests     int64   `json:"total_requests"`
+	DynamicWeight     float64 `json:"dynamic_weight"`
+	Status            string  `json:"status"` // "optimal" | "healthy" | "degraded"
+}
+
+// AdaptiveMetricsSummary encapsulates all target metrics and summary statistics for real-time views.
+type AdaptiveMetricsSummary struct {
+	Metrics []TargetMetricView `json:"metrics"`
+	Summary struct {
+		AvgEWMALatencyMs float64 `json:"avg_ewma_latency_ms"`
+		AvgTTFTMs        float64 `json:"avg_ttft_ms"`
+		TotalTargets     int     `json:"total_targets"`
+		Total429s        int64   `json:"total_429s"`
+	} `json:"summary"`
+}
+
 // AdaptiveRoutingSnapshot represents an immutable routing snapshot for zero-lock reads.
 type AdaptiveRoutingSnapshot struct {
 	// Weights maps a group/pool key to a slice of weighted candidate targets.

@@ -33,15 +33,24 @@ func CalculateCompositeScore(stats TargetStats, config Config) (effectiveLatency
 
 // ComputeDynamicWeights takes a list of candidate targets and their stats, and produces normalized dynamic weights.
 func ComputeDynamicWeights(candidates []TargetID, statsMap map[TargetID]TargetStats, config Config) []TargetWeight {
+	ct := make([]CandidateTarget, len(candidates))
+	for i, c := range candidates {
+		ct[i] = CandidateTarget{TargetID: c, BaseWeight: 1.0}
+	}
+	return ComputeDynamicWeightsWithBaseWeights(ct, statsMap, config)
+}
+
+// ComputeDynamicWeightsWithBaseWeights takes candidates with base configured weights and their stats, producing normalized dynamic weights.
+func ComputeDynamicWeightsWithBaseWeights(candidates []CandidateTarget, statsMap map[TargetID]TargetStats, config Config) []TargetWeight {
 	n := len(candidates)
 	if n == 0 {
 		return nil
 	}
 	if n == 1 {
-		effLat, score := CalculateCompositeScore(statsMap[candidates[0]], config)
+		effLat, score := CalculateCompositeScore(statsMap[candidates[0].TargetID], config)
 		return []TargetWeight{
 			{
-				TargetID:  candidates[0],
+				TargetID:  candidates[0].TargetID,
 				Weight:    1.0,
 				CumWeight: 1.0,
 				Score:     score,
@@ -61,13 +70,18 @@ func ComputeDynamicWeights(candidates []TargetID, statsMap map[TargetID]TargetSt
 	}
 
 	for i, candidate := range candidates {
-		stats := statsMap[candidate]
+		stats := statsMap[candidate.TargetID]
 		effLat, score := CalculateCompositeScore(stats, config)
 		effectiveLatencies[i] = effLat
 		scores[i] = score
 
-		// Inverse-latency formula: (1 / latency)^powerK
-		rawW := math.Pow(1000.0/effLat, powerK)
+		baseW := candidate.BaseWeight
+		if baseW <= 0 {
+			baseW = 1.0
+		}
+
+		// Combined formula: BaseWeight * (1000 / latency)^powerK
+		rawW := baseW * math.Pow(1000.0/effLat, powerK)
 		rawWeights[i] = rawW
 		totalRawWeight += rawW
 	}
@@ -87,14 +101,14 @@ func ComputeDynamicWeights(candidates []TargetID, statsMap map[TargetID]TargetSt
 	for i, candidate := range candidates {
 		var normW float64
 		if totalRawWeight > 0 {
-			normW = (1.0 - float64(n)*eps)*(rawWeights[i]/totalRawWeight) + eps
+			normW = (1.0-float64(n)*eps)*(rawWeights[i]/totalRawWeight) + eps
 		} else {
 			normW = 1.0 / float64(n)
 		}
 
 		cum += normW
 		results[i] = TargetWeight{
-			TargetID:  candidate,
+			TargetID:  candidate.TargetID,
 			Weight:    normW,
 			CumWeight: cum,
 			Score:     scores[i],
