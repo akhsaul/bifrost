@@ -555,3 +555,56 @@ func TestAdaptiveRouting_GetMetricsSummary(t *testing.T) {
 	}
 	assert.True(t, found, "openai/gpt-4o target metric must be present in summary")
 }
+
+func TestAdaptiveRouting_FallbackDoesNotFabricatePhantomTarget(t *testing.T) {
+	config := DefaultConfig()
+	plugin, err := New(config, nil, nil)
+	require.NoError(t, err)
+	defer func() { _ = plugin.Cleanup() }()
+
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	ctx.SetValue(adaptiveStartTimeKey, time.Now().Add(-50*time.Millisecond))
+
+	primaryProv := schemas.ModelProvider("opencode-zen")
+	primaryModel := "muse-spark-1.3-contributor-free"
+
+	// Simulate fallback response: Primary was opencode-zen/muse-spark,
+	// but the attempt that ran was antigravity/gemini-3.8-flash-high.
+	resp := &schemas.BifrostResponse{
+		ChatResponse: &schemas.BifrostChatResponse{
+			ExtraFields: schemas.BifrostResponseExtraFields{
+				RequestType:            schemas.ChatCompletionRequest,
+				Provider:               schemas.ModelProvider("antigravity"),
+				OriginalModelRequested: primaryModel,
+				ResolvedModelUsed:      "gemini-3.8-flash-high",
+				RoutingInfo: schemas.RoutingInfo{
+					Provider:        schemas.ModelProvider("antigravity"),
+					Model:           "gemini-3.8-flash-high",
+					IsFallback:      true,
+					PrimaryProvider: &primaryProv,
+					PrimaryModel:    &primaryModel,
+				},
+			},
+		},
+	}
+
+	_, _, err = plugin.PostLLMHook(ctx, resp, nil)
+	require.NoError(t, err)
+
+	summary := plugin.GetMetricsSummary()
+	for _, m := range summary.Metrics {
+		// Phantom target check: antigravity must NEVER be paired with muse-spark-1.3-contributor-free
+		if m.Provider == "antigravity" && m.Model == primaryModel {
+			t.Fatalf("phantom target found: %s/%s must not be recorded", m.Provider, m.Model)
+		}
+		// Empty model check: model must never be empty
+		if m.Model == "" {
+			t.Fatalf("model-less target found: %s/%s must not be recorded", m.Provider, m.Model)
+		}
+	}
+
+	// Verify the real fallback target was recorded
+	fallbackTarget := TargetID{Provider: "antigravity", Model: "gemini-3.8-flash-high"}
+	stats := plugin.store.GetStats(context.Background(), fallbackTarget, 5*time.Minute)
+	assert.Equal(t, int64(1), stats.TotalRequests, "actual fallback attempt must be recorded")
+}

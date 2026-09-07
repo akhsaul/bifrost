@@ -305,12 +305,25 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 		return resp, bifrostErr, nil
 	}
 
-	requestType, provider, originalModel, resolvedModel := bifrost.GetResponseFields(resp, bifrostErr)
-	model := resolvedModel
-	if model == "" {
-		model = originalModel
+	requestType, provider, _, resolvedModel := bifrost.GetResponseFields(resp, bifrostErr)
+	// Prefer RoutingInfo — it carries the provider/model pair that THIS attempt actually
+	// executed, including fallback attempts. The deprecated ExtraFields triplet mixes the
+	// failed primary's model with the fallback's provider on fallbacks (OriginalModelRequested
+	// collapses to the caller-sent model), which would fabricate phantom targets like
+	// "antigravity/muse-spark-1.3-contributor-free" for a request whose muse target failed
+	// over to antigravity. RoutingInfo.Model is always the wire model of this attempt.
+	routingInfo := bifrost.GetResponseRoutingInfo(resp, bifrostErr)
+	if routingInfo.Provider != "" {
+		provider = routingInfo.Provider
 	}
-	if provider == "" && model == "" {
+	if routingInfo.Model != "" {
+		resolvedModel = routingInfo.Model
+	}
+	model := resolvedModel
+	// Only record metrics for attempts with BOTH a provider and a model: targets without
+	// a model (e.g. provider-level probes) cannot be attributed to any routing rule and
+	// would render as "provider/" rows on the dashboard.
+	if provider == "" || model == "" {
 		return resp, bifrostErr, nil
 	}
 
@@ -380,24 +393,6 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 			Model:    model,
 		}
 		p.store.RecordMetric(p.ctx, targetNoKey, duration, ttft, statusCode, isError)
-	}
-
-	// If resolved model differs from requested original model, also record for original model
-	// to ensure routing rules matching originalModel find accurate telemetry
-	if originalModel != "" && originalModel != model {
-		targetOriginal := TargetID{
-			Provider: provider,
-			Model:    originalModel,
-			KeyID:    keyID,
-		}
-		p.store.RecordMetric(p.ctx, targetOriginal, duration, ttft, statusCode, isError)
-		if keyID != "" {
-			targetOriginalNoKey := TargetID{
-				Provider: provider,
-				Model:    originalModel,
-			}
-			p.store.RecordMetric(p.ctx, targetOriginalNoKey, duration, ttft, statusCode, isError)
-		}
 	}
 
 	return resp, bifrostErr, nil
@@ -619,8 +614,9 @@ func (p *Plugin) GetMetricsSummary() AdaptiveMetricsSummary {
 	var total429s int64
 
 	for target, stats := range allStats {
-		// Only display targets that have a provider
-		if target.Provider == "" {
+		// Only display targets that have both a provider and a model — model-less
+		// entries cannot be attributed to any routing rule target.
+		if target.Provider == "" || target.Model == "" {
 			continue
 		}
 
