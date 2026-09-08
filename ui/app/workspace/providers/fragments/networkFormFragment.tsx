@@ -206,12 +206,16 @@ export function NetworkFormFragment({ provider }: NetworkFormFragmentProps) {
 									<FormItem>
 										<FormLabel>Base URL {baseURLRequired ? "(Required)" : "(Optional)"}</FormLabel>
 										<FormControl>
-																<SecretVarInput
-																	placeholder={isCustomProvider ? "https://api.your-provider.com or env.PROVIDER_URL" : "https://api.example.com or env.PROVIDER_URL"}
-																	value={typeof field.value === "string" ? toSecretVarFormValue(field.value) : field.value}
-																	onChange={field.onChange}
-																	disabled={!hasUpdateProviderAccess}
-																/>
+											<SecretVarInput
+												placeholder={
+													isCustomProvider
+														? "https://api.your-provider.com or env.PROVIDER_URL"
+														: "https://api.example.com or env.PROVIDER_URL"
+												}
+												value={typeof field.value === "string" ? toSecretVarFormValue(field.value) : field.value}
+												onChange={field.onChange}
+												disabled={!hasUpdateProviderAccess}
+											/>
 										</FormControl>
 										<FormMessage />
 									</FormItem>

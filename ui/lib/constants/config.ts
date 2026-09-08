@@ -277,13 +277,7 @@ export const PROVIDER_SUPPORTED_REQUESTS: Record<BaseProvider, string[]> = {
 		"responses_stream",
 		"embedding",
 	],
-	antigravity: [
-		"list_models",
-		"chat_completion",
-		"chat_completion_stream",
-		"responses",
-		"responses_stream",
-	],
+	antigravity: ["list_models", "chat_completion", "chat_completion_stream", "responses", "responses_stream"],
 };
 
 export const IS_ENTERPRISE = process.env.BIFROST_IS_ENTERPRISE === "true";

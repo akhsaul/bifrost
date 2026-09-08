@@ -529,7 +529,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 										value={watch("strategy") || "weighted"}
 										onValueChange={(val: "weighted" | "adaptive" | "priority") => setValue("strategy", val)}
 									>
-										<SelectTrigger className="w-[140px] h-8 text-xs">
+										<SelectTrigger className="h-8 w-[140px] text-xs">
 											<SelectValue placeholder="Strategy" />
 										</SelectTrigger>
 										<SelectContent>
@@ -570,7 +570,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 
 							{/* Weight sum indicator / priority hint — semantics depend on strategy */}
 							{watch("strategy") === "priority" ? (
-								<div className="flex items-center justify-end gap-2 text-xs font-medium text-muted-foreground">
+								<div className="text-muted-foreground flex items-center justify-end gap-2 text-xs font-medium">
 									Priority: lower number = higher precedence (1 is highest)
 								</div>
 							) : (

@@ -23,15 +23,18 @@ const formSchema = z.object({
 	name: z.string().min(1),
 	baseFormat: z.string().min(1),
 	base_url: z.union([
-		z.string().min(1, "Base URL is required").refine((url) => {
-			if (/^env\.[A-Za-z_][A-Za-z0-9_]*$/.test(url) || /\$\{env\.[A-Za-z_][A-Za-z0-9_]*\}/.test(url)) return true;
-			try {
-				const parsed = new URL(url);
-				return parsed.protocol === "http:" || parsed.protocol === "https:";
-			} catch {
-				return false;
-			}
-		}, "Must be a valid HTTP or HTTPS URL or env reference"),
+		z
+			.string()
+			.min(1, "Base URL is required")
+			.refine((url) => {
+				if (/^env\.[A-Za-z_][A-Za-z0-9_]*$/.test(url) || /\$\{env\.[A-Za-z_][A-Za-z0-9_]*\}/.test(url)) return true;
+				try {
+					const parsed = new URL(url);
+					return parsed.protocol === "http:" || parsed.protocol === "https:";
+				} catch {
+					return false;
+				}
+			}, "Must be a valid HTTP or HTTPS URL or env reference"),
 		z.object({ value: z.string().optional(), ref: z.string().optional(), type: z.enum(["plain_text", "env", "vault"]).optional() }),
 	]),
 	allowed_requests: allowedRequestsSchema,

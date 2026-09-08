@@ -75,24 +75,12 @@ export default function DopplerVaultPage() {
 
 				{/* Header Actions */}
 				<div className="flex items-center gap-2.5">
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => refetch()}
-						disabled={isFetching}
-						className="cursor-pointer gap-1.5 text-xs"
-					>
+					<Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="cursor-pointer gap-1.5 text-xs">
 						<RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
 						Refresh Status
 					</Button>
 					{isEnabled && (
-						<Button
-							variant="default"
-							size="sm"
-							onClick={handleFlushCache}
-							disabled={isFlushing}
-							className="cursor-pointer gap-1.5 text-xs"
-						>
+						<Button variant="default" size="sm" onClick={handleFlushCache} disabled={isFlushing} className="cursor-pointer gap-1.5 text-xs">
 							<Zap className={`h-3.5 w-3.5 ${isFlushing ? "animate-pulse" : ""}`} />
 							{isFlushing ? "Flushing..." : "Flush Cache"}
 						</Button>
@@ -115,7 +103,7 @@ export default function DopplerVaultPage() {
 							<code className="bg-muted rounded px-1.5 py-0.5 font-mono text-xs">config.json</code>:
 						</p>
 						<pre className="bg-background/80 text-foreground overflow-x-auto rounded-md border p-3 font-mono text-xs">
-{`"config_store": {
+							{`"config_store": {
   "vault_store": {
     "enabled": true,
     "type": "doppler",
@@ -161,11 +149,9 @@ export default function DopplerVaultPage() {
 					<CardContent className="text-muted-foreground space-y-1 text-xs">
 						<div className="flex justify-between">
 							<span>API Endpoint:</span>
-							<span className="font-mono font-medium text-foreground">{status?.base_url || "https://api.doppler.com"}</span>
+							<span className="text-foreground font-mono font-medium">{status?.base_url || "https://api.doppler.com"}</span>
 						</div>
-						{status?.error && (
-							<p className="text-destructive mt-1 rounded bg-destructive/10 p-1.5 text-xs">{status.error}</p>
-						)}
+						{status?.error && <p className="text-destructive bg-destructive/10 mt-1 rounded p-1.5 text-xs">{status.error}</p>}
 					</CardContent>
 				</Card>
 
@@ -208,9 +194,7 @@ export default function DopplerVaultPage() {
 					<CardContent className="text-muted-foreground text-xs">
 						<p>
 							Prefix applied to Bifrost-managed secrets (e.g.{" "}
-							<code className="bg-muted rounded px-1 font-mono text-foreground">
-								{(status?.prefix || "BIFROST").toUpperCase()}_KEYS_*
-							</code>
+							<code className="bg-muted text-foreground rounded px-1 font-mono">{(status?.prefix || "BIFROST").toUpperCase()}_KEYS_*</code>
 							).
 						</p>
 					</CardContent>
@@ -234,28 +218,26 @@ export default function DopplerVaultPage() {
 						<div className="grid grid-cols-2 gap-3">
 							<div className="rounded-lg border p-3">
 								<span className="text-muted-foreground block text-[11px]">Workplace / Org</span>
-								<span className="font-semibold text-foreground">
+								<span className="text-foreground font-semibold">
 									{status?.authenticated_entity?.workplace?.name || "Configured Workspace"}
 								</span>
 							</div>
 
 							<div className="rounded-lg border p-3">
 								<span className="text-muted-foreground block text-[11px]">Identity / Token Name</span>
-								<span className="font-semibold text-foreground">
+								<span className="text-foreground font-semibold">
 									{status?.authenticated_entity?.name || status?.authenticated_entity?.token?.name || "Service Token"}
 								</span>
 							</div>
 
 							<div className="rounded-lg border p-3">
 								<span className="text-muted-foreground block text-[11px]">Default Project</span>
-								<span className="font-mono font-semibold text-foreground">
-									{status?.project || "(Per Reference)"}
-								</span>
+								<span className="text-foreground font-mono font-semibold">{status?.project || "(Per Reference)"}</span>
 							</div>
 
 							<div className="rounded-lg border p-3">
 								<span className="text-muted-foreground block text-[11px]">Token Type</span>
-								<span className="font-mono font-semibold text-foreground capitalize">
+								<span className="text-foreground font-mono font-semibold capitalize">
 									{status?.authenticated_entity?.token?.type || status?.authenticated_entity?.type || "Service Token"}
 								</span>
 							</div>
@@ -275,15 +257,16 @@ export default function DopplerVaultPage() {
 						</CardDescription>
 					</CardHeader>
 					<CardContent className="flex-1 space-y-4 text-xs">
-						<div className="bg-muted/50 rounded-lg border p-3.5 space-y-2">
+						<div className="bg-muted/50 space-y-2 rounded-lg border p-3.5">
 							<div className="flex items-center justify-between">
-								<span className="font-medium text-foreground">Secret Cache Status:</span>
+								<span className="text-foreground font-medium">Secret Cache Status:</span>
 								<Badge variant="secondary" className="font-mono text-xs">
 									Active (1h TTL)
 								</Badge>
 							</div>
 							<p className="text-muted-foreground text-xs leading-relaxed">
-								When you rotate or update a secret in Doppler Cloud, Bifrost picks it up on next TTL expiration. To apply secret rotations immediately across all workers, click <strong>Flush Cache</strong>.
+								When you rotate or update a secret in Doppler Cloud, Bifrost picks it up on next TTL expiration. To apply secret rotations
+								immediately across all workers, click <strong>Flush Cache</strong>.
 							</p>
 						</div>
 
@@ -322,33 +305,28 @@ export default function DopplerVaultPage() {
 				</CardHeader>
 				<CardContent className="space-y-3 text-xs">
 					<div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-						<div className="bg-muted/40 rounded-lg border p-3 space-y-1.5">
-							<span className="font-semibold text-foreground">1. Default Scope</span>
-							<code className="bg-background text-primary block rounded border p-1.5 font-mono text-xs">
-								vault.OPENAI_API_KEY
-							</code>
+						<div className="bg-muted/40 space-y-1.5 rounded-lg border p-3">
+							<span className="text-foreground font-semibold">1. Default Scope</span>
+							<code className="bg-background text-primary block rounded border p-1.5 font-mono text-xs">vault.OPENAI_API_KEY</code>
 							<p className="text-muted-foreground text-[11px]">
 								Resolves <code className="font-mono">OPENAI_API_KEY</code> from configured default project & config.
 							</p>
 						</div>
 
-						<div className="bg-muted/40 rounded-lg border p-3 space-y-1.5">
-							<span className="font-semibold text-foreground">2. Explicit Scope</span>
-							<code className="bg-background text-primary block rounded border p-1.5 font-mono text-xs">
-								vault.my-proj/prd/API_KEY
-							</code>
+						<div className="bg-muted/40 space-y-1.5 rounded-lg border p-3">
+							<span className="text-foreground font-semibold">2. Explicit Scope</span>
+							<code className="bg-background text-primary block rounded border p-1.5 font-mono text-xs">vault.my-proj/prd/API_KEY</code>
 							<p className="text-muted-foreground text-[11px]">
 								Resolves secret with explicit project and config slug directly in the reference path.
 							</p>
 						</div>
 
-						<div className="bg-muted/40 rounded-lg border p-3 space-y-1.5">
-							<span className="font-semibold text-foreground">3. JSON Fragment Extraction</span>
-							<code className="bg-background text-primary block rounded border p-1.5 font-mono text-xs">
-								vault.SHARED_KEYS#openai
-							</code>
+						<div className="bg-muted/40 space-y-1.5 rounded-lg border p-3">
+							<span className="text-foreground font-semibold">3. JSON Fragment Extraction</span>
+							<code className="bg-background text-primary block rounded border p-1.5 font-mono text-xs">vault.SHARED_KEYS#openai</code>
 							<p className="text-muted-foreground text-[11px]">
-								Parses JSON payload of <code className="font-mono">SHARED_KEYS</code> and extracts the <code className="font-mono">openai</code> field.
+								Parses JSON payload of <code className="font-mono">SHARED_KEYS</code> and extracts the{" "}
+								<code className="font-mono">openai</code> field.
 							</p>
 						</div>
 					</div>
@@ -359,7 +337,7 @@ export default function DopplerVaultPage() {
 							href="https://docs.doppler.com/reference/secrets-list"
 							target="_blank"
 							rel="noopener noreferrer"
-							className="text-primary hover:underline inline-flex items-center gap-1 font-medium"
+							className="text-primary inline-flex items-center gap-1 font-medium hover:underline"
 						>
 							docs.doppler.com/reference/secrets-list
 							<ExternalLink className="h-3 w-3" />

@@ -793,71 +793,175 @@ export const ProviderIcons = {
 	},
 	tokenrouter: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="TokenRouter"><title>TokenRouter</title><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" /><path d="M7 12h10M12 7v10" stroke="currentColor" strokeWidth="2" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="TokenRouter">
+				<title>TokenRouter</title>
+				<circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+				<path d="M7 12h10M12 7v10" stroke="currentColor" strokeWidth="2" />
+			</svg>
+		);
 	},
 	modal: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Modal"><title>Modal</title><rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" strokeWidth="2" /><path d="M8 12h8M12 8v8" stroke="currentColor" strokeWidth="2" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Modal">
+				<title>Modal</title>
+				<rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" strokeWidth="2" />
+				<path d="M8 12h8M12 8v8" stroke="currentColor" strokeWidth="2" />
+			</svg>
+		);
 	},
 	byteplus: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="BytePlus"><title>BytePlus</title><path d="M5 5h6v6H5zM13 13h6v6h-6zM13 5h6v6h-6zM5 13h6v6H5z" fill="currentColor" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="BytePlus">
+				<title>BytePlus</title>
+				<path d="M5 5h6v6H5zM13 13h6v6h-6zM13 5h6v6h-6zM5 13h6v6H5z" fill="currentColor" />
+			</svg>
+		);
 	},
 	poolside: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Poolside"><title>Poolside</title><path d="M5 5h14v4H5zM5 11h10v4H5zM5 17h6v2H5z" fill="currentColor" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Poolside">
+				<title>Poolside</title>
+				<path d="M5 5h14v4H5zM5 11h10v4H5zM5 17h6v2H5z" fill="currentColor" />
+			</svg>
+		);
 	},
 	longcat: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Longcat"><title>Longcat</title><path d="M6 5h5v14H6zM13 5h5v14h-5zM8 9h8v3H8z" fill="currentColor" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Longcat">
+				<title>Longcat</title>
+				<path d="M6 5h5v14H6zM13 5h5v14h-5zM8 9h8v3H8z" fill="currentColor" />
+			</svg>
+		);
 	},
 	inferx: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Inferx"><title>Inferx</title><path d="M5 5h14v4H5zM5 11h6v8H5zM13 11h6v4h-6z" fill="currentColor" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Inferx">
+				<title>Inferx</title>
+				<path d="M5 5h14v4H5zM5 11h6v8H5zM13 11h6v4h-6z" fill="currentColor" />
+			</svg>
+		);
 	},
 	dahl: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Dahl"><title>Dahl</title><circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="3" /><path d="M12 4v16" stroke="currentColor" strokeWidth="2" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Dahl">
+				<title>Dahl</title>
+				<circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="3" />
+				<path d="M12 4v16" stroke="currentColor" strokeWidth="2" />
+			</svg>
+		);
 	},
 	morphllm: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Morphllm"><title>Morphllm</title><path d="M4 6h16M4 12h12M4 18h8" stroke="currentColor" strokeWidth="3" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Morphllm">
+				<title>Morphllm</title>
+				<path d="M4 6h16M4 12h12M4 18h8" stroke="currentColor" strokeWidth="3" />
+			</svg>
+		);
 	},
 	tokenharbor: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="TokenHarbor"><title>TokenHarbor</title><path d="M5 7h14M8 7v12M16 7v12M5 19h14" stroke="currentColor" strokeWidth="2" /><path d="M8 4h8" stroke="currentColor" strokeWidth="2" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="TokenHarbor">
+				<title>TokenHarbor</title>
+				<path d="M5 7h14M8 7v12M16 7v12M5 19h14" stroke="currentColor" strokeWidth="2" />
+				<path d="M8 4h8" stroke="currentColor" strokeWidth="2" />
+			</svg>
+		);
 	},
 	aisure: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="AISure"><title>AISure</title><path d="M12 4l8 16H4L12 4z" stroke="currentColor" strokeWidth="2" /><path d="M12 10v5M12 18v.1" stroke="currentColor" strokeWidth="2" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="AISure">
+				<title>AISure</title>
+				<path d="M12 4l8 16H4L12 4z" stroke="currentColor" strokeWidth="2" />
+				<path d="M12 10v5M12 18v.1" stroke="currentColor" strokeWidth="2" />
+			</svg>
+		);
 	},
 	tokenfaucet: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="TokenFaucet"><title>TokenFaucet</title><path d="M7 4h10v4H7zM9 8h6v12H9z" fill="currentColor" /><path d="M5 12h14" stroke="currentColor" strokeWidth="2" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="TokenFaucet">
+				<title>TokenFaucet</title>
+				<path d="M7 4h10v4H7zM9 8h6v12H9z" fill="currentColor" />
+				<path d="M5 12h14" stroke="currentColor" strokeWidth="2" />
+			</svg>
+		);
 	},
 	seekai: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="SeekAI"><title>SeekAI</title><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" /><path d="M16 16l4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /><path d="M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="SeekAI">
+				<title>SeekAI</title>
+				<circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+				<path d="M16 16l4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+				<path d="M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+			</svg>
+		);
 	},
 	gorouter: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="GoRouter"><title>GoRouter</title><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" /><path d="M8 12h8M12 8l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="GoRouter">
+				<title>GoRouter</title>
+				<circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+				<path d="M8 12h8M12 8l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+			</svg>
+		);
 	},
 	vyceai: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="VyceAI"><title>VyceAI</title><path d="M4 6l8 12 8-12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><circle cx="12" cy="10" r="2" fill="currentColor" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="VyceAI">
+				<title>VyceAI</title>
+				<path d="M4 6l8 12 8-12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+				<circle cx="12" cy="10" r="2" fill="currentColor" />
+			</svg>
+		);
 	},
 	hcnsec: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="HCNSEC"><title>HCNSEC</title><path d="M12 3l7 4v6c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V7l7-4z" stroke="currentColor" strokeWidth="2" /><path d="M9 12h6M12 9v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="HCNSEC">
+				<title>HCNSEC</title>
+				<path d="M12 3l7 4v6c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V7l7-4z" stroke="currentColor" strokeWidth="2" />
+				<path d="M9 12h6M12 9v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+			</svg>
+		);
 	},
 	neuralwatt: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Neuralwatt"><title>Neuralwatt</title><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Neuralwatt">
+				<title>Neuralwatt</title>
+				<path
+					d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"
+					stroke="currentColor"
+					strokeWidth="2"
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					fill="none"
+				/>
+			</svg>
+		);
 	},
 	bai: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
-		return <svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="B.ai"><title>B.ai</title><circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" /><path d="M9 8v8M9 8h3a2 2 0 010 4H9m3 0a2 2 0 010 4H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>;
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="B.ai">
+				<title>B.ai</title>
+				<circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+				<path d="M9 8v8M9 8h3a2 2 0 010 4H9m3 0a2 2 0 010 4H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+			</svg>
+		);
 	},
 	antigravity: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);

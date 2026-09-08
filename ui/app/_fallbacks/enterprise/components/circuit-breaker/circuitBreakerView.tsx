@@ -4,12 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import {
-	useGetKeyQuotaQuery,
-	useGetProviderKeysQuery,
-	useGetProvidersQuery,
-	type ModelQuotaInfo,
-} from "@/lib/store";
+import { useGetKeyQuotaQuery, useGetProviderKeysQuery, useGetProvidersQuery, type ModelQuotaInfo } from "@/lib/store";
 import type { ModelProviderKey } from "@/lib/types/config";
 
 interface KeyQuotaCardProps {
@@ -18,13 +13,7 @@ interface KeyQuotaCardProps {
 }
 
 function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
-	const {
-		data: summary,
-		isLoading,
-		isFetching,
-		error,
-		refetch,
-	} = useGetKeyQuotaQuery({ provider, key_id: keyItem.id });
+	const { data: summary, isLoading, isFetching, error, refetch } = useGetKeyQuotaQuery({ provider, key_id: keyItem.id });
 
 	const weeklyBucket = summary?.groups?.flatMap((g) => g.buckets).find((b) => b.bucket_id.includes("weekly"));
 	const fiveHourBucket = summary?.groups?.flatMap((g) => g.buckets).find((b) => b.bucket_id.includes("5h"));
@@ -73,14 +62,14 @@ function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
 			const datePart = date.toLocaleDateString(browserLocale, {
 				day: "numeric",
 				month: "short",
-				year: "2-digit"
+				year: "2-digit",
 			});
 
-			const timePart = date.toLocaleTimeString('en', {
+			const timePart = date.toLocaleTimeString("en", {
 				second: "2-digit",
 				minute: "2-digit",
 				hour: "numeric",
-				hour12: false
+				hour12: false,
 			});
 
 			return `${datePart} ${timePart}`;
@@ -96,7 +85,7 @@ function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
 		<Card className="shadow-sm">
 			<CardHeader className="flex flex-row items-center justify-between pb-2">
 				<div className="space-y-1">
-					<CardTitle className="capitalize flex items-center gap-2">
+					<CardTitle className="flex items-center gap-2 capitalize">
 						<Sparkles className="h-4 w-4 text-amber-500" />
 						{keyItem.name || keyItem.id}
 					</CardTitle>
@@ -109,8 +98,8 @@ function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
 					variant="outline"
 					className={
 						isTripped || limitedModels.length > 0
-							? "bg-rose-500/10 text-rose-600 border-rose-500/20"
-							: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+							? "border-rose-500/20 bg-rose-500/10 text-rose-600"
+							: "border-emerald-500/20 bg-emerald-500/10 text-emerald-600"
 					}
 				>
 					{isTripped
@@ -122,27 +111,19 @@ function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
 				{errorMessage ? (
-					<div className="text-xs text-rose-500 bg-rose-500/10 p-3 rounded border border-rose-500/20">
-						{errorMessage}
-					</div>
+					<div className="rounded border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-500">{errorMessage}</div>
 				) : (
 					<>
 						{/* Quota overview buckets */}
-						<div className="rounded-md border p-4 bg-muted/30 flex flex-col gap-3">
+						<div className="bg-muted/30 flex flex-col gap-3 rounded-md border p-4">
 							{/* Weekly Limit Bucket */}
 							<div className="flex flex-col gap-1">
 								<div className="flex items-center justify-between">
 									<div className="flex items-center gap-1.5">
 										<span className="text-sm font-medium">{weeklyBucket?.display_name || "Weekly Limit"}</span>
-										{weeklyResetFormatted && (
-											<span className="text-[11px] text-muted-foreground">
-												(Resets at {weeklyResetFormatted})
-											</span>
-										)}
+										{weeklyResetFormatted && <span className="text-muted-foreground text-[11px]">(Resets at {weeklyResetFormatted})</span>}
 									</div>
-									<span className="text-xs font-mono text-muted-foreground">
-										{(weeklyFraction * 100).toFixed(1)}% Remaining
-									</span>
+									<span className="text-muted-foreground font-mono text-xs">{(weeklyFraction * 100).toFixed(1)}% Remaining</span>
 								</div>
 								<Progress value={weeklyFraction * 100} className="h-2" />
 							</div>
@@ -153,16 +134,10 @@ function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
 									<div className="flex items-center gap-1.5">
 										<span className="text-sm font-medium">{fiveHourBucket?.display_name || "5-Hour Sliding Window"}</span>
 										{fiveHourResetFormatted && (
-											<span className="text-[11px] text-muted-foreground">
-												(Resets at {fiveHourResetFormatted})
-											</span>
+											<span className="text-muted-foreground text-[11px]">(Resets at {fiveHourResetFormatted})</span>
 										)}
 									</div>
-									<span
-										className={`text-xs font-mono font-semibold ${
-											fiveHourFraction < 0.2 ? "text-rose-600" : "text-amber-600"
-										}`}
-									>
+									<span className={`font-mono text-xs font-semibold ${fiveHourFraction < 0.2 ? "text-rose-600" : "text-amber-600"}`}>
 										{(fiveHourFraction * 100).toFixed(1)}% Remaining
 									</span>
 								</div>
@@ -172,17 +147,13 @@ function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
 
 						{/* Affected Models / Model Quotas Section */}
 						{modelList.length > 0 && (
-							<div className="rounded-md border p-3 bg-muted/10 flex flex-col gap-2">
+							<div className="bg-muted/10 flex flex-col gap-2 rounded-md border p-3">
 								<div className="flex items-center justify-between pb-1">
-									<span className="text-xs font-semibold text-foreground uppercase tracking-wider">
-										Models & Quota Allocation
-									</span>
-									<span className="text-[11px] text-muted-foreground">
-										{modelList.length} models tracked
-									</span>
+									<span className="text-foreground text-xs font-semibold tracking-wider uppercase">Models & Quota Allocation</span>
+									<span className="text-muted-foreground text-[11px]">{modelList.length} models tracked</span>
 								</div>
 
-								<div className="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+								<div className="flex max-h-48 flex-col gap-2 overflow-y-auto pr-1">
 									{modelList.map((modelInfo) => {
 										const modelDisplayName = modelInfo.display_name?.trim() || modelInfo.model?.trim() || "";
 										if (!modelDisplayName) return null;
@@ -193,36 +164,25 @@ function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
 										return (
 											<div
 												key={modelInfo.model}
-												className="flex items-center justify-between text-xs py-1 px-2 rounded bg-background/60 border border-border/50"
+												className="bg-background/60 border-border/50 flex items-center justify-between rounded border px-2 py-1 text-xs"
 											>
 												<div className="flex flex-col truncate pr-2">
-													<span className="font-medium truncate text-foreground">
-														{modelDisplayName}
-													</span>
+													<span className="text-foreground truncate font-medium">{modelDisplayName}</span>
 													{modelInfo.display_name && modelInfo.model && modelInfo.display_name !== modelInfo.model && (
-														<span className="text-[10px] font-mono text-muted-foreground truncate">
-															{modelInfo.model}
-														</span>
+														<span className="text-muted-foreground truncate font-mono text-[10px]">{modelInfo.model}</span>
 													)}
 												</div>
 
-												<div className="flex items-center gap-2 shrink-0">
+												<div className="flex shrink-0 items-center gap-2">
 													<span
 														className={`font-mono text-[11px] font-semibold ${
-															isModelLimited
-																? "text-rose-600"
-																: modelFraction < 0.3
-																	? "text-amber-600"
-																	: "text-emerald-600"
+															isModelLimited ? "text-rose-600" : modelFraction < 0.3 ? "text-amber-600" : "text-emerald-600"
 														}`}
 													>
 														{(modelFraction * 100).toFixed(0)}%
 													</span>
 													{isModelLimited && (
-														<Badge
-															variant="outline"
-															className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-[10px] py-0 px-1"
-														>
+														<Badge variant="outline" className="border-rose-500/20 bg-rose-500/10 px-1 py-0 text-[10px] text-rose-600">
 															Limited
 														</Badge>
 													)}
@@ -235,20 +195,11 @@ function KeyQuotaCard({ provider, keyItem }: KeyQuotaCardProps) {
 						)}
 
 						<div className="flex items-center justify-between pt-2">
-							<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+							<div className="text-muted-foreground flex items-center gap-1.5 text-xs">
 								<Clock className="h-3.5 w-3.5" />
-								<span>
-									{fiveHourResetFormatted
-										? `5h Window Resets at ${fiveHourResetFormatted}`
-										: "Sliding 5h auto-refreshes"}
-								</span>
+								<span>{fiveHourResetFormatted ? `5h Window Resets at ${fiveHourResetFormatted}` : "Sliding 5h auto-refreshes"}</span>
 							</div>
-							<Button
-								size="sm"
-								variant="secondary"
-								onClick={() => refetch()}
-								disabled={isLoading || isFetching}
-							>
+							<Button size="sm" variant="secondary" onClick={() => refetch()} disabled={isLoading || isFetching}>
 								{isFetching ? "Syncing..." : "Sync Now"}
 							</Button>
 						</div>
@@ -311,7 +262,8 @@ export default function CircuitBreakerView() {
 				<div>
 					<h1 className="text-2xl font-bold tracking-tight">Circuit Breaker & Quota Monitor</h1>
 					<p className="text-muted-foreground text-sm">
-						Proactively monitor rate limits, 5-hour/weekly quotas per account key, and prevent degraded requests from hitting exhausted keys.
+						Proactively monitor rate limits, 5-hour/weekly quotas per account key, and prevent degraded requests from hitting exhausted
+						keys.
 					</p>
 				</div>
 				<div className="flex items-center gap-2">
@@ -332,9 +284,10 @@ export default function CircuitBreakerView() {
 			<div className="bg-primary/5 border-primary/20 flex items-start gap-3 rounded-lg border p-4">
 				<Zap className="text-primary mt-0.5 h-5 w-5 shrink-0" />
 				<div className="text-sm">
-					<p className="font-medium text-foreground">Multi-Account & Per-Key Smart Cooldown Active</p>
+					<p className="text-foreground font-medium">Multi-Account & Per-Key Smart Cooldown Active</p>
 					<p className="text-muted-foreground mt-0.5">
-						Each API key / subscription account is isolated independently. When one account reaches its 5-hour or weekly quota, the Circuit Breaker trips only that account key, allowing the other healthy keys in the pool to continue serving traffic seamlessly.
+						Each API key / subscription account is isolated independently. When one account reaches its 5-hour or weekly quota, the Circuit
+						Breaker trips only that account key, allowing the other healthy keys in the pool to continue serving traffic seamlessly.
 					</p>
 				</div>
 			</div>
@@ -342,9 +295,7 @@ export default function CircuitBreakerView() {
 			{/* Provider & Keys Cards */}
 			<div className="grid grid-cols-1 gap-6 md:grid-cols-2">
 				{supportedProviders.length > 0 ? (
-					supportedProviders.map((prov) => (
-						<ProviderKeysSection key={prov.name} provider={prov.name} />
-					))
+					supportedProviders.map((prov) => <ProviderKeysSection key={prov.name} provider={prov.name} />)
 				) : (
 					<Card className="shadow-sm">
 						<CardHeader className="pb-2">
@@ -367,17 +318,15 @@ export default function CircuitBreakerView() {
 							</CardTitle>
 							<CardDescription>Status of available key rotation pools</CardDescription>
 						</div>
-						<Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-500/20">
+						<Badge variant="outline" className="border-blue-500/20 bg-blue-500/10 text-blue-600">
 							All Ready
 						</Badge>
 					</CardHeader>
 					<CardContent className="flex flex-col gap-4">
-						<div className="flex flex-col items-center justify-center py-6 text-center text-muted-foreground">
-							<CheckCircle2 className="h-10 w-10 text-emerald-500/80 mb-2" />
-							<p className="text-sm font-medium text-foreground">
-								Multi-Key Pool Isolation Active
-							</p>
-							<p className="text-xs max-w-xs mt-1">
+						<div className="text-muted-foreground flex flex-col items-center justify-center py-6 text-center">
+							<CheckCircle2 className="mb-2 h-10 w-10 text-emerald-500/80" />
+							<p className="text-foreground text-sm font-medium">Multi-Key Pool Isolation Active</p>
+							<p className="mt-1 max-w-xs text-xs">
 								Traffic automatically fails over away from rate-limited keys to active healthy accounts.
 							</p>
 						</div>

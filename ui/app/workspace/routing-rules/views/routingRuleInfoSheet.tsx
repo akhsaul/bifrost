@@ -380,8 +380,8 @@ export function RoutingRuleInfoSheet({ rule, open, onOpenChange, onNavigate, has
 								{targets.length > 0 ? (
 									<div className="space-y-2">
 										{targets.map((target, i) => (
-												<TargetCard key={i} target={target} index={i} total={targets.length} strategy={rule.strategy} />
-											))}
+											<TargetCard key={i} target={target} index={i} total={targets.length} strategy={rule.strategy} />
+										))}
 									</div>
 								) : (
 									<p className="text-muted-foreground text-sm">No targets configured</p>

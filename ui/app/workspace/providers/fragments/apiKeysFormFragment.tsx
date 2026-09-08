@@ -188,7 +188,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			} else {
 				const hasManualCreds = Boolean(
 					form.getValues("key.antigravity_key_config.client_id")?.value ||
-					form.getValues("key.antigravity_key_config.client_secret")?.value
+					form.getValues("key.antigravity_key_config.client_secret")?.value,
 				);
 				if (hasManualCreds) {
 					setAntigravityAuthType("manual");
@@ -215,7 +215,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			const popup = window.open(
 				res.auth_url,
 				"antigravity_oauth",
-				`width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes`
+				`width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes`,
 			);
 
 			const handleMessage = async (event: MessageEvent) => {
@@ -1475,14 +1475,14 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 					</div>
 
 					{antigravityAuthType === "oauth" ? (
-						<div className="space-y-4 rounded-md border p-4 bg-muted/20">
+						<div className="bg-muted/20 space-y-4 rounded-md border p-4">
 							{Boolean(form.watch("key.value")?.value || form.watch("key.antigravity_key_config.refresh_token")?.value) ? (
 								<div className="flex flex-col gap-3">
-									<div className="flex items-center gap-3 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800/40 rounded-md p-3">
+									<div className="flex items-center gap-3 rounded-md border border-green-200 bg-green-50 p-3 text-green-700 dark:border-green-800/40 dark:bg-green-950/40 dark:text-green-400">
 										<CheckCircle2 className="h-5 w-5 shrink-0" />
 										<div className="text-sm">
 											<div className="font-semibold">Google Account Connected</div>
-											<div className="text-xs opacity-90 mt-0.5">
+											<div className="mt-0.5 text-xs opacity-90">
 												{form.watch("key.antigravity_key_config.project_id")?.value ? (
 													<span>
 														Google Cloud Project ID:{" "}
@@ -1532,9 +1532,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 													</Button>
 												</TooltipTrigger>
 												<TooltipContent className="max-w-xs">
-													<p>
-														Copy Google OAuth URL (redirecting to localhost:8085) to open in your local browser.
-													</p>
+													<p>Copy Google OAuth URL (redirecting to localhost:8085) to open in your local browser.</p>
 												</TooltipContent>
 											</Tooltip>
 										</TooltipProvider>
@@ -1543,14 +1541,15 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 							) : (
 								<div className="space-y-3">
 									<p className="text-muted-foreground text-sm">
-										Sign in with your Google account. Bifrost will automatically retrieve the OAuth tokens and discover your Cloud Code project.
+										Sign in with your Google account. Bifrost will automatically retrieve the OAuth tokens and discover your Cloud Code
+										project.
 									</p>
-									<div className="flex flex-col sm:flex-row gap-2">
+									<div className="flex flex-col gap-2 sm:flex-row">
 										<Button
 											type="button"
 											variant="default"
 											data-testid="antigravity-oauth-login-btn"
-											className="flex-1 flex items-center justify-center gap-2"
+											className="flex flex-1 items-center justify-center gap-2"
 											onClick={handleGoogleLogin}
 											disabled={isFetchingUrl || isExchanging || isCopyingUrl}
 										>
@@ -1601,15 +1600,16 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 												</TooltipTrigger>
 												<TooltipContent className="max-w-xs">
 													<p>
-														Recommended for VPS, Docker, or Hugging Face Space. Copy the link, open it in your local browser, then paste the resulting redirect URL below.
+														Recommended for VPS, Docker, or Hugging Face Space. Copy the link, open it in your local browser, then paste the
+														resulting redirect URL below.
 													</p>
 												</TooltipContent>
 											</Tooltip>
 										</TooltipProvider>
 									</div>
 
-									<div className="mt-4 pt-4 border-t space-y-2">
-										<FormLabel className="text-xs text-muted-foreground">
+									<div className="mt-4 space-y-2 border-t pt-4">
+										<FormLabel className="text-muted-foreground text-xs">
 											Alternative / Remote: Paste Authorization Code or Redirect URL
 										</FormLabel>
 										<div className="flex gap-2">
@@ -1652,9 +1652,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 								</div>
 							)}
 
-							{authError && (
-								<p className="text-destructive text-xs mt-2">{authError}</p>
-							)}
+							{authError && <p className="text-destructive mt-2 text-xs">{authError}</p>}
 						</div>
 					) : (
 						<div className="space-y-4">
@@ -1684,16 +1682,9 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 							<FormItem>
 								<FormLabel>Google Cloud Project ID (Optional override)</FormLabel>
 								<FormControl>
-									<SecretVarInput
-										placeholder="Auto-discovered or custom GCP project ID"
-										maskNonEnvValue={false}
-										type="text"
-										{...field}
-									/>
+									<SecretVarInput placeholder="Auto-discovered or custom GCP project ID" maskNonEnvValue={false} type="text" {...field} />
 								</FormControl>
-								<FormDescription>
-									Leave blank to use the project ID discovered automatically via Cloud Code assist.
-								</FormDescription>
+								<FormDescription>Leave blank to use the project ID discovered automatically via Cloud Code assist.</FormDescription>
 								<FormMessage />
 							</FormItem>
 						)}

@@ -1843,56 +1843,56 @@ export function LogDetailView({
 								</>
 							)}
 
-					{isRealtimeTurn && (
+							{isRealtimeTurn && (
 								<>
-					{Boolean(log.metadata?.realtime_session_id) && (
+									{Boolean(log.metadata?.realtime_session_id) && (
 										<LogEntryDetailsView
 											className="w-full"
 											label="Realtime Session"
 											value={
 												<span className="flex items-center gap-1">
-					<code className="font-mono text-xs">{String(metadata.realtime_session_id)}</code>
+													<code className="font-mono text-xs">{String(metadata.realtime_session_id)}</code>
 													<CopyInlineButton
-										text={String(metadata.realtime_session_id)}
+														text={String(metadata.realtime_session_id)}
 														testId="logdetails-copy-realtime-session-id-button"
 													/>
 												</span>
 											}
 										/>
 									)}
-					{Boolean(log.metadata?.provider_session_id) && (
+									{Boolean(log.metadata?.provider_session_id) && (
 										<LogEntryDetailsView
 											className="w-full"
 											label="Provider Session"
 											value={
 												<span className="flex items-center gap-1">
-					<code className="font-mono text-xs">{String(metadata.provider_session_id)}</code>
+													<code className="font-mono text-xs">{String(metadata.provider_session_id)}</code>
 													<CopyInlineButton
-										text={String(metadata.provider_session_id)}
+														text={String(metadata.provider_session_id)}
 														testId="logdetails-copy-provider-session-id-button"
 													/>
 												</span>
 											}
 										/>
 									)}
-					{Boolean(log.metadata?.realtime_transport) && (
+									{Boolean(log.metadata?.realtime_transport) && (
 										<LogEntryDetailsView
 											className="w-full"
 											label="Transport"
-									value={formatRealtimeTransport(String(metadata.realtime_transport))}
+											value={formatRealtimeTransport(String(metadata.realtime_transport))}
 										/>
 									)}
-					{Boolean(log.metadata?.realtime_voice) && (
-									<LogEntryDetailsView className="w-full" label="Voice" value={String(metadata.realtime_voice)} />
+									{Boolean(log.metadata?.realtime_voice) && (
+										<LogEntryDetailsView className="w-full" label="Voice" value={String(metadata.realtime_voice)} />
 									)}
-					{Boolean(log.metadata?.realtime_source) && (
+									{Boolean(log.metadata?.realtime_source) && (
 										<LogEntryDetailsView
 											className="w-full"
 											label="Turn Source"
 											value={formatRealtimeSource(String(metadata.realtime_source))}
 										/>
 									)}
-					{Boolean(log.metadata?.realtime_event_type) && (
+									{Boolean(log.metadata?.realtime_event_type) && (
 										<LogEntryDetailsView
 											className="w-full"
 											label="Trigger Event"
@@ -2336,8 +2336,8 @@ export function LogDetailView({
 									<div className="grid w-full grid-cols-1 items-start justify-between gap-4 md:grid-cols-3">
 										{Object.entries(log.metadata)
 											.filter(([key]) => {
-														if (key === "isAsyncRequest") return false;
-														if (key === "outgoing_bifrost") return false;
+												if (key === "isAsyncRequest") return false;
+												if (key === "outgoing_bifrost") return false;
 												if (
 													isRealtimeTurn &&
 													[
@@ -2360,20 +2360,26 @@ export function LogDetailView({
 								</div>
 							</>
 						)}
-					{!isContainer && !isPassthrough && (() => {
-						const outgoing = log.metadata?.outgoing_bifrost as { headers?: Record<string, string> } | undefined;
-						const headers = outgoing?.headers;
-						if (!headers || Object.keys(headers).length === 0) return null;
-						return <>
-							<DottedSeparator />
-							<div className="space-y-4">
-								<BlockHeader title="OUTGOING BIFROST" />
-								<div className="grid w-full grid-cols-3 items-start justify-between gap-4">
-									{Object.entries(headers).map(([key, value]) => <LogEntryDetailsView key={key} className="w-full" label={key} value={value} />)}
-								</div>
-							</div>
-						</>;
-					})()}
+					{!isContainer &&
+						!isPassthrough &&
+						(() => {
+							const outgoing = log.metadata?.outgoing_bifrost as { headers?: Record<string, string> } | undefined;
+							const headers = outgoing?.headers;
+							if (!headers || Object.keys(headers).length === 0) return null;
+							return (
+								<>
+									<DottedSeparator />
+									<div className="space-y-4">
+										<BlockHeader title="OUTGOING BIFROST" />
+										<div className="grid w-full grid-cols-3 items-start justify-between gap-4">
+											{Object.entries(headers).map(([key, value]) => (
+												<LogEntryDetailsView key={key} className="w-full" label={key} value={value} />
+											))}
+										</div>
+									</div>
+								</>
+							);
+						})()}
 				</div>
 			</details>
 			<Tabs

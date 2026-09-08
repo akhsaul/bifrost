@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-	KnownProvidersNames,
-	mapAppToClientApp,
-	mapUserAgentToApp,
-	RequestTypeColors,
-	RequestTypeLabels,
-	RequestTypes,
-} from "./logs";
+import { KnownProvidersNames, mapAppToClientApp, mapUserAgentToApp, RequestTypeColors, RequestTypeLabels, RequestTypes } from "./logs";
 
 describe("logs constants", () => {
 	it("registers realtime turn as a known request type", () => {
