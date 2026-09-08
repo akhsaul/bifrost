@@ -46,6 +46,13 @@ func storeReversibleToken(ctx *schemas.BifrostContext, token, secret string) {
 		ctx.SetValue(reversibleMapKey{}, existing)
 	}
 	existing[token] = secret
+
+	tracker := GetOrCreateTracker(ctx)
+	tracker.Lock()
+	tracker.secretToToken[secret] = token
+	tracker.tokenToSecret[token] = secret
+	tracker.tokenToMasked[token] = maskPartially(secret)
+	tracker.Unlock()
 }
 
 // getReversibleTokens returns the placeholder map stored on the context

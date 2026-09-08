@@ -1,8 +1,12 @@
 package guardrails
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/maximhq/bifrost/core/schemas"
 )
 
 // sampleGitHubPAT is a realistic random-entropy token matching the github-pat rule.
@@ -20,7 +24,7 @@ func TestBetterleaks_DetectGitHubToken(t *testing.T) {
 		t.Fatal("expected at least one finding for GitHub PAT")
 	}
 
-	blocked, _, detected := bl.evaluate(text)
+	blocked, _, detected := bl.evaluate(nil, text, schemas.RedactionPhaseInput)
 	if len(blocked) == 0 {
 		t.Fatal("expected finding to be blocked")
 	}
@@ -55,7 +59,7 @@ func TestBetterleaks_RedactReplace(t *testing.T) {
 	}
 
 	text := "deploy with " + sampleGitHubPAT + " now"
-	blocked, newText, detected := bl.evaluate(text)
+	blocked, newText, detected := bl.evaluate(nil, text, schemas.RedactionPhaseInput)
 	if len(blocked) != 0 {
 		t.Fatal("redact action must not block")
 	}
@@ -65,8 +69,29 @@ func TestBetterleaks_RedactReplace(t *testing.T) {
 	if strings.Contains(newText, sampleGitHubPAT) {
 		t.Fatalf("secret was not redacted: %q", newText)
 	}
-	if !strings.Contains(newText, "[SECRET]") {
-		t.Fatalf("expected [SECRET] placeholder, got %q", newText)
+	if !strings.Contains(newText, "[SECRET-1]") {
+		t.Fatalf("expected [SECRET-1] placeholder, got %q", newText)
+	}
+}
+
+func TestBetterleaks_DuplicateOccurrences(t *testing.T) {
+	bl, err := newBetterleaksDetector(SecretsConfig{
+		Action:            PatternActionRedact,
+		RedactionStrategy: RedactionReplace,
+	})
+	if err != nil {
+		t.Fatalf("newBetterleaksDetector: %v", err)
+	}
+
+	ctx := schemas.NewBifrostContext(context.Background(), time.Time{})
+	text := "first: " + sampleGitHubPAT + " second: " + sampleGitHubPAT
+	_, newText, _ := bl.evaluate(ctx, text, schemas.RedactionPhaseInput)
+	if strings.Contains(newText, sampleGitHubPAT) {
+		t.Fatalf("one of the occurrences was not redacted: %q", newText)
+	}
+	expected := "first: [SECRET-1] second: [SECRET-1]"
+	if newText != expected {
+		t.Fatalf("expected %q, got %q", expected, newText)
 	}
 }
 
@@ -80,7 +105,7 @@ func TestBetterleaks_RedactMask(t *testing.T) {
 	}
 
 	text := "deploy with " + sampleGitHubPAT + " now"
-	_, newText, _ := bl.evaluate(text)
+	_, newText, _ := bl.evaluate(nil, text, schemas.RedactionPhaseInput)
 	if strings.Contains(newText, sampleGitHubPAT) {
 		t.Fatalf("secret was not masked: %q", newText)
 	}

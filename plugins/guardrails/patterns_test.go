@@ -1,9 +1,13 @@
 package guardrails
 
 import (
+	"context"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/maximhq/bifrost/core/schemas"
 )
 
 func mustCompile(t *testing.T, p *Pattern) compiledPattern {
@@ -24,7 +28,7 @@ func TestEvaluatePatterns_DetectOnly(t *testing.T) {
 		Action:      PatternActionDetectOnly,
 	})
 	text := "contact me at John@Example.COM thanks"
-	blocked, newText, detected := evaluatePatterns([]compiledPattern{cp}, text)
+	blocked, newText, detected := evaluatePatterns(nil, []compiledPattern{cp}, text, schemas.RedactionPhaseInput)
 	if len(blocked) != 0 {
 		t.Fatalf("detect_only should not block, got %d", len(blocked))
 	}
@@ -38,7 +42,7 @@ func TestEvaluatePatterns_DetectOnly(t *testing.T) {
 
 func TestEvaluatePatterns_BlockActionFlagsNotRewrites(t *testing.T) {
 	cp := mustCompile(t, &Pattern{Pattern: `secret`, Action: PatternActionBlock})
-	blocked, _, _ := evaluatePatterns([]compiledPattern{cp}, "my secret token")
+	blocked, _, _ := evaluatePatterns(nil, []compiledPattern{cp}, "my secret token", schemas.RedactionPhaseInput)
 	if len(blocked) != 1 {
 		t.Fatal("block action should report the matched pattern")
 	}
@@ -52,8 +56,9 @@ func TestEvaluatePatterns_RedactReplaceUsesEntityType(t *testing.T) {
 		Flags:       "i",
 		Action:      PatternActionRedact,
 	})
-	_, newText, _ := evaluatePatterns([]compiledPattern{cp}, "mail me at a@b.com ok")
-	want := "mail me at [EMAIL] ok"
+	ctx := schemas.NewBifrostContext(context.Background(), time.Time{})
+	_, newText, _ := evaluatePatterns(ctx, []compiledPattern{cp}, "mail me at a@b.com ok", schemas.RedactionPhaseInput)
+	want := "mail me at [EMAIL-1] ok"
 	if newText != want {
 		t.Fatalf("replace redaction: got %q want %q", newText, want)
 	}
@@ -66,16 +71,18 @@ func TestEvaluatePatterns_RedactReplaceFallsBackToDescription(t *testing.T) {
 		Flags:       "i",
 		Action:      PatternActionRedact,
 	})
-	_, newText, _ := evaluatePatterns([]compiledPattern{cp}, "a@b.com")
-	if !strings.Contains(newText, "[Email address]") {
+	ctx := schemas.NewBifrostContext(context.Background(), time.Time{})
+	_, newText, _ := evaluatePatterns(ctx, []compiledPattern{cp}, "a@b.com", schemas.RedactionPhaseInput)
+	if !strings.Contains(newText, "[Email address-1]") {
 		t.Fatalf("fallback to description expected, got %q", newText)
 	}
 }
 
 func TestEvaluatePatterns_RedactReplaceFallsBackToGenericToken(t *testing.T) {
 	cp := mustCompile(t, &Pattern{Pattern: `a@b.com`, Action: PatternActionRedact})
-	_, newText, _ := evaluatePatterns([]compiledPattern{cp}, "a@b.com")
-	if !strings.Contains(newText, "[REGEX_MATCH]") {
+	ctx := schemas.NewBifrostContext(context.Background(), time.Time{})
+	_, newText, _ := evaluatePatterns(ctx, []compiledPattern{cp}, "a@b.com", schemas.RedactionPhaseInput)
+	if !strings.Contains(newText, "[REGEX_MATCH-1]") {
 		t.Fatalf("generic REGEX_MATCH token expected, got %q", newText)
 	}
 }
@@ -86,7 +93,7 @@ func TestEvaluatePatterns_RedactMask(t *testing.T) {
 		Action:            PatternActionRedact,
 		RedactionStrategy: RedactionMask,
 	})
-	_, newText, _ := evaluatePatterns([]compiledPattern{cp}, "pin 1234 here")
+	_, newText, _ := evaluatePatterns(nil, []compiledPattern{cp}, "pin 1234 here", schemas.RedactionPhaseInput)
 	if newText != "pin **** here" {
 		t.Fatalf("mask redaction: got %q", newText)
 	}
@@ -98,8 +105,9 @@ func TestEvaluatePatterns_RedactHash(t *testing.T) {
 		Action:            PatternActionRedact,
 		RedactionStrategy: RedactionHash,
 	})
-	_, newText, _ := evaluatePatterns([]compiledPattern{cp}, "pin 1234 here")
-	if !regexp.MustCompile(`pin \[[A-Za-z0-9_]+:[0-9a-f]{12}\] here`).MatchString(newText) {
+	ctx := schemas.NewBifrostContext(context.Background(), time.Time{})
+	_, newText, _ := evaluatePatterns(ctx, []compiledPattern{cp}, "pin 1234 here", schemas.RedactionPhaseInput)
+	if !regexp.MustCompile(`pin \[[A-Za-z0-9_]+:[0-9a-f]{16}\] here`).MatchString(newText) {
 		t.Fatalf("hash redaction: got %q", newText)
 	}
 }
@@ -116,8 +124,9 @@ func TestEvaluatePatterns_MultiplePatternsAndMatches(t *testing.T) {
 		EntityType:  "PHONE",
 		Action:      PatternActionRedact,
 	})
-	_, newText, detected := evaluatePatterns([]compiledPattern{email, phone}, "a@b.com or 555-1234")
-	if newText != "[EMAIL] or [PHONE]" {
+	ctx := schemas.NewBifrostContext(context.Background(), time.Time{})
+	_, newText, detected := evaluatePatterns(ctx, []compiledPattern{email, phone}, "a@b.com or 555-1234", schemas.RedactionPhaseInput)
+	if newText != "[EMAIL-1] or [PHONE-1]" {
 		t.Fatalf("got %q", newText)
 	}
 	if len(detected) != 2 {
@@ -126,14 +135,15 @@ func TestEvaluatePatterns_MultiplePatternsAndMatches(t *testing.T) {
 }
 
 func TestEvaluatePatterns_RedactAppliesAcrossWholeText(t *testing.T) {
-	// Multiple occurrences of the same pattern are all rewritten.
+	// Multiple occurrences of the same pattern are all rewritten to the same indexed placeholder.
 	cp := mustCompile(t, &Pattern{
 		Pattern:    `foo`,
 		EntityType: "X",
 		Action:     PatternActionRedact,
 	})
-	_, newText, _ := evaluatePatterns([]compiledPattern{cp}, "foo bar foo")
-	if newText != "[X] bar [X]" {
+	ctx := schemas.NewBifrostContext(context.Background(), time.Time{})
+	_, newText, _ := evaluatePatterns(ctx, []compiledPattern{cp}, "foo bar foo", schemas.RedactionPhaseInput)
+	if newText != "[X-1] bar [X-1]" {
 		t.Fatalf("got %q", newText)
 	}
 }
@@ -147,8 +157,9 @@ func TestEvaluatePatterns_InvalidRedactionStrategyDefaultsToReplace(t *testing.T
 		Action:            PatternActionRedact,
 		RedactionStrategy: RedactionStrategy("bogus"),
 	})
-	_, newText, _ := evaluatePatterns([]compiledPattern{cp}, "x abc y")
-	if newText != "x [X] y" {
+	ctx := schemas.NewBifrostContext(context.Background(), time.Time{})
+	_, newText, _ := evaluatePatterns(ctx, []compiledPattern{cp}, "x abc y", schemas.RedactionPhaseInput)
+	if newText != "x [X-1] y" {
 		t.Fatalf("got %q", newText)
 	}
 }

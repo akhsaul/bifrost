@@ -130,9 +130,10 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 			return nil, shortCircuit, nil
 		}
 	}
-	// Restore reversible placeholders in tool_calls arguments so bash/script
-	// executions on the client receive the real secret.
-	detokenizeToolCalls(resp, ctx)
+	// Restore egress response for client:
+	// - tool_calls arguments -> original full secret
+	// - message content / text -> partially masked value
+	restoreEgress(resp, ctx)
 	return resp, bifrostErr, nil
 }
 
@@ -163,7 +164,7 @@ func (p *Plugin) applyRulesToRequest(ctx *schemas.BifrostContext, rule *Rule, re
 					continue
 				}
 				if msg.Content.ContentStr != nil {
-					blocked, newText, detected := evaluatePatterns(patterns, *msg.Content.ContentStr)
+					blocked, newText, detected := evaluatePatterns(ctx, patterns, *msg.Content.ContentStr, schemas.RedactionPhaseInput)
 					if len(detected) > 0 {
 						p.logWarn("guardrails: rule %q detected %d match(es) on input: %v", rule.Name, len(detected), detected)
 					}
@@ -177,7 +178,7 @@ func (p *Plugin) applyRulesToRequest(ctx *schemas.BifrostContext, rule *Rule, re
 				for j := range msg.Content.ContentBlocks {
 					blk := &msg.Content.ContentBlocks[j]
 					if blk.Text != nil {
-						blocked, newText, detected := evaluatePatterns(patterns, *blk.Text)
+						blocked, newText, detected := evaluatePatterns(ctx, patterns, *blk.Text, schemas.RedactionPhaseInput)
 						if len(detected) > 0 {
 							p.logWarn("guardrails: rule %q detected %d match(es) on input block: %v", rule.Name, len(detected), detected)
 						}
@@ -189,18 +190,18 @@ func (p *Plugin) applyRulesToRequest(ctx *schemas.BifrostContext, rule *Rule, re
 						}
 					}
 				}
-			}
-		}
+				}
+				}
 
-		// 2. Betterleaks secrets detection
-		if sec, ok := p.config.secrets[pid]; ok && sec != nil {
-			for i := range req.ChatRequest.Input {
+				// 2. Betterleaks secrets detection
+				if sec, ok := p.config.secrets[pid]; ok && sec != nil {
+				for i := range req.ChatRequest.Input {
 				msg := &req.ChatRequest.Input[i]
 				if msg.Content == nil {
 					continue
 				}
 				if msg.Content.ContentStr != nil {
-					blocked, newText, detected := sec.evaluate(*msg.Content.ContentStr)
+					blocked, newText, detected := sec.evaluate(ctx, *msg.Content.ContentStr, schemas.RedactionPhaseInput)
 					if len(detected) > 0 {
 						p.logWarn("guardrails: rule %q (secrets) detected %d secret(s): %v", rule.Name, len(detected), detected)
 					}
@@ -214,7 +215,7 @@ func (p *Plugin) applyRulesToRequest(ctx *schemas.BifrostContext, rule *Rule, re
 				for j := range msg.Content.ContentBlocks {
 					blk := &msg.Content.ContentBlocks[j]
 					if blk.Text != nil {
-						blocked, newText, detected := sec.evaluate(*blk.Text)
+						blocked, newText, detected := sec.evaluate(ctx, *blk.Text, schemas.RedactionPhaseInput)
 						if len(detected) > 0 {
 							p.logWarn("guardrails: rule %q (secrets) detected %d secret(s) on input block: %v", rule.Name, len(detected), detected)
 						}
@@ -252,7 +253,7 @@ func (p *Plugin) applyRulesToResponse(ctx *schemas.BifrostContext, rule *Rule, r
 				if c.ChatNonStreamResponseChoice != nil && c.ChatNonStreamResponseChoice.Message != nil {
 					msg := c.ChatNonStreamResponseChoice.Message
 					if msg.Content != nil && msg.Content.ContentStr != nil {
-						blocked, newText, detected := evaluatePatterns(patterns, *msg.Content.ContentStr)
+						blocked, newText, detected := evaluatePatterns(ctx, patterns, *msg.Content.ContentStr, schemas.RedactionPhaseOutput)
 						if len(detected) > 0 {
 							p.logWarn("guardrails: rule %q detected %d match(es) on output: %v", rule.Name, len(detected), detected)
 						}
@@ -266,7 +267,7 @@ func (p *Plugin) applyRulesToResponse(ctx *schemas.BifrostContext, rule *Rule, r
 				}
 				if c.TextCompletionResponseChoice != nil && c.TextCompletionResponseChoice.Text != nil {
 					txt := *c.TextCompletionResponseChoice.Text
-					blocked, newText, detected := evaluatePatterns(patterns, txt)
+					blocked, newText, detected := evaluatePatterns(ctx, patterns, txt, schemas.RedactionPhaseOutput)
 					if len(detected) > 0 {
 						p.logWarn("guardrails: rule %q detected %d match(es) on output text: %v", rule.Name, len(detected), detected)
 					}
@@ -287,7 +288,7 @@ func (p *Plugin) applyRulesToResponse(ctx *schemas.BifrostContext, rule *Rule, r
 				if c.ChatNonStreamResponseChoice != nil && c.ChatNonStreamResponseChoice.Message != nil {
 					msg := c.ChatNonStreamResponseChoice.Message
 					if msg.Content != nil && msg.Content.ContentStr != nil {
-						blocked, newText, detected := sec.evaluate(*msg.Content.ContentStr)
+						blocked, newText, detected := sec.evaluate(ctx, *msg.Content.ContentStr, schemas.RedactionPhaseOutput)
 						if len(detected) > 0 {
 							p.logWarn("guardrails: rule %q (secrets) detected %d secret(s) on output: %v", rule.Name, len(detected), detected)
 						}
@@ -356,3 +357,69 @@ func blockError(rule *Rule, blocked []compiledPattern) *schemas.BifrostError {
 		AllowFallbacks: schemas.Ptr(false),
 	}
 }
+
+// replacePlaceholders replaces every placeholder in text using replacements map.
+func replacePlaceholders(text string, replacements map[string]string) string {
+	if text == "" || len(replacements) == 0 {
+		return text
+	}
+	out := text
+	for token, repl := range replacements {
+		if token == "" || repl == "" {
+			continue
+		}
+		if strings.Contains(out, token) {
+			out = strings.ReplaceAll(out, token, repl)
+		}
+	}
+	return out
+}
+
+// restoreEgress restores placeholders in response before sending to client:
+// - Non-tool-calls (message content / text): placeholders replaced with partially masked values (e.g. gith***_key)
+// - Tool-calls (arguments): placeholders replaced with original full secrets (e.g. github_pat_key)
+func restoreEgress(resp *schemas.BifrostResponse, ctx *schemas.BifrostContext) {
+	if resp == nil || resp.ChatResponse == nil || ctx == nil {
+		return
+	}
+	tracker := GetOrCreateTracker(ctx)
+	if !tracker.HasTokens() {
+		return
+	}
+
+	maskedMap := tracker.GetAllTokensToMasked()
+	secretMap := tracker.GetAllTokensToSecret()
+
+	for i := range resp.ChatResponse.Choices {
+		c := &resp.ChatResponse.Choices[i]
+		if c.ChatNonStreamResponseChoice != nil && c.ChatNonStreamResponseChoice.Message != nil {
+			msg := c.ChatNonStreamResponseChoice.Message
+			// 1. Restore message content -> partially masked
+			if msg.Content != nil {
+				if msg.Content.ContentStr != nil {
+					msg.Content.ContentStr = ptr(replacePlaceholders(*msg.Content.ContentStr, maskedMap))
+				}
+				for j := range msg.Content.ContentBlocks {
+					blk := &msg.Content.ContentBlocks[j]
+					if blk.Text != nil {
+						blk.Text = ptr(replacePlaceholders(*blk.Text, maskedMap))
+					}
+				}
+			}
+			// 2. Restore tool_calls arguments -> original full secret
+			if msg.ChatAssistantMessage != nil {
+				for j := range msg.ChatAssistantMessage.ToolCalls {
+					tc := &msg.ChatAssistantMessage.ToolCalls[j]
+					if tc.Function.Arguments != "" {
+						tc.Function.Arguments = replacePlaceholders(tc.Function.Arguments, secretMap)
+					}
+				}
+			}
+		}
+		// 3. Text completion choice -> partially masked
+		if c.TextCompletionResponseChoice != nil && c.TextCompletionResponseChoice.Text != nil {
+			c.TextCompletionResponseChoice.Text = ptr(replacePlaceholders(*c.TextCompletionResponseChoice.Text, maskedMap))
+		}
+	}
+}
+

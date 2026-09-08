@@ -91,7 +91,7 @@ func TestPreLLMHook_RedactMutatesRequest(t *testing.T) {
 	if err != nil || sc != nil {
 		t.Fatalf("redact should not short-circuit, got sc=%v err=%v", sc, err)
 	}
-	if got := *req.ChatRequest.Input[0].Content.ContentStr; got != "email me at [EMAIL]" {
+	if got := *req.ChatRequest.Input[0].Content.ContentStr; got != "email me at [EMAIL-1]" {
 		t.Fatalf("request not redacted, got %q", got)
 	}
 }
@@ -192,7 +192,8 @@ func TestPostLLMHook_Redact(t *testing.T) {
 		t.Fatal("response should be returned")
 	}
 	got := *gotResp.ChatResponse.Choices[0].ChatNonStreamResponseChoice.Message.Content.ContentStr
-	if got != "your email [EMAIL] was noted" {
+	// After redaction, the egress restoration replaces the placeholder with a partially masked value.
+	if got != "your email a***m was noted" {
 		t.Fatalf("got %q", got)
 	}
 }

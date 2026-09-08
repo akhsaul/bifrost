@@ -1,11 +1,9 @@
 package guardrails
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
 	"regexp"
-	"strings"
+
+	"github.com/maximhq/bifrost/core/schemas"
 )
 
 // compiledPattern is a validated pattern with its pre-compiled regex.
@@ -38,20 +36,13 @@ func (cp *compiledPattern) label() string {
 }
 
 // rewriteMatch produces the replacement text for one matched substring
-// according to the pattern's action and redaction strategy.
-func (cp *compiledPattern) rewriteMatch(match string) string {
+// according to the pattern's action, redaction strategy, and mode via the request tracker.
+func (cp *compiledPattern) rewriteMatch(match string, ctx *schemas.BifrostContext, phase schemas.RedactionPhase) string {
 	if cp.cfg.Action != PatternActionRedact {
 		return match
 	}
-	switch cp.cfg.RedactionStrategy {
-	case RedactionMask:
-		return strings.Repeat("*", len([]rune(match)))
-	case RedactionHash:
-		sum := sha256.Sum256([]byte(match))
-		return fmt.Sprintf("[%s:%s]", cp.redactionToken(), hex.EncodeToString(sum[:])[:12])
-	default: // replace (also the defense-in-depth default)
-		return "[" + cp.redactionToken() + "]"
-	}
+	tracker := GetOrCreateTracker(ctx)
+	return tracker.Redact(ctx, cp.redactionToken(), match, cp.cfg.RedactionStrategy, cp.cfg.RedactionMode, phase)
 }
 
 // evaluatePatterns runs every compiled pattern over text.
@@ -65,7 +56,7 @@ func (cp *compiledPattern) rewriteMatch(match string) string {
 //
 // All patterns are evaluated even when some block, so a single pass reports
 // every finding.
-func evaluatePatterns(patterns []compiledPattern, text string) (blocked []compiledPattern, newText string, detected []string) {
+func evaluatePatterns(ctx *schemas.BifrostContext, patterns []compiledPattern, text string, phase schemas.RedactionPhase) (blocked []compiledPattern, newText string, detected []string) {
 	newText = text
 	if text == "" {
 		return nil, text, nil
@@ -92,7 +83,9 @@ func evaluatePatterns(patterns []compiledPattern, text string) (blocked []compil
 			}
 		case PatternActionRedact:
 			for _, m := range matches {
-				edits = append(edits, edit{start: m[0], end: m[1], repl: cp.rewriteMatch(text[m[0]:m[1]])})
+				match := text[m[0]:m[1]]
+				repl := cp.rewriteMatch(match, ctx, phase)
+				edits = append(edits, edit{start: m[0], end: m[1], repl: repl})
 				detected = append(detected, cp.label())
 			}
 		default: // detect_only
