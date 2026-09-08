@@ -22,6 +22,7 @@ import {
 	type RedactionStrategy,
 } from "@/lib/types/guardrails";
 import { cn } from "@/lib/utils";
+import { upsertById } from "@/lib/utils/guardrails";
 import { ChevronDown, Code, Key, MoreHorizontal, Pencil, Plus, Shield, ShieldCheck, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -155,13 +156,8 @@ export default function GuardrailsProviderView() {
 	};
 
 	const handleSheetSave = async (saved: GuardrailProvider) => {
-		const isNew = sheet.provider === null;
-		let next: GuardrailProvider[];
-		if (isNew) {
-			next = [...providers, saved];
-		} else {
-			next = providers.map((p) => (p.id === saved.id ? saved : p));
-		}
+		const isNew = !providers.some((p) => p.id === saved.id);
+		const next = upsertById(providers, saved);
 		try {
 			const cfg = parseConfig(plugin?.config);
 			await updatePlugin({

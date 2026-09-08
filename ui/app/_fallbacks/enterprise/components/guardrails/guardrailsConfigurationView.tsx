@@ -16,6 +16,7 @@ import {
 	type GuardrailsPluginConfig,
 } from "@/lib/types/guardrails";
 import { cn } from "@/lib/utils";
+import { upsertById } from "@/lib/utils/guardrails";
 import {
 	Boxes,
 	ChevronDown,
@@ -82,13 +83,8 @@ export default function GuardrailsConfigurationView() {
 	};
 
 	const handleSheetSave = async (saved: GuardrailRule) => {
-		const isNew = sheet.rule === null;
-		let next: GuardrailRule[];
-		if (isNew) {
-			next = [...rules, saved];
-		} else {
-			next = rules.map((r) => (r.id === saved.id ? saved : r));
-		}
+		const isNew = !rules.some((r) => r.id === saved.id);
+		const next = upsertById(rules, saved);
 		try {
 			const cfg = parseConfig(plugin?.config);
 			await updatePlugin({
