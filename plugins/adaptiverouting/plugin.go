@@ -209,7 +209,7 @@ func (p *Plugin) recomputeActiveWeights() {
 	// 2. Also group remaining targets by Model (for fallback Level 1 direction selection)
 	modelGroups := make(map[string][]CandidateTarget)
 	for target := range allStats {
-		if target.Provider == "" || target.Model == "" {
+		if target.Provider == "" || target.Model == "" || target.KeyID != "" {
 			continue
 		}
 		modelGroups[target.Model] = append(modelGroups[target.Model], CandidateTarget{
@@ -218,7 +218,7 @@ func (p *Plugin) recomputeActiveWeights() {
 		})
 	}
 	for groupKey, candidates := range modelGroups {
-		if _, exists := newWeights[groupKey]; !exists {
+		if _, exists := newWeights[groupKey]; !exists && len(candidates) > 1 {
 			newWeights[groupKey] = ComputeDynamicWeightsWithBaseWeights(candidates, allStats, p.config)
 		}
 	}
@@ -696,15 +696,39 @@ func (p *Plugin) GetMetricsSummary() AdaptiveMetricsSummary {
 	allStats := p.store.GetAllStats(p.ctx, window)
 	snapshot := p.GetSnapshot()
 
-	// Build lookup for active dynamic weights from latest snapshot
-	// Multi-target pools take precedence over 1-target model groups
+	// Build lookup for active dynamic weights from the latest snapshot.
+	// Precedence (deterministic): multi-target rule pools first, then keyless
+	// provider/model groups. Keyed targets (#keyID) never overwrite the keyless
+	// entry they mirror — map iteration order is randomized in Go, so letting
+	// both write the same map key made weights flap between rule-pool values
+	// (e.g. 8.9%) and 50/50 model-group values on every dashboard refresh.
 	dynamicWeightMap := make(map[string]float64)
 	if snapshot != nil && snapshot.Weights != nil {
-		for _, twSlice := range snapshot.Weights {
+		poolKeys := make([]string, 0, len(snapshot.Weights))
+		for poolKey := range snapshot.Weights {
+			poolKeys = append(poolKeys, poolKey)
+		}
+		slices.Sort(poolKeys)
+		// Pass 1: pools with more than one target (adaptive rule pools) win.
+		for _, poolKey := range poolKeys {
+			twSlice := snapshot.Weights[poolKey]
+			if len(twSlice) <= 1 {
+				continue
+			}
 			for _, tw := range twSlice {
-				if _, exists := dynamicWeightMap[tw.TargetID.String()]; !exists || len(twSlice) > 1 {
-					dynamicWeightMap[tw.TargetID.String()] = tw.Weight
-				}
+				dynamicWeightMap[tw.TargetID.String()] = tw.Weight
+			}
+		}
+		// Pass 2: fill any remaining targets from model groups (keyless entries only,
+		// so a keyed duplicate cannot clobber its keyless sibling's rule weight).
+		for _, poolKey := range poolKeys {
+			twSlice := snapshot.Weights[poolKey]
+			if len(twSlice) != 1 {
+				continue
+			}
+			tw := twSlice[0]
+			if _, exists := dynamicWeightMap[tw.TargetID.String()]; !exists {
+				dynamicWeightMap[tw.TargetID.String()] = tw.Weight
 			}
 		}
 	}
