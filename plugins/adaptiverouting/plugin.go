@@ -12,6 +12,7 @@ import (
 
 	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/schemas"
+	"github.com/maximhq/bifrost/framework/configstore"
 	configstoreTables "github.com/maximhq/bifrost/framework/configstore/tables"
 	"github.com/maximhq/bifrost/framework/modelcatalog"
 )
@@ -23,30 +24,44 @@ const (
 
 // Plugin implements LLMPlugin, providing telemetry metrics collection and adaptive routing / key selection.
 type Plugin struct {
-	config   Config
-	store    Store
-	catalog  *modelcatalog.ModelCatalog
-	snapshot atomic.Pointer[AdaptiveRoutingSnapshot]
+	config      Config
+	store       Store
+	catalog     *modelcatalog.ModelCatalog
+	configStore configstore.ConfigStore
+	snapshot    atomic.Pointer[AdaptiveRoutingSnapshot]
 
 	ctx        context.Context
 	cancelFunc context.CancelFunc
 	wg         sync.WaitGroup
 	mu         sync.RWMutex
+
+	// pools caches candidate groups from adaptive routing rules so dynamic weights
+	// are computed across targets competing within the same rule (e.g. 4 distinct models)
+	// rather than isolating each model into an artificial 1-target group.
+	poolsMu sync.RWMutex
+	pools   map[string][]CandidateTarget
 }
 
 // New creates a new Adaptive Routing plugin.
-func New(config Config, store Store, catalog *modelcatalog.ModelCatalog) (*Plugin, error) {
+func New(config Config, store Store, catalog *modelcatalog.ModelCatalog, configStore ...configstore.ConfigStore) (*Plugin, error) {
 	if store == nil {
 		store = NewMemoryStore(config.Alpha)
 	}
 
+	var cs configstore.ConfigStore
+	if len(configStore) > 0 {
+		cs = configStore[0]
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	p := &Plugin{
-		config:     config,
-		store:      store,
-		catalog:    catalog,
-		ctx:        ctx,
-		cancelFunc: cancel,
+		config:      config,
+		store:       store,
+		catalog:     catalog,
+		configStore: cs,
+		ctx:         ctx,
+		cancelFunc:  cancel,
+		pools:       make(map[string][]CandidateTarget),
 	}
 
 	initialSnap := &AdaptiveRoutingSnapshot{
@@ -54,6 +69,8 @@ func New(config Config, store Store, catalog *modelcatalog.ModelCatalog) (*Plugi
 		UpdatedAt: time.Now(),
 	}
 	p.snapshot.Store(initialSnap)
+
+	p.refreshPoolsFromConfigStore()
 
 	if config.Enabled {
 		p.startTuningWorker()
@@ -109,6 +126,65 @@ func (p *Plugin) startTuningWorker() {
 	}()
 }
 
+// RegisterTargetPool registers or updates a group of candidate targets from an adaptive routing rule.
+func (p *Plugin) RegisterTargetPool(poolKey string, candidates []CandidateTarget) {
+	if len(candidates) <= 1 {
+		return
+	}
+	p.poolsMu.Lock()
+	defer p.poolsMu.Unlock()
+	p.pools[poolKey] = candidates
+}
+
+// refreshPoolsFromConfigStore reads active routing rules with strategy="adaptive" and caches their candidate pools.
+func (p *Plugin) refreshPoolsFromConfigStore() {
+	if p.configStore == nil {
+		return
+	}
+	rules, err := p.configStore.GetRoutingRules(p.ctx)
+	if err != nil {
+		return
+	}
+
+	p.poolsMu.Lock()
+	defer p.poolsMu.Unlock()
+
+	for _, rule := range rules {
+		if rule.Strategy != "adaptive" || !rule.EnabledValue() || len(rule.Targets) <= 1 {
+			continue
+		}
+
+		candidates := make([]CandidateTarget, 0, len(rule.Targets))
+		for _, t := range rule.Targets {
+			prov := ""
+			if t.Provider != nil {
+				prov = *t.Provider
+			}
+			model := ""
+			if t.Model != nil {
+				model = *t.Model
+			}
+			keyID := ""
+			if t.KeyID != nil {
+				keyID = *t.KeyID
+			}
+			baseW := t.Weight
+			if baseW <= 0 {
+				baseW = 1.0
+			}
+			candidates = append(candidates, CandidateTarget{
+				TargetID: TargetID{
+					Provider: schemas.ModelProvider(prov),
+					Model:    model,
+					KeyID:    keyID,
+				},
+				BaseWeight: baseW,
+			})
+		}
+		p.pools[rule.ID] = candidates
+	}
+}
+
 // recomputeActiveWeights calculates updated weights across all known targets and updates the atomic snapshot.
 func (p *Plugin) recomputeActiveWeights() {
 	window := p.config.WindowSize.D()
@@ -117,23 +193,34 @@ func (p *Plugin) recomputeActiveWeights() {
 	}
 
 	allStats := p.store.GetAllStats(p.ctx, window)
-	if len(allStats) == 0 {
-		return
-	}
+	p.refreshPoolsFromConfigStore()
 
-	// Group targets by model/pool
-	modelGroups := make(map[string][]TargetID)
-	for target := range allStats {
-		groupKey := target.Model
-		if groupKey == "" {
-			groupKey = string(target.Provider)
+	newWeights := make(map[string][]TargetWeight)
+
+	// 1. Recompute dynamic weights for each registered adaptive rule pool
+	p.poolsMu.RLock()
+	for poolKey, poolCandidates := range p.pools {
+		if len(poolCandidates) > 1 {
+			newWeights[poolKey] = ComputeDynamicWeightsWithBaseWeights(poolCandidates, allStats, p.config)
 		}
-		modelGroups[groupKey] = append(modelGroups[groupKey], target)
 	}
+	p.poolsMu.RUnlock()
 
-	newWeights := make(map[string][]TargetWeight, len(modelGroups))
+	// 2. Also group remaining targets by Model (for fallback Level 1 direction selection)
+	modelGroups := make(map[string][]CandidateTarget)
+	for target := range allStats {
+		if target.Provider == "" || target.Model == "" {
+			continue
+		}
+		modelGroups[target.Model] = append(modelGroups[target.Model], CandidateTarget{
+			TargetID:   target,
+			BaseWeight: 1.0,
+		})
+	}
 	for groupKey, candidates := range modelGroups {
-		newWeights[groupKey] = ComputeDynamicWeights(candidates, allStats, p.config)
+		if _, exists := newWeights[groupKey]; !exists {
+			newWeights[groupKey] = ComputeDynamicWeightsWithBaseWeights(candidates, allStats, p.config)
+		}
 	}
 
 	newSnap := &AdaptiveRoutingSnapshot{
@@ -504,6 +591,18 @@ func (p *Plugin) AdaptiveTargetSelector() func(targets []configstoreTables.Table
 			})
 		}
 
+		// Register the pool of candidates for this rule so background weight tuning
+		// computes real dynamic weights across targets competing in this rule.
+		ruleID := targets[0].RuleID
+		if ruleID == "" {
+			sigs := make([]string, len(candidates))
+			for i, c := range candidates {
+				sigs[i] = c.TargetID.String()
+			}
+			ruleID = strings.Join(sigs, ";")
+		}
+		p.RegisterTargetPool(ruleID, candidates)
+
 		pickedTarget, ok := p.SelectOptimalTargetWithBaseWeights(candidates)
 		if !ok {
 			return targets[0], true
@@ -598,11 +697,14 @@ func (p *Plugin) GetMetricsSummary() AdaptiveMetricsSummary {
 	snapshot := p.GetSnapshot()
 
 	// Build lookup for active dynamic weights from latest snapshot
+	// Multi-target pools take precedence over 1-target model groups
 	dynamicWeightMap := make(map[string]float64)
 	if snapshot != nil && snapshot.Weights != nil {
 		for _, twSlice := range snapshot.Weights {
 			for _, tw := range twSlice {
-				dynamicWeightMap[tw.TargetID.String()] = tw.Weight
+				if _, exists := dynamicWeightMap[tw.TargetID.String()]; !exists || len(twSlice) > 1 {
+					dynamicWeightMap[tw.TargetID.String()] = tw.Weight
+				}
 			}
 		}
 	}
@@ -634,7 +736,11 @@ func (p *Plugin) GetMetricsSummary() AdaptiveMetricsSummary {
 
 		dynW, hasDynW := dynamicWeightMap[target.String()]
 		if !hasDynW {
-			dynW = 0.0
+			// Fallback to provider/model level without keyID
+			targetNoKey := TargetID{Provider: target.Provider, Model: target.Model}
+			if w, ok := dynamicWeightMap[targetNoKey.String()]; ok {
+				dynW = w
+			}
 		}
 
 		total429s += stats.RateLimit429Count

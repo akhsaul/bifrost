@@ -608,3 +608,67 @@ func TestAdaptiveRouting_FallbackDoesNotFabricatePhantomTarget(t *testing.T) {
 	stats := plugin.store.GetStats(context.Background(), fallbackTarget, 5*time.Minute)
 	assert.Equal(t, int64(1), stats.TotalRequests, "actual fallback attempt must be recorded")
 }
+
+func TestAdaptiveRouting_DynamicWeightProportionsInRulePool(t *testing.T) {
+	config := DefaultConfig()
+	config.ExplorationFloor = 0.05
+	plugin, err := New(config, nil, nil)
+	require.NoError(t, err)
+	defer func() { _ = plugin.Cleanup() }()
+
+	provOpencode := "opencode-zen"
+	provTokenrouter := "tokenrouter"
+	provBai := "bai"
+
+	modelMuse := "muse-spark-1.3-contributor-free"
+	modelGlmTR := "z-ai/glm-5.3-free"
+	modelGlmBai := "glm-5.3-flash"
+	modelDeepseek := "deepseek-v4-flash-free"
+
+	ruleID := "rule-bifrost-smart-1m"
+	targets := []configstoreTables.TableRoutingTarget{
+		{RuleID: ruleID, Provider: &provOpencode, Model: &modelMuse, Weight: 0.35},
+		{RuleID: ruleID, Provider: &provTokenrouter, Model: &modelGlmTR, Weight: 0.35},
+		{RuleID: ruleID, Provider: &provBai, Model: &modelGlmBai, Weight: 0.20},
+		{RuleID: ruleID, Provider: &provOpencode, Model: &modelDeepseek, Weight: 0.10},
+	}
+
+	targetMuse := TargetID{Provider: "opencode-zen", Model: modelMuse}
+	targetGlmTR := TargetID{Provider: "tokenrouter", Model: modelGlmTR}
+	targetGlmBai := TargetID{Provider: "bai", Model: modelGlmBai}
+	targetDeepseek := TargetID{Provider: "opencode-zen", Model: modelDeepseek}
+
+	// Seed muse and deepseek as degraded (5xx errors)
+	for i := 0; i < 5; i++ {
+		plugin.GetStore().RecordMetric(context.Background(), targetMuse, 1200*time.Millisecond, 0, 500, true)
+		plugin.GetStore().RecordMetric(context.Background(), targetDeepseek, 1800*time.Millisecond, 0, 500, true)
+	}
+
+	// Seed tokenrouter and bai as healthy
+	for i := 0; i < 10; i++ {
+		plugin.GetStore().RecordMetric(context.Background(), targetGlmTR, 200*time.Millisecond, 150*time.Millisecond, 200, false)
+		plugin.GetStore().RecordMetric(context.Background(), targetGlmBai, 250*time.Millisecond, 180*time.Millisecond, 200, false)
+	}
+
+	// Trigger selector which registers pool and computes dynamic weights
+	selector := plugin.AdaptiveTargetSelector()
+	_, ok := selector(targets)
+	require.True(t, ok)
+
+	// Recompute active snapshot
+	plugin.recomputeActiveWeights()
+
+	summary := plugin.GetMetricsSummary()
+	weightsMap := make(map[string]float64)
+	for _, m := range summary.Metrics {
+		weightsMap[m.Target] = m.DynamicWeight
+	}
+
+	// The degraded targets must NOT be 100% — they should be suppressed to exploration floor (~5%)
+	assert.InDelta(t, 0.05, weightsMap["opencode-zen/muse-spark-1.3-contributor-free"], 0.02)
+	assert.InDelta(t, 0.05, weightsMap["opencode-zen/deepseek-v4-flash-free"], 0.02)
+
+	// Healthy targets should receive the majority of traffic
+	assert.Greater(t, weightsMap["tokenrouter/z-ai/glm-5.3-free"], 0.50)
+	assert.Greater(t, weightsMap["bai/glm-5.3-flash"], 0.25)
+}

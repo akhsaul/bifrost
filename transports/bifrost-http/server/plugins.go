@@ -153,7 +153,7 @@ func loadBuiltinPlugin(ctx context.Context, name string, pluginConfig any, bifro
 				adaptiveCfg = *extraConfig
 			}
 		}
-		return adaptiverouting.New(adaptiveCfg, nil, bifrostConfig.ModelCatalog)
+		return adaptiverouting.New(adaptiveCfg, nil, bifrostConfig.ModelCatalog, bifrostConfig.ConfigStore)
 
 	case modelcatalogresolver.PluginName:
 		return modelcatalogresolver.Init(bifrostConfig.ModelCatalog, logger)
