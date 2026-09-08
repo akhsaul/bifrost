@@ -183,8 +183,18 @@ function ConditionGroup({ group, depth = 0 }: { group: RuleGroupType; depth?: nu
 
 // ─── target card ─────────────────────────────────────────────────────────────
 
-function TargetCard({ target, total }: { target: RoutingRule["targets"][0]; index: number; total: number }) {
+function TargetCard({
+	target,
+	total,
+	strategy,
+}: {
+	target: RoutingRule["targets"][0];
+	index: number;
+	total: number;
+	strategy?: "weighted" | "adaptive" | "priority";
+}) {
 	const providerLabel = target.provider ? getProviderLabel(target.provider) : "Incoming provider";
+	const isPriority = strategy === "priority";
 	const weightPercent = total > 0 ? Math.round(target.weight * 100) : 0;
 
 	return (
@@ -201,17 +211,28 @@ function TargetCard({ target, total }: { target: RoutingRule["targets"][0]; inde
 						)}
 					</div>
 				</div>
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<div className="flex cursor-default items-center gap-1.5">
-							<div className="bg-muted h-1.5 w-16 overflow-hidden rounded-full">
-								<div className="bg-primary h-full rounded-full transition-all" style={{ width: `${weightPercent}%` }} />
+				{isPriority ? (
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Badge variant="outline" className="cursor-default gap-1 font-mono">
+								#{target.priority ?? 1}
+							</Badge>
+						</TooltipTrigger>
+						<TooltipContent>Priority rank: lower number = higher precedence</TooltipContent>
+					</Tooltip>
+				) : (
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<div className="flex cursor-default items-center gap-1.5">
+								<div className="bg-muted h-1.5 w-16 overflow-hidden rounded-full">
+									<div className="bg-primary h-full rounded-full transition-all" style={{ width: `${weightPercent}%` }} />
+								</div>
+								<span className="text-muted-foreground w-8 text-right font-mono text-xs">{weightPercent}%</span>
 							</div>
-							<span className="text-muted-foreground w-8 text-right font-mono text-xs">{weightPercent}%</span>
-						</div>
-					</TooltipTrigger>
-					<TooltipContent>Weight: {target.weight} (raw)</TooltipContent>
-				</Tooltip>
+						</TooltipTrigger>
+						<TooltipContent>Weight: {target.weight} (raw)</TooltipContent>
+					</Tooltip>
+				)}
 			</div>
 			{target.key_id && (
 				<div className="bg-muted/50 flex items-center gap-1.5 rounded-md px-2 py-1">
@@ -359,8 +380,8 @@ export function RoutingRuleInfoSheet({ rule, open, onOpenChange, onNavigate, has
 								{targets.length > 0 ? (
 									<div className="space-y-2">
 										{targets.map((target, i) => (
-											<TargetCard key={i} target={target} index={i} total={targets.length} />
-										))}
+												<TargetCard key={i} target={target} index={i} total={targets.length} strategy={rule.strategy} />
+											))}
 									</div>
 								) : (
 									<p className="text-muted-foreground text-sm">No targets configured</p>

@@ -84,14 +84,18 @@ func (h *RoutingHandler) RegisterRoutes(r *router.Router, middlewares ...schemas
 	register(fasthttp.MethodPost, "/api/routing/complexity-analyzer-config/reset", "/api/governance/complexity-analyzer-config/reset", h.resetComplexityAnalyzerConfig)
 }
 
-// RoutingTarget represents a single weighted routing target within a rule.
+// RoutingTarget represents a single routing target within a rule.
 // All fields except Weight are optional; nil means "use the incoming request's value".
-// Weights across all targets in a rule must sum to 1 (e.g. 0.7 + 0.3 = 1.0).
+// For "weighted"/"adaptive" rules, Weight is a probability weight and all weights
+// in a rule must sum to 1 (e.g. 0.7 + 0.3 = 1.0).
+// For "priority" rules, Priority carries an integer rank (>= 1, lower = higher
+// precedence) and weights are ignored by selection.
 type RoutingTarget struct {
 	Provider *string `json:"provider,omitempty"` // nil = use incoming provider
 	Model    *string `json:"model,omitempty"`    // nil = use incoming model
 	KeyID    *string `json:"key_id,omitempty"`   // nil = no key pin
-	Weight   float64 `json:"weight"`             // must be > 0; all weights must sum to 1
+	Weight   float64 `json:"weight"`             // probability weight (weighted/adaptive); must be > 0 and sum to 1 across targets
+	Priority *int    `json:"priority,omitempty"` // integer rank >= 1 (lower = higher precedence) for the "priority" strategy
 }
 
 // CreateRoutingRuleRequest represents the request body for creating a routing rule
@@ -102,7 +106,7 @@ type CreateRoutingRuleRequest struct {
 	ChainRule     *bool           `json:"chain_rule,omitempty"` // nil = use DB default (false)
 	CelExpression string          `json:"cel_expression"`
 	Strategy      string          `json:"strategy,omitempty"` // "weighted" (default) | "adaptive" | "priority"
-	Targets       []RoutingTarget `json:"targets"`            // Required; weights must sum to 1
+	Targets       []RoutingTarget `json:"targets"`            // Required; semantics depend on strategy (see RoutingTarget)
 	Fallbacks     []string        `json:"fallbacks,omitempty"`
 	Scope         string          `json:"scope,omitempty"` // Defaults to "global" if not provided
 	ScopeID       *string         `json:"scope_id,omitempty"`
@@ -118,7 +122,7 @@ type UpdateRoutingRuleRequest struct {
 	ChainRule     *bool           `json:"chain_rule,omitempty"`
 	CelExpression *string         `json:"cel_expression,omitempty"`
 	Strategy      *string         `json:"strategy,omitempty"` // "weighted" | "adaptive" | "priority"
-	Targets       []RoutingTarget `json:"targets,omitempty"`  // If provided, replaces all existing targets; weights must sum to 1
+	Targets       []RoutingTarget `json:"targets,omitempty"`  // If provided, replaces all existing targets; semantics depend on strategy
 	Fallbacks     []string        `json:"fallbacks,omitempty"`
 	Query         map[string]any  `json:"query,omitempty"`
 	Priority      *int            `json:"priority,omitempty"`
@@ -218,14 +222,30 @@ func validateRoutingStrategy(strategy string) error {
 	return nil
 }
 
-// validateRoutingTargets checks that all weights are positive, that no two
-// targets share the same (provider, model, key_id) identity, and that all
-// weights sum to 1.
-func validateRoutingTargets(targets []RoutingTarget) error {
+// validateRoutingTargets checks target validity according to the rule strategy:
+//   - common: no two targets share the same (provider, model, key_id) identity,
+//     and key_id requires provider to be set.
+//   - "weighted"/"adaptive" (and empty, which defaults to weighted): every weight
+//     must be positive and all weights must sum to 1 (within 0.001 tolerance).
+//   - "priority": every target carries an integer rank >= 1 — either the dedicated
+//     priority field, or (legacy) an integer weight >= 1 when priority is unset.
+//     The sum-to-1 invariant does NOT apply, because weight no longer encodes
+//     priority order.
+func validateRoutingTargets(targets []RoutingTarget, strategy string) error {
 	seen := make(map[string]struct{}, len(targets))
 	total := 0.0
 	for _, t := range targets {
-		if t.Weight < 0 {
+		if strategy == "priority" {
+			if t.Priority != nil {
+				if *t.Priority < 1 {
+					return fmt.Errorf("target priority must be an integer >= 1, got %d", *t.Priority)
+				}
+			} else if t.Weight < 1 || t.Weight != math.Trunc(t.Weight) {
+				// Legacy shape: priority rank encoded in weight. A value that is
+				// not a positive integer can never be a rank.
+				return fmt.Errorf("target priority must be an integer >= 1 (set the priority field), got weight %v", t.Weight)
+			}
+		} else if t.Weight <= 0 {
 			return fmt.Errorf("each target weight must be positive")
 		}
 		if t.KeyID != nil && *t.KeyID != "" && (t.Provider == nil || *t.Provider == "") {
@@ -251,9 +271,11 @@ func validateRoutingTargets(targets []RoutingTarget) error {
 		}
 		seen[key] = struct{}{}
 
-		total += t.Weight
+		if strategy != "priority" {
+			total += t.Weight
+		}
 	}
-	if math.Abs(total-1.0) > 0.001 {
+	if strategy != "priority" && math.Abs(total-1.0) > 0.001 {
 		return fmt.Errorf("target weights must sum to 1, got %.4f", total)
 	}
 	return nil
@@ -493,16 +515,6 @@ func (h *RoutingHandler) createRoutingRule(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	// Validate targets
-	if len(req.Targets) == 0 {
-		SendError(ctx, 400, "at least one target is required")
-		return
-	}
-	if err := validateRoutingTargets(req.Targets); err != nil {
-		SendError(ctx, 400, err.Error())
-		return
-	}
-
 	// Validate strategy; empty defaults to "weighted" at persistence time
 	if err := validateRoutingStrategy(req.Strategy); err != nil {
 		SendError(ctx, 400, err.Error())
@@ -512,6 +524,17 @@ func (h *RoutingHandler) createRoutingRule(ctx *fasthttp.RequestCtx) {
 	if strategy == "" {
 		strategy = "weighted"
 	}
+
+	// Validate targets with strategy context
+	if len(req.Targets) == 0 {
+		SendError(ctx, 400, "at least one target is required")
+		return
+	}
+	if err := validateRoutingTargets(req.Targets, strategy); err != nil {
+		SendError(ctx, 400, err.Error())
+		return
+	}
+
 	if err := validateRoutingFallbacks(req.Fallbacks); err != nil {
 		SendError(ctx, 400, err.Error())
 		return
@@ -549,11 +572,19 @@ func (h *RoutingHandler) createRoutingRule(ctx *fasthttp.RequestCtx) {
 	ruleID := uuid.NewString()
 	targets := make([]configstoreTables.TableRoutingTarget, 0, len(req.Targets))
 	for _, t := range req.Targets {
+		// Priority rules keep rank in the dedicated Priority field; weight is a
+		// probability that plays no role in selection, so a missing/zero weight
+		// is stored as the DB default (1) rather than failing the not-null column.
+		weight := t.Weight
+		if strategy == "priority" && weight <= 0 {
+			weight = 1.0
+		}
 		targets = append(targets, configstoreTables.TableRoutingTarget{
 			Provider: t.Provider,
 			Model:    t.Model,
 			KeyID:    t.KeyID,
-			Weight:   t.Weight,
+			Weight:   weight,
+			Priority: t.Priority,
 		})
 	}
 
@@ -645,31 +676,50 @@ func (h *RoutingHandler) updateRoutingRule(ctx *fasthttp.RequestCtx) {
 		}
 		rule.CelExpression = *req.CelExpression
 	}
-	if req.Targets != nil {
-		if len(req.Targets) == 0 {
-			SendError(ctx, 400, "at least one routing target is required")
-			return
-		}
-		if err := validateRoutingTargets(req.Targets); err != nil {
-			SendError(ctx, 400, err.Error())
-			return
-		}
-		newTargets := make([]configstoreTables.TableRoutingTarget, 0, len(req.Targets))
-		for _, t := range req.Targets {
-			newTargets = append(newTargets, configstoreTables.TableRoutingTarget{
-				Provider: t.Provider,
-				Model:    t.Model,
-				KeyID:    t.KeyID,
-				Weight:   t.Weight,
-			})
-		}
-		rule.Targets = newTargets
-	}
+	// Resolve the effective strategy first: an explicitly provided strategy wins,
+	// otherwise target validation must run against the rule's existing strategy
+	// (e.g. a priority-rule target swap via PUT that does not resend "strategy").
+	strategy := rule.Strategy
 	if req.Strategy != nil {
 		if err := validateRoutingStrategy(*req.Strategy); err != nil {
 			SendError(ctx, 400, err.Error())
 			return
 		}
+		if *req.Strategy == "" {
+			*req.Strategy = "weighted"
+		}
+		strategy = *req.Strategy
+	}
+	if req.Targets != nil {
+		if len(req.Targets) == 0 {
+			SendError(ctx, 400, "at least one routing target is required")
+			return
+		}
+		if err := validateRoutingTargets(req.Targets, strategy); err != nil {
+			SendError(ctx, 400, err.Error())
+			return
+		}
+		newTargets := make([]configstoreTables.TableRoutingTarget, 0, len(req.Targets))
+		for _, t := range req.Targets {
+			// Priority rules keep rank in the dedicated Priority field; weight is
+			// a probability that plays no role in selection, so a missing/zero
+			// weight is stored as the DB default (1) rather than failing the
+			// not-null column.
+			weight := t.Weight
+			if strategy == "priority" && weight <= 0 {
+				weight = 1.0
+			}
+			newTargets = append(newTargets, configstoreTables.TableRoutingTarget{
+				Provider: t.Provider,
+				Model:    t.Model,
+				KeyID:    t.KeyID,
+				Weight:   weight,
+				Priority: t.Priority,
+			})
+		}
+		rule.Targets = newTargets
+	}
+	if req.Strategy != nil {
 		rule.Strategy = *req.Strategy
 	}
 	if req.Priority != nil {

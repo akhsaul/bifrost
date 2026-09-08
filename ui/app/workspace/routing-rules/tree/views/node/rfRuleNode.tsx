@@ -130,7 +130,7 @@ export function RFRuleNode({ data }: { data: any }) {
 									</div>
 									{multi && (
 										<span className="ml-1 shrink-0 text-[11px] font-semibold" style={{ color: scopeColor }}>
-											{Math.round(t.weight * 100)}%
+											{rule.strategy === "priority" ? `#${t.priority ?? i + 1}` : `${Math.round(t.weight * 100)}%`}
 										</span>
 									)}
 								</div>

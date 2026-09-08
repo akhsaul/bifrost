@@ -158,12 +158,13 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 			setValue("chain_rule", editingRule.chain_rule ?? false);
 			if (editingRule.targets && editingRule.targets.length > 0) {
 				setTargets(
-					editingRule.targets.map((t) => ({
+					editingRule.targets.map((t, idx) => ({
 						...DEFAULT_ROUTING_TARGET,
 						provider: t.provider || "",
 						model: t.model || "",
 						key_id: t.key_id || "",
 						weight: t.weight,
+						priority: t.priority ?? idx + 1,
 					})),
 				);
 			} else {
@@ -202,9 +203,9 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 	const addTarget = () => {
 		const currentStrategy = watch("strategy") || "weighted";
 		if (currentStrategy === "priority") {
-			// Priority strategy: default a new target to one after the current max.
-			const maxPriority = targets.reduce((max, t) => Math.max(max, t.weight || 0), 0);
-			setTargets((prev) => [...prev, { ...DEFAULT_ROUTING_TARGET, weight: maxPriority + 1 }]);
+			// Priority strategy: default a new target to one after the current max priority rank.
+			const maxPriority = targets.reduce((max, t) => Math.max(max, t.priority || 0), 0);
+			setTargets((prev) => [...prev, { ...DEFAULT_ROUTING_TARGET, weight: 1, priority: maxPriority + 1 }]);
 			return;
 		}
 		const remaining = 1 - targets.reduce((sum, t) => sum + (t.weight || 0), 0);
@@ -232,9 +233,9 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 			return;
 		}
 
-		// Validate targets — semantics depend on strategy: priority uses integer priorities
-		// (lower number = higher precedence, must be ≥ 1), weighted/adaptive use probability
-		// weights that must sum to 1.
+		// Validate targets — semantics depend on strategy: priority uses the dedicated
+		// integer priority rank (lower number = higher precedence, must be ≥ 1),
+		// weighted/adaptive use probability weights that must sum to 1.
 		if (targets.length === 0) {
 			toast.error("At least one routing target is required");
 			return;
@@ -242,7 +243,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 		const currentStrategy = data.strategy || "weighted";
 		if (currentStrategy === "priority") {
 			for (const t of targets) {
-				if (!Number.isInteger(t.weight) || t.weight < 1) {
+				if (t.priority == null || !Number.isInteger(t.priority) || t.priority < 1) {
 					toast.error("Each target priority must be an integer ≥ 1 (lower number = higher priority)");
 					return;
 				}
@@ -289,11 +290,12 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 			description: data.description,
 			cel_expression: data.cel_expression,
 			strategy: data.strategy || "weighted",
-			targets: targets.map(({ provider, model, key_id, weight }) => ({
+			targets: targets.map(({ provider, model, key_id, weight, priority }) => ({
 				provider: provider || undefined,
 				model: model || undefined,
 				key_id: key_id || undefined,
-				weight,
+				weight: currentStrategy === "priority" ? 1 : weight,
+				priority: currentStrategy === "priority" ? priority : undefined,
 			})),
 			fallbacks: validFallbacks,
 			scope: data.scope,
@@ -703,7 +705,8 @@ function TargetRow({ target, index, strategy, providerOptions, allKeys, showRemo
 	const availableKeys = target.provider
 		? allKeys.filter((k) => k.provider === target.provider).map((k) => ({ id: k.key_id, name: k.name }))
 		: [];
-	// Priority strategy reuses the weight field as an integer priority: lower number = higher precedence.
+	// Priority strategy has a dedicated priority rank input (bound to target.priority);
+	// weighted/adaptive show the probability weight input (bound to target.weight).
 	const isPriority = strategy === "priority";
 
 	return (
@@ -715,19 +718,30 @@ function TargetRow({ target, index, strategy, providerOptions, allKeys, showRemo
 						<Label htmlFor={`routing-target-${index}-weight-input`} className="text-muted-foreground shrink-0 text-xs">
 							{isPriority ? "Priority" : "Weight"}
 						</Label>
-						<Input
-							id={`routing-target-${index}-weight-input`}
-							type="number"
-							min={isPriority ? 1 : 0.001}
-							max={isPriority ? undefined : 1}
-							step={isPriority ? 1 : 0.001}
-							value={target.weight}
-							onChange={(e) =>
-								onUpdate(index, "weight", isPriority ? Number.parseInt(e.target.value, 10) || 1 : parseFloat(e.target.value) || 0)
-							}
-							className="h-8 w-24 text-sm"
-							data-testid={`routing-target-${index}-weight-input`}
-						/>
+						{isPriority ? (
+							<Input
+								id={`routing-target-${index}-weight-input`}
+								type="number"
+								min={1}
+								step={1}
+								value={target.priority ?? index + 1}
+								onChange={(e) => onUpdate(index, "priority", Number.parseInt(e.target.value, 10) || 1)}
+								className="h-8 w-24 text-sm"
+								data-testid={`routing-target-${index}-priority-input`}
+							/>
+						) : (
+							<Input
+								id={`routing-target-${index}-weight-input`}
+								type="number"
+								min={0.001}
+								max={1}
+								step={0.001}
+								value={target.weight}
+								onChange={(e) => onUpdate(index, "weight", parseFloat(e.target.value) || 0)}
+								className="h-8 w-24 text-sm"
+								data-testid={`routing-target-${index}-weight-input`}
+							/>
+						)}
 					</div>
 					{showRemove && (
 						<Button

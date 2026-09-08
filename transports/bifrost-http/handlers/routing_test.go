@@ -7,6 +7,9 @@ import (
 	"strings"
 	"testing"
 
+	bifrost "github.com/maximhq/bifrost/core"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/fasthttp/router"
 	"github.com/stretchr/testify/require"
 
@@ -263,5 +266,105 @@ func TestRoutingRoutesServeCanonicalAndLegacyPaths(t *testing.T) {
 				t.Fatalf("%s %s registrations = %d, want 1", pair.method, path, got)
 			}
 		}
+	}
+}
+
+// TestValidateRoutingTargets_StrategyAware pins the strategy-aware semantics of
+// target validation:
+//   - "weighted" (and "adaptive") require each weight > 0 and all weights summing
+//     to 1 within tolerance.
+//   - "priority" requires an integer priority >= 1 per target (via the dedicated
+//     priority field, or a legacy integer weight when priority is unset) and must
+//     NOT enforce the sum-to-1 invariant — that's the regression where the add
+//     dialog failed with "target weights must sum to 1, got 3.0000".
+func TestValidateRoutingTargets_StrategyAware(t *testing.T) {
+	prio1 := 1
+	prio2 := 2
+	prio0 := 0
+
+	tests := []struct {
+		name     string
+		strategy string
+		targets  []RoutingTarget
+		wantErr  bool
+		errMsg   string
+	}{
+		{
+			name:     "weighted strategy accepts weights summing to 1",
+			strategy: "weighted",
+			targets: []RoutingTarget{
+				{Provider: bifrost.Ptr("openai"), Weight: 0.6},
+				{Provider: bifrost.Ptr("azure"), Weight: 0.4},
+			},
+			wantErr: false,
+		},
+		{
+			name:     "weighted strategy rejects weights not summing to 1",
+			strategy: "weighted",
+			targets: []RoutingTarget{
+				{Provider: bifrost.Ptr("openai"), Weight: 1.0},
+				{Provider: bifrost.Ptr("azure"), Weight: 2.0},
+			},
+			wantErr: true,
+			errMsg:  "target weights must sum to 1",
+		},
+		{
+			name:     "adaptive strategy rejects weights not summing to 1",
+			strategy: "adaptive",
+			targets: []RoutingTarget{
+				{Provider: bifrost.Ptr("openai"), Weight: 1.0},
+				{Provider: bifrost.Ptr("azure"), Weight: 2.0},
+			},
+			wantErr: true,
+			errMsg:  "target weights must sum to 1",
+		},
+		{
+			name:     "priority strategy accepts dedicated priority field with arbitrary weights",
+			strategy: "priority",
+			targets: []RoutingTarget{
+				{Provider: bifrost.Ptr("openai"), Weight: 1.0, Priority: &prio1},
+				{Provider: bifrost.Ptr("azure"), Weight: 1.0, Priority: &prio2},
+			},
+			wantErr: false,
+		},
+		{
+			name:     "priority strategy accepts legacy integer weight when priority unset",
+			strategy: "priority",
+			targets: []RoutingTarget{
+				{Provider: bifrost.Ptr("openai"), Weight: 1},
+				{Provider: bifrost.Ptr("azure"), Weight: 2},
+			},
+			wantErr: false,
+		},
+		{
+			name:     "priority strategy rejects non-integer legacy weight",
+			strategy: "priority",
+			targets: []RoutingTarget{
+				{Provider: bifrost.Ptr("openai"), Weight: 0.5},
+			},
+			wantErr: true,
+			errMsg:  "target priority must be an integer >= 1",
+		},
+		{
+			name:     "priority strategy rejects priority below 1",
+			strategy: "priority",
+			targets: []RoutingTarget{
+				{Provider: bifrost.Ptr("openai"), Weight: 1.0, Priority: &prio0},
+			},
+			wantErr: true,
+			errMsg:  "target priority must be an integer >= 1",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateRoutingTargets(tc.targets, tc.strategy)
+			if tc.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errMsg)
+			} else {
+				require.NoError(t, err)
+			}
+		})
 	}
 }

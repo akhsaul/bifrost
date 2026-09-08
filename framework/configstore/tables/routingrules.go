@@ -97,7 +97,10 @@ func (r *TableRoutingRule) AfterFind(tx *gorm.DB) error {
 
 // TableRoutingTarget represents a weighted routing target for probabilistic routing.
 // Multiple targets can be associated with a single routing rule; weights determine
-// the probability of each target being selected and must sum to 1 across all targets in a rule.
+// the probability of each target being selected and must sum to 1 across all targets in a rule
+// when the rule strategy is "weighted" or "adaptive". When the strategy is "priority",
+// the dedicated Priority field carries an integer rank (>= 1, lower = higher precedence)
+// and weights are ignored by selection.
 // The composite (RuleID, Provider, Model, KeyID) is unique to prevent duplicate target configs.
 type TableRoutingTarget struct {
 	RuleID          string  `gorm:"type:varchar(255);not null;index;uniqueIndex:idx_routing_target_config" json:"-"`
@@ -105,7 +108,8 @@ type TableRoutingTarget struct {
 	Model           *string `gorm:"type:varchar(255);uniqueIndex:idx_routing_target_config" json:"model,omitempty"`    // nil = use incoming model
 	KeyID           *string `gorm:"type:varchar(255);uniqueIndex:idx_routing_target_config" json:"key_id,omitempty"`   // persisted key pin
 	ProviderKeyName *string `gorm:"-" json:"provider_key_name,omitempty"`                                              // config-only alias; resolved to key_id during load
-	Weight          float64 `gorm:"not null;default:1" json:"weight"`                                                  // must sum to 1 across all targets in a rule
+	Weight          float64 `gorm:"not null;default:1" json:"weight"`                                                  // probability weight; must sum to 1 across all targets in a rule (weighted/adaptive)
+	Priority        *int    `gorm:"type:integer" json:"priority,omitempty"`                                            // integer rank >= 1 (lower = higher precedence) for the "priority" strategy
 }
 
 // TableName for TableRoutingTarget

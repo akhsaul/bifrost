@@ -477,6 +477,7 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_ultrafast_pricing_columns"}, run: migrationAddUltrafastPricingColumns},
 	{IDs: []string{"add_image_size_quality_pricing_columns"}, run: migrationAddImageSizeQualityPricingColumns},
 	{IDs: []string{"add_batch_jobs_attribution_columns"}, run: migrationAddBatchJobsAttributionColumns},
+	{IDs: []string{"add_priority_column_to_routing_targets"}, run: migrationAddPriorityColumnToRoutingTargets},
 }
 
 // migrationAddBatchJobsAttributionColumns adds the requester-identity columns to
@@ -4771,6 +4772,39 @@ func migrationAddStrategyColumnToRoutingRules(ctx context.Context, db *gorm.DB, 
 	}})
 	if err := m.Migrate(); err != nil {
 		return fmt.Errorf("error running add_strategy_column_to_routing_rules migration: %s", err.Error())
+	}
+	return nil
+}
+
+// migrationAddPriorityColumnToRoutingTargets adds the nullable `priority` column to
+// routing_targets. The column carries the per-target integer rank (>= 1, lower =
+// higher precedence) used by the "priority" rule strategy, so priority order no
+// longer overloads the probability `weight` column. Existing rows keep priority
+// NULL; the routing engine falls back to reading the legacy integer weight for
+// those rules.
+func migrationAddPriorityColumnToRoutingTargets(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "add_priority_column_to_routing_targets"
+	logger.Info("[configstore] starting migration %s", migrationName)
+	defer logger.Info("[configstore] finished migration %s", migrationName)
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: migrationName,
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			if err := addColumnIfNotExists(tx, logger, &tables.TableRoutingTarget{}, "priority"); err != nil {
+				return fmt.Errorf("failed to add priority column to routing_targets: %w", err)
+			}
+			return nil
+		},
+		Rollback: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			if err := dropColumnIfExists(tx, logger, &tables.TableRoutingTarget{}, "priority"); err != nil {
+				return fmt.Errorf("failed to drop priority column from routing_targets: %w", err)
+			}
+			return nil
+		},
+	}})
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error running add_priority_column_to_routing_targets migration: %s", err.Error())
 	}
 	return nil
 }

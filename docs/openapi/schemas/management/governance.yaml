@@ -1234,8 +1234,13 @@ RoutingTarget:
       type: number
       format: double
       exclusiveMinimum: 0
-      description: Probability weight for this target (must be > 0; all target weights in a rule must sum to 1, e.g. 0.7 + 0.3 = 1.0)
+      description: Probability weight for this target (must be > 0; all target weights in a rule must sum to 1, e.g. 0.7 + 0.3 = 1.0; ignored when strategy is 'priority')
       example: 0.5
+    priority:
+      type: [integer, 'null']
+      minimum: 1
+      description: Priority rank for this target (>= 1, lower number = higher precedence). Required for each target when rule strategy is 'priority'
+      example: 1
 
 RoutingRule:
   type: object
@@ -1258,7 +1263,7 @@ RoutingRule:
       description: CEL (Common Expression Language) expression for matching
     targets:
       type: array
-      description: Weighted routing targets; weights must sum to 1; target is selected probabilistically at request time
+      description: Routing targets; for weighted/adaptive strategies weights must sum to 1 (probabilistic selection), for priority strategy each target carries a priority rank (>= 1, lower = higher precedence, deterministic selection)
       items:
         $ref: '#/RoutingTarget'
     fallbacks:
@@ -1331,7 +1336,7 @@ CreateRoutingRuleRequest:
     targets:
       type: array
       minItems: 1
-      description: Weighted routing targets; weights must sum to 1; target is selected probabilistically at request time
+      description: Routing targets; for weighted/adaptive strategies weights must sum to 1, for priority strategy each target carries an integer priority rank (>= 1, lower = higher precedence)
       items:
         $ref: '#/RoutingTarget'
     fallbacks:
@@ -1388,7 +1393,7 @@ UpdateRoutingRuleRequest:
     targets:
       type: array
       minItems: 1
-      description: Replaces all existing targets when provided; weights must sum to 1
+      description: Replaces all existing targets when provided; weights must sum to 1 for weighted/adaptive strategies, or each target must carry an integer priority (>= 1) for the priority strategy
       items:
         $ref: '#/RoutingTarget'
     fallbacks:

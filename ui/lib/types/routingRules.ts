@@ -10,6 +10,8 @@ export interface RoutingTarget {
 	model?: string;
 	key_id?: string;
 	weight: number;
+	/** Integer rank >= 1 (lower = higher precedence); used when rule strategy is "priority". */
+	priority?: number;
 }
 
 export interface RoutingRule {
@@ -71,6 +73,8 @@ export interface RoutingTargetFormData {
 	model: string;
 	key_id: string;
 	weight: number;
+	/** Integer rank >= 1 (lower = higher precedence); used when rule strategy is "priority". */
+	priority?: number;
 }
 
 export interface RoutingRuleFormData {
@@ -112,6 +116,7 @@ export const DEFAULT_ROUTING_TARGET: RoutingTargetFormData = {
 	model: "",
 	key_id: "",
 	weight: 1,
+	priority: 1,
 };
 
 export const DEFAULT_ROUTING_RULE_FORM_DATA: RoutingRuleFormData = {

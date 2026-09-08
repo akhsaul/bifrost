@@ -3,6 +3,7 @@ package rules
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"regexp"
 	"strings"
@@ -40,17 +41,17 @@ type Decision struct {
 // EvaluationContext holds all data needed for routing rule evaluation
 // Reuses existing configstore table types for VirtualKey, Team, Customer
 type EvaluationContext struct {
-	VirtualKey               *configstoreTables.TableVirtualKey   // nil if no VK
-	UserID                   string                               // Resolved calling user id; empty when the request carries no user identity
-	Provider                 schemas.ModelProvider                // Current provider
-	Model                    string                               // Current model
-	RequestType              string                               // Request type (e.g., "chat_completion", "embedding"); streaming requests carry a distinct "_stream" suffix (e.g., "chat_completion_stream")
-	Fallbacks                []string                             // Fallback chain: ["provider/model", ...]
-	Headers                  map[string]string                    // Request headers for dynamic routing
-	QueryParams              map[string]string                    // Query parameters for dynamic routing
-	BudgetAndRateLimitStatus *governance.BudgetAndRateLimitStatus // Budget and rate limit status by provider/model
+	VirtualKey               *configstoreTables.TableVirtualKey                                                                // nil if no VK
+	UserID                   string                                                                                            // Resolved calling user id; empty when the request carries no user identity
+	Provider                 schemas.ModelProvider                                                                             // Current provider
+	Model                    string                                                                                            // Current model
+	RequestType              string                                                                                            // Request type (e.g., "chat_completion", "embedding"); streaming requests carry a distinct "_stream" suffix (e.g., "chat_completion_stream")
+	Fallbacks                []string                                                                                          // Fallback chain: ["provider/model", ...]
+	Headers                  map[string]string                                                                                 // Request headers for dynamic routing
+	QueryParams              map[string]string                                                                                 // Query parameters for dynamic routing
+	BudgetAndRateLimitStatus *governance.BudgetAndRateLimitStatus                                                              // Budget and rate limit status by provider/model
 	AdaptiveTargetSelector   func(targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, bool) // Optional adaptive target selector
-	ComputeComplexity        func() *complexity.ComplexityResult  // Lazy complexity computation; called at most once when a rule references "complexity_tier"
+	ComputeComplexity        func() *complexity.ComplexityResult                                                               // Lazy complexity computation; called at most once when a rule references "complexity_tier"
 }
 
 type RoutingContext = EvaluationContext
@@ -382,18 +383,36 @@ func selectWeightedTarget(targets []configstoreTables.TableRoutingTarget) (confi
 }
 
 // selectPriorityTarget picks the target with the lowest priority number (highest precedence).
-// Used by the "priority" strategy: the Weight field carries an integer priority (≥ 1) and
-// selection is fully deterministic — no randomness. Ties are broken by declaration order
-// (the first target with the lowest priority wins).
+// Used by the "priority" strategy: the dedicated Priority field carries an integer priority
+// (≥ 1) and selection is fully deterministic — no randomness. For backwards compatibility
+// with rows stored before the dedicated field existed (priority encoded in Weight), a
+// target with nil Priority falls back to int(Weight) when Weight is a positive integer,
+// and sorts last otherwise. Ties are broken by declaration order (the first target with
+// the lowest priority wins).
 // Returns ok=false only when len(targets)==0.
 func selectPriorityTarget(targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, bool) {
 	if len(targets) == 0 {
 		return configstoreTables.TableRoutingTarget{}, false
 	}
+	targetPriority := func(t configstoreTables.TableRoutingTarget) int {
+		if t.Priority != nil {
+			return *t.Priority
+		}
+		// Legacy rows: priority rank was stored in Weight. Weight values below 1
+		// (or fractional) can never be a legacy rank — deprioritize them so a
+		// mixed old/new rule still resolves to a proper rank-1 target.
+		if t.Weight >= 1 && t.Weight == math.Trunc(t.Weight) {
+			return int(t.Weight)
+		}
+		return math.MaxInt32
+	}
+
 	best := targets[0]
+	bestPriority := targetPriority(best)
 	for _, t := range targets[1:] {
-		if t.Weight < best.Weight {
+		if p := targetPriority(t); p < bestPriority {
 			best = t
+			bestPriority = p
 		}
 	}
 	return best, true
