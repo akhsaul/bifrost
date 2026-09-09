@@ -160,70 +160,102 @@ func (p *Plugin) applyRulesToRequest(ctx *schemas.BifrostContext, rule *Rule, re
 		if patterns, ok := p.config.patterns[pid]; ok && len(patterns) > 0 {
 			for i := range req.ChatRequest.Input {
 				msg := &req.ChatRequest.Input[i]
-				if msg.Content == nil {
-					continue
-				}
-				if msg.Content.ContentStr != nil {
-					blocked, newText, detected := evaluatePatterns(ctx, patterns, *msg.Content.ContentStr, schemas.RedactionPhaseInput)
-					if len(detected) > 0 {
-						p.logWarn("guardrails: rule %q detected %d match(es) on input: %v", rule.Name, len(detected), detected)
-					}
-					if len(blocked) > 0 {
-						return blockShortCircuit(rule, blocked)
-					}
-					if newText != *msg.Content.ContentStr {
-						msg.Content.ContentStr = ptr(newText)
-					}
-				}
-				for j := range msg.Content.ContentBlocks {
-					blk := &msg.Content.ContentBlocks[j]
-					if blk.Text != nil {
-						blocked, newText, detected := evaluatePatterns(ctx, patterns, *blk.Text, schemas.RedactionPhaseInput)
+				if msg.Content != nil {
+					if msg.Content.ContentStr != nil {
+						blocked, newText, detected := evaluatePatterns(ctx, patterns, *msg.Content.ContentStr, schemas.RedactionPhaseInput)
 						if len(detected) > 0 {
-							p.logWarn("guardrails: rule %q detected %d match(es) on input block: %v", rule.Name, len(detected), detected)
+							p.logWarn("guardrails: rule %q detected %d match(es) on input: %v", rule.Name, len(detected), detected)
 						}
 						if len(blocked) > 0 {
 							return blockShortCircuit(rule, blocked)
 						}
-						if newText != *blk.Text {
-							blk.Text = ptr(newText)
+						if newText != *msg.Content.ContentStr {
+							msg.Content.ContentStr = ptr(newText)
+						}
+					}
+					for j := range msg.Content.ContentBlocks {
+						blk := &msg.Content.ContentBlocks[j]
+						if blk.Text != nil {
+							blocked, newText, detected := evaluatePatterns(ctx, patterns, *blk.Text, schemas.RedactionPhaseInput)
+							if len(detected) > 0 {
+								p.logWarn("guardrails: rule %q detected %d match(es) on input block: %v", rule.Name, len(detected), detected)
+							}
+							if len(blocked) > 0 {
+								return blockShortCircuit(rule, blocked)
+							}
+							if newText != *blk.Text {
+								blk.Text = ptr(newText)
+							}
 						}
 					}
 				}
+				if msg.ChatAssistantMessage != nil {
+					for j := range msg.ChatAssistantMessage.ToolCalls {
+						tc := &msg.ChatAssistantMessage.ToolCalls[j]
+						if tc.Function.Arguments != "" {
+							blocked, newText, detected := evaluatePatterns(ctx, patterns, tc.Function.Arguments, schemas.RedactionPhaseInput)
+							if len(detected) > 0 {
+								p.logWarn("guardrails: rule %q detected %d match(es) on assistant tool arguments: %v", rule.Name, len(detected), detected)
+							}
+							if len(blocked) > 0 {
+								return blockShortCircuit(rule, blocked)
+							}
+							if newText != tc.Function.Arguments {
+								tc.Function.Arguments = newText
+							}
+						}
+					}
 				}
-				}
+			}
+		}
 
-				// 2. Betterleaks secrets detection
-				if sec, ok := p.config.secrets[pid]; ok && sec != nil {
-				for i := range req.ChatRequest.Input {
+		// 2. Betterleaks secrets detection
+		if sec, ok := p.config.secrets[pid]; ok && sec != nil {
+			for i := range req.ChatRequest.Input {
 				msg := &req.ChatRequest.Input[i]
-				if msg.Content == nil {
-					continue
-				}
-				if msg.Content.ContentStr != nil {
-					blocked, newText, detected := sec.evaluate(ctx, *msg.Content.ContentStr, schemas.RedactionPhaseInput)
-					if len(detected) > 0 {
-						p.logWarn("guardrails: rule %q (secrets) detected %d secret(s): %v", rule.Name, len(detected), detected)
-					}
-					if len(blocked) > 0 {
-						return blockShortCircuitSimple(rule, fmt.Sprintf("detected secrets (%s)", strings.Join(blocked, ", ")))
-					}
-					if newText != *msg.Content.ContentStr {
-						msg.Content.ContentStr = ptr(newText)
-					}
-				}
-				for j := range msg.Content.ContentBlocks {
-					blk := &msg.Content.ContentBlocks[j]
-					if blk.Text != nil {
-						blocked, newText, detected := sec.evaluate(ctx, *blk.Text, schemas.RedactionPhaseInput)
+				if msg.Content != nil {
+					if msg.Content.ContentStr != nil {
+						blocked, newText, detected := sec.evaluate(ctx, *msg.Content.ContentStr, schemas.RedactionPhaseInput)
 						if len(detected) > 0 {
-							p.logWarn("guardrails: rule %q (secrets) detected %d secret(s) on input block: %v", rule.Name, len(detected), detected)
+							p.logWarn("guardrails: rule %q (secrets) detected %d secret(s): %v", rule.Name, len(detected), detected)
 						}
 						if len(blocked) > 0 {
 							return blockShortCircuitSimple(rule, fmt.Sprintf("detected secrets (%s)", strings.Join(blocked, ", ")))
 						}
-						if newText != *blk.Text {
-							blk.Text = ptr(newText)
+						if newText != *msg.Content.ContentStr {
+							msg.Content.ContentStr = ptr(newText)
+						}
+					}
+					for j := range msg.Content.ContentBlocks {
+						blk := &msg.Content.ContentBlocks[j]
+						if blk.Text != nil {
+							blocked, newText, detected := sec.evaluate(ctx, *blk.Text, schemas.RedactionPhaseInput)
+							if len(detected) > 0 {
+								p.logWarn("guardrails: rule %q (secrets) detected %d secret(s) on input block: %v", rule.Name, len(detected), detected)
+							}
+							if len(blocked) > 0 {
+								return blockShortCircuitSimple(rule, fmt.Sprintf("detected secrets (%s)", strings.Join(blocked, ", ")))
+							}
+							if newText != *blk.Text {
+								blk.Text = ptr(newText)
+							}
+						}
+					}
+				}
+				if msg.ChatAssistantMessage != nil {
+					for j := range msg.ChatAssistantMessage.ToolCalls {
+						tc := &msg.ChatAssistantMessage.ToolCalls[j]
+						if tc.Function.Arguments != "" {
+							blocked, newText, detected := sec.evaluate(ctx, tc.Function.Arguments, schemas.RedactionPhaseInput)
+							if len(detected) > 0 {
+								p.logWarn("guardrails: rule %q (secrets) detected %d secret(s) on assistant tool arguments: %v", rule.Name, len(detected), detected)
+							}
+							if len(blocked) > 0 {
+								return blockShortCircuitSimple(rule, fmt.Sprintf("detected secrets (%s)", strings.Join(blocked, ", ")))
+							}
+							if newText != tc.Function.Arguments {
+								tc.Function.Arguments = newText
+							}
 						}
 					}
 				}
@@ -264,6 +296,23 @@ func (p *Plugin) applyRulesToResponse(ctx *schemas.BifrostContext, rule *Rule, r
 							msg.Content.ContentStr = ptr(newText)
 						}
 					}
+					if msg.ChatAssistantMessage != nil {
+						for j := range msg.ChatAssistantMessage.ToolCalls {
+							tc := &msg.ChatAssistantMessage.ToolCalls[j]
+							if tc.Function.Arguments != "" {
+								blocked, newText, detected := evaluatePatterns(ctx, patterns, tc.Function.Arguments, schemas.RedactionPhaseOutput)
+								if len(detected) > 0 {
+									p.logWarn("guardrails: rule %q detected %d match(es) on output tool arguments: %v", rule.Name, len(detected), detected)
+								}
+								if len(blocked) > 0 {
+									return blockError(rule, blocked)
+								}
+								if newText != tc.Function.Arguments {
+									tc.Function.Arguments = newText
+								}
+							}
+						}
+					}
 				}
 				if c.TextCompletionResponseChoice != nil && c.TextCompletionResponseChoice.Text != nil {
 					txt := *c.TextCompletionResponseChoice.Text
@@ -297,6 +346,23 @@ func (p *Plugin) applyRulesToResponse(ctx *schemas.BifrostContext, rule *Rule, r
 						}
 						if newText != *msg.Content.ContentStr {
 							msg.Content.ContentStr = ptr(newText)
+						}
+					}
+					if msg.ChatAssistantMessage != nil {
+						for j := range msg.ChatAssistantMessage.ToolCalls {
+							tc := &msg.ChatAssistantMessage.ToolCalls[j]
+							if tc.Function.Arguments != "" {
+								blocked, newText, detected := sec.evaluate(ctx, tc.Function.Arguments, schemas.RedactionPhaseOutput)
+								if len(detected) > 0 {
+									p.logWarn("guardrails: rule %q (secrets) detected %d secret(s) on output tool arguments: %v", rule.Name, len(detected), detected)
+								}
+								if len(blocked) > 0 {
+									return blockErrorSimple(rule, fmt.Sprintf("detected secrets (%s)", strings.Join(blocked, ", ")))
+								}
+								if newText != tc.Function.Arguments {
+									tc.Function.Arguments = newText
+								}
+							}
 						}
 					}
 				}
@@ -379,7 +445,7 @@ func replacePlaceholders(text string, replacements map[string]string) string {
 // - Non-tool-calls (message content / text): placeholders replaced with partially masked values (e.g. gith***_key)
 // - Tool-calls (arguments): placeholders replaced with original full secrets (e.g. github_pat_key)
 func restoreEgress(resp *schemas.BifrostResponse, ctx *schemas.BifrostContext) {
-	if resp == nil || resp.ChatResponse == nil || ctx == nil {
+	if resp == nil || ctx == nil {
 		return
 	}
 	tracker := GetOrCreateTracker(ctx)
@@ -390,35 +456,166 @@ func restoreEgress(resp *schemas.BifrostResponse, ctx *schemas.BifrostContext) {
 	maskedMap := tracker.GetAllTokensToMasked()
 	secretMap := tracker.GetAllTokensToSecret()
 
-	for i := range resp.ChatResponse.Choices {
-		c := &resp.ChatResponse.Choices[i]
-		if c.ChatNonStreamResponseChoice != nil && c.ChatNonStreamResponseChoice.Message != nil {
-			msg := c.ChatNonStreamResponseChoice.Message
-			// 1. Restore message content -> partially masked
-			if msg.Content != nil {
-				if msg.Content.ContentStr != nil {
-					msg.Content.ContentStr = ptr(replacePlaceholders(*msg.Content.ContentStr, maskedMap))
+	isStreamEnd := false
+	if v := ctx.Value(schemas.BifrostContextKeyStreamEndIndicator); v != nil {
+		if b, ok := v.(bool); ok && b {
+			isStreamEnd = true
+		}
+	}
+
+	// 1. Chat Response
+	if resp.ChatResponse != nil {
+		for i := range resp.ChatResponse.Choices {
+			c := &resp.ChatResponse.Choices[i]
+			isLast := isStreamEnd || (c.FinishReason != nil && *c.FinishReason != "")
+
+			// A. Non-streaming choice
+			if c.ChatNonStreamResponseChoice != nil && c.ChatNonStreamResponseChoice.Message != nil {
+				msg := c.ChatNonStreamResponseChoice.Message
+				// 1. Restore message content -> partially masked
+				if msg.Content != nil {
+					if msg.Content.ContentStr != nil {
+						msg.Content.ContentStr = ptr(replacePlaceholders(*msg.Content.ContentStr, maskedMap))
+					}
+					for j := range msg.Content.ContentBlocks {
+						blk := &msg.Content.ContentBlocks[j]
+						if blk.Text != nil {
+							blk.Text = ptr(replacePlaceholders(*blk.Text, maskedMap))
+						}
+					}
 				}
-				for j := range msg.Content.ContentBlocks {
-					blk := &msg.Content.ContentBlocks[j]
+				// 2. Restore tool_calls arguments -> original full secret
+				if msg.ChatAssistantMessage != nil {
+					for j := range msg.ChatAssistantMessage.ToolCalls {
+						tc := &msg.ChatAssistantMessage.ToolCalls[j]
+						if tc.Function.Arguments != "" {
+							tc.Function.Arguments = replacePlaceholders(tc.Function.Arguments, secretMap)
+						}
+					}
+				}
+			}
+
+			// B. Streaming choice
+			if c.ChatStreamResponseChoice != nil {
+				delta := c.ChatStreamResponseChoice.Delta
+				if delta != nil {
+					// 1. Restore content -> partially masked (with carry buffer for split tokens)
+					if delta.Content != nil {
+						newContent := tracker.StreamReplaceContent(i, *delta.Content, isLast)
+						delta.Content = ptr(newContent)
+					}
+					// 2. Restore reasoning -> partially masked (with carry buffer for split tokens)
+					if delta.Reasoning != nil {
+						newReasoning := tracker.StreamReplaceReasoning(i, *delta.Reasoning, isLast)
+						delta.Reasoning = ptr(newReasoning)
+					}
+					// 3. Restore tool_calls arguments -> original full secret (with carry buffer for split tokens)
+					for j := range delta.ToolCalls {
+						tc := &delta.ToolCalls[j]
+						if tc.Function.Arguments != "" {
+							tc.Function.Arguments = tracker.StreamReplaceToolArgs(tc.Index, tc.Function.Arguments, isLast)
+						}
+					}
+				}
+
+				// If stream or choice ended, flush any remaining carry buffers
+				if isLast {
+					if flushedContent := tracker.FlushContentCarry(i); flushedContent != "" {
+						if delta == nil {
+							delta = &schemas.ChatStreamResponseChoiceDelta{}
+							c.ChatStreamResponseChoice.Delta = delta
+						}
+						if delta.Content == nil {
+							delta.Content = ptr(flushedContent)
+						} else {
+							delta.Content = ptr(*delta.Content + flushedContent)
+						}
+					}
+					if flushedReasoning := tracker.FlushReasoningCarry(i); flushedReasoning != "" {
+						if delta == nil {
+							delta = &schemas.ChatStreamResponseChoiceDelta{}
+							c.ChatStreamResponseChoice.Delta = delta
+						}
+						if delta.Reasoning == nil {
+							delta.Reasoning = ptr(flushedReasoning)
+						} else {
+							delta.Reasoning = ptr(*delta.Reasoning + flushedReasoning)
+						}
+					}
+					if flushedToolArgs := tracker.FlushToolArgsCarry(); len(flushedToolArgs) > 0 {
+						if delta == nil {
+							delta = &schemas.ChatStreamResponseChoiceDelta{}
+							c.ChatStreamResponseChoice.Delta = delta
+						}
+						for idx, remaining := range flushedToolArgs {
+							found := false
+							for j := range delta.ToolCalls {
+								if delta.ToolCalls[j].Index == idx {
+									delta.ToolCalls[j].Function.Arguments += remaining
+									found = true
+									break
+								}
+							}
+							if !found {
+								delta.ToolCalls = append(delta.ToolCalls, schemas.ChatAssistantMessageToolCall{
+									Index: idx,
+									Function: schemas.ChatAssistantMessageToolCallFunction{
+										Arguments: remaining,
+									},
+								})
+							}
+						}
+					}
+				}
+			}
+
+			// C. Text completion choice -> partially masked
+			if c.TextCompletionResponseChoice != nil && c.TextCompletionResponseChoice.Text != nil {
+				c.TextCompletionResponseChoice.Text = ptr(replacePlaceholders(*c.TextCompletionResponseChoice.Text, maskedMap))
+			}
+		}
+	}
+
+	// 2. Responses API (BifrostResponsesResponse)
+	if resp.ResponsesResponse != nil {
+		for i := range resp.ResponsesResponse.Output {
+			item := &resp.ResponsesResponse.Output[i]
+			if item.Content != nil {
+				if item.Content.ContentStr != nil {
+					item.Content.ContentStr = ptr(replacePlaceholders(*item.Content.ContentStr, maskedMap))
+				}
+				for j := range item.Content.ContentBlocks {
+					blk := &item.Content.ContentBlocks[j]
 					if blk.Text != nil {
 						blk.Text = ptr(replacePlaceholders(*blk.Text, maskedMap))
 					}
 				}
 			}
-			// 2. Restore tool_calls arguments -> original full secret
-			if msg.ChatAssistantMessage != nil {
-				for j := range msg.ChatAssistantMessage.ToolCalls {
-					tc := &msg.ChatAssistantMessage.ToolCalls[j]
-					if tc.Function.Arguments != "" {
-						tc.Function.Arguments = replacePlaceholders(tc.Function.Arguments, secretMap)
-					}
-				}
+			if item.ResponsesToolMessage != nil && item.ResponsesToolMessage.Arguments != nil {
+				item.ResponsesToolMessage.Arguments = ptr(replacePlaceholders(*item.ResponsesToolMessage.Arguments, secretMap))
 			}
 		}
-		// 3. Text completion choice -> partially masked
-		if c.TextCompletionResponseChoice != nil && c.TextCompletionResponseChoice.Text != nil {
-			c.TextCompletionResponseChoice.Text = ptr(replacePlaceholders(*c.TextCompletionResponseChoice.Text, maskedMap))
+	}
+
+	// 3. Responses API Streaming (BifrostResponsesStreamResponse)
+	if resp.ResponsesStreamResponse != nil {
+		sr := resp.ResponsesStreamResponse
+		if sr.Arguments != nil && *sr.Arguments != "" {
+			sr.Arguments = ptr(replacePlaceholders(*sr.Arguments, secretMap))
+		}
+		if sr.Delta != nil && *sr.Delta != "" {
+			sr.Delta = ptr(replacePlaceholders(*sr.Delta, maskedMap))
+		}
+		if sr.Text != nil && *sr.Text != "" {
+			sr.Text = ptr(replacePlaceholders(*sr.Text, maskedMap))
+		}
+		if sr.Item != nil {
+			if sr.Item.Content != nil && sr.Item.Content.ContentStr != nil {
+				sr.Item.Content.ContentStr = ptr(replacePlaceholders(*sr.Item.Content.ContentStr, maskedMap))
+			}
+			if sr.Item.ResponsesToolMessage != nil && sr.Item.ResponsesToolMessage.Arguments != nil {
+				sr.Item.ResponsesToolMessage.Arguments = ptr(replacePlaceholders(*sr.Item.ResponsesToolMessage.Arguments, secretMap))
+			}
 		}
 	}
 }

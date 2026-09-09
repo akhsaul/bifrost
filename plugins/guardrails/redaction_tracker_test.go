@@ -102,3 +102,46 @@ func TestRedactionTracker_PermanentRuntimeModeDoesNotStoreReveal(t *testing.T) {
 	assert.Equal(t, "github_pat_key", tracker.TokenToSecret("[SECRET-1]"))
 	assert.Equal(t, "gith***_key", tracker.TokenToMasked("[SECRET-1]"))
 }
+
+func TestRedactionTracker_StreamingReplacement(t *testing.T) {
+	ctx := schemas.NewBifrostContext(context.Background(), time.Time{})
+	tracker := GetOrCreateTracker(ctx)
+	token := tracker.Redact(ctx, "SECRET", "github_pat_key123", RedactionReplace, RedactionModeRuntimeReversible, schemas.RedactionPhaseInput)
+	assert.Equal(t, "[SECRET-1]", token)
+
+	t.Run("tool call args 3 split chunks", func(t *testing.T) {
+		c1 := tracker.StreamReplaceToolArgs(0, `{"cmd":"echo [SE`, false)
+		assert.Equal(t, `{"cmd":"echo `, c1)
+
+		c2 := tracker.StreamReplaceToolArgs(0, `CRE`, false)
+		assert.Equal(t, "", c2)
+
+		c3 := tracker.StreamReplaceToolArgs(0, `T-1]"}`, true)
+		assert.Equal(t, `github_pat_key123"}`, c3)
+
+		assert.Equal(t, `{"cmd":"echo github_pat_key123"}`, c1+c2+c3)
+	})
+
+	t.Run("content partial mask with non-placeholder brackets", func(t *testing.T) {
+		c1 := tracker.StreamReplaceContent(0, "array[", false)
+		assert.Equal(t, "array", c1)
+
+		c2 := tracker.StreamReplaceContent(0, "0] = [SECRET", false)
+		assert.Equal(t, "[0] = ", c2)
+
+		c3 := tracker.StreamReplaceContent(0, "-1]!", false)
+		assert.Equal(t, "gith***y123!", c3)
+
+		assert.Equal(t, "array[0] = gith***y123!", c1+c2+c3)
+	})
+
+	t.Run("flush carry on final chunk when carry not empty", func(t *testing.T) {
+		c1 := tracker.StreamReplaceContent(1, "my [SEC", false)
+		assert.Equal(t, "my ", c1)
+
+		// Final chunk arrives with finish
+		flushed := tracker.FlushContentCarry(1)
+		assert.Equal(t, "[SEC", flushed)
+	})
+}
+

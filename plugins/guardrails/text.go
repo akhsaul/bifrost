@@ -19,32 +19,44 @@ func extractRequestText(req *schemas.BifrostRequest) string {
 	return b.String()
 }
 
-// appendMessageText appends the message's text content (string or text blocks).
+// appendMessageText appends the message's text content (string, text blocks, and tool arguments).
 func appendMessageText(b *strings.Builder, msg *schemas.ChatMessage) {
-	if msg == nil || msg.Content == nil {
+	if msg == nil {
 		return
 	}
-	if msg.Content.ContentStr != nil {
-		if b.Len() > 0 {
-			b.WriteByte('\n')
-		}
-		b.WriteString(*msg.Content.ContentStr)
-		return
-	}
-	for i := range msg.Content.ContentBlocks {
-		blk := &msg.Content.ContentBlocks[i]
-		if blk.Text != nil {
+	if msg.Content != nil {
+		if msg.Content.ContentStr != nil {
 			if b.Len() > 0 {
 				b.WriteByte('\n')
 			}
-			b.WriteString(*blk.Text)
+			b.WriteString(*msg.Content.ContentStr)
+		}
+		for i := range msg.Content.ContentBlocks {
+			blk := &msg.Content.ContentBlocks[i]
+			if blk.Text != nil {
+				if b.Len() > 0 {
+					b.WriteByte('\n')
+				}
+				b.WriteString(*blk.Text)
+			}
+		}
+	}
+	if msg.ChatAssistantMessage != nil {
+		for i := range msg.ChatAssistantMessage.ToolCalls {
+			tc := &msg.ChatAssistantMessage.ToolCalls[i]
+			if tc.Function.Arguments != "" {
+				if b.Len() > 0 {
+					b.WriteByte('\n')
+				}
+				b.WriteString(tc.Function.Arguments)
+			}
 		}
 	}
 }
 
 // redactRequestInPlace replaces every occurrence of match with repl in the
-// request's message contents (string and text blocks). Returns true when any
-// replacement happened.
+// request's message contents (string, text blocks, and assistant tool arguments).
+// Returns true when any replacement happened.
 func redactRequestInPlace(req *schemas.BifrostRequest, match, repl string) bool {
 	if req == nil || req.ChatRequest == nil || match == "" {
 		return false
@@ -52,18 +64,26 @@ func redactRequestInPlace(req *schemas.BifrostRequest, match, repl string) bool 
 	replaced := false
 	for i := range req.ChatRequest.Input {
 		msg := &req.ChatRequest.Input[i]
-		if msg.Content == nil {
-			continue
-		}
-		if msg.Content.ContentStr != nil && strings.Contains(*msg.Content.ContentStr, match) {
-			msg.Content.ContentStr = ptr(strings.ReplaceAll(*msg.Content.ContentStr, match, repl))
-			replaced = true
-		}
-		for j := range msg.Content.ContentBlocks {
-			blk := &msg.Content.ContentBlocks[j]
-			if blk.Text != nil && strings.Contains(*blk.Text, match) {
-				blk.Text = ptr(strings.ReplaceAll(*blk.Text, match, repl))
+		if msg.Content != nil {
+			if msg.Content.ContentStr != nil && strings.Contains(*msg.Content.ContentStr, match) {
+				msg.Content.ContentStr = ptr(strings.ReplaceAll(*msg.Content.ContentStr, match, repl))
 				replaced = true
+			}
+			for j := range msg.Content.ContentBlocks {
+				blk := &msg.Content.ContentBlocks[j]
+				if blk.Text != nil && strings.Contains(*blk.Text, match) {
+					blk.Text = ptr(strings.ReplaceAll(*blk.Text, match, repl))
+					replaced = true
+				}
+			}
+		}
+		if msg.ChatAssistantMessage != nil {
+			for j := range msg.ChatAssistantMessage.ToolCalls {
+				tc := &msg.ChatAssistantMessage.ToolCalls[j]
+				if strings.Contains(tc.Function.Arguments, match) {
+					tc.Function.Arguments = strings.ReplaceAll(tc.Function.Arguments, match, repl)
+					replaced = true
+				}
 			}
 		}
 	}
@@ -113,21 +133,32 @@ func redactResponseInPlace(resp *schemas.BifrostResponse, match, repl string) bo
 	return replaced
 }
 
-// redactMessageInPlace redacts one message's contents.
+// redactMessageInPlace redacts one message's contents (content and assistant tool arguments).
 func redactMessageInPlace(msg *schemas.ChatMessage, match, repl string) bool {
-	if msg == nil || msg.Content == nil {
+	if msg == nil {
 		return false
 	}
 	replaced := false
-	if msg.Content.ContentStr != nil && strings.Contains(*msg.Content.ContentStr, match) {
-		msg.Content.ContentStr = ptr(strings.ReplaceAll(*msg.Content.ContentStr, match, repl))
-		replaced = true
-	}
-	for j := range msg.Content.ContentBlocks {
-		blk := &msg.Content.ContentBlocks[j]
-		if blk.Text != nil && strings.Contains(*blk.Text, match) {
-			blk.Text = ptr(strings.ReplaceAll(*blk.Text, match, repl))
+	if msg.Content != nil {
+		if msg.Content.ContentStr != nil && strings.Contains(*msg.Content.ContentStr, match) {
+			msg.Content.ContentStr = ptr(strings.ReplaceAll(*msg.Content.ContentStr, match, repl))
 			replaced = true
+		}
+		for j := range msg.Content.ContentBlocks {
+			blk := &msg.Content.ContentBlocks[j]
+			if blk.Text != nil && strings.Contains(*blk.Text, match) {
+				blk.Text = ptr(strings.ReplaceAll(*blk.Text, match, repl))
+				replaced = true
+			}
+		}
+	}
+	if msg.ChatAssistantMessage != nil {
+		for j := range msg.ChatAssistantMessage.ToolCalls {
+			tc := &msg.ChatAssistantMessage.ToolCalls[j]
+			if strings.Contains(tc.Function.Arguments, match) {
+				tc.Function.Arguments = strings.ReplaceAll(tc.Function.Arguments, match, repl)
+				replaced = true
+			}
 		}
 	}
 	return replaced
