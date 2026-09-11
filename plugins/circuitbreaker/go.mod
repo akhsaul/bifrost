@@ -1,6 +1,6 @@
 module github.com/maximhq/bifrost/plugins/circuitbreaker
 
-go 1.26.5
+go 1.27.0
 
 require (
 	github.com/maximhq/bifrost/core v1.7.10

@@ -1,6 +1,6 @@
 module github.com/maximhq/bifrost/plugins/guardrails
 
-go 1.26.5
+go 1.27.0
 
 require (
 	github.com/betterleaks/betterleaks v1.8.1
