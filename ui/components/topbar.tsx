@@ -15,7 +15,8 @@ import { IS_ENTERPRISE } from "@/lib/constants/config";
 import { useDescriptionSlotRef, useMobileFilterSlotRef, useTopbarTitle } from "@/lib/contexts/topbarContext";
 import type { TopbarTitleValue } from "@/lib/contexts/topbarContext.utils";
 import { useBranding } from "@/lib/hooks/useBranding";
-import { useGetCoreConfigQuery, useGetVersionQuery, useLogoutMutation } from "@/lib/store";
+import { useAppDispatch, useGetCoreConfigQuery, useGetVersionQuery, useLogoutMutation } from "@/lib/store";
+import { baseApi } from "@/lib/store/apis/baseApi";
 import { cn } from "@/lib/utils";
 import type { UserInfo } from "@enterprise/lib/store/utils/tokenManager";
 import { getUserInfo } from "@enterprise/lib/store/utils/tokenManager";
@@ -36,29 +37,29 @@ const externalLinks: {
 	icon: React.ComponentType<Record<string, unknown>>;
 	strokeWidth?: number;
 }[] = [
-		{
-			title: "Discord Server",
-			url: "https://discord.gg/exN5KAydbU",
-			icon: DiscordLogoIcon,
-		},
-		{
-			title: "GitHub Repository",
-			url: "https://github.com/maximhq/bifrost",
-			icon: GithubLogoIcon,
-		},
-		{
-			title: "Report a bug",
-			url: "https://github.com/maximhq/bifrost/issues/new?title=[Bug Report]&labels=bug&type=bug&projects=maximhq/1",
-			icon: BugIcon,
-			strokeWidth: 1.5,
-		},
-		{
-			title: "Full Documentation",
-			url: "https://docs.getbifrost.ai",
-			icon: BooksIcon,
-			strokeWidth: 1,
-		},
-	];
+	{
+		title: "Discord Server",
+		url: "https://discord.gg/exN5KAydbU",
+		icon: DiscordLogoIcon,
+	},
+	{
+		title: "GitHub Repository",
+		url: "https://github.com/maximhq/bifrost",
+		icon: GithubLogoIcon,
+	},
+	{
+		title: "Report a bug",
+		url: "https://github.com/maximhq/bifrost/issues/new?title=[Bug Report]&labels=bug&type=bug&projects=maximhq/1",
+		icon: BugIcon,
+		strokeWidth: 1.5,
+	},
+	{
+		title: "Full Documentation",
+		url: "https://docs.getbifrost.ai",
+		icon: BooksIcon,
+		strokeWidth: 1,
+	},
+];
 
 /**
  * Resolves the topbar title. A page can name itself via useSetTopbarTitle();
@@ -75,35 +76,35 @@ function usePageTitle() {
 /**
  * Renders the topbar heading — either a plain title or a breadcrumb trail.
  *
- * The trail keeps the same `text-lg font-semibold` scale as a plain title, so a
- * nested page doesn't read as visually demoted; only the ancestor crumbs are
+ * The trail keeps the same `text-base font-semibold` scale as a plain title, so
+ * a nested page doesn't read as visually demoted; only the ancestor crumbs are
  * muted, leaving the current page as the emphasised one.
  */
 function TopbarHeading({ title }: { title: TopbarTitleValue }) {
 	const navigate = useNavigate();
 
 	if (!Array.isArray(title)) {
-		return <h1 className="hidden truncate text-lg font-semibold md:block">{title}</h1>;
+		return <h1 className="hidden truncate text-base font-semibold md:block">{title}</h1>;
 	}
 
 	return (
-		<h1 className="hidden min-w-0 items-center gap-1.5 text-lg font-semibold md:flex" data-testid="topbar-breadcrumbs">
+		<h1 className="hidden min-w-0 items-center gap-1.5 text-base font-semibold md:flex" data-testid="topbar-breadcrumbs">
 			{title.map((crumb, index) => {
 				const isLast = index === title.length - 1;
 				return (
 					<Fragment key={`${crumb.label}-${index}`}>
 						{index > 0 && <span className="text-muted-foreground/50 shrink-0 font-normal">/</span>}
-						{crumb.to && !isLast ? (
+						{(crumb.to || crumb.onSelect) && !isLast ? (
 							<button
 								type="button"
-								onClick={() => navigate({ to: crumb.to })}
+								onClick={() => (crumb.onSelect ? crumb.onSelect() : navigate({ to: crumb.to! }))}
 								className="text-muted-foreground hover:text-foreground shrink-0 cursor-pointer transition-colors"
 								data-testid={`topbar-breadcrumb-${index}`}
 							>
 								{crumb.label}
 							</button>
 						) : (
-							// The current page is never a link, even if a `to` was supplied.
+							// The current page is never a link, even if a `to`/`onSelect` was supplied.
 							<span className={cn("truncate", !isLast && "text-muted-foreground")}>{crumb.label}</span>
 						)}
 					</Fragment>
@@ -132,6 +133,7 @@ export default function Topbar() {
 	const setMobileFilterSlot = useMobileFilterSlotRef();
 	const navigate = useNavigate();
 	const [logout] = useLogoutMutation();
+	const dispatch = useAppDispatch();
 	const { data: coreConfig } = useGetCoreConfigQuery({});
 	// Shares the sidebar's RTK Query cache entry, so this costs no extra request.
 	const { data: version } = useGetVersionQuery();
@@ -158,11 +160,14 @@ export default function Topbar() {
 	const handleLogout = async () => {
 		try {
 			await logout().unwrap();
-		} finally {
-			// Redirect regardless — a failed server-side logout still means the
-			// user intended to end the session locally.
-			navigate({ to: "/login" });
+		} catch {
+			// Fall through: a failed server-side logout still means the user
+			// intended to end the session locally.
 		}
+		// Navigate first so the dashboard's polled queries unmount, then drop
+		// the cache. Resetting while they are mounted refetches all of them.
+		await navigate({ to: "/login" });
+		dispatch(baseApi.util.resetApiState());
 	};
 
 	return (
@@ -170,8 +175,9 @@ export default function Topbar() {
 			<div className="flex min-w-0 flex-1 items-center gap-2">
 				<SidebarTrigger className="shrink-0 md:hidden" />
 				<img className="h-[22px] w-auto max-w-[120px] object-contain md:hidden" src={logoSrc} alt={logoAlt} width={70} height={70} />
-				{/* text-lg font-semibold is the existing in-page <h1> scale, so hoisting
-				    the title here doesn't visually demote it. */}
+				{/* text-base font-semibold, which is the size this heading has actually
+				    rendered at: Tailwind has no --text-md token, so the text-md it used
+				    to carry emitted no font-size rule and it simply inherited 0.95rem. */}
 				<TopbarHeading title={title} />
 				{/* Anchor for <PageTitle>'s description popover. Pages portal into
 				    this node, so the topbar never has to know their content. */}
