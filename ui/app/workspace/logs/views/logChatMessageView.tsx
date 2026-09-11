@@ -1,7 +1,9 @@
+import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/codeEditor";
 import { ChatMessage, ContentBlock } from "@/lib/types/logs";
 import { cn } from "@/lib/utils";
+import { applyRedactionMappingToValue } from "@/lib/utils/redaction";
 import { cleanJson, isJson } from "@/lib/utils/validation";
 import { Download } from "lucide-react";
 import AudioPlayer from "./audioPlayer";
@@ -10,6 +12,7 @@ import CollapsibleBox from "./collapsibleBox";
 interface LogChatMessageViewProps {
 	message: ChatMessage;
 	audioFormat?: string; // Optional audio format from request params
+	redactionMapping?: Record<string, string>;
 }
 
 function isSafeHttpUrl(value: string) {
@@ -164,7 +167,12 @@ function ContentBlockView({ block }: { block: ContentBlock; index: number }) {
 	return null;
 }
 
-export default function LogChatMessageView({ message, audioFormat }: LogChatMessageViewProps) {
+export default function LogChatMessageView({ message: rawMessage, audioFormat, redactionMapping }: LogChatMessageViewProps) {
+	const message = useMemo(() => {
+		if (!redactionMapping) return rawMessage;
+		return applyRedactionMappingToValue(rawMessage, redactionMapping);
+	}, [rawMessage, redactionMapping]);
+
 	return (
 		<div className="flex w-full flex-col gap-2">
 			{/* Role header */}

@@ -5,6 +5,7 @@ import {
 	LatencyHistogramResponse,
 	LogEntry,
 	LogFilters,
+	LogRevealResponse,
 	LogSessionDetailResponse,
 	LogSessionSummaryResponse,
 	LogsHistogramResponse,
@@ -451,6 +452,11 @@ export const logsApi = baseApi.injectEndpoints({
 			query: (id) => `/logs/${encodeURIComponent(id)}`,
 			providesTags: (result, error, id) => [{ type: "Logs", id }],
 		}),
+
+		// Get reveal redaction mapping for a log entry by ID
+		getLogRevealMapping: builder.query<LogRevealResponse, string>({
+			query: (id) => `/logs/${encodeURIComponent(id)}/reveal`,
+		}),
 	}),
 });
 
@@ -495,4 +501,6 @@ export const {
 	useCancelRecalculateCostJobMutation,
 	useLazyGetLogByIdQuery,
 	useGetLogByIdQuery,
+	useGetLogRevealMappingQuery,
+	useLazyGetLogRevealMappingQuery,
 } = logsApi;

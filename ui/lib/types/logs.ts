@@ -599,6 +599,12 @@ export interface RedactionMapping {
 	output?: Record<string, string>;
 }
 
+export interface LogRevealResponse {
+	redaction_mapping?: RedactionMapping;
+	input?: Record<string, string>;
+	output?: Record<string, string>;
+}
+
 // One slice of Bifrost overhead, attributed to a span (or group of spans) by
 // self-time. duration_us is microseconds. Buckets come in chronological order and
 // summing them gives an independent measure of overhead vs the overhead_latency
@@ -708,6 +714,7 @@ export interface LogEntry {
 	passthrough_response_body?: string; // Raw passthrough response body (UTF-8)
 	metadata?: Record<string, any>; // JSON metadata (e.g., isAsyncRequest and outgoing_bifrost)
 	redaction_mapping?: RedactionMapping; // Phase-scoped placeholder-to-original mappings, present only when caller has Logs:Reveal
+	has_redaction_mapping?: boolean; // true if the log has reversible redactions available for reveal
 	user_agent?: string; // Raw HTTP User-Agent of the calling client
 	app?: string; // Backend-detected client app
 	// Aggregates over this log's fallback children (rows whose parent_request_id

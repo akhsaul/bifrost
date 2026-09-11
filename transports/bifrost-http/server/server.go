@@ -2088,9 +2088,13 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 		loggingHandler = handlers.NewLoggingHandler(loggerPlugin.GetPluginLogManager(), s, s.Config)
 		if resolverProvider, ok := callbacks.(LogRedactionMappingResolverProvider); ok {
 			loggingHandler.SetLogRedactionMappingResolver(resolverProvider.GetLogRedactionMappingResolver())
+		} else {
+			loggingHandler.SetLogRedactionMappingResolver(handlers.NewDefaultLogRedactionResolver())
 		}
 		if resolverProvider, ok := callbacks.(MCPLogRedactionMappingResolverProvider); ok {
 			loggingHandler.SetMCPLogRedactionMappingResolver(resolverProvider.GetMCPLogRedactionMappingResolver())
+		} else {
+			loggingHandler.SetMCPLogRedactionMappingResolver(handlers.NewDefaultLogRedactionResolver())
 		}
 		// Wire the sidekiq runner so cost recalculation runs as a durable background
 		// job. Registering the handler here (before RecoverIncomplete) lets a job

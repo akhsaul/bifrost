@@ -245,3 +245,41 @@ func TestDeserializeFieldsCostBreakdownNilWhenNoCost(t *testing.T) {
 	require.NoError(t, log.DeserializeFields())
 	assert.Nil(t, log.CostBreakdown)
 }
+
+func TestSerializeFieldsRedactionMapping(t *testing.T) {
+	t.Run("Log serializes ReversibleMappings to pure JSON", func(t *testing.T) {
+		log := &Log{
+			RedactionData: &schemas.RedactionData{
+				ReversibleMappings: schemas.RedactionMapsByPhase{
+					Input:  map[string]string{"EMAIL-1": "alex@example.com"},
+					Output: map[string]string{"PHONE_NUMBER-1": "+1 555 0100"},
+				},
+			},
+		}
+		require.NoError(t, log.SerializeFields())
+		assert.Contains(t, log.RedactionMapping, `"EMAIL-1":"alex@example.com"`)
+		assert.Contains(t, log.RedactionMapping, `"PHONE_NUMBER-1":"+1 555 0100"`)
+		assert.NotContains(t, log.RedactionMapping, "plain:")
+
+		// Preserves existing RedactionMapping if already populated
+		log.RedactionMapping = `{"custom":"value"}`
+		require.NoError(t, log.SerializeFields())
+		assert.Equal(t, `{"custom":"value"}`, log.RedactionMapping)
+	})
+
+	t.Run("MCPToolLog serializes ReversibleMappings to pure JSON", func(t *testing.T) {
+		mcpLog := &MCPToolLog{
+			RedactionData: &schemas.RedactionData{
+				ReversibleMappings: schemas.RedactionMapsByPhase{
+					Input:  map[string]string{"TOKEN-1": "secret_arg"},
+					Output: map[string]string{"TOKEN-2": "secret_result"},
+				},
+			},
+		}
+		require.NoError(t, mcpLog.SerializeFields())
+		assert.Contains(t, mcpLog.RedactionMapping, `"TOKEN-1":"secret_arg"`)
+		assert.Contains(t, mcpLog.RedactionMapping, `"TOKEN-2":"secret_result"`)
+		assert.NotContains(t, mcpLog.RedactionMapping, "plain:")
+	})
+}
+

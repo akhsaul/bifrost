@@ -334,10 +334,37 @@ type LogRedactionMappingResolver interface {
 
 // MCPLogRedactionMappingResolver optionally exposes decoded redaction mappings on MCP log-detail responses.
 type MCPLogRedactionMappingResolver interface {
-	// ResolveMCPLogRedactionMapping returns phase-scoped placeholder-to-original mappings when the caller may reveal them.
-	// Implementations should return nil, nil when the caller is not authorized or no mapping is available.
-	// Errors are treated as reveal-data failures only; the base MCP log detail response is still served.
 	ResolveMCPLogRedactionMapping(ctx *fasthttp.RequestCtx, log *logstore.MCPToolLog) (*schemas.RedactionMapsByPhase, error)
+}
+
+// DefaultLogRedactionResolver resolves unencrypted redaction mappings in OSS/custom deployments.
+type DefaultLogRedactionResolver struct{}
+
+// NewDefaultLogRedactionResolver creates a new DefaultLogRedactionResolver.
+func NewDefaultLogRedactionResolver() *DefaultLogRedactionResolver {
+	return &DefaultLogRedactionResolver{}
+}
+
+func (r *DefaultLogRedactionResolver) ResolveLogRedactionMapping(_ *fasthttp.RequestCtx, log *logstore.Log) (*schemas.RedactionMapsByPhase, error) {
+	if log == nil || log.RedactionMapping == "" {
+		return nil, nil
+	}
+	var mapping schemas.RedactionMapsByPhase
+	if err := sonic.Unmarshal([]byte(log.RedactionMapping), &mapping); err != nil {
+		return nil, err
+	}
+	return &mapping, nil
+}
+
+func (r *DefaultLogRedactionResolver) ResolveMCPLogRedactionMapping(_ *fasthttp.RequestCtx, log *logstore.MCPToolLog) (*schemas.RedactionMapsByPhase, error) {
+	if log == nil || log.RedactionMapping == "" {
+		return nil, nil
+	}
+	var mapping schemas.RedactionMapsByPhase
+	if err := sonic.Unmarshal([]byte(log.RedactionMapping), &mapping); err != nil {
+		return nil, err
+	}
+	return &mapping, nil
 }
 
 // NewLoggingHandler creates a new logging handler instance
@@ -376,6 +403,7 @@ func (h *LoggingHandler) RegisterRoutes(r *router.Router, middlewares ...schemas
 	r.POST("/api/logs/user-agent-mappings", lib.ChainMiddlewares(h.createUserAgentMapping, middlewares...))
 	r.PUT("/api/logs/user-agent-mappings/{id}", lib.ChainMiddlewares(h.updateUserAgentMapping, middlewares...))
 	r.DELETE("/api/logs/user-agent-mappings/{id}", lib.ChainMiddlewares(h.deleteUserAgentMapping, middlewares...))
+	r.GET("/api/logs/{id}/reveal", lib.ChainMiddlewares(h.getLogRevealMapping, middlewares...))
 	r.GET("/api/logs/{id}", lib.ChainMiddlewares(h.getLogByID, middlewares...))
 	r.GET("/api/logs/stats", lib.ChainMiddlewares(h.getLogsStats, middlewares...))
 	r.GET("/api/logs/histogram", lib.ChainMiddlewares(h.getLogsHistogram, middlewares...))
@@ -839,13 +867,8 @@ func (h *LoggingHandler) getLogByID(ctx *fasthttp.RequestCtx) {
 		return
 	}
 
-	if h.logRedactionMappingResolver != nil && log.RedactionMapping != "" {
-		mapping, err := h.logRedactionMappingResolver.ResolveLogRedactionMapping(ctx, log)
-		if err != nil {
-			logger.Error("failed to resolve redaction mapping for log %s: %v", id, err)
-		} else if mapping != nil && mapping.HasReplacements() {
-			log.RevealRedactionMapping = mapping
-		}
+	if log.RedactionMapping != "" {
+		log.HasRedactionMapping = true
 	}
 
 	// Assemble virtual key, selected key, and routing rule objects (gorm:"-" fields not
@@ -864,6 +887,49 @@ func (h *LoggingHandler) getLogByID(ctx *fasthttp.RequestCtx) {
 	}
 
 	SendJSON(ctx, log)
+}
+
+// getLogRevealMapping handles GET /api/logs/{id}/reveal - Get the redaction mapping for a single log entry
+func (h *LoggingHandler) getLogRevealMapping(ctx *fasthttp.RequestCtx) {
+	id, ok := ctx.UserValue("id").(string)
+	if !ok || id == "" {
+		SendError(ctx, fasthttp.StatusBadRequest, "log id is required")
+		return
+	}
+
+	log, err := h.logManager.GetLog(ctx, id)
+	if err != nil {
+		if errors.Is(err, logstore.ErrNotFound) {
+			SendError(ctx, fasthttp.StatusNotFound, "log not found")
+			return
+		}
+		SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("failed to get log: %v", err))
+		return
+	}
+
+	var mapping *schemas.RedactionMapsByPhase
+	if h.logRedactionMappingResolver != nil && log.RedactionMapping != "" {
+		resolved, err := h.logRedactionMappingResolver.ResolveLogRedactionMapping(ctx, log)
+		if err != nil {
+			logger.Error("failed to resolve redaction mapping for log %s: %v", id, err)
+			SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("failed to resolve redaction mapping: %v", err))
+			return
+		}
+		mapping = resolved
+	}
+	if mapping == nil {
+		mapping = &schemas.RedactionMapsByPhase{
+			Input:  make(map[string]string),
+			Output: make(map[string]string),
+		}
+	}
+
+	ctx.Response.Header.Set("Cache-Control", "no-store")
+	SendJSON(ctx, map[string]any{
+		"redaction_mapping": mapping,
+		"input":             mapping.Input,
+		"output":            mapping.Output,
+	})
 }
 
 // getLogsStats handles GET /api/logs/stats - Get statistics for logs with filtering

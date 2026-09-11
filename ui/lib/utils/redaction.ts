@@ -8,7 +8,7 @@ export function hasRedactionMappingEntries(mapping?: RedactionMapping): boolean 
 // applyRedactionMapping replaces reversible placeholders in display text without mutating source data.
 export function applyRedactionMapping(text: string | undefined, mapping?: Record<string, string>): string {
 	if (!text || !mapping) return text || "";
-	return text.replace(/\[([^\]]+)\]/g, (placeholder, key: string) =>
+	return text.replace(/\[([^\[\]]+)\]/g, (placeholder, key: string) =>
 		Object.prototype.hasOwnProperty.call(mapping, key) ? mapping[key] : placeholder,
 	);
 }

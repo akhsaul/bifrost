@@ -36,4 +36,11 @@ describe("redaction reveal helpers", () => {
 		const merged = mergeRedactionMappings({ input: { "SECRET-1": "same" }, output: { "SECRET-1": "same" } });
 		expect(applyRedactionMapping("[SECRET-1]", merged)).toBe("same");
 	});
+
+	it("reveals placeholders surrounded by JSON array brackets without greedily matching across arrays", () => {
+		const jsonString = '{"tool_calls": [{"function": {"arguments": "{\\"cmd\\": \\"[SECRET-1]\\"}"}}]}';
+		expect(applyRedactionMapping(jsonString, { "SECRET-1": "revealed_key" })).toBe(
+			'{"tool_calls": [{"function": {"arguments": "{\\"cmd\\": \\"revealed_key\\"}"}}]}',
+		);
+	});
 });

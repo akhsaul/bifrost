@@ -39,12 +39,12 @@ import {
 	RoutingEngineUsedLabels,
 	Status,
 } from "@/lib/constants/logs";
-import { BatchRequestCounts, ContentBlock, LogEntry, OverheadBucket, ResponsesMessage } from "@/lib/types/logs";
-import { useGetUserAgentMappingsQuery } from "@/lib/store";
+import { BatchRequestCounts, ContentBlock, LogEntry, OverheadBucket, RedactionMapping, ResponsesMessage } from "@/lib/types/logs";
+import { useGetUserAgentMappingsQuery, useLazyGetLogRevealMappingQuery } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { downloadAsJson } from "@/lib/utils/browser-download";
 import { formatCompactNumber } from "@/lib/utils/numbers";
-import { applyRedactionMapping, applyRedactionMappingToValue, hasRedactionMappingEntries } from "@/lib/utils/redaction";
+import { applyRedactionMapping, applyRedactionMappingToValue, hasRedactionMappingEntries, mergeRedactionMappings } from "@/lib/utils/redaction";
 import { extractResponsesItemPayload, summarizeResponsesToolCall } from "@/lib/utils/responsesItems";
 import { isJson } from "@/lib/utils/validation";
 import { Link } from "@tanstack/react-router";
@@ -971,21 +971,43 @@ export function LogDetailView({
 		errorMessage: "Failed to copy request body",
 	});
 	const [showRevealedValues, setShowRevealedValues] = useState(false);
-	const revealMapping = log?.redaction_mapping;
-	const revealAvailable = canReveal && hasRedactionMappingEntries(revealMapping);
+	const [fetchedMapping, setFetchedMapping] = useState<RedactionMapping | undefined>(undefined);
+	const [triggerGetRevealMapping, { isFetching: isFetchingReveal }] = useLazyGetLogRevealMappingQuery();
+
+	const revealMapping = fetchedMapping || log?.redaction_mapping;
+	const revealAvailable = canReveal && Boolean(log?.has_redaction_mapping || hasRedactionMappingEntries(revealMapping));
 	const revealEnabled = revealAvailable && showRevealedValues;
-	const activeInputRevealMapping = revealEnabled ? revealMapping?.input : undefined;
-	const activeOutputRevealMapping = revealEnabled ? revealMapping?.output : undefined;
+	const mixedRevealMapping = revealEnabled ? mergeRedactionMappings(revealMapping) : undefined;
+	const activeInputRevealMapping = mixedRevealMapping ?? (revealEnabled ? revealMapping?.input : undefined);
+	const activeOutputRevealMapping = mixedRevealMapping ?? (revealEnabled ? revealMapping?.output : undefined);
 
 	useEffect(() => {
 		setShowRevealedValues(false);
-	}, [log?.id, revealAvailable]);
+		setFetchedMapping(undefined);
+	}, [log?.id]);
 
 	const allRoles: MessageRole[] = ["system", "user", "assistant", "tool", "reasoning"];
 	const [visibleRoles, setVisibleRoles] = useState<Set<MessageRole>>(new Set(allRoles));
 
-	const handleToggleReveal = (checked: boolean) => {
-		setShowRevealedValues(checked && revealAvailable);
+	const handleToggleReveal = async (checked: boolean) => {
+		if (!revealAvailable) return;
+		if (checked) {
+			if (!revealMapping && log?.id) {
+				try {
+					const res = await triggerGetRevealMapping(log.id).unwrap();
+					const mapping: RedactionMapping = res.redaction_mapping ?? { input: res.input, output: res.output };
+					setFetchedMapping(mapping);
+					setShowRevealedValues(true);
+				} catch (err) {
+					console.error("Failed to fetch reveal mapping", err);
+					toast.error("Failed to fetch secret values");
+				}
+			} else {
+				setShowRevealedValues(true);
+			}
+		} else {
+			setShowRevealedValues(false);
+		}
 	};
 
 	if (!log) return null;
@@ -1190,19 +1212,6 @@ export function LogDetailView({
 					<span className="text-foreground font-medium">Request details</span>
 				</div>
 				<div className="flex items-center gap-3">
-					{revealAvailable && (
-						<div className="flex items-center gap-2">
-							<label htmlFor="logdetails-reveal-toggle" className="text-muted-foreground text-[11px] font-medium">
-								Show original values
-							</label>
-							<Switch
-								id="logdetails-reveal-toggle"
-								checked={revealEnabled}
-								onCheckedChange={handleToggleReveal}
-								data-testid="logdetails-reveal-toggle"
-							/>
-						</div>
-					)}
 					{onClose ? (
 						<AlertDialog>
 							<DropdownMenu>
@@ -2835,8 +2844,17 @@ export function LogDetailView({
 														<CollapsibleCode text={text} preview={3} lang={role === "system" ? "xml" : undefined} />
 													)
 												) : (
-													<LogChatMessageView message={message} audioFormat={audioFormat} />
+													<LogChatMessageView message={message} audioFormat={audioFormat} redactionMapping={activeInputRevealMapping} />
 												)}
+												{hasToolCalls && text ? (
+													<div className="mt-2">
+														<LogChatMessageView
+															message={{ role: message.role, content: "", tool_calls: message.tool_calls }}
+															audioFormat={audioFormat}
+															redactionMapping={activeInputRevealMapping}
+														/>
+													</div>
+												) : null}
 												{text &&
 													Array.isArray(message.content) &&
 													(message.content as ContentBlock[])
@@ -2857,14 +2875,6 @@ export function LogDetailView({
 																className="mt-2"
 															/>
 														))}
-												{hasToolCalls && text ? (
-													<div className="text-muted-foreground mt-2 text-[11px]">
-														{message
-															.tool_calls!.map((tc) => tc.function?.name)
-															.filter(Boolean)
-															.join(", ") || `${message.tool_calls!.length} tool call${message.tool_calls!.length === 1 ? "" : "s"}`}
-													</div>
-												) : null}
 											</MessageRow>,
 										);
 									}
@@ -2916,8 +2926,9 @@ export function LogDetailView({
 																)}
 															</div>
 														) : text ? (
-															isJson(text) ? (
-																<CodeEditor
+															<>
+																{isJson(text) ? (
+																	<CodeEditor
 																	wrap
 																	code={(() => {
 																		try {
@@ -2937,10 +2948,20 @@ export function LogDetailView({
 																/>
 															) : (
 																<CollapsibleCode text={text} preview={3} mono={false} />
-															)
-														) : (
-															<LogChatMessageView message={log.output_message} audioFormat={audioFormat} />
-														)}
+															)}
+															{log.output_message.tool_calls && log.output_message.tool_calls.length > 0 && (
+																<div className="mt-2">
+																	<LogChatMessageView
+																		message={{ role: "assistant", content: "", tool_calls: log.output_message.tool_calls }}
+																		audioFormat={audioFormat}
+																		redactionMapping={activeOutputRevealMapping}
+																	/>
+																</div>
+															)}
+														</>
+													) : (
+														<LogChatMessageView message={log.output_message} audioFormat={audioFormat} redactionMapping={activeOutputRevealMapping} />
+													)}
 													</MessageRow>
 												) : null}
 											</>
@@ -3070,11 +3091,11 @@ export function LogDetailView({
 												)
 											) : msg.output !== undefined ? (
 												<CollapsibleCode
-													text={typeof msg.output === "string" ? msg.output : JSON.stringify(msg.output, null, 2)}
+													text={typeof msg.output === "string" ? applyRedactionMapping(msg.output, mapping) : JSON.stringify(applyRedactionMappingToValue(msg.output, mapping), null, 2)}
 													preview={3}
 												/>
 											) : Array.isArray(msg.tools) && msg.tools.length > 0 ? (
-												<CollapsibleCode text={JSON.stringify(msg.tools, null, 2)} preview={3} />
+												<CollapsibleCode text={JSON.stringify(applyRedactionMappingToValue(msg.tools, mapping), null, 2)} preview={3} />
 											) : Array.isArray(msg.tools) ? (
 												<div className="text-muted-foreground text-[12px] italic">No tools declared</div>
 											) : itemPayload ? (
@@ -3333,6 +3354,21 @@ export function LogDetailView({
 				</TabsContent>
 
 				<TabsContent value="raw" className="space-y-3">
+					{revealAvailable && (
+						<div className="flex items-center justify-end gap-2 pb-1">
+							{isFetchingReveal && <Loader2 className="text-muted-foreground h-3 w-3 animate-spin" />}
+							<label htmlFor="logdetails-reveal-toggle" className="text-muted-foreground text-[11px] font-medium">
+								show secret values
+							</label>
+							<Switch
+								id="logdetails-reveal-toggle"
+								checked={revealEnabled}
+								onCheckedChange={handleToggleReveal}
+								disabled={isFetchingReveal}
+								data-testid="logdetails-reveal-toggle"
+							/>
+						</div>
+					)}
 					{rawRequest && (
 						<>
 							<div className="text-muted-foreground text-[12px]">

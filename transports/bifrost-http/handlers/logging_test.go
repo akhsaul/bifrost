@@ -108,6 +108,112 @@ func TestGetMCPLogByIDRedactionMapping(t *testing.T) {
 	}
 }
 
+func TestDefaultLogRedactionResolver(t *testing.T) {
+	resolver := NewDefaultLogRedactionResolver()
+
+	t.Run("ResolveLogRedactionMapping pure JSON", func(t *testing.T) {
+		log := &logstore.Log{
+			ID:               "log-1",
+			RedactionMapping: `{"input":{"EMAIL-1":"alex@example.com"},"output":{"PHONE_NUMBER-1":"+1 555 0100"}}`,
+		}
+		res, err := resolver.ResolveLogRedactionMapping(nil, log)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res == nil {
+			t.Fatal("expected non-nil mapping")
+		}
+		if res.Input["EMAIL-1"] != "alex@example.com" {
+			t.Errorf("got %q, want alex@example.com", res.Input["EMAIL-1"])
+		}
+		if res.Output["PHONE_NUMBER-1"] != "+1 555 0100" {
+			t.Errorf("got %q, want +1 555 0100", res.Output["PHONE_NUMBER-1"])
+		}
+	})
+
+	t.Run("ResolveMCPLogRedactionMapping pure JSON", func(t *testing.T) {
+		mcpLog := &logstore.MCPToolLog{
+			ID:               "mcp-1",
+			RedactionMapping: `{"input":{"TOKEN-1":"secret_arg"}}`,
+		}
+		res, err := resolver.ResolveMCPLogRedactionMapping(nil, mcpLog)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if res == nil {
+			t.Fatal("expected non-nil mapping")
+		}
+		if res.Input["TOKEN-1"] != "secret_arg" {
+			t.Errorf("got %q, want secret_arg", res.Input["TOKEN-1"])
+		}
+	})
+
+	t.Run("Empty or nil returns nil without error", func(t *testing.T) {
+		res, err := resolver.ResolveLogRedactionMapping(nil, nil)
+		if err != nil || res != nil {
+			t.Errorf("expected nil, nil; got %v, %v", res, err)
+		}
+		res, err = resolver.ResolveLogRedactionMapping(nil, &logstore.Log{RedactionMapping: ""})
+		if err != nil || res != nil {
+			t.Errorf("expected nil, nil; got %v, %v", res, err)
+		}
+	})
+}
+
+func TestGetLogRevealMapping(t *testing.T) {
+	SetLogger(&mockLogger{})
+	manager := &dashboardLogManager{
+		log: &logstore.Log{
+			ID:               "log-1",
+			RedactionMapping: `{"input":{"EMAIL-1":"alex@example.com"}}`,
+		},
+	}
+	handler := &LoggingHandler{
+		logManager:                  manager,
+		logRedactionMappingResolver: NewDefaultLogRedactionResolver(),
+	}
+
+	// 1. Verify getLogByID does NOT return redaction_mapping, but returns has_redaction_mapping: true
+	ctxDetail := &fasthttp.RequestCtx{}
+	ctxDetail.SetUserValue("id", "log-1")
+	handler.getLogByID(ctxDetail)
+	if ctxDetail.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("getLogByID status = %d, want %d", ctxDetail.Response.StatusCode(), fasthttp.StatusOK)
+	}
+	var detailResponse struct {
+		HasRedactionMapping bool                          `json:"has_redaction_mapping"`
+		RedactionMapping    *schemas.RedactionMapsByPhase `json:"redaction_mapping"`
+	}
+	if err := json.Unmarshal(ctxDetail.Response.Body(), &detailResponse); err != nil {
+		t.Fatalf("decode detail response: %v", err)
+	}
+	if !detailResponse.HasRedactionMapping {
+		t.Error("expected has_redaction_mapping to be true")
+	}
+	if detailResponse.RedactionMapping != nil {
+		t.Errorf("expected redaction_mapping to be omitted from getLogByID, got: %#v", detailResponse.RedactionMapping)
+	}
+
+	// 2. Verify getLogRevealMapping returns redaction_mapping
+	ctxReveal := &fasthttp.RequestCtx{}
+	ctxReveal.SetUserValue("id", "log-1")
+	handler.getLogRevealMapping(ctxReveal)
+	if ctxReveal.Response.StatusCode() != fasthttp.StatusOK {
+		t.Fatalf("getLogRevealMapping status = %d, want %d", ctxReveal.Response.StatusCode(), fasthttp.StatusOK)
+	}
+	var revealResponse struct {
+		RedactionMapping *schemas.RedactionMapsByPhase `json:"redaction_mapping"`
+	}
+	if err := json.Unmarshal(ctxReveal.Response.Body(), &revealResponse); err != nil {
+		t.Fatalf("decode reveal response: %v", err)
+	}
+	if revealResponse.RedactionMapping == nil || revealResponse.RedactionMapping.Input["EMAIL-1"] != "alex@example.com" {
+		t.Fatalf("expected revealed email alex@example.com, got: %#v", revealResponse.RedactionMapping)
+	}
+}
+
+
+
 // TestShouldCacheFilterDimensions_NarrowsToRawScans verifies the cache is spent
 // only where it saves real work. Matview-backed dimensions are indexed lookups
 // and a cache entry serves exactly one caller, so they are not worth caching;
@@ -571,6 +677,7 @@ func (s *fakeSidekiqStore) FinalizeCancelledSidekiqJob(ctx context.Context, id, 
 
 type dashboardLogManager struct {
 	failStats              bool
+	log                    *logstore.Log
 	mcpLog                 *logstore.MCPToolLog
 	lastLLMFilters         logstore.SearchFilters
 	lastMCPFilters         logstore.MCPToolLogSearchFilters
@@ -579,6 +686,9 @@ type dashboardLogManager struct {
 }
 
 func (m *dashboardLogManager) GetLog(ctx context.Context, id string) (*logstore.Log, error) {
+	if m.log != nil {
+		return m.log, nil
+	}
 	return nil, nil
 }
 func (m *dashboardLogManager) Search(ctx context.Context, filters *logstore.SearchFilters, pagination *logstore.PaginationOptions) (*logstore.SearchResult, error) {

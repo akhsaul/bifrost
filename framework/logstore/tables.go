@@ -296,6 +296,7 @@ type Log struct {
 	RedactionData          *schemas.RedactionData        `gorm:"-" json:"-"`                           // Transient guardrail redaction data consumed by enterprise logstore wrappers
 	RedactionMapping       string                        `gorm:"type:text" json:"-"`                   // Reversible redaction mapping (encrypted when an encryption key is set), written by enterprise logstore wrappers; deleted with the row
 	RevealRedactionMapping *schemas.RedactionMapsByPhase `gorm:"-" json:"redaction_mapping,omitempty"` // Virtual field populated only on permitted log-detail reads
+	HasRedactionMapping    bool                          `gorm:"-" json:"has_redaction_mapping,omitempty"`
 
 	// Cluster governance fields - attached by the logging plugin when running in a cluster
 	// so that leaders can recover disconnected node usage from the logs table.
@@ -837,6 +838,12 @@ func (l *Log) SerializeFields() error {
 		l.ContentSummary = l.BuildContentSummary()
 	}
 
+	if l.RedactionData != nil && l.RedactionData.ReversibleMappings.HasReplacements() && l.RedactionMapping == "" {
+		if data, err := sonic.Marshal(l.RedactionData.ReversibleMappings); err == nil {
+			l.RedactionMapping = string(data)
+		}
+	}
+
 	return nil
 }
 
@@ -1350,6 +1357,12 @@ func (l *MCPToolLog) SerializeFields() error {
 			l.MetadataParsed = nil
 		} else {
 			l.Metadata = string(data)
+		}
+	}
+
+	if l.RedactionData != nil && l.RedactionData.ReversibleMappings.HasReplacements() && l.RedactionMapping == "" {
+		if data, err := sonic.Marshal(l.RedactionData.ReversibleMappings); err == nil {
+			l.RedactionMapping = string(data)
 		}
 	}
 
