@@ -24,8 +24,8 @@ import (
 	"github.com/maximhq/bifrost/core/providers/aisure"
 	"github.com/maximhq/bifrost/core/providers/anthropic"
 	"github.com/maximhq/bifrost/core/providers/antigravity"
-	"github.com/maximhq/bifrost/core/providers/bai"
 	"github.com/maximhq/bifrost/core/providers/azure"
+	"github.com/maximhq/bifrost/core/providers/bai"
 	"github.com/maximhq/bifrost/core/providers/bedrock"
 	"github.com/maximhq/bifrost/core/providers/bedrockmantle"
 	"github.com/maximhq/bifrost/core/providers/byteplus"
@@ -52,6 +52,7 @@ import (
 	"github.com/maximhq/bifrost/core/providers/ollama"
 	"github.com/maximhq/bifrost/core/providers/openai"
 	"github.com/maximhq/bifrost/core/providers/opencode"
+	"github.com/maximhq/bifrost/core/providers/opencodefree"
 	"github.com/maximhq/bifrost/core/providers/openrouter"
 	"github.com/maximhq/bifrost/core/providers/parasail"
 	"github.com/maximhq/bifrost/core/providers/perplexity"
@@ -4572,6 +4573,8 @@ func (bifrost *Bifrost) createBaseProvider(providerKey schemas.ModelProvider, co
 		return opencode.NewOpencodeGoProvider(config, bifrost.logger)
 	case schemas.OpencodeZen:
 		return opencode.NewOpencodeZenProvider(config, bifrost.logger)
+	case schemas.OpencodeFree:
+		return opencodefree.NewOpencodeFreeProvider(config, bifrost.logger)
 	case schemas.GithubCopilot:
 		return githubcopilot.NewGithubCopilotProvider(config, bifrost.logger)
 	case schemas.SGL:
@@ -6973,7 +6976,7 @@ func (bifrost *Bifrost) requestWorker(provider schemas.Provider, config *schemas
 		// batch/file/container operations that manage their own key lists.
 		var keyProvider func(usedKeyIDs, deadKeyIDs map[string]bool) (schemas.Key, error)
 
-		if providerRequiresKey(config.CustomProviderConfig) {
+		if providerRequiresKey(provider.GetProviderKey(), config.CustomProviderConfig) {
 			// ListModels needs all enabled/supported keys so providers can aggregate
 			// and report per-key statuses (KeyStatuses).
 			if req.RequestType == schemas.ListModelsRequest {

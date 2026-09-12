@@ -93,6 +93,7 @@ const (
 	Neuralwatt    ModelProvider = "neuralwatt"
 	Bai           ModelProvider = "bai"
 	Antigravity   ModelProvider = "antigravity"
+	OpencodeFree  ModelProvider = "opencode-free"
 )
 
 // SupportedBaseProviders is the list of base providers allowed for custom providers.
@@ -159,6 +160,7 @@ var StandardProviders = []ModelProvider{
 	Neuralwatt,
 	Bai,
 	Antigravity,
+	OpencodeFree,
 }
 
 // RequestType represents the type of request being made to a provider.

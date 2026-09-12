@@ -501,6 +501,9 @@
         "opencode-zen": {
           "$ref": "#/$defs/provider"
         },
+        "opencode-free": {
+          "$ref": "#/$defs/provider"
+        },
         "openrouter": {
           "$ref": "#/$defs/provider"
         },
@@ -8740,6 +8743,7 @@
 			"antigravity",
             "opencode-go",
             "opencode-zen",
+            "opencode-free",
             "sgl",
             "parasail",
             "perplexity",

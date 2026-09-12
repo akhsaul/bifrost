@@ -452,6 +452,32 @@ export const ProviderIcons = {
 		);
 	},
 
+	"opencode-free": ({ size = "md", className = "" }: IconProps) => {
+		const resolvedSize = resolveSize(size);
+
+		return (
+			<svg
+				width={resolvedSize}
+				height={resolvedSize}
+				viewBox="0 0 128 128"
+				fill="none"
+				xmlns="http://www.w3.org/2000/svg"
+				className={className}
+			>
+				<title>OpenCode Free</title>
+				<rect x="16" y="20" width="96" height="88" rx="8" stroke="currentColor" strokeWidth="6" fill="none" />
+				<path
+					d="M52 46 L36 64 L52 82 M76 46 L92 64 L76 82"
+					stroke="currentColor"
+					strokeWidth="8"
+					strokeLinecap="round"
+					strokeLinejoin="round"
+					fill="none"
+				/>
+			</svg>
+		);
+	},
+
 	sgl: ({ className = "" }: IconProps) => {
 		return <img src="/images/sgl.webp" alt="sgl" width={14} height={14} loading="lazy" decoding="async" className={className} />;
 	},

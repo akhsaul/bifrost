@@ -120,7 +120,7 @@ func ToOpenAIChatRequest(ctx *schemas.BifrostContext, bifrostReq *schemas.Bifros
 		openaiReq.filterOpenAISpecificParameters(caps)
 		openaiReq.applyMistralCompatibility()
 		return openaiReq
-	case schemas.OpencodeGo, schemas.OpencodeZen:
+	case schemas.OpencodeGo, schemas.OpencodeZen, schemas.OpencodeFree:
 		openaiReq.filterOpenAISpecificParameters(caps)
 		// OpenCode's chat-completions endpoints still use the legacy max_tokens
 		// field and ignore max_completion_tokens.

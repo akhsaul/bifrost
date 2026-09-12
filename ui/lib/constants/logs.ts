@@ -13,10 +13,12 @@ export const KnownProvidersNames = [
 	"cerebras",
 	"cohere",
 	"dahl",
+	"databricks",
 	"deepseek",
 	"elevenlabs",
 	"fireworks",
 	"gemini",
+	"github-copilot",
 	"gorouter",
 	"groq",
 	"hcnsec",
@@ -30,6 +32,7 @@ export const KnownProvidersNames = [
 	"neuralwatt",
 	"ollama",
 	"openai",
+	"opencode-free",
 	"opencode-go",
 	"opencode-zen",
 	"openrouter",
@@ -50,8 +53,6 @@ export const KnownProvidersNames = [
 	"vyceai",
 	"wafer",
 	"xai",
-	"databricks",
-	"github-copilot",
 ] as const;
 
 // Local Provider type derived from KNOWN_PROVIDERS constant
@@ -171,6 +172,7 @@ export const ProviderLabels: Record<ProviderName, string> = {
 	ollama: "Ollama",
 	"opencode-go": "OpenCode Go",
 	"opencode-zen": "OpenCode Zen",
+	"opencode-free": "OpenCode Free",
 	groq: "Groq",
 	parasail: "Parasail",
 	elevenlabs: "Elevenlabs",

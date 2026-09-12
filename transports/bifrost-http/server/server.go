@@ -944,7 +944,7 @@ func (s *BifrostHTTPServer) ReloadProvider(ctx context.Context, provider schemas
 	if err != nil {
 		return nil, fmt.Errorf("failed to read provider keys for %s: %w", provider, err)
 	}
-	isKeylessProvider := providerInfo.CustomProviderConfig != nil && providerInfo.CustomProviderConfig.IsKeyLess
+	isKeylessProvider := isKeylessProvider(provider, s.Config)
 	hasNoKeys := len(inMemoryKeys) == 0 && !isKeylessProvider
 
 	// Refresh keyconfig from the current key list, then reconcile the live
@@ -1097,7 +1097,12 @@ func keyEnabled(key schemas.Key) bool {
 // isKeylessProvider returns true when the provider's config marks it
 // keyless. Used to pick the live-cache key for OnKey* helpers: keyless
 // providers cache under the empty-string sentinel.
+// Standard providers that are inherently keyless (no upstream credential),
+// like opencode-free's anonymous tier, are recognized without config.
 func isKeylessProvider(provider schemas.ModelProvider, cfg *lib.Config) bool {
+	if provider == schemas.OpencodeFree {
+		return true
+	}
 	if cfg == nil {
 		return false
 	}

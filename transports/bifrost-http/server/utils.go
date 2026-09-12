@@ -179,7 +179,7 @@ func (s *BifrostHTTPServer) currentKeyStatus(ks schemas.KeyStatus) (status strin
 	}
 
 	if ks.KeyID == "" {
-		if providerConfig.CustomProviderConfig == nil || !providerConfig.CustomProviderConfig.IsKeyLess {
+		if (providerConfig.CustomProviderConfig == nil || !providerConfig.CustomProviderConfig.IsKeyLess) && ks.Provider != schemas.OpencodeFree {
 			return "", "", false
 		}
 		return providerConfig.Status, providerConfig.Description, true
@@ -242,7 +242,7 @@ func (s *BifrostHTTPServer) updateKeyStatus(
 			continue
 		}
 
-		isKeylessProvider := providerConfig.CustomProviderConfig != nil && providerConfig.CustomProviderConfig.IsKeyLess
+		isKeylessProvider := (providerConfig.CustomProviderConfig != nil && providerConfig.CustomProviderConfig.IsKeyLess) || ks.Provider == schemas.OpencodeFree
 
 		if ks.KeyID == "" {
 			if !isKeylessProvider {

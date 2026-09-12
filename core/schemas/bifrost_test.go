@@ -15,3 +15,12 @@ func TestBaiProviderRegistered(t *testing.T) {
 		t.Fatalf("StandardProviders must contain %q", schemas.Bai)
 	}
 }
+
+func TestOpencodeFreeProviderRegistered(t *testing.T) {
+	if schemas.OpencodeFree != "opencode-free" {
+		t.Fatalf("OpencodeFree = %q, want %q", schemas.OpencodeFree, "opencode-free")
+	}
+	if !slices.Contains(schemas.StandardProviders, schemas.OpencodeFree) {
+		t.Fatalf("StandardProviders must contain %q", schemas.OpencodeFree)
+	}
+}
