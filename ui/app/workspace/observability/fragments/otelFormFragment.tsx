@@ -804,16 +804,12 @@ function OtelProfileSection({ form, control, index, hasOtelAccess, canRemove, op
 										<div className="flex w-full flex-row items-center gap-2">
 											<div className="flex flex-col gap-1">
 												<h3 className="text-sm font-medium">Overhead breakdown</h3>
-												<p className="text-muted-foreground text-xs">
-													Export per-component Bifrost overhead latency as a histogram.
-												</p>
+												<p className="text-muted-foreground text-xs">Export per-component Bifrost overhead latency as a histogram.</p>
 											</div>
 											<div className="ml-auto">
 												<Switch
 													aria-label="Enable overhead breakdown"
-													data-testid={
-														index === 0 ? "otel-overhead-breakdown-toggle" : `otel-profile-${index}-overhead-breakdown-toggle`
-													}
+													data-testid={index === 0 ? "otel-overhead-breakdown-toggle" : `otel-profile-${index}-overhead-breakdown-toggle`}
 													checked={field.value}
 													onCheckedChange={field.onChange}
 													disabled={!hasOtelAccess}
