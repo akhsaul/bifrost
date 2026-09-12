@@ -6872,11 +6872,14 @@ func applyRawCaptureSignals(ctx *schemas.BifrostContext, config *schemas.Provide
 
 	// Step 2: derive per-side capture and strip flags.
 	// Capture if we need to send the data back OR store it — independent per side.
-	captureReq := effectiveSendBackReq || effectiveStore
-	captureResp := effectiveSendBackResp || effectiveStore
-	// Strip from client response if we captured for storage but not for send-back.
-	dropReq := effectiveStore && !effectiveSendBackReq
-	dropResp := effectiveStore && !effectiveSendBackResp
+	// When content_logging_on_error is active, raw bytes must be captured in memory
+	// so they are available if the provider errors, regardless of provider-level store_raw_request_response.
+	contentLoggingOnError, _ := ctx.Value(schemas.BifrostContextKeyContentLoggingOnError).(bool)
+	captureReq := effectiveSendBackReq || effectiveStore || contentLoggingOnError
+	captureResp := effectiveSendBackResp || effectiveStore || contentLoggingOnError
+	// Strip from client response if we captured for storage/error-logging but not for send-back.
+	dropReq := (effectiveStore || contentLoggingOnError) && !effectiveSendBackReq
+	dropResp := (effectiveStore || contentLoggingOnError) && !effectiveSendBackResp
 
 	// Step 3: write all internal signals explicitly (never touch the user override keys).
 	ctx.SetValue(schemas.BifrostContextKeyCaptureRawRequest, captureReq)

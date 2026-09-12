@@ -430,6 +430,7 @@ func formatExportClientConfig(c configstore.ClientConfig) map[string]any {
 	}
 
 	out["disable_content_logging"] = c.DisableContentLogging
+	out["content_logging_on_error"] = c.ContentLoggingOnError
 	out["retain_content_in_object_storage"] = c.RetainContentInObjectStorage
 	out["allow_per_request_content_storage_override"] = c.AllowPerRequestContentStorageOverride
 	out["allow_per_request_raw_override"] = c.AllowPerRequestRawOverride
@@ -1225,6 +1226,7 @@ func (h *ConfigHandler) updateConfig(ctx *fasthttp.RequestCtx) {
 	// No restart needed - logging plugin holds a live pointer to ClientConfig.DisableContentLogging,
 	// and ReloadClientConfigFromConfigStore mutates the struct in place so the next request picks up the new value.
 	updatedConfig.DisableContentLogging = payload.ClientConfig.DisableContentLogging
+	updatedConfig.ContentLoggingOnError = payload.ClientConfig.ContentLoggingOnError
 	// No restart needed - logging plugin holds a live pointer to ClientConfig.RetainContentInObjectStorage.
 	updatedConfig.RetainContentInObjectStorage = payload.ClientConfig.RetainContentInObjectStorage
 	updatedConfig.DisableDBPingsInHealth = payload.ClientConfig.DisableDBPingsInHealth

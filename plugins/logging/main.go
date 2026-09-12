@@ -221,6 +221,21 @@ func (p *LoggerPlugin) contentLoggingEnabled(ctx *schemas.BifrostContext) bool {
 	return p.resolveContentPolicy(ctx).storeContent
 }
 
+// isContentLoggingOnErrorEnabled reports whether the content_logging_on_error mode is
+// active for this request: either enabled globally via config, or signalled per-request
+// through the context (set by the HTTP transport from the live client config).
+func (p *LoggerPlugin) isContentLoggingOnErrorEnabled(ctx *schemas.BifrostContext) bool {
+	if p.contentLoggingOnError != nil && *p.contentLoggingOnError {
+		return true
+	}
+	if ctx != nil {
+		if val, ok := ctx.Value(schemas.BifrostContextKeyContentLoggingOnError).(bool); ok {
+			return val
+		}
+	}
+	return false
+}
+
 // applyMCPGovernanceFieldsToEntry stamps MCP log ownership from the request context.
 func applyMCPGovernanceFieldsToEntry(ctx *schemas.BifrostContext, entry *logstore.MCPToolLog) {
 	if ctx == nil || entry == nil {
@@ -1094,6 +1109,7 @@ type MCPToolLogCallback func(*logstore.MCPToolLog)
 // Config controls logging plugin behavior.
 type Config struct {
 	DisableContentLogging        *bool                  `json:"disable_content_logging"`
+	ContentLoggingOnError       *bool                  `json:"content_logging_on_error"`
 	RetainContentInObjectStorage *bool                  `json:"retain_content_in_object_storage"` // Pointer to live config value; when true, content-disabled requests are offloaded to object storage as hidden instead of dropped
 	LoggingHeaders               *[]string              `json:"logging_headers"`                  // Pointer to live config slice; changes are reflected immediately without restart
 	RedactSensitiveHeaders       *[]string              `json:"redact_sensitive_headers"`         // Pointer to live redaction patterns
@@ -1148,6 +1164,7 @@ type LoggerPlugin struct {
 	store                        logstore.LogStore
 	batchStore                   jobaccounting.SweepStore // configstore-backed mutable batch coordination state (nil disables batch accounting)
 	disableContentLogging        *bool
+	contentLoggingOnError       *bool
 	retainContentInObjectStorage *bool     // Pointer to live config value; when true, content-disabled requests are stored hidden instead of dropped
 	objectStorageEnabled         bool      // Log store offloads payloads to object storage; required for retain_content_in_object_storage
 	retainWarnOnce               sync.Once // Warns once when retention is configured without object storage
@@ -1225,6 +1242,7 @@ func Init(ctx context.Context, config *Config, logger schemas.Logger, logsStore 
 		pricingManager:               pricingManager,
 		mcpCatalog:                   mcpCatalog,
 		disableContentLogging:        config.DisableContentLogging,
+		contentLoggingOnError:       config.ContentLoggingOnError,
 		retainContentInObjectStorage: config.RetainContentInObjectStorage,
 		objectStorageEnabled:         config.ObjectStorageEnabled,
 		loggingHeaders:               config.LoggingHeaders,
@@ -1652,7 +1670,11 @@ func (p *LoggerPlugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.Bifr
 		ctx.SetValue(schemas.BifrostContextKeyApp, appKey)
 	}
 
-	if p.contentLoggingEnabled(ctx) {
+	// Content logging on error buffers input content in memory even when content
+	// logging is globally disabled, so the log entry can be fully populated if the
+	// provider call fails. Success entries keep the normal content policy.
+	shouldBufferContent := p.contentLoggingEnabled(ctx) || p.isContentLoggingOnErrorEnabled(ctx)
+	if shouldBufferContent {
 		inputHistory, responsesInputHistory := p.extractInputHistory(req)
 		initialData.InputHistory = inputHistory
 		initialData.ResponsesInputHistory = responsesInputHistory
@@ -1903,6 +1925,20 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 	resolvedKeyAlias := bifrost.GetResponseRoutingInfo(result, bifrostErr).ResolvedKeyAlias
 	shouldStoreRaw, _ := ctx.Value(schemas.BifrostContextKeyShouldStoreRawInLogs).(bool)
 	contentLoggingEnabled := p.contentLoggingEnabled(ctx)
+
+	// Content logging on error mode: error entries force content logging and raw storage
+	// on so failures are debuggable regardless of disable_content_logging or provider
+	// store_raw_request_response settings. Success entries force content logging off.
+	if p.isContentLoggingOnErrorEnabled(ctx) {
+		isErrorResponse := bifrostErr != nil || (result != nil && isPassthroughErrorResponse(result))
+		if isErrorResponse {
+			contentLoggingEnabled = true
+			shouldStoreRaw = true
+		} else {
+			contentLoggingEnabled = false
+			shouldStoreRaw = false
+		}
+	}
 	guardrailMetadata := guardrailMetadataForLog(ctx, result)
 	if result != nil && guardrailMetadata != nil {
 		result.GetExtraFields().GuardrailDebug = guardrailMetadata.Clone()
@@ -2311,6 +2347,9 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 		// Attach the per-category cost split to the accumulated stream usage so
 		// log detail views can surface input / output / cache costs.
 		p.attachCostBreakdown(ctx, entry, result)
+		if !contentLoggingEnabled {
+			clearEntryContent(entry)
+		}
 		p.storeOrEnqueueEntry(ctx, entry, p.makePostWriteCallback(nil))
 		p.scheduleDeferredUsageUpdate(ctx, requestID, entry.TokenUsageParsed != nil)
 		return result, bifrostErr, nil
@@ -2321,6 +2360,18 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 		entry.Status = logStatusForError(bifrostErr)
 		applyModelAlias(entry, originalModelRequested, resolvedModelUsed)
 		entry.ErrorDetailsParsed = sanitizeErrorForLogging(bifrostErr, contentLoggingEnabled, shouldStoreRaw)
+		if shouldStoreRaw && contentLoggingEnabled {
+			if entry.RawRequest == "" && bifrostErr.ExtraFields.RawRequest != nil {
+				if rawReqBytes, err := sonic.Marshal(bifrostErr.ExtraFields.RawRequest); err == nil {
+					entry.RawRequest = string(rawReqBytes)
+				}
+			}
+			if entry.RawResponse == "" && bifrostErr.ExtraFields.RawResponse != nil {
+				if rawRespBytes, err := sonic.Marshal(bifrostErr.ExtraFields.RawResponse); err == nil {
+					entry.RawResponse = string(rawRespBytes)
+				}
+			}
+		}
 		// Realtime turns that fail mid-stream still need their input transcript
 		// surfaced — backfill from bifrostErr.ExtraFields.RawRequest if present.
 		if requestType == schemas.RealtimeRequest {
@@ -2407,6 +2458,9 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 			ID:   *entry.RoutingRuleID,
 			Name: *entry.RoutingRuleName,
 		}
+	}
+	if !contentLoggingEnabled {
+		clearEntryContent(entry)
 	}
 	p.storeOrEnqueueEntry(ctx, entry, p.makePostWriteCallback(nil))
 	p.scheduleDeferredUsageUpdate(ctx, requestID, entry.TokenUsageParsed != nil)
@@ -2513,10 +2567,21 @@ func (p *LoggerPlugin) storeOrEnqueueEntry(ctx *schemas.BifrostContext, entry *l
 	// ContentHidden marks entries whose content the API/UI never serves back —
 	// both the retained-in-object-storage case and the dropped-entirely case.
 	entry.ContentHidden = !policy.visible()
+	// Content logging on error: entries whose provider call failed keep their
+	// content visible even when the static content policy disabled it, so the
+	// error is debuggable. Cancelled requests are client-side aborts, not provider
+	// errors, so they follow the normal policy. Success entries are unaffected.
+	isErrorLog := entry.Status == logStatusError || entry.Status == logStatusCancelled
+	if isErrorLog && p.isContentLoggingOnErrorEnabled(ctx) {
+		entry.ContentHidden = false
+	}
 	// Redaction mappings exist to reveal redacted content on permitted UI
 	// reads; hidden entries serve no content back, so attach only when the
 	// content is actually visible.
 	attachLogRedactionData(ctx, entry, policy.visible())
+	if isErrorLog && p.isContentLoggingOnErrorEnabled(ctx) {
+		attachLogRedactionData(ctx, entry, true)
+	}
 	traceID, _ := ctx.Value(schemas.BifrostContextKeyTraceID).(string)
 	if traceID != "" {
 		// Append to slice for Inject() to pick up — supports multiple attempts per trace

@@ -102,6 +102,11 @@
           "type": "boolean",
           "description": "Disable logging of sensitive content (inputs, outputs, embeddings, etc.)"
         },
+        "content_logging_on_error": {
+          "type": "boolean",
+          "description": "When enabled, request and response content (prompts, messages, parameters, tools, and raw error payloads) is always captured and stored whenever an AI provider request fails, regardless of the disable_content_logging setting or provider-level store_raw_request_response settings. Successful requests log metadata only (or follow disable_content_logging when this is off).",
+          "default": false
+        },
         "retain_content_in_object_storage": {
           "type": "boolean",
           "description": "When content logging is disabled, offload the full content to object storage as hidden instead of dropping it. Hidden content is never served back through the API/UI — the database row stays metadata-only and is only readable with direct access to the storage bucket. Requires object storage to be configured on the logs store.",
@@ -2609,6 +2614,11 @@
                     "disable_content_logging": {
                       "type": "boolean",
                       "description": "Disable logging of request and response content"
+                    },
+                    "content_logging_on_error": {
+                      "type": "boolean",
+                      "description": "Log request and response content only when an AI provider returns an error. Overrides disable_content_logging and provider-level store_raw_request_response for error entries.",
+                      "default": false
                     },
                     "retain_content_in_object_storage": {
                       "type": "boolean",

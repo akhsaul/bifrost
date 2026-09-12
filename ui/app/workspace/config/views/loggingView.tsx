@@ -54,6 +54,7 @@ export default function LoggingView() {
 		return (
 			localConfig.enable_logging !== config.enable_logging ||
 			localConfig.disable_content_logging !== config.disable_content_logging ||
+			(localConfig.content_logging_on_error ?? false) !== (config.content_logging_on_error ?? false) ||
 			localConfig.retain_content_in_object_storage !== config.retain_content_in_object_storage ||
 			localConfig.allow_per_request_content_storage_override !== config.allow_per_request_content_storage_override ||
 			localConfig.allow_per_request_raw_override !== config.allow_per_request_raw_override ||
@@ -62,8 +63,8 @@ export default function LoggingView() {
 			JSON.stringify(localConfig.logging_headers || []) !== JSON.stringify(config.logging_headers || []) ||
 			JSON.stringify(localConfig.redact_sensitive_headers || []) !== JSON.stringify(config.redact_sensitive_headers || []) ||
 			!sameRequestTypes(localConfig.hidden_request_types, config.hidden_request_types)
-	);
-}, [config, localConfig]);
+		);
+	}, [config, localConfig]);
 
 	const handleConfigChange = useCallback((field: keyof CoreConfig, value: boolean | number | string[]) => {
 		setLocalConfig((prev) => ({ ...prev, [field]: value }));
@@ -192,6 +193,29 @@ export default function LoggingView() {
 								onCheckedChange={(checked) => handleConfigChange("disable_content_logging", checked)}
 							/>
 						</div>
+					</div>
+				)}
+
+				{/* Content Logging on Error - Only show when logging is enabled */}
+				{localConfig.enable_logging && bifrostConfig?.is_logs_connected && (
+					<div className="flex items-center justify-between space-x-2 rounded-sm border p-4">
+						<div className="space-y-0.5">
+							<label htmlFor="content-logging-on-error" className="text-sm font-medium">
+								Content Logging on Error
+							</label>
+							<p className="text-muted-foreground text-sm">
+								When enabled, request and response content (prompts, messages, parameters, tools, and raw payloads) is always captured and
+								stored whenever an AI provider request fails, regardless of the Disable Content Logging setting or provider-level store
+								request/response settings. Successful requests do not log content.
+							</p>
+						</div>
+						<Switch
+							id="content-logging-on-error"
+							data-testid="workspace-content-logging-on-error-switch"
+							size="md"
+							checked={localConfig.content_logging_on_error ?? false}
+							onCheckedChange={(checked) => handleConfigChange("content_logging_on_error", checked)}
+						/>
 					</div>
 				)}
 

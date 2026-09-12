@@ -985,6 +985,7 @@ export const coreConfigSchema = z.object({
 	prometheus_labels: z.array(z.string()).default([]),
 	enable_logging: z.boolean().default(true),
 	disable_content_logging: z.boolean().default(false),
+	content_logging_on_error: z.boolean().default(false),
 	enforce_auth_on_inference: z.boolean().default(false),
 	hide_deleted_virtual_keys_in_filters: z.boolean().default(false),
 	hidden_request_types: z.array(z.string()).default([]),

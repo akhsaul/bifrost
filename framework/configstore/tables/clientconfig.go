@@ -32,6 +32,7 @@ type TableClientConfig struct {
 	InitialPoolSize                       int                            `gorm:"default:300" json:"initial_pool_size"`
 	EnableLogging                         *bool                          `gorm:"default:true" json:"enable_logging"`
 	DisableContentLogging                 bool                           `gorm:"default:false" json:"disable_content_logging"`          // DisableContentLogging controls whether sensitive content (inputs, outputs, embeddings, etc.) is logged
+	ContentLoggingOnError                 bool                           `gorm:"default:false" json:"content_logging_on_error"`          // ContentLoggingOnError logs content and raw request/response only when an AI provider returns an error
 	RetainContentInObjectStorage          bool                           `gorm:"default:false" json:"retain_content_in_object_storage"` // When content logging is disabled, still offload content to object storage as hidden instead of dropping it
 	DisableDBPingsInHealth                bool                           `gorm:"default:false" json:"disable_db_pings_in_health"`
 	DumpErrorsInConsoleLogs               bool                           `gorm:"default:false" json:"dump_errors_in_console_logs"`       // Dump full error details to the server console logs

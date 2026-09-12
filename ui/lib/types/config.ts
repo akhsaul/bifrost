@@ -693,6 +693,7 @@ export interface CoreConfig {
 	prometheus_labels: string[];
 	enable_logging: boolean;
 	disable_content_logging: boolean;
+	content_logging_on_error?: boolean;
 	retain_content_in_object_storage: boolean;
 	allow_per_request_content_storage_override: boolean;
 	allow_per_request_raw_override: boolean;
@@ -742,6 +743,7 @@ export const DefaultCoreConfig: CoreConfig = {
 	prometheus_labels: [],
 	enable_logging: true,
 	disable_content_logging: false,
+	content_logging_on_error: false,
 	retain_content_in_object_storage: false,
 	allow_per_request_content_storage_override: false,
 	allow_per_request_raw_override: false,

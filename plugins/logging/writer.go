@@ -490,6 +490,64 @@ func buildCompleteLogEntryFromPending(pending *PendingLogData) *logstore.Log {
 	return entry
 }
 
+// clearEntryContent removes all request and response content (inputs, outputs, parameters,
+// tools, and raw payloads) from a log entry while preserving operational metadata (latency,
+// cost, token usage, routing, provider, model, status, etc.).
+func clearEntryContent(entry *logstore.Log) {
+	if entry == nil {
+		return
+	}
+	entry.InputHistoryParsed = nil
+	entry.InputHistory = ""
+	entry.ResponsesInputHistoryParsed = nil
+	entry.ResponsesInputHistory = ""
+	entry.OutputMessageParsed = nil
+	entry.OutputMessage = ""
+	entry.ResponsesOutputParsed = nil
+	entry.ResponsesOutput = ""
+	entry.ParamsParsed = nil
+	entry.Params = ""
+	entry.ToolsParsed = nil
+	entry.Tools = ""
+	entry.ToolCallsParsed = nil
+	entry.ToolCalls = ""
+	entry.SpeechInputParsed = nil
+	entry.SpeechInput = ""
+	entry.TranscriptionInputParsed = nil
+	entry.TranscriptionInput = ""
+	entry.OCRInputParsed = nil
+	entry.OCRInput = ""
+	entry.ImageGenerationInputParsed = nil
+	entry.ImageGenerationInput = ""
+	entry.ImageEditInputParsed = nil
+	entry.ImageEditInput = ""
+	entry.ImageVariationInputParsed = nil
+	entry.ImageVariationInput = ""
+	entry.VideoGenerationInputParsed = nil
+	entry.VideoGenerationInput = ""
+	entry.VideoEditInputParsed = nil
+	entry.VideoEditInput = ""
+	entry.SpeechOutputParsed = nil
+	entry.SpeechOutput = ""
+	entry.TranscriptionOutputParsed = nil
+	entry.TranscriptionOutput = ""
+	entry.ImageGenerationOutputParsed = nil
+	entry.ImageGenerationOutput = ""
+	entry.EmbeddingOutputParsed = nil
+	entry.EmbeddingOutput = ""
+	entry.RerankOutputParsed = nil
+	entry.RerankOutput = ""
+	entry.OCROutputParsed = nil
+	entry.OCROutput = ""
+	entry.ListModelsOutputParsed = nil
+	entry.ListModelsOutput = ""
+	entry.RawRequest = ""
+	entry.RawResponse = ""
+	entry.PassthroughRequestBody = ""
+	entry.PassthroughResponseBody = ""
+	entry.ContentSummary = ""
+}
+
 // User-Agent and App map to fixed-width DB columns (varchar(512) / varchar(128)).
 // User-Agent is an untrusted, unbounded client header, so clamp both before
 // persisting to avoid an insert that fails (and silently drops the log) when a

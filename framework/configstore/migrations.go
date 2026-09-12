@@ -495,6 +495,7 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"backfill_vk_allow_all_providers_hash"}, run: migrationBackfillVirtualKeyAllowAllProvidersHash},
 	{IDs: []string{"add_prompt_cache_json_column"}, run: migrationAddPromptCacheJSONColumn},
 	{IDs: []string{"add_hidden_request_types_json_column"}, run: migrationAddHiddenRequestTypesJSONColumn},
+	{IDs: []string{"add_content_logging_on_error_column"}, run: migrationAddContentLoggingOnErrorColumn},
 }
 
 // videoResolutionPricingColumns are the resolution-banded video output rate columns.
@@ -13572,6 +13573,35 @@ func migrationAddHiddenRequestTypesJSONColumn(ctx context.Context, db *gorm.DB, 
 			tx = tx.WithContext(ctx)
 			if err := dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, "hidden_request_types_json"); err != nil {
 				return fmt.Errorf("failed to drop hidden_request_types_json column: %w", err)
+			}
+			return nil
+		},
+	}})
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error running %s migration: %w", migrationName, err)
+	}
+	return nil
+}
+
+// migrationAddContentLoggingOnErrorColumn adds the content_logging_on_error column to config_client
+// so the "log content only when the provider errors" mode can be toggled from the UI as well as config.json.
+func migrationAddContentLoggingOnErrorColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "add_content_logging_on_error_column"
+	logger.Info("[configstore] starting migration %s", migrationName)
+	defer logger.Info("[configstore] finished migration %s", migrationName)
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: migrationName,
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			if err := addColumnIfNotExists(tx, logger, &tables.TableClientConfig{}, "content_logging_on_error"); err != nil {
+				return fmt.Errorf("failed to add content_logging_on_error column: %w", err)
+			}
+			return nil
+		},
+		Rollback: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			if err := dropColumnIfExists(tx, logger, &tables.TableClientConfig{}, "content_logging_on_error"); err != nil {
+				return fmt.Errorf("failed to drop content_logging_on_error column: %w", err)
 			}
 			return nil
 		},

@@ -87,6 +87,8 @@ type HandlerStore interface {
 	GetMCPHeaderCombinedAllowlist() schemas.WhiteList
 	// ShouldAllowPerRequestStorageOverride returns whether per-request overrides for content storage are permitted
 	ShouldAllowPerRequestStorageOverride() bool
+	// ShouldContentLoggingOnError returns whether content logging on error is enabled
+	ShouldContentLoggingOnError() bool
 	// ShouldAllowPerRequestRawOverride returns whether per-request overrides for raw request/response visibility are permitted
 	ShouldAllowPerRequestRawOverride() bool
 	// ShouldAllowDirectKeys returns whether callers may bypass the registered key pool via x-bf-direct-key header
@@ -5726,6 +5728,11 @@ func (c *Config) GetProviderConfigRaw(provider schemas.ModelProvider) (*configst
 // ShouldAllowPerRequestStorageOverride returns whether per-request content storage overrides are permitted.
 func (c *Config) ShouldAllowPerRequestStorageOverride() bool {
 	return c.ClientConfig.AllowPerRequestContentStorageOverride
+}
+
+// ShouldContentLoggingOnError returns whether content logging on error is enabled.
+func (c *Config) ShouldContentLoggingOnError() bool {
+	return c.ClientConfig.ContentLoggingOnError
 }
 
 // ShouldAllowPerRequestRawOverride returns whether per-request raw request/response overrides are permitted.

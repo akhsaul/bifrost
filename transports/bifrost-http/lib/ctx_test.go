@@ -30,6 +30,7 @@ func (s testHandlerStore) GetMCPHeaderCombinedAllowlist() schemas.WhiteList {
 	return schemas.WhiteList{}
 }
 func (s testHandlerStore) ShouldAllowPerRequestStorageOverride() bool { return false }
+func (s testHandlerStore) ShouldContentLoggingOnError() bool           { return false }
 func (s testHandlerStore) ShouldAllowPerRequestRawOverride() bool     { return false }
 func (s testHandlerStore) ShouldAllowDirectKeys() bool                { return s.allowDirectKeys }
 func (s testHandlerStore) GetMCPExternalServerURL() string            { return "" }
