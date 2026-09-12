@@ -1670,11 +1670,13 @@ func (p *LoggerPlugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.Bifr
 		ctx.SetValue(schemas.BifrostContextKeyApp, appKey)
 	}
 
-	// Content logging on error buffers input content in memory even when content
-	// logging is globally disabled, so the log entry can be fully populated if the
-	// provider call fails. Success entries keep the normal content policy.
-	shouldBufferContent := p.contentLoggingEnabled(ctx) || p.isContentLoggingOnErrorEnabled(ctx)
-	if shouldBufferContent {
+	// Content input is buffered whenever the resolved content policy stores it
+	// (disable_content_logging == false). The resolved contentLoggingEnabled
+	// already covers success and error paths, so on-error mode needs no extra
+	// buffering gate here — it only elevates raw storage on error in
+	// PostLLMHook. When disable_content_logging is true the master switch
+	// drops everything and nothing is buffered.
+	if p.contentLoggingEnabled(ctx) {
 		inputHistory, responsesInputHistory := p.extractInputHistory(req)
 		initialData.InputHistory = inputHistory
 		initialData.ResponsesInputHistory = responsesInputHistory
@@ -1926,17 +1928,17 @@ func (p *LoggerPlugin) PostLLMHook(ctx *schemas.BifrostContext, result *schemas.
 	shouldStoreRaw, _ := ctx.Value(schemas.BifrostContextKeyShouldStoreRawInLogs).(bool)
 	contentLoggingEnabled := p.contentLoggingEnabled(ctx)
 
-	// Content logging on error mode: error entries force content logging and raw storage
-	// on so failures are debuggable regardless of disable_content_logging or provider
-	// store_raw_request_response settings. Success entries force content logging off.
-	if p.isContentLoggingOnErrorEnabled(ctx) {
+	// Content logging on error mode: on error entries, elevate raw storage on so
+	// failures are debuggable even when the provider-level
+	// store_raw_request_response is off. Success entries are never stripped:
+	// parsed content and raw payloads follow disable_content_logging and the
+	// provider store_raw_request_response flag. When disable_content_logging
+	// is true (contentLoggingEnabled == false) it is an absolute master
+	// switch — on-error mode does not override it.
+	if contentLoggingEnabled && p.isContentLoggingOnErrorEnabled(ctx) {
 		isErrorResponse := bifrostErr != nil || (result != nil && isPassthroughErrorResponse(result))
 		if isErrorResponse {
-			contentLoggingEnabled = true
 			shouldStoreRaw = true
-		} else {
-			contentLoggingEnabled = false
-			shouldStoreRaw = false
 		}
 	}
 	guardrailMetadata := guardrailMetadataForLog(ctx, result)
@@ -2566,22 +2568,13 @@ func (p *LoggerPlugin) storeOrEnqueueEntry(ctx *schemas.BifrostContext, entry *l
 	policy := p.resolveContentPolicy(ctx)
 	// ContentHidden marks entries whose content the API/UI never serves back —
 	// both the retained-in-object-storage case and the dropped-entirely case.
+	// When disable_content_logging is true this is an absolute master switch:
+	// on-error mode does not override it.
 	entry.ContentHidden = !policy.visible()
-	// Content logging on error: entries whose provider call failed keep their
-	// content visible even when the static content policy disabled it, so the
-	// error is debuggable. Cancelled requests are client-side aborts, not provider
-	// errors, so they follow the normal policy. Success entries are unaffected.
-	isErrorLog := entry.Status == logStatusError || entry.Status == logStatusCancelled
-	if isErrorLog && p.isContentLoggingOnErrorEnabled(ctx) {
-		entry.ContentHidden = false
-	}
 	// Redaction mappings exist to reveal redacted content on permitted UI
 	// reads; hidden entries serve no content back, so attach only when the
 	// content is actually visible.
 	attachLogRedactionData(ctx, entry, policy.visible())
-	if isErrorLog && p.isContentLoggingOnErrorEnabled(ctx) {
-		attachLogRedactionData(ctx, entry, true)
-	}
 	traceID, _ := ctx.Value(schemas.BifrostContextKeyTraceID).(string)
 	if traceID != "" {
 		// Append to slice for Inject() to pick up — supports multiple attempts per trace

@@ -204,9 +204,9 @@ export default function LoggingView() {
 								Content Logging on Error
 							</label>
 							<p className="text-muted-foreground text-sm">
-								When enabled, request and response content (prompts, messages, parameters, tools, and raw payloads) is always captured and
-								stored whenever an AI provider request fails, regardless of the Disable Content Logging setting or provider-level store
-								request/response settings. Successful requests do not log content.
+								When enabled, provider raw request and response bytes are always captured and stored whenever an AI provider request fails,
+								regardless of provider-level store request/response settings. Successful requests never strip content: parsed content
+								follows Disable Content Logging, and Disable Content Logging remains an absolute master switch when on.
 							</p>
 						</div>
 						<Switch

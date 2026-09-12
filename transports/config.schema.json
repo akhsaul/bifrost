@@ -104,7 +104,7 @@
         },
         "content_logging_on_error": {
           "type": "boolean",
-          "description": "When enabled, request and response content (prompts, messages, parameters, tools, and raw error payloads) is always captured and stored whenever an AI provider request fails, regardless of the disable_content_logging setting or provider-level store_raw_request_response settings. Successful requests log metadata only (or follow disable_content_logging when this is off).",
+          "description": "When enabled, provider raw request/response bytes are always captured and stored whenever an AI provider request fails, regardless of provider-level store_raw_request_response settings. Parsed content (prompts, messages, parameters, tools) follows disable_content_logging on both success and error paths. When disable_content_logging is true it is an absolute master switch and nothing is stored. Successful requests never strip content: they follow disable_content_logging and store_raw_request_response.",
           "default": false
         },
         "retain_content_in_object_storage": {
@@ -2620,7 +2620,7 @@
                     },
                     "content_logging_on_error": {
                       "type": "boolean",
-                      "description": "Log request and response content only when an AI provider returns an error. Overrides disable_content_logging and provider-level store_raw_request_response for error entries.",
+                      "description": "When enabled, provider raw request/response bytes are always captured and stored whenever an AI provider request fails, regardless of provider-level store_raw_request_response. Parsed content follows disable_content_logging on both success and error paths; disable_content_logging=true is an absolute master switch that stores nothing. Successful requests never strip content.",
                       "default": false
                     },
                     "retain_content_in_object_storage": {

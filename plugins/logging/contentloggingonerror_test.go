@@ -54,10 +54,10 @@ func TestIsContentLoggingOnErrorEnabled_ContextSignal(t *testing.T) {
 	assert.False(t, p.isContentLoggingOnErrorEnabled(ctx))
 }
 
-// TestPreLLMHookBuffersContentWhenOnlyOnErrorEnabled verifies the ingress phase still
-// extracts input history when content logging is globally disabled but
-// content_logging_on_error is enabled — without buffering there is nothing to persist
-// later when the provider fails.
+// TestPreLLMHookBuffersContentWhenOnlyOnErrorEnabled verifies the ingress phase
+// buffers input history when content logging is enabled (the resolved policy
+// stores content); the on-error signal alone does not bypass the
+// disable_content_logging master switch.
 func TestPreLLMHookBuffersContentWhenOnlyOnErrorEnabled(t *testing.T) {
 	store := newTestStore(t)
 	defer store.Close(context.Background())
@@ -99,12 +99,11 @@ func TestPreLLMHookBuffersContentWhenOnlyOnErrorEnabled(t *testing.T) {
 	assert.Equal(t, userMsg, *pending.InitialData.InputHistory[0].Content.ContentStr)
 }
 
-// TestPostLLMHookErrorKeepsContentWithContentLoggingDisabled is the core wire-visible
-// behaviour of content_logging_on_error: an error entry stores the input history and
-// error details even when disable_content_logging is true, while success entries stay
-// content-free.
+// TestPostLLMHookErrorKeepsContentWithContentLoggingDisabled verifies the master
+// switch: when disable_content_logging is true, both success and error entries
+// stay content-free even with content_logging_on_error enabled.
 func TestPostLLMHookErrorKeepsContentWithContentLoggingDisabled(t *testing.T) {
-	t.Run("error_path_retains_content_and_raw", func(t *testing.T) {
+	t.Run("error_path_drops_content_master_switch", func(t *testing.T) {
 		store := newTestStore(t)
 		defer store.Close(context.Background())
 		plugin, err := Init(context.Background(), &Config{
@@ -165,21 +164,20 @@ func TestPostLLMHookErrorKeepsContentWithContentLoggingDisabled(t *testing.T) {
 		if entry.Status != "error" {
 			t.Fatalf("expected error status, got %q", entry.Status)
 		}
-		if entry.ContentHidden {
-			t.Fatal("error entry under content_logging_on_error must not be content-hidden")
+		if !entry.ContentHidden {
+			t.Fatal("disable_content_logging is an absolute master switch: error entries must stay content-hidden")
 		}
-		if len(entry.InputHistoryParsed) == 0 {
-			t.Fatal("error entry under content_logging_on_error must retain input history")
+		if len(entry.InputHistoryParsed) != 0 {
+			t.Fatalf("error entry under the master switch must drop input history, got %d messages", len(entry.InputHistoryParsed))
 		}
-		assert.Equal(t, userMsg, *entry.InputHistoryParsed[0].Content.ContentStr)
 		if entry.ErrorDetailsParsed == nil {
 			t.Fatal("error entry must carry error details")
 		}
-		if entry.RawRequest == "" {
-			t.Fatal("error entry under content_logging_on_error must retain raw request bytes regardless of provider store_raw_request_response")
+		if entry.RawRequest != "" {
+			t.Fatal("error entry under the master switch must drop raw request bytes")
 		}
-		if entry.RawResponse == "" {
-			t.Fatal("error entry under content_logging_on_error must retain raw response bytes regardless of provider store_raw_request_response")
+		if entry.RawResponse != "" {
+			t.Fatal("error entry under the master switch must drop raw response bytes")
 		}
 	})
 
@@ -324,9 +322,9 @@ func TestPostLLMHookDisabledModeKeepsLegacyBehaviour(t *testing.T) {
 }
 
 // TestPostLLMHookSuccessStripsContentEvenIfGlobalDisableIsFalse verifies that when
-// content_logging_on_error is true, even if disable_content_logging is false (the
-// default), successful requests strip their content so that content is logged ONLY on
-// error.
+// content_logging_on_error is true and disable_content_logging is false (the
+// default), successful requests keep their parsed content and follow the
+// provider store_raw_request_response flag for raw payloads.
 func TestPostLLMHookSuccessStripsContentEvenIfGlobalDisableIsFalse(t *testing.T) {
 	store := newTestStore(t)
 	defer store.Close(context.Background())
@@ -393,10 +391,10 @@ func TestPostLLMHookSuccessStripsContentEvenIfGlobalDisableIsFalse(t *testing.T)
 	if entry.Status != "success" {
 		t.Fatalf("expected success status, got %q", entry.Status)
 	}
-	if len(entry.InputHistoryParsed) != 0 {
-		t.Fatalf("success entry under content_logging_on_error must strip input history even when disable_content_logging=false, got %d messages", len(entry.InputHistoryParsed))
+	if len(entry.InputHistoryParsed) == 0 {
+		t.Fatal("success entry with disable_content_logging=false must keep input history")
 	}
-	if entry.OutputMessage != "" {
-		t.Fatal("success entry under content_logging_on_error must strip output message")
+	if entry.OutputMessage == "" {
+		t.Fatal("success entry with disable_content_logging=false must keep output message")
 	}
 }
