@@ -54,6 +54,7 @@ import (
 	"github.com/maximhq/bifrost/core/providers/opencode"
 	"github.com/maximhq/bifrost/core/providers/opencodefree"
 	"github.com/maximhq/bifrost/core/providers/openrouter"
+	"github.com/maximhq/bifrost/core/providers/openrouterfree"
 	"github.com/maximhq/bifrost/core/providers/parasail"
 	"github.com/maximhq/bifrost/core/providers/perplexity"
 	"github.com/maximhq/bifrost/core/providers/poolside"
@@ -4593,6 +4594,8 @@ func (bifrost *Bifrost) createBaseProvider(providerKey schemas.ModelProvider, co
 		return gemini.NewGeminiProvider(config, bifrost.logger), nil
 	case schemas.OpenRouter:
 		return openrouter.NewOpenRouterProvider(config, bifrost.logger), nil
+	case schemas.OpenRouterFree:
+		return openrouterfree.NewProvider(config, bifrost.logger), nil
 	case schemas.Elevenlabs:
 		return elevenlabs.NewElevenlabsProvider(config, bifrost.logger), nil
 	case schemas.Nebius:
@@ -6703,8 +6706,21 @@ func executeRequestWithRetries[T any](
 		// the time we come back to it.
 		isPermanentKeyFailure := false
 		if isPerKeyFailure && keyProvider != nil {
+			// Default: 401/402/403 are permanent per-key (auth/billing/permission).
 			isPermanentKeyFailure = bifrostError.StatusCode != nil &&
 				(*bifrostError.StatusCode == 401 || *bifrostError.StatusCode == 402 || *bifrostError.StatusCode == 403)
+			// Scope-limited exception (per user approval): for OpenRouter family providers,
+			// if the upstream message indicates a content-rejection 403 (PII redaction / guardrail),
+			// treat as NON-permanent — don't kill the key permanently. Only applies to
+			// openrouter / openrouterfree so other providers are unaffected.
+			if isPermanentKeyFailure && (providerKey == schemas.OpenRouter || providerKey == schemas.OpenRouterFree) {
+				if bifrostError != nil && bifrostError.Error != nil && bifrostError.Error.Message != "" {
+					msg := strings.ToLower(bifrostError.Error.Message)
+					if strings.Contains(msg, "pii detected") || strings.Contains(msg, "request blocked") {
+						isPermanentKeyFailure = false
+					}
+				}
+			}
 			if isPermanentKeyFailure {
 				if deadKeyIDs == nil {
 					deadKeyIDs = make(map[string]bool)
