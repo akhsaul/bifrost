@@ -1,6 +1,19 @@
 // Package openrouterfree implements the OpenRouter Free LLM provider.
 package openrouterfree
 
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/maximhq/bifrost/core/providers/openai"
+	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
+	schemas "github.com/maximhq/bifrost/core/schemas"
+	"github.com/valyala/fasthttp"
+)
+
 var DefaultHeaders = map[string]string{
 	"http-referer":                  "https://hermes-agent.nousresearch.com",
 	"user-agent":                    "OpenAI/Python 2.24.0",
@@ -18,20 +31,6 @@ var DefaultHeaders = map[string]string{
 	"x-stainless-runtime-version":  "3.11.16",
 	"x-title":                       "Hermes Agent",
 }
-
-
-import (
-	"context"
-	"fmt"
-	"net/http"
-	"strings"
-	"time"
-
-	"github.com/maximhq/bifrost/core/providers/openai"
-	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
-	schemas "github.com/maximhq/bifrost/core/schemas"
-	"github.com/valyala/fasthttp"
-)
 
 // Provider implements the Provider interface for OpenRouter's API.
 type Provider struct {
