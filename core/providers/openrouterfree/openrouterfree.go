@@ -382,8 +382,40 @@ func (provider *Provider) TextCompletionStream(ctx *schemas.BifrostContext, post
 	)
 }
 
+func applyOpenRouterFreeDefaults(req *schemas.BifrostChatRequest) {
+	if req == nil || req.Params == nil {
+		return
+	}
+	// stream_options: include_usage default true
+	if req.Params.StreamOptions == nil {
+		req.Params.StreamOptions = &schemas.ChatStreamOptions{
+			IncludeUsage: schemas.Ptr(true),
+		}
+	} else if req.Params.StreamOptions.IncludeUsage == nil {
+		req.Params.StreamOptions.IncludeUsage = schemas.Ptr(true)
+	}
+	// reasoning: enabled=true, effort=high (if not set by client)
+	if req.Params.Reasoning == nil {
+		req.Params.Reasoning = &schemas.ChatReasoning{
+			Enabled: schemas.Ptr(true),
+			Effort:  schemas.Ptr("high"),
+		}
+	} else {
+		if req.Params.Reasoning.Enabled == nil {
+			req.Params.Reasoning.Enabled = schemas.Ptr(true)
+		}
+		if req.Params.Reasoning.Effort == nil || *req.Params.Reasoning.Effort == "" {
+			req.Params.Reasoning.Effort = schemas.Ptr("high")
+		}
+		if req.Params.Reasoning.Summary == nil || *req.Params.Reasoning.Summary == "" {
+			req.Params.Reasoning.Summary = schemas.Ptr("auto")
+		}
+	}
+}
+
 // ChatCompletion performs a chat completion request to the OpenRouter API.
 func (provider *Provider) ChatCompletion(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostChatRequest) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
+	applyOpenRouterFreeDefaults(request)
 	return openai.HandleOpenAIChatCompletionRequest(
 		ctx,
 		provider.client,
@@ -406,6 +438,7 @@ func (provider *Provider) ChatCompletion(ctx *schemas.BifrostContext, key schema
 // Uses OpenRouter's OpenAI-compatible streaming format.
 // Returns a channel containing BifrostStreamChunk objects representing the stream or an error if the request fails.
 func (provider *Provider) ChatCompletionStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostChatRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+	applyOpenRouterFreeDefaults(request)
 	return openai.HandleOpenAIChatCompletionStreaming(
 		ctx,
 		provider.streamingClient,
@@ -431,6 +464,8 @@ func (provider *Provider) ChatCompletionStream(ctx *schemas.BifrostContext, post
 
 // Responses performs a responses request to the OpenRouter API.
 func (provider *Provider) Responses(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostResponsesRequest) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
+	// Note: BifrostResponsesRequest doesn't have Params in same way; stream_options/reasoning
+	// defaults apply mainly to chat. Skip defaults for responses unless added to request shape.
 	return openai.HandleOpenAIResponsesRequest(
 		ctx,
 		provider.client,
