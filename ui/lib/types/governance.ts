@@ -116,6 +116,10 @@ export interface VirtualKey {
 	allow_all_providers?: boolean;
 	created_at: string;
 	updated_at: string;
+	// The third owner a key can have, alongside a team and a customer. Carried as an id only:
+	// business units are an enterprise table this model does not preload, so there is no
+	// `business_unit` relation to read a name from.
+	business_unit_id?: string;
 	// Populated relationships
 	team?: Team;
 	customer?: Customer;
@@ -125,6 +129,11 @@ export interface VirtualKey {
 	// Lets the UI lock edits and show the managed-key notice without the separately
 	// RBAC-gated access-profile lookup.
 	is_access_profile_managed?: boolean;
+	// Read-only, server-computed: the user this key is assigned to, or null when it
+	// is assigned to a team, a customer, or nothing. Absent (rather than null) when
+	// the response came from a path that does not resolve assignees, so callers can
+	// tell "unassigned" from "unknown". Always null in OSS, which has no users.
+	assigned_user?: { id: string; name: string; email: string } | null;
 	config_hash?: string; // Present when config is synced from config.json
 }
 
@@ -221,6 +230,8 @@ export interface CreateVirtualKeyRequest {
 	mcp_configs?: VirtualKeyMCPConfigRequest[];
 	team_id?: string;
 	customer_id?: string;
+	// Third owner, mutually exclusive with team_id and customer_id (enterprise).
+	business_unit_id?: string;
 	budgets?: CreateBudgetRequest[];
 	rate_limit?: CreateRateLimitRequest;
 	is_active?: boolean;
@@ -236,6 +247,8 @@ export interface UpdateVirtualKeyRequest {
 	mcp_configs?: VirtualKeyMCPConfigRequest[];
 	team_id?: string | null;
 	customer_id?: string | null;
+	// Third owner, mutually exclusive with team_id and customer_id (enterprise); null clears it.
+	business_unit_id?: string | null;
 	budgets?: CreateBudgetRequest[];
 	rate_limit?: UpdateRateLimitRequest;
 	is_active?: boolean;
@@ -331,6 +344,8 @@ export interface GetVirtualKeysParams {
 	search?: string;
 	customer_id?: string;
 	team_id?: string;
+	/** Enterprise-only owner kind; a key names at most one owner, so this ORs with the other two. */
+	business_unit_id?: string;
 	/** Enterprise-only: filters to virtual keys assigned to this user. */
 	user_id?: string;
 	exclude_access_profile_managed_virtual?: boolean;

@@ -349,6 +349,7 @@ type AllowedRequests struct {
 	Compaction            bool `json:"compaction"`
 	Embedding             bool `json:"embedding"`
 	Rerank                bool `json:"rerank"`
+	Decision              bool `json:"decisions"`
 	OCR                   bool `json:"ocr"`
 	Speech                bool `json:"speech"`
 	SpeechStream          bool `json:"speech_stream"`
@@ -434,6 +435,8 @@ func (ar *AllowedRequests) IsOperationAllowed(operation RequestType) bool {
 		return ar.Embedding
 	case RerankRequest:
 		return ar.Rerank
+	case DecisionRequest:
+		return ar.Decision
 	case OCRRequest:
 		return ar.OCR
 	case SpeechRequest:
@@ -531,6 +534,7 @@ func (ar *AllowedRequests) IsOperationAllowed(operation RequestType) bool {
 	}
 }
 
+// CustomProviderConfig represent custom provider config
 type CustomProviderConfig struct {
 	CustomProviderKey     string                 `json:"-"`                                // Custom provider key, internally set by Bifrost
 	IsKeyLess             bool                   `json:"is_key_less"`                      // Whether the custom provider requires a key (not allowed for Bedrock)
@@ -538,6 +542,7 @@ type CustomProviderConfig struct {
 	AllowedRequests       *AllowedRequests       `json:"allowed_requests,omitempty"`       // Allowed requests for the custom provider
 	RequestPathOverrides  map[RequestType]string `json:"request_path_overrides,omitempty"` // Mapping of request type to its custom path which will override the default path of the provider (not allowed for Bedrock)
 	DoesNotSendDoneMarker bool                   `json:"does_not_send_done_marker"`        // Upstream ends its SSE stream after finish_reason without sending data: [DONE]
+	WaitForUsage          bool                   `json:"wait_for_usage"`                   // With DoesNotSendDoneMarker, keep reading past finish_reason so the trailing usage-only chunk is not dropped (#7143). A silent upstream then ends on network_config.stream_idle_timeout_in_seconds
 }
 
 // IsOperationAllowed checks if a specific operation is allowed for this custom provider
@@ -704,6 +709,8 @@ type Provider interface {
 	Embedding(ctx *BifrostContext, key Key, request *BifrostEmbeddingRequest) (*BifrostEmbeddingResponse, *BifrostError)
 	// Rerank performs a rerank request to reorder documents by relevance to a query
 	Rerank(ctx *BifrostContext, key Key, request *BifrostRerankRequest) (*BifrostRerankResponse, *BifrostError)
+	// Decision performs an decision request against an annotated function-tool definition (Typesafe-only; other providers return unsupported)
+	Decision(ctx *BifrostContext, key Key, request *BifrostDecisionRequest) (*BifrostDecisionResponse, *BifrostError)
 	// OCR performs an optical character recognition request on a document
 	OCR(ctx *BifrostContext, key Key, request *BifrostOCRRequest) (*BifrostOCRResponse, *BifrostError)
 	// Speech performs a text to speech request

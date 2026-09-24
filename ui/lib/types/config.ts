@@ -7,7 +7,9 @@ import { SecretVar } from "./schemas";
 export type KnownProvider = (typeof KnownProvidersNames)[number];
 
 // Base provider names - all supported base providers
-export type BaseProvider = "openai" | "anthropic" | "cohere" | "gemini" | "bedrock" | "replicate" | "fireworks";
+export const BaseProviderNames = ["openai", "anthropic", "cohere", "gemini", "bedrock", "replicate", "fireworks"] as const;
+
+export type BaseProvider = (typeof BaseProviderNames)[number];
 
 // Branded type for custom provider names to prevent collision with known providers
 export type CustomProviderName = string & { readonly __brand: "CustomProviderName" };
@@ -443,6 +445,7 @@ export interface CustomProviderConfig {
 	base_provider_type: KnownProvider;
 	is_key_less?: boolean;
 	does_not_send_done_marker?: boolean;
+	wait_for_usage?: boolean;
 	allowed_requests?: AllowedRequests;
 	request_path_overrides?: Record<string, string>;
 }

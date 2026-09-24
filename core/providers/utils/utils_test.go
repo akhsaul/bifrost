@@ -2046,6 +2046,139 @@ func TestExtractPassthroughProviderResponseHeaders(t *testing.T) {
 	}
 }
 
+// providerResponseSensitiveHeaderCases is shared by the three extractor tests below so the
+// paths cannot drift apart again. Every "drop" name is credential-bearing under
+// schemas.IsSensitiveHeader but absent from providerResponseFilterHeaders, which is exactly the
+// gap that let an operator's network_config.extra_headers credential reach inference callers.
+var providerResponseSensitiveHeaderCases = []struct {
+	name  string
+	value string
+	drop  bool
+	why   string
+}{
+	// Credential names the fixed list does not enumerate.
+	{"X-Provider-Secret", "provider-secret-value", true, "contains \"secret\""},
+	{"X-Auth-Token", "auth-token-value", true, "suffix \"-token\""},
+	{"X-Session_Token", "session-token-value", true, "suffix \"_token\""},
+	{"X-Custom-Api-Key", "custom-api-key-value", true, "contains \"api-key\""},
+	{"X-Proxy-Authorization-Hint", "proxy-auth-value", true, "contains \"authorization\""},
+	{"Cf-Access-Jwt-Assertion", "signed-jwt-value", true, "prefix \"cf-access-\""},
+	{"X-Amzn-Oidc-Data", "oidc-data-value", true, "prefix \"x-amzn-oidc-\""},
+	// Names already covered by the fixed list, which must keep working.
+	{"X-Goog-Api-Key", "goog-api-key-value", true, "existing denylist entry"},
+	{"Authorization", "Bearer token-value", true, "existing denylist entry"},
+	// Benign provider headers that callers rely on and must survive.
+	{"X-Request-Id", "req-789", false, "benign correlation header"},
+	{"Retry-After", "30", false, "benign retry hint"},
+	{"X-Ratelimit-Remaining-Requests", "42", false, "benign rate-limit hint"},
+}
+
+// lookupHeaderFold finds a header case-insensitively, since fasthttp canonicalizes keys.
+func lookupHeaderFold(headers map[string]string, name string) (string, bool) {
+	for k, v := range headers {
+		if strings.EqualFold(k, name) {
+			return v, true
+		}
+	}
+	return "", false
+}
+
+// assertSensitiveHeaderCases checks one extractor's output against the shared table.
+func assertSensitiveHeaderCases(t *testing.T, extractor string, headers map[string]string) {
+	t.Helper()
+	for _, tc := range providerResponseSensitiveHeaderCases {
+		got, ok := lookupHeaderFold(headers, tc.name)
+		if tc.drop && ok {
+			t.Errorf("%s: header %q (%s) leaked to the client with value %q", extractor, tc.name, tc.why, got)
+		}
+		if !tc.drop && (!ok || got != tc.value) {
+			t.Errorf("%s: benign header %q (%s) should be forwarded as %q, got %q ok=%v",
+				extractor, tc.name, tc.why, tc.value, got, ok)
+		}
+	}
+}
+
+// TestProviderResponseSensitiveHeaderCases_MatchClassifier guards the table itself: every name
+// marked drop must really be rejected by shouldFilterProviderResponseHeader, and every name
+// marked keep must really be accepted. Without this, a typo in the table would silently weaken
+// the three extractor tests below into asserting nothing.
+func TestProviderResponseSensitiveHeaderCases_MatchClassifier(t *testing.T) {
+	for _, tc := range providerResponseSensitiveHeaderCases {
+		lower := strings.ToLower(tc.name)
+		if got := shouldFilterProviderResponseHeader(lower); got != tc.drop {
+			t.Errorf("shouldFilterProviderResponseHeader(%q) = %v, want %v (%s)", lower, got, tc.drop, tc.why)
+		}
+	}
+}
+
+// TestExtractProviderResponseHeaders_StripsSensitiveCustomHeaders verifies that the response
+// filter consults schemas.IsSensitiveHeader and not just the fixed name list, so credential
+// headers the list does not enumerate stop reaching inference callers.
+func TestExtractProviderResponseHeaders_StripsSensitiveCustomHeaders(t *testing.T) {
+	resp := &fasthttp.Response{}
+	for _, tc := range providerResponseSensitiveHeaderCases {
+		resp.Header.Set(tc.name, tc.value)
+	}
+
+	assertSensitiveHeaderCases(t, "ExtractProviderResponseHeaders", ExtractProviderResponseHeaders(resp))
+}
+
+// TestExtractPassthroughProviderResponseHeaders_StripsSensitiveCustomHeaders verifies the same
+// for the passthrough variant, and that its content-type carve-out is unaffected: content-type
+// is not credential-bearing, so the added rule must not change its verdict.
+func TestExtractPassthroughProviderResponseHeaders_StripsSensitiveCustomHeaders(t *testing.T) {
+	resp := &fasthttp.Response{}
+	for _, tc := range providerResponseSensitiveHeaderCases {
+		resp.Header.Set(tc.name, tc.value)
+	}
+	resp.Header.Set("Content-Type", "application/json")
+
+	headers := ExtractPassthroughProviderResponseHeaders(resp)
+	assertSensitiveHeaderCases(t, "ExtractPassthroughProviderResponseHeaders", headers)
+
+	if v, ok := lookupHeaderFold(headers, "content-type"); !ok || v != "application/json" {
+		t.Fatalf("passthrough content-type carve-out regressed: got %q ok=%v", v, ok)
+	}
+}
+
+// TestExtractProviderResponseHeadersFromHTTP_StripsSensitiveCustomHeaders verifies the same for
+// the net/http extractor used by providers such as Bedrock, which shares the identical filter.
+func TestExtractProviderResponseHeadersFromHTTP_StripsSensitiveCustomHeaders(t *testing.T) {
+	resp := &http.Response{Header: http.Header{}}
+	for _, tc := range providerResponseSensitiveHeaderCases {
+		resp.Header.Set(tc.name, tc.value)
+	}
+
+	assertSensitiveHeaderCases(t, "ExtractProviderResponseHeadersFromHTTP", ExtractProviderResponseHeadersFromHTTP(resp))
+}
+
+// TestProviderResponseExtractors_AgreeOnSensitiveHeaders pins the three extractors to the same
+// verdict for every name in the table. They previously shared only a map literal, which is how
+// the credential rule could be added to one definition of "sensitive" (telemetry redaction) and
+// not to this one. This test fails if any future change filters one path but not the others.
+func TestProviderResponseExtractors_AgreeOnSensitiveHeaders(t *testing.T) {
+	fastResp := &fasthttp.Response{}
+	httpResp := &http.Response{Header: http.Header{}}
+	for _, tc := range providerResponseSensitiveHeaderCases {
+		fastResp.Header.Set(tc.name, tc.value)
+		httpResp.Header.Set(tc.name, tc.value)
+	}
+
+	standard := ExtractProviderResponseHeaders(fastResp)
+	passthrough := ExtractPassthroughProviderResponseHeaders(fastResp)
+	fromHTTP := ExtractProviderResponseHeadersFromHTTP(httpResp)
+
+	for _, tc := range providerResponseSensitiveHeaderCases {
+		_, inStandard := lookupHeaderFold(standard, tc.name)
+		_, inPassthrough := lookupHeaderFold(passthrough, tc.name)
+		_, inFromHTTP := lookupHeaderFold(fromHTTP, tc.name)
+		if inStandard != inPassthrough || inStandard != inFromHTTP {
+			t.Errorf("extractors disagree on %q (%s): standard=%v passthrough=%v fromHTTP=%v",
+				tc.name, tc.why, inStandard, inPassthrough, inFromHTTP)
+		}
+	}
+}
+
 func TestStripThoughtSignature(t *testing.T) {
 	cases := []struct {
 		name string
@@ -3140,5 +3273,423 @@ func TestRealiasNamespacedFunctionCalls_RequiresExactNamespaceOwner(t *testing.T
 	owner := out.Input[1].ResponsesToolMessage
 	if *owner.Name != "a_b__x" || owner.Namespace != nil {
 		t.Errorf("the exact owner a:b must still be rewritten to its alias, got name=%q namespace=%v", *owner.Name, owner.Namespace)
+	}
+}
+
+// TestHandleProviderAPIErrorRootMessage covers AWS's flat error shape, which every Bedrock
+// surface answers with. The shared Anthropic and OpenAI handlers serve those surfaces and
+// their own parsers only read a nested error object, so without this seeding the failure
+// reason is dropped and the log shows an error with no message.
+func TestHandleProviderAPIErrorRootMessage(t *testing.T) {
+	tests := []struct {
+		name            string
+		body            string
+		expectedMessage string
+	}{
+		{
+			name:            "AWS flat error shape",
+			body:            `{"message":"data retention mode 'default' is not available for this model"}`,
+			expectedMessage: "data retention mode 'default' is not available for this model",
+		},
+		{
+			name:            "AWS flat error shape with exception type",
+			body:            `{"message":"rate exceeded","__type":"ThrottlingException"}`,
+			expectedMessage: "rate exceeded",
+		},
+		{
+			name:            "nested error envelope is left to the caller's parser",
+			body:            `{"type":"error","error":{"type":"invalid_request_error","message":"bad request"}}`,
+			expectedMessage: "",
+		},
+		{
+			name:            "blank root message is ignored",
+			body:            `{"message":"   "}`,
+			expectedMessage: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp := &fasthttp.Response{}
+			resp.SetStatusCode(400)
+			resp.Header.Set("Content-Type", "application/json")
+			resp.SetBodyString(tt.body)
+
+			var errorResp map[string]interface{}
+			bifrostErr := HandleProviderAPIError(resp, &errorResp)
+
+			if bifrostErr == nil || bifrostErr.Error == nil {
+				t.Fatal("expected a non-nil error with an error field")
+			}
+			if bifrostErr.Error.Message != tt.expectedMessage {
+				t.Errorf("expected message %q, got %q", tt.expectedMessage, bifrostErr.Error.Message)
+			}
+		})
+	}
+}
+
+// TestStripCallerAuthForInsecureURL verifies that a forwarded caller Authorization
+// header only survives to HTTPS or loopback upstreams (RFC 6750 section 5.3, with
+// the RFC 8252 section 8.3 loopback rationale).
+func TestStripCallerAuthForInsecureURL(t *testing.T) {
+	for name, tc := range map[string]struct {
+		url      string
+		header   string
+		wantKept bool
+	}{
+		"https kept":              {"https://api.openai.com/v1/responses", "authorization", true},
+		"http stripped":           {"http://api.internal.example/v1/responses", "authorization", false},
+		"http localhost kept":     {"http://localhost:8080/v1/responses", "authorization", true},
+		"http 127.0.0.1 kept":     {"http://127.0.0.1:9090/v1/messages", "authorization", true},
+		"http ::1 kept":           {"http://[::1]:9090/v1/messages", "authorization", true},
+		"unparsable stripped":     {"http://bad url\x00", "authorization", false},
+		"mixed case key stripped": {"http://api.internal.example/v1/messages", "Authorization", false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			safeHeaders := map[string]string{
+				tc.header:        "Bearer sk-ant-oat01-token",
+				"anthropic-beta": "context-1m",
+			}
+			StripCallerAuthForInsecureURL(tc.url, safeHeaders)
+			_, kept := safeHeaders[tc.header]
+			if kept != tc.wantKept {
+				t.Fatalf("StripCallerAuthForInsecureURL(%q): authorization kept = %v, want %v", tc.url, kept, tc.wantKept)
+			}
+			if _, ok := safeHeaders["anthropic-beta"]; !ok {
+				t.Fatal("non-auth safe header must never be stripped")
+			}
+		})
+	}
+}
+
+func TestNormalizeRegexNULEscape(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		// The pattern Claude Code's Artifact tool ships, which DeepSeek rejects with
+		// a 400 and kimi-k3 on Bedrock answers with an empty 200 stream.
+		{"NUL escape in a negated class", `^[^\0]*$`, `^[^\x00]*$`},
+		{"bare NUL escape", `^\0$`, `^\x00$`},
+		{"NUL escape among other escapes", `^\d+\0\w+$`, `^\d+\x00\w+$`},
+
+		// Must not fire.
+		{"already normalized", `^[^\x00]*$`, `^[^\x00]*$`},
+		{"legacy octal escape is not a NUL escape", `^\012$`, `^\012$`},
+		// 8 and 9 are not octal digits, so `\08` is a NUL escape then a literal 8.
+		{"NUL escape followed by 8", `^\08$`, `^\x008$`},
+		{"NUL escape followed by 9 inside a class", `^[^\09]*$`, `^[^\x009]*$`},
+		{"octal escape inside a class", `^[\0123]$`, `^[\0123]$`},
+		{"escaped backslash then a zero digit", `^\\0$`, `^\\0$`},
+		{"digit and word escapes", `^\d+\w+$`, `^\d+\w+$`},
+		{"no escapes at all", `^[a-z]+$`, `^[a-z]+$`},
+		{"literal zero", `^0$`, `^0$`},
+		{"trailing lone backslash is left intact", `^a\`, `^a\`},
+		{"empty", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := NormalizeRegexNULEscape(tc.in); got != tc.want {
+				t.Fatalf("NormalizeRegexNULEscape(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+// normalizeSchemaFromJSON round-trips a schema through ToolFunctionParameters so
+// the test exercises the same nested shapes a real tool arrives as.
+func normalizeSchemaFromJSON(t *testing.T, raw string) (*schemas.ToolFunctionParameters, *schemas.ToolFunctionParameters, bool) {
+	t.Helper()
+	var params schemas.ToolFunctionParameters
+	if err := json.Unmarshal([]byte(raw), &params); err != nil {
+		t.Fatalf("failed to unmarshal schema: %v", err)
+	}
+	normalized, changed := RewriteToolSchemaPatterns(&params, NormalizeRegexNULEscape)
+	return &params, normalized, changed
+}
+
+func TestNormalizeToolSchemaPatterns_RewritesEveryNestedPattern(t *testing.T) {
+	raw := `{
+		"type": "object",
+		"properties": {
+			"file_paths": {"type": "array", "items": {"type": "string", "pattern": "^[^\\0]*$"}},
+			"after": {"type": "string", "pattern": "^[A-Za-z0-9_=-]{1,4096}$"},
+			"nested": {"type": "object", "properties": {"deep": {"type": "string", "pattern": "^\\0$"}}}
+		},
+		"required": ["file_paths"]
+	}`
+	_, normalized, changed := normalizeSchemaFromJSON(t, raw)
+	if !changed {
+		t.Fatal("expected the schema to be rewritten")
+	}
+	out, err := json.Marshal(normalized)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	rendered := string(out)
+	if strings.Contains(rendered, `\\0]`) || strings.Contains(rendered, `^\\0$`) {
+		t.Fatalf("a NUL escape survived normalization: %s", rendered)
+	}
+	for _, want := range []string{`^[^\\x00]*$`, `^\\x00$`, `^[A-Za-z0-9_=-]{1,4096}$`} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("expected %s in the normalized schema, got %s", want, rendered)
+		}
+	}
+}
+
+// The rewrite must not reach back into the caller's schema. OrderedMap.Clone is
+// shallow, so a clone taken at the wrong level would leave nested maps shared and
+// silently mutate the request the caller still holds.
+func TestNormalizeToolSchemaPatterns_LeavesTheCallerSchemaUntouched(t *testing.T) {
+	raw := `{"type":"object","properties":{"p":{"type":"string","pattern":"^[^\\0]*$"}}}`
+	original, normalized, changed := normalizeSchemaFromJSON(t, raw)
+	if !changed {
+		t.Fatal("expected the schema to be rewritten")
+	}
+	if normalized == original {
+		t.Fatal("a rewritten schema must be a copy, not the caller's schema")
+	}
+	before, err := json.Marshal(original)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(before), `\\0]`) {
+		t.Fatalf("the caller's schema was mutated in place: %s", before)
+	}
+}
+
+// A schema with nothing to rewrite must come back as the very same pointer: this
+// is what keeps tool bytes, and therefore prompt cache keys, identical for every
+// request that already works.
+func TestNormalizeToolSchemaPatterns_UnchangedSchemaIsNotCopied(t *testing.T) {
+	raw := `{"type":"object","properties":{"p":{"type":"string","pattern":"^[a-z]+$"}},"required":["p"]}`
+	original, normalized, changed := normalizeSchemaFromJSON(t, raw)
+	if changed {
+		t.Fatal("a schema with no NUL escape must not report a change")
+	}
+	if normalized != original {
+		t.Fatal("a schema with no NUL escape must be returned as-is, not copied")
+	}
+}
+
+// Key order feeds the prompt cache key, so a rewrite must not reorder anything.
+func TestNormalizeToolSchemaPatterns_PreservesKeyOrder(t *testing.T) {
+	raw := `{"type":"object","properties":{"zulu":{"type":"string","pattern":"^[^\\0]*$"},"alpha":{"type":"string"}},"required":["zulu"]}`
+	_, normalized, changed := normalizeSchemaFromJSON(t, raw)
+	if !changed {
+		t.Fatal("expected the schema to be rewritten")
+	}
+	out, err := json.Marshal(normalized)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	rendered := string(out)
+	if strings.Index(rendered, `"zulu"`) > strings.Index(rendered, `"alpha"`) {
+		t.Fatalf("property order changed during normalization: %s", rendered)
+	}
+}
+
+func TestNormalizeResponsesToolSchemas_CopiesOnlyTheRewrittenTool(t *testing.T) {
+	withNUL := schemas.ToolFunctionParameters{Type: "object", Pattern: schemas.Ptr(`^[^\0]*$`)}
+	clean := schemas.ToolFunctionParameters{Type: "object", Pattern: schemas.Ptr(`^[a-z]+$`)}
+	tools := []schemas.ResponsesTool{
+		{Type: schemas.ResponsesToolTypeFunction, Name: schemas.Ptr("clean"),
+			ResponsesToolFunction: &schemas.ResponsesToolFunction{Parameters: &clean}},
+		{Type: schemas.ResponsesToolTypeFunction, Name: schemas.Ptr("dirty"),
+			ResponsesToolFunction: &schemas.ResponsesToolFunction{Parameters: &withNUL}},
+	}
+
+	updated, changed := RewriteResponsesToolSchemas(tools, NormalizeRegexNULEscape)
+	if !changed {
+		t.Fatal("expected the tool slice to be rewritten")
+	}
+	if *withNUL.Pattern != `^[^\0]*$` {
+		t.Fatalf("the caller's tool schema was mutated in place: %q", *withNUL.Pattern)
+	}
+	if got := *updated[1].ResponsesToolFunction.Parameters.Pattern; got != `^[^\x00]*$` {
+		t.Fatalf("dirty tool not normalized, got %q", got)
+	}
+	if updated[0].ResponsesToolFunction != tools[0].ResponsesToolFunction {
+		t.Fatal("a tool with no NUL escape must not be copied")
+	}
+}
+
+func TestNormalizeToolSchemas_NoToolsIsANoOp(t *testing.T) {
+	if tools, changed := RewriteResponsesToolSchemas(nil, NormalizeRegexNULEscape); changed || tools != nil {
+		t.Fatal("nil responses tools must be returned unchanged")
+	}
+	if params, changed := RewriteToolSchemaPatterns(nil, NormalizeRegexNULEscape); changed || params != nil {
+		t.Fatal("a nil schema must be returned unchanged")
+	}
+}
+
+func TestStripRegexLookaround(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		// The four ArtifactData patterns that made every Claude Code request to
+		// kimi-k3 come back as an empty stream.
+		{"ArtifactData doc_id", `^(?!\.\.?(?:\/|$))[A-Za-z0-9_\-.~:@+]{1,200}$`, `^[A-Za-z0-9_\-.~:@+]{1,200}$`},
+		{"ArtifactData collection", `^(?!\.\.?(?:\/|$))[A-Za-z0-9_\-.~:@+]{1,200}(?:\/(?!\.\.?(?:\/|$))[A-Za-z0-9_\-.~:@+]{1,200}){0,14}$`,
+			`^[A-Za-z0-9_\-.~:@+]{1,200}(?:\/[A-Za-z0-9_\-.~:@+]{1,200}){0,14}$`},
+
+		{"positive lookahead", `^(?=.*\d).{8,}$`, `^.{8,}$`},
+		{"positive lookbehind", `(?<=\$)\d+`, `\d+`},
+		{"negative lookbehind", `(?<!x)y`, `y`},
+		{"nested group inside lookahead", `(?!(a|b)c)d`, `d`},
+		{"escaped paren inside lookahead", `(?!\))x`, `x`},
+		{"class holding a paren inside lookahead", `(?![)])x`, `x`},
+		{"class with leading literal bracket", `(?![]a])x`, `x`},
+
+		// Not lookaround: must be untouched.
+		{"non-capturing group", `^(?:a|b)$`, `^(?:a|b)$`},
+		{"named group", `(?<year>\d{4})`, `(?<year>\d{4})`},
+		{"inline flags", `(?i)abc`, `(?i)abc`},
+		{"paren literal inside a class", `[(?!]x`, `[(?!]x`},
+		{"escaped lookaround-looking text", `\(\?!x`, `\(\?!x`},
+		{"plain", `^[a-z]+$`, `^[a-z]+$`},
+		{"empty", ``, ``},
+
+		// A quantifier attached to the assertion goes with it: left behind it would
+		// lead the pattern (RE2: "missing argument to repetition operator") or bind
+		// to the previous atom and change its meaning.
+		{"leading quantified lookahead", `(?=b)+a`, `a`},
+		{"trailing quantified lookahead", `a(?=b)+`, `a`},
+		{"lazy counted quantifier", `(?!x){2,3}?y`, `y`},
+		{"open-ended counted quantifier", `(?!x){2,}y`, `y`},
+		{"exact counted quantifier", `(?!x){2}y`, `y`},
+		{"malformed brace is not a quantifier", `(?!x){2,y`, `{2,y`},
+
+		// Never truncate a pattern that does not balance.
+		{"unbalanced lookahead", `(?!abc`, `(?!abc`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := StripRegexLookaround(tc.in); got != tc.want {
+				t.Fatalf("StripRegexLookaround(%q)\n got %q\nwant %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestComposePatternRewriters_AppliesInOrderAndStaysNoOpWhenIdle(t *testing.T) {
+	both := ComposePatternRewriters(NormalizeRegexNULEscape, StripRegexLookaround)
+	if got := both(`^(?!\0)[^\0]*$`); got != `^[^\x00]*$` {
+		t.Fatalf("composed rewrite = %q, want %q", got, `^[^\x00]*$`)
+	}
+	if in := `^[a-z]+$`; both(in) != in {
+		t.Fatal("a composed rewriter must return its input unchanged when nothing applies")
+	}
+}
+
+// The lossy rewrite must go through the same copy-on-write walker as the
+// lossless one: nothing copied unless a pattern actually changed, and the
+// caller's schema never written through.
+func TestRewriteToolSchemaPatterns_LookaroundIsCopyOnWrite(t *testing.T) {
+	raw := `{"type":"object","properties":{"doc_id":{"type":"string","pattern":"^(?!\\.\\.?$)[A-Za-z0-9_.]{1,200}$"},"note":{"type":"string","pattern":"^[a-z]+$"}}}`
+	var params schemas.ToolFunctionParameters
+	if err := json.Unmarshal([]byte(raw), &params); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	updated, changed := RewriteToolSchemaPatterns(&params, StripRegexLookaround)
+	if !changed || updated == &params {
+		t.Fatal("expected a rewritten copy")
+	}
+	before, _ := json.Marshal(&params)
+	if !strings.Contains(string(before), `(?!`) {
+		t.Fatalf("caller's schema was mutated in place: %s", before)
+	}
+	after, _ := json.Marshal(updated)
+	if strings.Contains(string(after), `(?!`) || !strings.Contains(string(after), `^[A-Za-z0-9_.]{1,200}$`) {
+		t.Fatalf("lookahead not stripped: %s", after)
+	}
+	// The untouched property keeps the caller's nested map: Clone is shallow and
+	// only the changed spine may be copied.
+	origNote, _ := params.Properties.Get("note")
+	newNote, _ := updated.Properties.Get("note")
+	if origNote != newNote {
+		t.Fatal("an unchanged nested schema was copied")
+	}
+}
+
+// additionalProperties may itself be a schema (JSON Schema: "the value of the
+// additionalProperties keyword is a schema"), so a pattern under it is reachable
+// by the model and must be rewritten like any other. The boolean form has no
+// schema and must pass through as the caller's own pointer.
+func TestRewriteToolSchemaPatterns_CoversTopLevelAdditionalProperties(t *testing.T) {
+	extra := schemas.NewOrderedMap()
+	extra.Set("type", "string")
+	extra.Set("pattern", `^[^\0]*$`)
+	params := schemas.ToolFunctionParameters{
+		Type:                 "object",
+		Properties:           schemas.NewOrderedMap(),
+		AdditionalProperties: &schemas.AdditionalPropertiesStruct{AdditionalPropertiesMap: extra},
+	}
+
+	updated, changed := RewriteToolSchemaPatterns(&params, NormalizeRegexNULEscape)
+	if !changed {
+		t.Fatal("a pattern under additionalProperties was not rewritten")
+	}
+	if updated.AdditionalProperties == params.AdditionalProperties {
+		t.Fatal("AdditionalPropertiesStruct must be copied, not written through")
+	}
+	got, _ := updated.AdditionalProperties.AdditionalPropertiesMap.Get("pattern")
+	if got != `^[^\x00]*$` {
+		t.Fatalf("additionalProperties pattern = %q, want %q", got, `^[^\x00]*$`)
+	}
+	orig, _ := params.AdditionalProperties.AdditionalPropertiesMap.Get("pattern")
+	if orig != `^[^\0]*$` {
+		t.Fatalf("caller's additionalProperties schema was mutated in place: %q", orig)
+	}
+
+	// Boolean variant: nothing to rewrite, nothing copied.
+	boolParams := schemas.ToolFunctionParameters{
+		Type:                 "object",
+		Properties:           schemas.NewOrderedMap(),
+		AdditionalProperties: &schemas.AdditionalPropertiesStruct{AdditionalPropertiesBool: schemas.Ptr(false)},
+	}
+	if out, changed := RewriteToolSchemaPatterns(&boolParams, NormalizeRegexNULEscape); changed || out != &boolParams {
+		t.Fatal("boolean additionalProperties must be returned as-is")
+	}
+}
+
+// Schemas built in code, not parsed from JSON, carry nested schemas as plain
+// maps: BuildDecisionSchema sets each question's schema into an OrderedMap as a
+// map[string]any. The walker must descend into those too, copy-on-write, and
+// must hand back the caller's own map when nothing inside it changes.
+func TestRewriteToolSchemaPatterns_DescendsIntoPlainMapSchemas(t *testing.T) {
+	dirty := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"id": map[string]any{"type": "string", "pattern": `^[^\0]*$`},
+		},
+	}
+	clean := map[string]any{"type": "string", "enum": []any{"a", "b"}}
+	props := schemas.NewOrderedMap()
+	props.Set("dirty", dirty)
+	props.Set("clean", clean)
+	params := schemas.ToolFunctionParameters{Type: "object", Properties: props}
+
+	updated, changed := RewriteToolSchemaPatterns(&params, NormalizeRegexNULEscape)
+	if !changed {
+		t.Fatal("a pattern inside a plain-map nested schema was not rewritten")
+	}
+	v, _ := updated.Properties.Get("dirty")
+	got := v.(map[string]any)["properties"].(map[string]any)["id"].(map[string]any)["pattern"]
+	if got != `^[^\x00]*$` {
+		t.Fatalf("plain-map pattern = %q, want %q", got, `^[^\x00]*$`)
+	}
+	// The caller's maps are untouched at every level.
+	if orig := dirty["properties"].(map[string]any)["id"].(map[string]any)["pattern"]; orig != `^[^\0]*$` {
+		t.Fatalf("caller's plain-map schema was mutated in place: %q", orig)
+	}
+	// The untouched sibling must be the caller's very own map, not a copy: a
+	// write through the original has to be visible through the returned schema.
+	clean["sentinel"] = true
+	if c2, _ := updated.Properties.Get("clean"); c2.(map[string]any)["sentinel"] != true {
+		t.Fatal("an unchanged plain-map schema was copied instead of shared")
 	}
 }
