@@ -597,8 +597,8 @@ func TestAdaptiveRouting_FallbackDoesNotFabricatePhantomTarget(t *testing.T) {
 		if m.Provider == "antigravity" && m.Model == primaryModel {
 			t.Fatalf("phantom target found: %s/%s must not be recorded", m.Provider, m.Model)
 		}
-		// Empty model check: model must never be empty
-		if m.Model == "" {
+		// Empty model check: model must never be empty for non-provider levels
+		if m.Level != MetricLevelProvider && m.Model == "" {
 			t.Fatalf("model-less target found: %s/%s must not be recorded", m.Provider, m.Model)
 		}
 	}
@@ -671,4 +671,177 @@ func TestAdaptiveRouting_DynamicWeightProportionsInRulePool(t *testing.T) {
 	// Healthy targets should receive the majority of traffic
 	assert.Greater(t, weightsMap["tokenrouter/z-ai/glm-5.3-free"], 0.50)
 	assert.Greater(t, weightsMap["bai/glm-5.3-flash"], 0.25)
+}
+
+func TestAdaptiveRouting_ThreeLevelMetrics(t *testing.T) {
+	config := DefaultConfig()
+	plugin, err := New(config, nil, nil)
+	require.NoError(t, err)
+	defer func() { _ = plugin.Cleanup() }()
+
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	ctx.SetValue(adaptiveStartTimeKey, time.Now().Add(-50*time.Millisecond))
+	ctx.SetValue(schemas.BifrostContextKeySelectedKeyID, "key-alpha")
+
+	resp := &schemas.BifrostResponse{
+		ChatResponse: &schemas.BifrostChatResponse{
+			ExtraFields: schemas.BifrostResponseExtraFields{
+				RequestType:       schemas.ChatCompletionRequest,
+				Provider:          schemas.ModelProvider("openrouter"),
+				ResolvedModelUsed: "qwen3.8-flash",
+				RoutingInfo: schemas.RoutingInfo{
+					Provider: schemas.ModelProvider("openrouter"),
+					Model:    "qwen3.8-flash",
+				},
+			},
+		},
+	}
+
+	_, _, err = plugin.PostLLMHook(ctx, resp, nil)
+	require.NoError(t, err)
+
+	summary := plugin.GetMetricsSummary()
+	require.Len(t, summary.Metrics, 3, "must record exactly 3 metric levels")
+
+	levels := make(map[string]TargetMetricView)
+	for _, m := range summary.Metrics {
+		levels[m.Level] = m
+	}
+
+	keyMetric, hasKey := levels[MetricLevelKey]
+	assert.True(t, hasKey, "key-level metric must exist")
+	assert.Equal(t, "openrouter/qwen3.8-flash#key-alpha", keyMetric.Target)
+	assert.Equal(t, "key-alpha", keyMetric.KeyID)
+	assert.Equal(t, "qwen3.8-flash", keyMetric.Model)
+	assert.Equal(t, "openrouter", keyMetric.Provider)
+
+	modelMetric, hasModel := levels[MetricLevelModel]
+	assert.True(t, hasModel, "model-level metric must exist")
+	assert.Equal(t, "openrouter/qwen3.8-flash", modelMetric.Target)
+	assert.Equal(t, "", modelMetric.KeyID)
+	assert.Equal(t, "qwen3.8-flash", modelMetric.Model)
+
+	providerMetric, hasProvider := levels[MetricLevelProvider]
+	assert.True(t, hasProvider, "provider-level metric must exist")
+	assert.Equal(t, "openrouter", providerMetric.Target)
+	assert.Equal(t, "", providerMetric.Model)
+	assert.Equal(t, "", providerMetric.KeyID)
+}
+
+func TestAdaptiveRouting_GroupAdaptivePriorityRotation(t *testing.T) {
+	config := DefaultConfig()
+	plugin, err := New(config, nil, nil)
+	require.NoError(t, err)
+	defer func() { _ = plugin.Cleanup() }()
+
+	prio1 := 1
+	prio2 := 2
+	targets := []configstoreTables.TableRoutingTarget{
+		{
+			RuleID:   "rule-group-1",
+			Provider: schemas.Ptr("openrouter"),
+			Model:    schemas.Ptr("qwen3.8-flash"),
+			Priority: &prio1,
+			Weight:   1.0,
+		},
+		{
+			RuleID:   "rule-group-1",
+			Provider: schemas.Ptr("openrouter"),
+			Model:    schemas.Ptr("hy3"),
+			Priority: &prio2,
+			Weight:   1.0,
+		},
+	}
+
+	selector := plugin.GroupAdaptiveTargetSelector()
+
+	// 6 successive selections must strictly rotate 1 → 2 → 1
+	expectedModels := []string{
+		"qwen3.8-flash",
+		"hy3",
+		"qwen3.8-flash",
+		"hy3",
+		"qwen3.8-flash",
+		"hy3",
+	}
+
+	for i, expectedModel := range expectedModels {
+		picked, fallbacks, ok := selector("rule-group-1", targets)
+		require.True(t, ok)
+		assert.Equal(t, expectedModel, *picked.Model, "step %d should select %s", i, expectedModel)
+
+		// In-provider fallbacks must contain the sibling model
+		if expectedModel == "qwen3.8-flash" {
+			require.Equal(t, []string{"openrouter/hy3"}, fallbacks)
+		} else {
+			require.Equal(t, []string{"openrouter/qwen3.8-flash"}, fallbacks)
+		}
+	}
+}
+
+func TestAdaptiveRouting_GroupAdaptiveProviderEWMA(t *testing.T) {
+	config := DefaultConfig()
+	plugin, err := New(config, nil, nil)
+	require.NoError(t, err)
+	defer func() { _ = plugin.Cleanup() }()
+
+	// Record fast latency for openrouter (20ms) and slow for deepinfra (800ms)
+	provOpenRouter := TargetID{Provider: schemas.ModelProvider("openrouter")}
+	provDeepInfra := TargetID{Provider: schemas.ModelProvider("deepinfra")}
+
+	for i := 0; i < 15; i++ {
+		plugin.GetStore().RecordMetric(context.Background(), provOpenRouter, 20*time.Millisecond, 15*time.Millisecond, 200, false)
+		plugin.GetStore().RecordMetric(context.Background(), provDeepInfra, 800*time.Millisecond, 600*time.Millisecond, 200, false)
+	}
+
+	prio1 := 1
+	prio2 := 2
+	targets := []configstoreTables.TableRoutingTarget{
+		{
+			RuleID:   "rule-group-2",
+			Provider: schemas.Ptr("openrouter"),
+			Model:    schemas.Ptr("qwen3.8-flash"),
+			Priority: &prio1,
+			Weight:   0.5,
+		},
+		{
+			RuleID:   "rule-group-2",
+			Provider: schemas.Ptr("openrouter"),
+			Model:    schemas.Ptr("hy3"),
+			Priority: &prio2,
+			Weight:   0.5,
+		},
+		{
+			RuleID:   "rule-group-2",
+			Provider: schemas.Ptr("deepinfra"),
+			Model:    schemas.Ptr("qwen3.8-flash"),
+			Priority: &prio1,
+			Weight:   0.5,
+		},
+		{
+			RuleID:   "rule-group-2",
+			Provider: schemas.Ptr("deepinfra"),
+			Model:    schemas.Ptr("hy3"),
+			Priority: &prio2,
+			Weight:   0.5,
+		},
+	}
+
+	selector := plugin.GroupAdaptiveTargetSelector()
+
+	openRouterCount := 0
+	deepInfraCount := 0
+	for i := 0; i < 100; i++ {
+		picked, _, ok := selector("rule-group-2", targets)
+		require.True(t, ok)
+		if *picked.Provider == "openrouter" {
+			openRouterCount++
+		} else if *picked.Provider == "deepinfra" {
+			deepInfraCount++
+		}
+	}
+
+	// openrouter with 20ms EWMA must win the vast majority of selections over 800ms deepinfra
+	assert.Greater(t, openRouterCount, 70, "openrouter must win >70%% of selections")
+	assert.Less(t, deepInfraCount, 30, "deepinfra must be suppressed")
 }

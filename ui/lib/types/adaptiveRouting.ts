@@ -4,12 +4,14 @@
  */
 
 export type AdaptiveTargetStatus = "healthy" | "degraded" | "optimal";
+export type MetricLevel = "provider" | "model" | "key";
 
 export interface AdaptiveTargetMetric {
 	target: string;
 	provider: string;
 	model: string;
 	key_id?: string;
+	level?: MetricLevel;
 	ewma_latency_ms: number;
 	ttft_ms: number;
 	p90_latency_ms: number;

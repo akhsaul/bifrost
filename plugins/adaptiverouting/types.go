@@ -22,7 +22,29 @@ func (t TargetID) String() string {
 	if t.KeyID != "" {
 		return fmt.Sprintf("%s/%s#%s", t.Provider, t.Model, t.KeyID)
 	}
-	return fmt.Sprintf("%s/%s", t.Provider, t.Model)
+	if t.Model != "" {
+		return fmt.Sprintf("%s/%s", t.Provider, t.Model)
+	}
+	return string(t.Provider)
+}
+
+// Metric granularity levels, mirrored by the dashboard's level filter.
+const (
+	MetricLevelProvider = "provider"
+	MetricLevelModel    = "model"
+	MetricLevelKey      = "key"
+)
+
+// Level returns the metric granularity this target is recorded at:
+// "key" (provider/model#key_id), "model" (provider/model), or "provider".
+func (t TargetID) Level() string {
+	if t.KeyID != "" {
+		return MetricLevelKey
+	}
+	if t.Model != "" {
+		return MetricLevelModel
+	}
+	return MetricLevelProvider
 }
 
 // TargetStats contains real-time performance metrics and scores for a specific TargetID.
@@ -60,6 +82,7 @@ type TargetMetricView struct {
 	Provider          string  `json:"provider"`
 	Model             string  `json:"model"`
 	KeyID             string  `json:"key_id,omitempty"`
+	Level             string  `json:"level"` // "provider" | "model" | "key"
 	EWMALatencyMs     float64 `json:"ewma_latency_ms"`
 	TTFTMs            float64 `json:"ttft_ms"`
 	P90LatencyMs      float64 `json:"p90_latency_ms"`

@@ -10,7 +10,7 @@ import { getOperatorLabel } from "@/lib/config/celOperatorsRouting";
 import { ProviderIconType, RenderProviderIcon } from "@/lib/constants/icons";
 import { getProviderLabel } from "@/lib/constants/logs";
 import { useGetCustomerQuery, useGetTeamQuery, useGetVirtualKeyQuery } from "@/lib/store/apis/governanceApi";
-import { RoutingRule } from "@/lib/types/routingRules";
+import { RoutingRule, RoutingStrategy } from "@/lib/types/routingRules";
 import { getScopeLabel } from "@/lib/utils/labels";
 import { formatDistanceToNow } from "date-fns";
 import { Check, Copy, GitMerge, Key } from "lucide-react";
@@ -191,10 +191,11 @@ function TargetCard({
 	target: RoutingRule["targets"][0];
 	index: number;
 	total: number;
-	strategy?: "weighted" | "adaptive" | "priority";
+	strategy?: RoutingStrategy;
 }) {
 	const providerLabel = target.provider ? getProviderLabel(target.provider) : "Incoming provider";
 	const isPriority = strategy === "priority";
+	const isGroupAdaptive = strategy === "group_adaptive";
 	const weightPercent = total > 0 ? Math.round(target.weight * 100) : 0;
 
 	return (
@@ -203,7 +204,14 @@ function TargetCard({
 				<div className="flex items-center gap-2.5">
 					{target.provider && <RenderProviderIcon provider={target.provider as ProviderIconType} size="sm" className="h-5 w-5 shrink-0" />}
 					<div className="flex flex-col">
-						<span className="text-sm font-medium">{providerLabel}</span>
+						<div className="flex items-center gap-2">
+							<span className="text-sm font-medium">{providerLabel}</span>
+							{isGroupAdaptive && target.priority && (
+								<Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
+									Priority {target.priority}
+								</Badge>
+							)}
+						</div>
 						{target.model ? (
 							<span className="text-muted-foreground font-mono text-xs">{target.model}</span>
 						) : (

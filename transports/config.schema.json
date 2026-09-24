@@ -3790,6 +3790,13 @@
           "type": "integer",
           "minimum": 1,
           "description": "Priority rank for this target (must be >= 1, lower number = higher precedence). Required for each target when the rule strategy is 'priority'"
+        },
+        "models": {
+          "type": "array",
+          "description": "Optional list of models with individual priorities for the 'group_adaptive' strategy",
+          "items": {
+            "type": ["string", "object"]
+          }
         }
       },
       "required": ["weight"],
@@ -3822,8 +3829,8 @@
         },
         "strategy": {
           "type": "string",
-          "enum": ["weighted", "adaptive", "priority"],
-          "description": "Target selection strategy: weighted distribution, adaptive latency-based selection, or strict priority order",
+          "enum": ["weighted", "adaptive", "priority", "group_adaptive"],
+          "description": "Target selection strategy: weighted distribution, adaptive latency-based selection, strict priority order, or group adaptive (provider EWMA + priority model rotation)",
           "default": "weighted"
         },
         "chain_rule": {

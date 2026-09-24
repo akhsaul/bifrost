@@ -5,9 +5,17 @@
 
 import { RuleGroupType } from "react-querybuilder";
 
+export type RoutingStrategy = "weighted" | "adaptive" | "priority" | "group_adaptive";
+
+export interface TargetModelItem {
+	model: string;
+	priority: number;
+}
+
 export interface RoutingTarget {
 	provider?: string;
 	model?: string;
+	models?: TargetModelItem[];
 	key_id?: string;
 	weight: number;
 	/** Integer rank >= 1 (lower = higher precedence); used when rule strategy is "priority". */
@@ -19,7 +27,7 @@ export interface RoutingRule {
 	name: string;
 	description: string;
 	cel_expression: string;
-	strategy?: "weighted" | "adaptive" | "priority";
+	strategy?: RoutingStrategy;
 	targets: RoutingTarget[];
 	fallbacks?: string[];
 	scope: "global" | "team" | "customer" | "virtual_key" | "user";
@@ -36,7 +44,7 @@ export interface CreateRoutingRuleRequest {
 	name: string;
 	description?: string;
 	cel_expression?: string;
-	strategy?: "weighted" | "adaptive" | "priority";
+	strategy?: RoutingStrategy;
 	targets: RoutingTarget[];
 	fallbacks?: string[];
 	scope: string;
@@ -71,6 +79,7 @@ export interface GetRoutingRuleResponse {
 export interface RoutingTargetFormData {
 	provider: string;
 	model: string;
+	models?: TargetModelItem[];
 	key_id: string;
 	weight: number;
 	/** Integer rank >= 1 (lower = higher precedence); used when rule strategy is "priority". */
@@ -82,7 +91,7 @@ export interface RoutingRuleFormData {
 	name: string;
 	description: string;
 	cel_expression: string;
-	strategy?: "weighted" | "adaptive" | "priority";
+	strategy?: RoutingStrategy;
 	targets: RoutingTargetFormData[];
 	fallbacks: string[];
 	scope: string;

@@ -134,12 +134,36 @@ func (h *RoutingHandler) RegisterRoutes(r *router.Router, middlewares ...schemas
 // in a rule must sum to 1 (e.g. 0.7 + 0.3 = 1.0).
 // For "priority" rules, Priority carries an integer rank (>= 1, lower = higher
 // precedence) and weights are ignored by selection.
+// For "group_adaptive" rules, Models can specify multiple models with individual priorities
+// that rotate sequentially (1 → 2 → 1), while Weight is the provider's base weight.
+type TargetModelItem struct {
+	Model    string `json:"model"`
+	Priority int    `json:"priority"`
+}
+
+func (t *TargetModelItem) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := sonic.Unmarshal(data, &s); err == nil {
+		t.Model = s
+		t.Priority = 1
+		return nil
+	}
+	type rawItem TargetModelItem
+	var item rawItem
+	if err := sonic.Unmarshal(data, &item); err != nil {
+		return err
+	}
+	*t = TargetModelItem(item)
+	return nil
+}
+
 type RoutingTarget struct {
-	Provider *string `json:"provider,omitempty"` // nil = use incoming provider
-	Model    *string `json:"model,omitempty"`    // nil = use incoming model
-	KeyID    *string `json:"key_id,omitempty"`   // nil = no key pin
-	Weight   float64 `json:"weight"`             // probability weight (weighted/adaptive); must be > 0 and sum to 1 across targets
-	Priority *int    `json:"priority,omitempty"` // integer rank >= 1 (lower = higher precedence) for the "priority" strategy
+	Provider *string           `json:"provider,omitempty"` // nil = use incoming provider
+	Model    *string           `json:"model,omitempty"`    // nil = use incoming model
+	Models   []TargetModelItem `json:"models,omitempty"`   // optional multi-model with explicit priorities (group_adaptive)
+	KeyID    *string           `json:"key_id,omitempty"`   // nil = no key pin
+	Weight   float64           `json:"weight"`             // probability weight (weighted/adaptive/group_adaptive); must be > 0
+	Priority *int              `json:"priority,omitempty"` // integer rank >= 1 (lower = higher precedence) for the "priority" strategy
 }
 
 // CreateRoutingRuleRequest represents the request body for creating a routing rule
@@ -249,9 +273,10 @@ func validateRoutingScope(scope string) error {
 
 // validRoutingStrategies contains the allowed target-selection strategy values
 var validRoutingStrategies = map[string]bool{
-	"weighted": true,
-	"adaptive": true,
-	"priority": true,
+	"weighted":       true,
+	"adaptive":       true,
+	"priority":       true,
+	"group_adaptive": true,
 }
 
 // validateRoutingStrategy checks that the strategy value is allowed. Empty is valid
@@ -261,9 +286,52 @@ func validateRoutingStrategy(strategy string) error {
 		return nil
 	}
 	if !validRoutingStrategies[strategy] {
-		return fmt.Errorf("invalid strategy %q: must be one of: weighted, adaptive, priority", strategy)
+		return fmt.Errorf("invalid strategy %q: must be one of: weighted, adaptive, priority, group_adaptive", strategy)
 	}
 	return nil
+}
+
+// normalizeRoutingTargets expands multi-model targets (group_adaptive) into individual
+// RoutingTarget entries with sequential Priority ranks and preserves the provider's weight.
+func normalizeRoutingTargets(targets []RoutingTarget, strategy string) []RoutingTarget {
+	result := make([]RoutingTarget, 0, len(targets))
+	for _, t := range targets {
+		if len(t.Models) > 1 {
+			for i, m := range t.Models {
+				mCopy := m.Model
+				prio := m.Priority
+				if prio <= 0 {
+					prio = i + 1
+				}
+				result = append(result, RoutingTarget{
+					Provider: t.Provider,
+					Model:    &mCopy,
+					KeyID:    t.KeyID,
+					Weight:   t.Weight,
+					Priority: &prio,
+				})
+			}
+		} else if len(t.Models) == 1 {
+			mCopy := t.Models[0].Model
+			prio := t.Models[0].Priority
+			if prio <= 0 {
+				prio = 1
+				if t.Priority != nil {
+					prio = *t.Priority
+				}
+			}
+			result = append(result, RoutingTarget{
+				Provider: t.Provider,
+				Model:    &mCopy,
+				KeyID:    t.KeyID,
+				Weight:   t.Weight,
+				Priority: &prio,
+			})
+		} else {
+			result = append(result, t)
+		}
+	}
+	return result
 }
 
 // validateRoutingTargets checks target validity according to the rule strategy:
@@ -271,12 +339,15 @@ func validateRoutingStrategy(strategy string) error {
 //     and key_id requires provider to be set.
 //   - "weighted"/"adaptive" (and empty, which defaults to weighted): every weight
 //     must be positive and all weights must sum to 1 (within 0.001 tolerance).
+//   - "group_adaptive": distinct provider card weights must sum to 1 (within 0.001 tolerance),
+//     and all weights must be positive.
 //   - "priority": every target carries an integer rank >= 1 — either the dedicated
 //     priority field, or (legacy) an integer weight >= 1 when priority is unset.
 //     The sum-to-1 invariant does NOT apply, because weight no longer encodes
 //     priority order.
 func validateRoutingTargets(targets []RoutingTarget, strategy string) error {
 	seen := make(map[string]struct{}, len(targets))
+	providerWeightCounted := make(map[string]struct{})
 	total := 0.0
 	for _, t := range targets {
 		if strategy == "priority" {
@@ -315,7 +386,14 @@ func validateRoutingTargets(targets []RoutingTarget, strategy string) error {
 		}
 		seen[key] = struct{}{}
 
-		if strategy != "priority" {
+		if strategy == "group_adaptive" {
+			// In group_adaptive, weight is per provider card. Count each distinct provider key once.
+			provKey := provider + "|" + keyID
+			if _, counted := providerWeightCounted[provKey]; !counted {
+				providerWeightCounted[provKey] = struct{}{}
+				total += t.Weight
+			}
+		} else if strategy != "priority" {
 			total += t.Weight
 		}
 	}
@@ -632,6 +710,8 @@ func (h *RoutingHandler) createRoutingRule(ctx *fasthttp.RequestCtx) {
 		strategy = "weighted"
 	}
 
+	req.Targets = normalizeRoutingTargets(req.Targets, strategy)
+
 	// Validate targets with strategy context
 	if len(req.Targets) == 0 {
 		SendError(ctx, 400, "at least one target is required")
@@ -798,6 +878,7 @@ func (h *RoutingHandler) updateRoutingRule(ctx *fasthttp.RequestCtx) {
 		strategy = *req.Strategy
 	}
 	if req.Targets != nil {
+		req.Targets = normalizeRoutingTargets(req.Targets, strategy)
 		if len(req.Targets) == 0 {
 			SendError(ctx, 400, "at least one routing target is required")
 			return

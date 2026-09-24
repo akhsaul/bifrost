@@ -23,17 +23,21 @@ import { getErrorMessage } from "@/lib/store";
 import { useGetAllKeysQuery, useGetProvidersQuery } from "@/lib/store/apis/providersApi";
 import { useCreateRoutingRuleMutation, useGetRoutingRulesQuery, useUpdateRoutingRuleMutation } from "@/lib/store/apis/routingRulesApi";
 import {
+	CreateRoutingRuleRequest,
 	DEFAULT_ROUTING_RULE_FORM_DATA,
 	DEFAULT_ROUTING_TARGET,
 	ROUTING_RULE_SCOPES,
 	RoutingRule,
 	RoutingRuleFormData,
+	RoutingStrategy,
+	RoutingTarget,
 	RoutingTargetFormData,
+	TargetModelItem,
 } from "@/lib/types/routingRules";
 import { validateRateLimitAndBudgetRules, validateRoutingRules } from "@/lib/utils/celConverterRouting";
 import { isValidRuleGroupType, normalizeRoutingRuleGroupQuery } from "@/lib/utils/routingRuleGroupQuery";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
-import { Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus, Trash2, X } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { RuleGroupType } from "react-querybuilder";
@@ -157,16 +161,44 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 			setValue("enabled", editingRule.enabled);
 			setValue("chain_rule", editingRule.chain_rule ?? false);
 			if (editingRule.targets && editingRule.targets.length > 0) {
-				setTargets(
-					editingRule.targets.map((t, idx) => ({
-						...DEFAULT_ROUTING_TARGET,
-						provider: t.provider || "",
-						model: t.model || "",
-						key_id: t.key_id || "",
-						weight: t.weight,
-						priority: t.priority ?? idx + 1,
-					})),
-				);
+				if (editingRule.strategy === "group_adaptive") {
+					const cardMap = new Map<string, RoutingTargetFormData>();
+					for (const t of editingRule.targets) {
+						const key = `${t.provider || ""}|${t.key_id || ""}`;
+						const prio = t.priority ?? 1;
+						const existing = cardMap.get(key);
+						if (existing) {
+							if (t.model) {
+								const updated = [...(existing.models || []), { model: t.model, priority: prio }];
+								updated.sort((a, b) => a.priority - b.priority);
+								existing.models = updated;
+							}
+						} else {
+							cardMap.set(key, {
+								...DEFAULT_ROUTING_TARGET,
+								provider: t.provider || "",
+								model: t.model || "",
+								models: t.model ? [{ model: t.model, priority: prio }] : [],
+								key_id: t.key_id || "",
+								weight: t.weight,
+								priority: prio,
+							});
+						}
+					}
+					setTargets(Array.from(cardMap.values()));
+				} else {
+					setTargets(
+						editingRule.targets.map((t, idx) => ({
+							...DEFAULT_ROUTING_TARGET,
+							provider: t.provider || "",
+							model: t.model || "",
+							models: t.model ? [{ model: t.model, priority: t.priority ?? idx + 1 }] : [],
+							key_id: t.key_id || "",
+							weight: t.weight,
+							priority: t.priority ?? idx + 1,
+						})),
+					);
+				}
 			} else {
 				setTargets([{ ...DEFAULT_ROUTING_TARGET }]);
 			}
@@ -216,8 +248,48 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 		setTargets((prev) => prev.filter((_, i) => i !== index));
 	};
 
-	const updateTarget = (index: number, field: keyof RoutingTargetFormData, value: string | number) => {
+	const updateTarget = (index: number, field: keyof RoutingTargetFormData, value: string | number | TargetModelItem[] | undefined) => {
 		setTargets((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
+	};
+
+	const updateTargetModels = (index: number, models: string[]) => {
+		setTargets((prev) =>
+			prev.map((t, i) => {
+				if (i !== index) return t;
+				const existing = t.models || [];
+				const next: TargetModelItem[] = models.map((m, idx) => {
+					const found = existing.find((e) => e.model === m);
+					return found ? found : { model: m, priority: idx + 1 };
+				});
+				next.sort((a, b) => a.priority - b.priority);
+				return { ...t, models: next, model: next[0]?.model || "" };
+			}),
+		);
+	};
+
+	const moveModelPriority = (index: number, modelIndex: number, direction: "up" | "down") => {
+		setTargets((prev) =>
+			prev.map((t, i) => {
+				if (i !== index || !t.models) return t;
+				const sorted = [...t.models].sort((a, b) => a.priority - b.priority);
+				const swapIdx = direction === "up" ? modelIndex - 1 : modelIndex + 1;
+				if (swapIdx < 0 || swapIdx >= sorted.length) return t;
+				[sorted[modelIndex], sorted[swapIdx]] = [sorted[swapIdx], sorted[modelIndex]];
+				const reindexed = sorted.map((m, idx) => ({ ...m, priority: idx + 1 }));
+				return { ...t, models: reindexed, model: reindexed[0]?.model || t.model };
+			}),
+		);
+	};
+
+	const setModelPriority = (index: number, model: string, priority: number) => {
+		setTargets((prev) =>
+			prev.map((t, i) => {
+				if (i !== index || !t.models) return t;
+				const updated = t.models.map((m) => (m.model === model ? { ...m, priority } : m));
+				updated.sort((a, b) => a.priority - b.priority);
+				return { ...t, models: updated };
+			}),
+		);
 	};
 
 	const totalWeight = targets.reduce((sum, t) => sum + (t.weight || 0), 0);
@@ -255,8 +327,13 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 					return;
 				}
 			}
-			if (Math.abs(totalWeight - 1) > 0.001) {
-				toast.error(`Target weights must sum to 1, current total: ${totalWeight.toFixed(4)}`);
+			// group_adaptive: weight is per provider card, so sum distinct card weights
+			const effectiveTotal =
+				currentStrategy === "group_adaptive"
+					? targets.reduce((sum, t) => sum + (t.weight || 0), 0)
+					: totalWeight;
+			if (Math.abs(effectiveTotal - 1) > 0.001) {
+				toast.error(`Target weights must sum to 1, current total: ${effectiveTotal.toFixed(4)}`);
 				return;
 			}
 		}
@@ -285,18 +362,34 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 			return provider && provider.length > 0;
 		});
 
-		const payload = {
+		const finalTargets: RoutingTarget[] = targets.flatMap(({ provider, model, models, key_id, weight, priority }): RoutingTarget[] => {
+			if (currentStrategy === "group_adaptive" && models && models.length > 0) {
+				return [
+					{
+						provider: provider || undefined,
+						key_id: key_id || undefined,
+						weight: weight,
+						models: models.map((m) => ({ model: m.model, priority: m.priority })),
+					},
+				];
+			}
+			return [
+				{
+					provider: provider || undefined,
+					model: model || undefined,
+					key_id: key_id || undefined,
+					weight: currentStrategy === "priority" ? 1 : weight,
+					priority: currentStrategy === "priority" ? priority : undefined,
+				},
+			];
+		});
+
+		const payload: CreateRoutingRuleRequest = {
 			name: data.name,
 			description: data.description,
 			cel_expression: data.cel_expression,
 			strategy: data.strategy || "weighted",
-			targets: targets.map(({ provider, model, key_id, weight, priority }) => ({
-				provider: provider || undefined,
-				model: model || undefined,
-				key_id: key_id || undefined,
-				weight: currentStrategy === "priority" ? 1 : weight,
-				priority: currentStrategy === "priority" ? priority : undefined,
-			})),
+			targets: finalTargets,
 			fallbacks: validFallbacks,
 			scope: data.scope,
 			scope_id: data.scope === "global" ? undefined : data.scope_id || undefined,
@@ -527,7 +620,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 								<div className="flex items-center gap-2">
 									<Select
 										value={watch("strategy") || "weighted"}
-										onValueChange={(val: "weighted" | "adaptive" | "priority") => setValue("strategy", val)}
+										onValueChange={(val: RoutingStrategy) => setValue("strategy", val)}
 									>
 										<SelectTrigger className="h-8 w-[140px] text-xs">
 											<SelectValue placeholder="Strategy" />
@@ -536,6 +629,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 											<SelectItem value="weighted">Static Weighted</SelectItem>
 											<SelectItem value="adaptive">Adaptive (EWMA)</SelectItem>
 											<SelectItem value="priority">Priority Order</SelectItem>
+											<SelectItem value="group_adaptive">Group Adaptive (Provider EWMA)</SelectItem>
 										</SelectContent>
 									</Select>
 									<Button
@@ -564,6 +658,9 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 										showRemove={targets.length > 1}
 										onUpdate={updateTarget}
 										onRemove={removeTarget}
+										onUpdateModels={updateTargetModels}
+										onMoveModelPriority={moveModelPriority}
+										onSetModelPriority={setModelPriority}
 									/>
 								))}
 							</div>
@@ -572,6 +669,18 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 							{watch("strategy") === "priority" ? (
 								<div className="text-muted-foreground flex items-center justify-end gap-2 text-xs font-medium">
 									Priority: lower number = higher precedence (1 is highest)
+								</div>
+							) : watch("strategy") === "group_adaptive" ? (
+								<div className="space-y-1">
+									<p className="text-muted-foreground text-xs">
+										Group Adaptive selects the optimal provider via provider-level EWMA, then rotates models within the chosen provider by priority (1 → 2 → 1).
+									</p>
+									<div
+										className={`flex items-center justify-end gap-2 text-xs font-medium ${Math.abs(totalWeight - 1) > 0.001 ? "text-destructive" : "text-muted-foreground"}`}
+									>
+										Total provider weight: {totalWeight.toFixed(4)}
+										{Math.abs(totalWeight - 1) > 0.001 && <span className="text-destructive">(must equal 1)</span>}
+									</div>
 								</div>
 							) : (
 								<div
@@ -693,21 +802,37 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 interface TargetRowProps {
 	target: RoutingTargetFormData;
 	index: number;
-	strategy: "weighted" | "adaptive" | "priority";
+	strategy: RoutingStrategy;
 	providerOptions: Array<{ label: string; value: string; icon: React.ReactNode }>;
 	allKeys: Array<{ key_id: string; name: string; provider: string }>;
 	showRemove: boolean;
-	onUpdate: (index: number, field: keyof RoutingTargetFormData, value: string | number) => void;
+	onUpdate: (index: number, field: keyof RoutingTargetFormData, value: string | number | TargetModelItem[] | undefined) => void;
 	onRemove: (index: number) => void;
+	onUpdateModels?: (index: number, models: string[]) => void;
+	onMoveModelPriority?: (index: number, modelIndex: number, direction: "up" | "down") => void;
+	onSetModelPriority?: (index: number, model: string, priority: number) => void;
 }
 
-function TargetRow({ target, index, strategy, providerOptions, allKeys, showRemove, onUpdate, onRemove }: TargetRowProps) {
+function TargetRow({
+	target,
+	index,
+	strategy,
+	providerOptions,
+	allKeys,
+	showRemove,
+	onUpdate,
+	onRemove,
+	onUpdateModels,
+	onMoveModelPriority,
+	onSetModelPriority,
+}: TargetRowProps) {
 	const availableKeys = target.provider
 		? allKeys.filter((k) => k.provider === target.provider).map((k) => ({ id: k.key_id, name: k.name }))
 		: [];
 	// Priority strategy has a dedicated priority rank input (bound to target.priority);
-	// weighted/adaptive show the probability weight input (bound to target.weight).
+	// weighted/adaptive/group_adaptive show the probability weight input (bound to target.weight).
 	const isPriority = strategy === "priority";
+	const isGroupAdaptive = strategy === "group_adaptive";
 
 	return (
 		<div className="space-y-3 rounded-lg border p-3" data-testid={`routing-target-${index}`}>
@@ -771,6 +896,7 @@ function TargetRow({ target, index, strategy, providerOptions, allKeys, showRemo
 							onValueChange={(value) => {
 								onUpdate(index, "provider", value ?? "");
 								onUpdate(index, "model", "");
+								onUpdate(index, "models", []);
 								onUpdate(index, "key_id", "");
 							}}
 							placeholder="Incoming (optional)"
@@ -786,6 +912,7 @@ function TargetRow({ target, index, strategy, providerOptions, allKeys, showRemo
 								onClick={() => {
 									onUpdate(index, "provider", "");
 									onUpdate(index, "model", "");
+									onUpdate(index, "models", []);
 									onUpdate(index, "key_id", "");
 								}}
 								className="h-9 w-9 p-0"
@@ -800,28 +927,44 @@ function TargetRow({ target, index, strategy, providerOptions, allKeys, showRemo
 
 				<div className="space-y-1.5">
 					<Label id={`routing-target-${index}-model-label`} className="text-xs">
-						Model
+						Model {isGroupAdaptive && <span className="text-muted-foreground font-normal">(1 or more)</span>}
 					</Label>
 					<div className="flex gap-1.5">
 						<div className="flex-1" data-testid={`routing-target-${index}-model-select`}>
-							<ModelMultiselect
-								provider={target.provider || undefined}
-								value={target.model}
-								onChange={(value) => onUpdate(index, "model", value)}
-								placeholder="Incoming (optional)"
-								isSingleSelect
-								loadModelsOnEmptyProvider
-								className="!h-9 !min-h-9"
-								inputId={`routing-target-${index}-model-input`}
-								ariaLabelledBy={`routing-target-${index}-model-label`}
-							/>
+							{isGroupAdaptive ? (
+								<ModelMultiselect
+									provider={target.provider || undefined}
+									value={target.models?.map((m) => m.model) || (target.model ? [target.model] : [])}
+									onChange={(models) => onUpdateModels?.(index, models)}
+									placeholder="Incoming (optional)"
+									loadModelsOnEmptyProvider
+									className="!h-9 !min-h-9"
+									inputId={`routing-target-${index}-model-input`}
+									ariaLabelledBy={`routing-target-${index}-model-label`}
+								/>
+							) : (
+								<ModelMultiselect
+									provider={target.provider || undefined}
+									value={target.model}
+									onChange={(value) => onUpdate(index, "model", value)}
+									placeholder="Incoming (optional)"
+									isSingleSelect
+									loadModelsOnEmptyProvider
+									className="!h-9 !min-h-9"
+									inputId={`routing-target-${index}-model-input`}
+									ariaLabelledBy={`routing-target-${index}-model-label`}
+								/>
+							)}
 						</div>
-						{target.model && (
+						{((isGroupAdaptive && target.models && target.models.length > 0) || (!isGroupAdaptive && target.model)) && (
 							<Button
 								type="button"
 								variant="outline"
 								size="sm"
-								onClick={() => onUpdate(index, "model", "")}
+								onClick={() => {
+									onUpdate(index, "model", "");
+									onUpdate(index, "models", []);
+								}}
 								className="h-9 w-9 p-0"
 								aria-label={`Clear model for target ${index + 1}`}
 								data-testid={`routing-target-${index}-model-clear`}
@@ -832,6 +975,56 @@ function TargetRow({ target, index, strategy, providerOptions, allKeys, showRemo
 					</div>
 				</div>
 			</div>
+
+			{/* Group Adaptive: Model Priority Rotation List */}
+			{isGroupAdaptive && target.models && target.models.length > 1 && (
+				<div className="space-y-1.5 rounded-md border bg-muted/40 p-2.5 text-xs">
+					<div className="flex items-center justify-between text-muted-foreground font-medium">
+						<span>Model Priority Rotation (1 → 2 → 1)</span>
+						<span className="text-[10px]">Lower number = higher precedence</span>
+					</div>
+					<div className="space-y-1">
+						{target.models.map((item, mIdx) => (
+							<div key={item.model} className="flex items-center justify-between gap-2 rounded border bg-background px-2.5 py-1.5">
+								<span className="font-mono text-xs font-semibold">{item.model}</span>
+								<div className="flex items-center gap-1.5">
+									<Label className="text-[10px] text-muted-foreground">Priority:</Label>
+									<Input
+										type="number"
+										min={1}
+										value={item.priority}
+										onChange={(e) => {
+											const prio = parseInt(e.target.value, 10) || 1;
+											onSetModelPriority?.(index, item.model, prio);
+										}}
+										className="h-6 w-14 text-center text-xs"
+									/>
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										className="h-6 w-6 p-0"
+										onClick={() => onMoveModelPriority?.(index, mIdx, "up")}
+										disabled={mIdx === 0}
+									>
+										<ChevronUp className="h-3 w-3" />
+									</Button>
+									<Button
+										type="button"
+										variant="ghost"
+										size="sm"
+										className="h-6 w-6 p-0"
+										onClick={() => onMoveModelPriority?.(index, mIdx, "down")}
+										disabled={mIdx === target.models!.length - 1}
+									>
+										<ChevronDown className="h-3 w-3" />
+									</Button>
+								</div>
+							</div>
+						))}
+					</div>
+				</div>
+			)}
 
 			{target.provider && (availableKeys.length > 0 || target.key_id) && (
 				<div className="space-y-1.5">

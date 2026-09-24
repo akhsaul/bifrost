@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useGetAdaptiveRoutingMetricsQuery } from "@/lib/store/apis";
+import { MetricLevel } from "@/lib/types/adaptiveRouting";
 import { Link } from "@tanstack/react-router";
 import { Activity, Gauge, RefreshCw, Server, Settings, Shuffle, Zap } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -13,6 +14,7 @@ interface TargetMetricRow {
 	provider: string;
 	model: string;
 	keyId?: string;
+	level: MetricLevel;
 	ewmaLatencyMs: number;
 	ttftMs: number;
 	p90LatencyMs: number;
@@ -22,8 +24,17 @@ interface TargetMetricRow {
 	status: "healthy" | "degraded" | "optimal";
 }
 
+type LevelFilter = "all" | MetricLevel;
+
+const LEVEL_BADGE_CLASS: Record<MetricLevel, string> = {
+	provider: "border-purple-200 bg-purple-500/10 text-purple-600 font-mono text-[10px]",
+	model: "border-blue-200 bg-blue-500/10 text-blue-600 font-mono text-[10px]",
+	key: "border-emerald-200 bg-emerald-500/10 text-emerald-600 font-mono text-[10px]",
+};
+
 export default function AdaptiveRoutingView() {
 	const [searchQuery, setSearchQuery] = useState("");
+	const [selectedLevel, setSelectedLevel] = useState<LevelFilter>("all");
 
 	// Query live EWMA and dynamic routing telemetry with 3-second auto polling
 	const { data, isFetching, refetch } = useGetAdaptiveRoutingMetricsQuery(undefined, {
@@ -37,6 +48,7 @@ export default function AdaptiveRoutingView() {
 			provider: m.provider,
 			model: m.model,
 			keyId: m.key_id,
+			level: m.level ?? (m.key_id ? "key" : m.model ? "model" : "provider"),
 			ewmaLatencyMs: m.ewma_latency_ms,
 			ttftMs: m.ttft_ms,
 			p90LatencyMs: m.p90_latency_ms,
@@ -47,12 +59,21 @@ export default function AdaptiveRoutingView() {
 		}));
 	}, [data]);
 
-	const filteredTargets = targets.filter(
-		(t) =>
+	const levelCounts = useMemo(() => {
+		const counts = { provider: 0, model: 0, key: 0, all: targets.length };
+		for (const t of targets) counts[t.level]++;
+		return counts;
+	}, [targets]);
+
+	const filteredTargets = targets.filter((t) => {
+		const matchesLevel = selectedLevel === "all" || t.level === selectedLevel;
+		const matchesSearch =
 			t.target.toLowerCase().includes(searchQuery.toLowerCase()) ||
 			t.provider.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			t.model.toLowerCase().includes(searchQuery.toLowerCase()),
-	);
+			t.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
+			(t.keyId && t.keyId.toLowerCase().includes(searchQuery.toLowerCase()));
+		return matchesLevel && matchesSearch;
+	});
 
 	const summary = data?.summary;
 	const avgLatency = summary && targets.length > 0 ? summary.avg_ewma_latency_ms.toFixed(1) : "0.0";
@@ -154,6 +175,21 @@ export default function AdaptiveRoutingView() {
 						</Button>
 					</div>
 				</CardHeader>
+				<div className="flex flex-wrap items-center gap-1.5 border-b px-6 py-2.5">
+					{(["all", "provider", "model", "key"] as const).map((lvl) => (
+						<Button
+							key={lvl}
+							variant={selectedLevel === lvl ? "secondary" : "ghost"}
+							size="sm"
+							className="h-7 gap-1.5 px-2.5 text-xs"
+							data-testid={`adaptive-level-filter-${lvl}`}
+							onClick={() => setSelectedLevel(lvl)}
+						>
+							<span className="capitalize">{lvl === "all" ? "All Levels" : `${lvl} Level`}</span>
+							<span className="text-muted-foreground font-mono text-[10px]">{levelCounts[lvl]}</span>
+						</Button>
+					))}
+				</div>
 				<CardContent className="p-0">
 					<Table>
 						<TableHeader>
@@ -176,11 +212,17 @@ export default function AdaptiveRoutingView() {
 								</TableRow>
 							) : (
 								filteredTargets.map((row) => (
-									<TableRow key={row.target}>
+									<TableRow key={`${row.level}-${row.target}`}>
 										<TableCell className="font-medium">
-											<div className="flex flex-col">
-												<span className="text-foreground font-semibold">{row.target}</span>
-												{row.keyId && <span className="text-muted-foreground font-mono text-[10px]">Key: {row.keyId}</span>}
+											<div className="flex flex-col gap-0.5">
+												<div className="flex items-center gap-2">
+													<Badge variant="outline" className={LEVEL_BADGE_CLASS[row.level]}>
+														{row.level.toUpperCase()}
+													</Badge>
+													<span className="text-foreground font-semibold">{row.target}</span>
+												</div>
+												{row.level === "provider" && <span className="text-muted-foreground text-[10px]">Provider-level EWMA aggregate</span>}
+												{row.level === "key" && row.keyId && <span className="text-muted-foreground font-mono text-[10px]">Key: {row.keyId}</span>}
 											</div>
 										</TableCell>
 										<TableCell>

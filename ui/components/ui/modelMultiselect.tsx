@@ -1,10 +1,13 @@
 import { cn } from "@/components/ui/utils";
 import { useLazyGetBaseModelsQuery, useLazyGetModelsQuery } from "@/lib/store/apis/providersApi";
 import { X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { components, MultiValueProps, OptionProps, SingleValueProps } from "react-select";
 import { AsyncMultiSelect } from "./asyncMultiselect";
 import { Option } from "./multiselectUtils";
+
+const CHIP_ROW_RESERVE = 44; // right indicators + padding reserve
+const CHIP_GAP = 4;
 
 interface ModelMultiselectPropsBase {
 	provider?: string;
@@ -87,10 +90,7 @@ export function ModelMultiselect(props: ModelMultiselectProps) {
 		useLazyGetBaseModelsQuery();
 	const [inputValue, setInputValue] = useState("");
 	const inputValueRef = useRef("");
-
-	// Determine if we should use base models (no provider selected + "base_models" mode)
-	const shouldUseBaseModels = loadModelsOnEmptyProvider === "base_models" && !provider;
-	const shouldLoadOnEmpty = !!loadModelsOnEmptyProvider;
+	const [isFocused, setIsFocused] = useState(false);
 
 	// Convert value to options (handle both single and multi select)
 	const stringValue = value as string;
@@ -100,6 +100,67 @@ export function ModelMultiselect(props: ModelMultiselectProps) {
 			? [stringValue === "*" ? ALL_MODELS_OPTION : { label: stringValue, value: stringValue }]
 			: []
 		: arrayValue.map((model) => (model === "*" ? ALL_MODELS_OPTION : { label: model, value: model }));
+
+	// ─── collapsed-display measurement ───────────────────────────────────────
+	// When the control is not focused, the selected chips render on a single row.
+	// How many fit depends on the control's width and on each model name's width,
+	// so both are measured instead of hard-coding "show one chip + N more".
+	// The overflow counter only appears when a chip genuinely does not fit, and a
+	// name is only truncated when even a single chip is wider than the row.
+	const wrapperRef = useRef<HTMLDivElement>(null);
+	const measureRef = useRef<HTMLDivElement>(null);
+	const [availableWidth, setAvailableWidth] = useState(0);
+	const [chipWidths, setChipWidths] = useState<number[]>([]);
+	const [moreWidth, setMoreWidth] = useState(0);
+
+	const labelKey = selectedOptions.map((o) => o.label).join("\u0001");
+	const isCollapsed = !isSingleSelect && !isFocused && inputValue.length === 0;
+
+	useLayoutEffect(() => {
+		const el = wrapperRef.current;
+		if (!el) return;
+		const update = () => setAvailableWidth(el.clientWidth);
+		update();
+		const observer = new ResizeObserver(update);
+		observer.observe(el);
+		return () => observer.disconnect();
+	}, []);
+
+	useLayoutEffect(() => {
+		if (isSingleSelect) return;
+		const root = measureRef.current;
+		if (!root) return;
+		const widths = Array.from(root.querySelectorAll<HTMLElement>("[data-measure-chip]"), (chip) => chip.offsetWidth);
+		const measuredMore = root.querySelector<HTMLElement>("[data-measure-more]")?.offsetWidth ?? 0;
+		setChipWidths((prev) => (prev.length === widths.length && prev.every((w, i) => w === widths[i]) ? prev : widths));
+		setMoreWidth((prev) => (prev === measuredMore ? prev : measuredMore));
+	}, [isSingleSelect, labelKey]);
+
+	const { visibleCount, hiddenCount } = useMemo(() => {
+		const total = selectedOptions.length;
+		if (total === 0) return { visibleCount: 0, hiddenCount: 0 };
+		if (!isCollapsed) return { visibleCount: total, hiddenCount: 0 };
+
+		const rowWidth = availableWidth - CHIP_ROW_RESERVE;
+		// Nothing measured yet: fall back to a single chip so the row never overflows.
+		if (availableWidth <= 0 || chipWidths.length !== total) return { visibleCount: 1, hiddenCount: total - 1 };
+		if (rowWidth <= 0) return { visibleCount: 1, hiddenCount: total - 1 };
+
+		const spanOf = (count: number) => chipWidths.slice(0, count).reduce((sum, w) => sum + w, 0) + CHIP_GAP * (count - 1);
+		if (spanOf(total) <= rowWidth) return { visibleCount: total, hiddenCount: 0 };
+		for (let count = total - 1; count >= 1; count -= 1) {
+			if (spanOf(count) + CHIP_GAP + moreWidth <= rowWidth) return { visibleCount: count, hiddenCount: total - count };
+		}
+		return { visibleCount: 1, hiddenCount: total - 1 };
+	}, [availableWidth, chipWidths, isCollapsed, moreWidth, selectedOptions.length]);
+
+	// The single visible chip is the only case where the row can still be too
+	// narrow for the name itself; then — and only then — the label is truncated.
+	const truncateSoleChip = isCollapsed && visibleCount === 1 && hiddenCount === 0 && chipWidths.length === 1 && chipWidths[0] > availableWidth - CHIP_ROW_RESERVE;
+
+	// Determine if we should use base models (no provider selected + "base_models" mode)
+	const shouldUseBaseModels = loadModelsOnEmptyProvider === "base_models" && !provider;
+	const shouldLoadOnEmpty = !!loadModelsOnEmptyProvider;
 
 	// Fetch initial models on mount or when provider/keys/vks change
 	useEffect(() => {
@@ -263,94 +324,141 @@ export function ModelMultiselect(props: ModelMultiselectProps) {
 	const modelLoadError = !activeIsFetching && activeIsError;
 
 	return (
-		<AsyncMultiSelect<ModelOption>
-			isSingleSelect={isSingleSelect}
-			hideSelectedOptions
-			hideSearchIcon={props.hideSearchIcon}
-			inputId={props.inputId}
-			ariaLabelledBy={props.ariaLabelledBy}
-			data-testid={props["data-testid"]}
-			value={selectedOptions}
-			onChange={handleChange}
-			reload={loadOptions}
-			debounce={300}
-			isCreatable={true}
-			dynamicOptionCreation={true}
-			createOptionText={"Press enter to add new model"}
-			defaultOptions={defaultOptions.length > 0 ? defaultOptions : ([] as Option<ModelOption>[])}
-			isLoading={activeIsFetching}
-			placeholder={placeholder}
-			disabled={shouldBeDisabled}
-			className={cn("!min-h-9 w-full", className)}
-			triggerClassName="!shadow-none !border-border !min-h-9 px-1"
-			menuClassName="!z-[100] max-h-[300px] overflow-y-auto w-full cursor-pointer custom-scrollbar"
-			isClearable={clearable}
-			closeMenuOnSelect={isSingleSelect}
-			menuPlacement="auto"
-			menuPosition={props.menuPosition}
-			menuPortalTarget={props.menuPortalTarget}
-			menuListClassName="mx-1"
-			inputValue={inputValue}
-			onInputChange={handleInputChange}
-			noResultsFoundPlaceholder={modelLoadError ? "Couldn’t load models." : "No matching models."}
-			emptyResultPlaceholder={
-				modelLoadError
-					? "Couldn’t load models."
-					: provider
-						? "No models available for this provider."
-						: shouldLoadOnEmpty
-							? "No models available."
-							: "Select a provider first."
-			}
-			views={{
-				dropdownIndicator: isSingleSelect ? undefined : () => <></>,
-				singleValue: isSingleSelect
-					? (singleValueProps: SingleValueProps<ModelOption>) => (
-							<span className="absolute left-1.5 text-sm">{singleValueProps.data.label}</span>
-						)
-					: undefined,
-				multiValue: isSingleSelect
-					? undefined
-					: (multiValueProps: MultiValueProps<ModelOption>) => {
-							return (
-								<div
-									{...multiValueProps.innerProps}
-									className="bg-accent dark:!bg-card flex cursor-pointer items-center gap-1 rounded-sm px-1 py-0.5 text-sm"
-								>
-									{multiValueProps.data.label}{" "}
-									<X
-										className="hover:text-foreground text-muted-foreground h-4 w-4 cursor-pointer"
-										onClick={(e) => {
-											e.stopPropagation();
-											multiValueProps.removeProps.onClick?.(e as any);
-										}}
-									/>
-								</div>
-							);
-						},
-				option: (optionProps: OptionProps<ModelOption>) => {
-					const { Option } = components;
-					const isDeprecated = optionProps.data.isDeprecated;
-					return (
-						<Option
-							{...optionProps}
-							className={cn(
-								"flex w-full items-center gap-2 rounded-sm px-2 py-2 text-sm",
-								isDeprecated ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-accent",
-								!isDeprecated && optionProps.isFocused && "bg-accent dark:!bg-card",
-								!isDeprecated && optionProps.isSelected && "bg-accent dark:!bg-card",
-							)}
+		<div ref={wrapperRef} className="relative w-full">
+			{/* Off-screen measurement container: measures real browser-rendered widths */}
+			{!isSingleSelect && (
+				<div
+					ref={measureRef}
+					aria-hidden="true"
+					className="pointer-events-none absolute -top-[9999px] left-0 flex items-center gap-1 opacity-0 whitespace-nowrap"
+				>
+					{selectedOptions.map((opt) => (
+						<div
+							key={opt.value}
+							data-measure-chip
+							className="bg-accent flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs shrink-0 whitespace-nowrap"
 						>
-							<span className={cn("grow truncate text-sm", isDeprecated && "text-muted-foreground")}>{optionProps.data.label}</span>
-							{isDeprecated && (
-								<span className="text-muted-foreground border-border shrink-0 rounded-sm border px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase">
-									Deprecated
-								</span>
-							)}
-						</Option>
-					);
-				},
-			}}
-		/>
+							<span>{opt.label}</span>
+							<X className="h-3.5 w-3.5 shrink-0" />
+						</div>
+					))}
+					<span
+						data-measure-more
+						className="bg-primary/10 text-primary border-primary/20 rounded border px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap"
+					>
+						+99 more
+					</span>
+				</div>
+			)}
+			<AsyncMultiSelect<ModelOption>
+				isSingleSelect={isSingleSelect}
+				hideSelectedOptions
+				hideSearchIcon={props.hideSearchIcon}
+				inputId={props.inputId}
+				ariaLabelledBy={props.ariaLabelledBy}
+				data-testid={props["data-testid"]}
+				value={selectedOptions}
+				onChange={handleChange}
+				reload={loadOptions}
+				debounce={300}
+				isCreatable={true}
+				dynamicOptionCreation={true}
+				createOptionText={"Press enter to add new model"}
+				defaultOptions={defaultOptions.length > 0 ? defaultOptions : ([] as Option<ModelOption>[])}
+				isLoading={activeIsFetching}
+				placeholder={placeholder}
+				disabled={shouldBeDisabled}
+				className={cn(isCollapsed ? "!h-9 !min-h-9" : "!min-h-9", "w-full", className)}
+				triggerClassName={cn(
+					"!shadow-none !border-border px-1",
+					isCollapsed ? "!h-9 !min-h-9 overflow-hidden flex-nowrap" : "!min-h-9 flex-wrap",
+				)}
+				menuClassName="!z-[100] max-h-[300px] overflow-y-auto w-full cursor-pointer custom-scrollbar"
+				isClearable={clearable}
+				closeMenuOnSelect={isSingleSelect}
+				menuPlacement="auto"
+				menuPosition={props.menuPosition}
+				menuPortalTarget={props.menuPortalTarget}
+				menuListClassName="mx-1"
+				inputValue={inputValue}
+				onInputChange={handleInputChange}
+				onFocus={() => setIsFocused(true)}
+				onBlur={() => setIsFocused(false)}
+				onMenuOpen={() => setIsFocused(true)}
+				onMenuClose={() => setIsFocused(false)}
+				noResultsFoundPlaceholder={modelLoadError ? "Couldn’t load models." : "No matching models."}
+				emptyResultPlaceholder={
+					modelLoadError
+						? "Couldn’t load models."
+						: provider
+							? "No models available for this provider."
+							: shouldLoadOnEmpty
+								? "No models available."
+								: "Select a provider first."
+				}
+				views={{
+					dropdownIndicator: isSingleSelect ? undefined : () => <></>,
+					singleValue: isSingleSelect
+						? (singleValueProps: SingleValueProps<ModelOption>) => (
+								<span className="absolute left-1.5 text-sm">{singleValueProps.data.label}</span>
+							)
+						: undefined,
+					multiValue: isSingleSelect
+						? undefined
+						: (multiValueProps: MultiValueProps<ModelOption>) => {
+								if (isCollapsed && multiValueProps.index >= visibleCount) {
+									return null;
+								}
+								const isLastVisible = isCollapsed && multiValueProps.index === visibleCount - 1;
+
+								return (
+									<div
+										{...multiValueProps.innerProps}
+										className={cn(
+											"bg-accent dark:!bg-card flex cursor-pointer items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs shrink-0",
+											truncateSoleChip ? "max-w-[calc(100%-12px)]" : "max-w-full",
+										)}
+									>
+										<span className={cn(truncateSoleChip && "truncate")}>{multiValueProps.data.label}</span>
+										<X
+											className="hover:text-foreground text-muted-foreground h-3.5 w-3.5 shrink-0 cursor-pointer"
+											onClick={(e) => {
+												e.stopPropagation();
+												multiValueProps.removeProps.onClick?.(e as any);
+											}}
+										/>
+										{isLastVisible && hiddenCount > 0 && (
+											<span className="bg-primary/10 text-primary border-primary/20 ml-1 shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap">
+												+{hiddenCount} more
+											</span>
+										)}
+									</div>
+								);
+							},
+					option: (optionProps: OptionProps<ModelOption>) => {
+						const { Option } = components;
+						const isDeprecated = optionProps.data.isDeprecated;
+						return (
+							<Option
+								{...optionProps}
+								className={cn(
+									"flex w-full items-center gap-2 rounded-sm px-2 py-2 text-sm",
+									isDeprecated ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-accent",
+									!isDeprecated && optionProps.isFocused && "bg-accent dark:!bg-card",
+									!isDeprecated && optionProps.isSelected && "bg-accent dark:!bg-card",
+								)}
+							>
+								<span className={cn("grow truncate text-sm", isDeprecated && "text-muted-foreground")}>{optionProps.data.label}</span>
+								{isDeprecated && (
+									<span className="text-muted-foreground border-border shrink-0 rounded-sm border px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase">
+										Deprecated
+									</span>
+								)}
+							</Option>
+						);
+					},
+				}}
+			/>
+		</div>
 	);
 }

@@ -64,9 +64,10 @@ type EvaluationContext struct {
 	Fallbacks                []string                                                                                          // Fallback chain: ["provider/model", ...]
 	Headers                  map[string]string                                                                                 // Request headers for dynamic routing
 	QueryParams              map[string]string                                                                                 // Query parameters for dynamic routing
-	BudgetAndRateLimitStatus *governance.BudgetAndRateLimitStatus                                                              // Budget and rate limit status by provider/model
-	AdaptiveTargetSelector   func(targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, bool) // Optional adaptive target selector
-	ComputeComplexity        func() *complexity.ComplexityResult                                                               // Lazy complexity computation; called at most once when a rule references "complexity_tier"
+	BudgetAndRateLimitStatus    *governance.BudgetAndRateLimitStatus                                                              // Budget and rate limit status by provider/model
+	AdaptiveTargetSelector      func(targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, bool) // Optional adaptive target selector
+	GroupAdaptiveTargetSelector func(ruleID string, targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, []string, bool) // Optional group adaptive target selector
+	ComputeComplexity           func() *complexity.ComplexityResult                                                               // Lazy complexity computation; called at most once when a rule references "complexity_tier"
 }
 
 type RoutingContext = EvaluationContext
@@ -267,8 +268,11 @@ func (re *Engine) EvaluateRoutingRules(ctx *schemas.BifrostContext, routingCtx *
 				}
 
 				var target configstoreTables.TableRoutingTarget
+				var inProviderFallbacks []string
 				var ok bool
 				switch {
+				case rule.Strategy == "group_adaptive" && routingCtx.GroupAdaptiveTargetSelector != nil:
+					target, inProviderFallbacks, ok = routingCtx.GroupAdaptiveTargetSelector(rule.ID, rule.Targets)
 				case rule.Strategy == "adaptive" && routingCtx.AdaptiveTargetSelector != nil:
 					target, ok = routingCtx.AdaptiveTargetSelector(rule.Targets)
 				case rule.Strategy == "priority":
@@ -297,11 +301,14 @@ func (re *Engine) EvaluateRoutingRules(ctx *schemas.BifrostContext, routingCtx *
 					keyID = *target.KeyID
 				}
 
+				combinedFallbacks := append([]string{}, inProviderFallbacks...)
+				combinedFallbacks = append(combinedFallbacks, rule.ParsedFallbacks...)
+
 				stepDecision = &Decision{
 					Provider:        provider,
 					Model:           model,
 					KeyID:           keyID,
-					Fallbacks:       rule.ParsedFallbacks,
+					Fallbacks:       combinedFallbacks,
 					MatchedRuleID:   rule.ID,
 					MatchedRuleName: rule.Name,
 				}

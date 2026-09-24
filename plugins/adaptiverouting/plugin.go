@@ -40,6 +40,10 @@ type Plugin struct {
 	// rather than isolating each model into an artificial 1-target group.
 	poolsMu sync.RWMutex
 	pools   map[string][]CandidateTarget
+
+	// rotations tracks the sequential model-rotation cursor per "ruleID:provider"
+	// for the group_adaptive strategy (priority 1 → 2 → 1 round-robin).
+	rotations sync.Map // string -> *atomic.Uint64
 }
 
 // New creates a new Adaptive Routing plugin.
@@ -241,6 +245,8 @@ func (p *Plugin) PreRequestHook(ctx *schemas.BifrostContext, req *schemas.Bifros
 		// targets dynamically. Runs in this hook because the routing plugin evaluates rules
 		// during its own PreRequestHook and reads the selector from the context.
 		ctx.SetValue(schemas.BifrostContextKeyAdaptiveTargetSelector, p.AdaptiveTargetSelector())
+		// Inject group adaptive target selector for strategy="group_adaptive" rules (provider EWMA + priority model rotation).
+		ctx.SetValue(schemas.BifrostContextKeyGroupAdaptiveTargetSelector, p.GroupAdaptiveTargetSelector())
 	}
 	if !p.config.Enabled || req == nil || p.catalog == nil {
 		return nil
@@ -482,6 +488,12 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 		p.store.RecordMetric(p.ctx, targetNoKey, duration, ttft, statusCode, isError)
 	}
 
+	// Also record at the Provider level (without model or keyID) for group_adaptive provider-level EWMA
+	targetProviderOnly := TargetID{
+		Provider: provider,
+	}
+	p.store.RecordMetric(p.ctx, targetProviderOnly, duration, ttft, statusCode, isError)
+
 	return resp, bifrostErr, nil
 }
 
@@ -632,6 +644,139 @@ func (p *Plugin) AdaptiveTargetSelector() func(targets []configstoreTables.Table
 	}
 }
 
+// GroupAdaptiveTargetSelector returns a selector closure for strategy="group_adaptive" rules.
+// It evaluates EWMA latency at the provider level across distinct candidate providers,
+// selects the provider via dynamic weights (respecting provider base weight), and then rotates
+// models within the selected provider sequentially in priority order (1 → 2 → 1).
+// Sibling models in that provider are returned as in-provider fallbacks for retry.
+func (p *Plugin) GroupAdaptiveTargetSelector() func(ruleID string, targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, []string, bool) {
+	return func(ruleID string, targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, []string, bool) {
+		if !p.config.Enabled || len(targets) == 0 {
+			return configstoreTables.TableRoutingTarget{}, nil, false
+		}
+		if len(targets) == 1 {
+			return targets[0], nil, true
+		}
+
+		// 1. Group targets by provider, preserving original order of appearance
+		providerOrder := make([]string, 0)
+		providerTargets := make(map[string][]configstoreTables.TableRoutingTarget)
+		for _, t := range targets {
+			prov := ""
+			if t.Provider != nil {
+				prov = *t.Provider
+			}
+			if _, exists := providerTargets[prov]; !exists {
+				providerOrder = append(providerOrder, prov)
+			}
+			providerTargets[prov] = append(providerTargets[prov], t)
+		}
+
+		if len(providerOrder) == 0 {
+			return configstoreTables.TableRoutingTarget{}, nil, false
+		}
+
+		// 2. Provider selection via provider-level EWMA combined with provider base weight
+		selectedProvider := providerOrder[0]
+		if len(providerOrder) > 1 {
+			window := p.config.WindowSize.D()
+			if window <= 0 {
+				window = 5 * time.Minute
+			}
+
+			providerCandidates := make([]CandidateTarget, len(providerOrder))
+			statsMap := make(map[TargetID]TargetStats, len(providerOrder))
+
+			for i, prov := range providerOrder {
+				targetID := TargetID{Provider: schemas.ModelProvider(prov)}
+				statsMap[targetID] = p.store.GetStats(p.ctx, targetID, window)
+
+				// Base weight comes from the targets for this provider (first target's weight or max)
+				baseW := providerTargets[prov][0].Weight
+				if baseW <= 0 {
+					baseW = 1.0
+				}
+
+				providerCandidates[i] = CandidateTarget{
+					TargetID:   targetID,
+					BaseWeight: baseW,
+				}
+			}
+
+			weights := ComputeDynamicWeightsWithBaseWeights(providerCandidates, statsMap, p.config)
+			if len(weights) > 0 {
+				r := rand.Float64()
+				for _, tw := range weights {
+					if r <= tw.CumWeight {
+						selectedProvider = string(tw.TargetID.Provider)
+						break
+					}
+				}
+			}
+		}
+
+		// 3. Sequential model rotation within the selected provider based on Priority (1 -> 2 -> 1)
+		candidateTargets := providerTargets[selectedProvider]
+		if len(candidateTargets) == 0 {
+			return targets[0], nil, true
+		}
+		if len(candidateTargets) == 1 {
+			return candidateTargets[0], nil, true
+		}
+
+		// Sort candidate targets by Priority (lower priority integer = higher precedence)
+		sortedTargets := make([]configstoreTables.TableRoutingTarget, len(candidateTargets))
+		copy(sortedTargets, candidateTargets)
+		slices.SortFunc(sortedTargets, func(a, b configstoreTables.TableRoutingTarget) int {
+			prioA := 1
+			if a.Priority != nil {
+				prioA = *a.Priority
+			}
+			prioB := 1
+			if b.Priority != nil {
+				prioB = *b.Priority
+			}
+			return prioA - prioB
+		})
+
+		effectiveRuleID := ruleID
+		if effectiveRuleID == "" && len(targets) > 0 {
+			effectiveRuleID = targets[0].RuleID
+		}
+		if effectiveRuleID == "" {
+			effectiveRuleID = "default-group-rule"
+		}
+
+		rotKey := fmt.Sprintf("%s:%s", effectiveRuleID, selectedProvider)
+		val, _ := p.rotations.LoadOrStore(rotKey, new(atomic.Uint64))
+		counter := val.(*atomic.Uint64)
+		idx := counter.Add(1) - 1
+
+		selectedIdx := int(idx % uint64(len(sortedTargets)))
+		picked := sortedTargets[selectedIdx]
+
+		// 4. In-provider fallbacks: remaining sibling models in priority order for retry
+		var inProviderFallbacks []string
+		for i := 1; i < len(sortedTargets); i++ {
+			fbIdx := (selectedIdx + i) % len(sortedTargets)
+			fbTarget := sortedTargets[fbIdx]
+			prov := selectedProvider
+			if fbTarget.Provider != nil && *fbTarget.Provider != "" {
+				prov = *fbTarget.Provider
+			}
+			model := ""
+			if fbTarget.Model != nil {
+				model = *fbTarget.Model
+			}
+			if prov != "" && model != "" {
+				inProviderFallbacks = append(inProviderFallbacks, fmt.Sprintf("%s/%s", prov, model))
+			}
+		}
+
+		return picked, inProviderFallbacks, true
+	}
+}
+
 // KeyPoolFilter returns a KeyPoolFilter function that dynamically sorts/filters candidate keys.
 func (p *Plugin) KeyPoolFilter() schemas.KeyPoolFilter {
 	return func(ctx *schemas.BifrostContext, provider schemas.ModelProvider, model string, keys []schemas.Key) ([]schemas.Key, error) {
@@ -737,12 +882,31 @@ func (p *Plugin) GetMetricsSummary() AdaptiveMetricsSummary {
 	var totalEWMA float64
 	var totalTTFT float64
 	var ttftCount int
+	var summaryCount int
 	var total429s int64
 
+	// Summary dedup across the three recorded levels: with PostLLMHook mirroring every
+	// sample to provider/model#key, provider/model, and provider, summing all entries would
+	// multiply-count each request. Aggregate at the coarsest level present per provider
+	// (provider → model → key), so providers with provider-level data contribute exactly once.
+	hasProviderLevel := make(map[string]bool)
+	hasModelLevel := make(map[string]bool)
+	for target := range allStats {
+		if target.Provider == "" {
+			continue
+		}
+		if target.Model == "" && target.KeyID == "" {
+			hasProviderLevel[string(target.Provider)] = true
+		}
+		if target.Model != "" && target.KeyID == "" {
+			hasModelLevel[target.String()] = true
+		}
+	}
+
 	for target, stats := range allStats {
-		// Only display targets that have both a provider and a model — model-less
-		// entries cannot be attributed to any routing rule target.
-		if target.Provider == "" || target.Model == "" {
+		// Only display targets with a provider; model-less entries are now the intentional
+		// provider-level aggregate (rendered as "provider" by TargetID.String()).
+		if target.Provider == "" {
 			continue
 		}
 
@@ -767,16 +931,29 @@ func (p *Plugin) GetMetricsSummary() AdaptiveMetricsSummary {
 			}
 		}
 
-		total429s += stats.RateLimit429Count
-		totalEWMA += stats.EWMALatencyMs
-		if stats.TTFTMs > 0 {
-			totalTTFT += stats.TTFTMs
-			ttftCount++
+		countInSummary := false
+		switch target.Level() {
+		case MetricLevelProvider:
+			countInSummary = true
+		case MetricLevelModel:
+			countInSummary = !hasProviderLevel[string(target.Provider)]
+		case MetricLevelKey:
+			countInSummary = !hasProviderLevel[string(target.Provider)] && !hasModelLevel[target.String()]
+		}
+		if countInSummary {
+			summaryCount++
+			total429s += stats.RateLimit429Count
+			totalEWMA += stats.EWMALatencyMs
+			if stats.TTFTMs > 0 {
+				totalTTFT += stats.TTFTMs
+				ttftCount++
+			}
 		}
 
 		metricsList = append(metricsList, TargetMetricView{
 			Target:            target.String(),
 			Provider:          string(target.Provider),
+			Level:             target.Level(),
 			Model:             target.Model,
 			KeyID:             target.KeyID,
 			EWMALatencyMs:     stats.EWMALatencyMs,
@@ -797,7 +974,9 @@ func (p *Plugin) GetMetricsSummary() AdaptiveMetricsSummary {
 	})
 
 	var avgEWMA float64
-	if len(metricsList) > 0 {
+	if summaryCount > 0 {
+		avgEWMA = totalEWMA / float64(summaryCount)
+	} else if len(metricsList) > 0 {
 		avgEWMA = totalEWMA / float64(len(metricsList))
 	}
 	var avgTTFT float64

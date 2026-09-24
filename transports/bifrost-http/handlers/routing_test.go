@@ -552,6 +552,27 @@ func TestValidateRoutingTargets_StrategyAware(t *testing.T) {
 			wantErr: true,
 			errMsg:  "target priority must be an integer >= 1",
 		},
+		{
+			name:     "group_adaptive strategy accepts provider weights summing to 1",
+			strategy: "group_adaptive",
+			targets: []RoutingTarget{
+				{Provider: bifrost.Ptr("openrouter"), Model: bifrost.Ptr("qwen3.8-flash"), Weight: 0.6},
+				{Provider: bifrost.Ptr("openrouter"), Model: bifrost.Ptr("hy3"), Weight: 0.6},
+				{Provider: bifrost.Ptr("deepinfra"), Model: bifrost.Ptr("qwen3.8-flash"), Weight: 0.4},
+				{Provider: bifrost.Ptr("deepinfra"), Model: bifrost.Ptr("hy3"), Weight: 0.4},
+			},
+			wantErr: false,
+		},
+		{
+			name:     "group_adaptive strategy rejects provider weights not summing to 1",
+			strategy: "group_adaptive",
+			targets: []RoutingTarget{
+				{Provider: bifrost.Ptr("openrouter"), Model: bifrost.Ptr("qwen3.8-flash"), Weight: 0.6},
+				{Provider: bifrost.Ptr("deepinfra"), Model: bifrost.Ptr("qwen3.8-flash"), Weight: 0.2},
+			},
+			wantErr: true,
+			errMsg:  "target weights must sum to 1",
+		},
 	}
 
 	for _, tc := range tests {
@@ -565,4 +586,51 @@ func TestValidateRoutingTargets_StrategyAware(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNormalizeRoutingTargets_GroupAdaptive(t *testing.T) {
+	rawTargets := []RoutingTarget{
+		{
+			Provider: bifrost.Ptr("openrouter"),
+			Weight:   0.6,
+			Models: []TargetModelItem{
+				{Model: "qwen3.8-flash", Priority: 1},
+				{Model: "hy3", Priority: 2},
+			},
+		},
+		{
+			Provider: bifrost.Ptr("deepinfra"),
+			Weight:   0.4,
+			Model:    bifrost.Ptr("llama-3.3-70b"),
+		},
+	}
+
+	normalized := normalizeRoutingTargets(rawTargets, "group_adaptive")
+	require.Len(t, normalized, 3)
+
+	assert.Equal(t, "openrouter", *normalized[0].Provider)
+	assert.Equal(t, "qwen3.8-flash", *normalized[0].Model)
+	assert.Equal(t, 1, *normalized[0].Priority)
+	assert.Equal(t, 0.6, normalized[0].Weight)
+
+	assert.Equal(t, "openrouter", *normalized[1].Provider)
+	assert.Equal(t, "hy3", *normalized[1].Model)
+	assert.Equal(t, 2, *normalized[1].Priority)
+	assert.Equal(t, 0.6, normalized[1].Weight)
+
+	assert.Equal(t, "deepinfra", *normalized[2].Provider)
+	assert.Equal(t, "llama-3.3-70b", *normalized[2].Model)
+	assert.Equal(t, 0.4, normalized[2].Weight)
+
+	// Normalized targets must pass validation
+	err := validateRoutingTargets(normalized, "group_adaptive")
+	require.NoError(t, err)
+}
+
+func TestValidateRoutingStrategy_GroupAdaptive(t *testing.T) {
+	require.NoError(t, validateRoutingStrategy("group_adaptive"))
+	require.NoError(t, validateRoutingStrategy("adaptive"))
+	require.NoError(t, validateRoutingStrategy("weighted"))
+	require.NoError(t, validateRoutingStrategy("priority"))
+	require.Error(t, validateRoutingStrategy("invalid_strat"))
 }

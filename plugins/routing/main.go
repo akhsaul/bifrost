@@ -492,16 +492,22 @@ func (p *RoutingPlugin) applyRoutingRules(ctx *schemas.BifrostContext, req *sche
 		adaptiveTargetSelector = fn
 	}
 
+	var groupAdaptiveTargetSelector func(ruleID string, targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, []string, bool)
+	if fn, ok := ctx.Value(schemas.BifrostContextKeyGroupAdaptiveTargetSelector).(func(ruleID string, targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, []string, bool)); ok {
+		groupAdaptiveTargetSelector = fn
+	}
+
 	routingCtx := &rules.EvaluationContext{
-		Scope:                    scope,
-		Provider:                 provider,
-		Model:                    model,
-		RequestType:              requestType,
-		Headers:                  headers,
-		QueryParams:              queryParams,
-		BudgetAndRateLimitStatus: p.governance.GetBudgetAndRateLimitStatus(ctx, provider, model, nil, nil, nil),
-		AdaptiveTargetSelector:   adaptiveTargetSelector,
-		ComputeComplexity:        computeComplexity,
+		Scope:                       scope,
+		Provider:                    provider,
+		Model:                       model,
+		RequestType:                 requestType,
+		Headers:                     headers,
+		QueryParams:                 queryParams,
+		BudgetAndRateLimitStatus:    p.governance.GetBudgetAndRateLimitStatus(ctx, provider, model, nil, nil, nil),
+		AdaptiveTargetSelector:      adaptiveTargetSelector,
+		GroupAdaptiveTargetSelector: groupAdaptiveTargetSelector,
+		ComputeComplexity:           computeComplexity,
 	}
 
 	p.logger.Debug("[Routing] Built routing context: provider=%s, model=%s, requestType=%s, vk=%s",

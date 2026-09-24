@@ -182,6 +182,7 @@ interface AsyncMultiSelectProps<T> {
 
 	/** text to be displayed when static create option */
 	createOptionText?: string;
+	onFocus?: () => void;
 	onBlur?: () => void;
 
 	/** callback function to be called when input value changes */
@@ -398,6 +399,9 @@ export function AsyncMultiSelect<T>(props: AsyncMultiSelectProps<T>) {
 					if (props.onInputChange) {
 						props.onInputChange(newValue, { action: actionMeta.action });
 					}
+				}}
+				onFocus={() => {
+					if (props.onFocus) props.onFocus();
 				}}
 				onBlur={(e) => {
 					if (!props.menuPortalTarget) {
