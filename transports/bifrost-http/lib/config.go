@@ -2838,6 +2838,15 @@ func resolveGovernanceKeyReferences(ctx context.Context, config *Config, governa
 				break
 			}
 		}
+		if !usesNameRefs {
+			for j := range governanceConfig.RoutingRules[i].ParsedFallbacks {
+				fallback := &governanceConfig.RoutingRules[i].ParsedFallbacks[j]
+				if fallback.ProviderKeyName != nil && strings.TrimSpace(*fallback.ProviderKeyName) != "" {
+					usesNameRefs = true
+					break
+				}
+			}
+		}
 		if usesNameRefs {
 			break
 		}
@@ -2915,6 +2924,31 @@ func resolveGovernanceKeyReferences(ctx context.Context, config *Config, governa
 				}
 				target.KeyID = bifrost.Ptr(keyID)
 				target.ProviderKeyName = nil
+			}
+
+			for j := range governanceConfig.RoutingRules[i].ParsedFallbacks {
+				fallback := &governanceConfig.RoutingRules[i].ParsedFallbacks[j]
+				keyName := ""
+				if fallback.ProviderKeyName != nil {
+					keyName = strings.TrimSpace(*fallback.ProviderKeyName)
+				}
+				if keyName == "" {
+					fallback.ProviderKeyName = nil
+					continue
+				}
+				if strings.TrimSpace(fallback.KeyID) != "" {
+					return fmt.Errorf("routing rule %q fallback cannot set key_id together with provider_key_name", governanceConfig.RoutingRules[i].ID)
+				}
+				if strings.TrimSpace(string(fallback.Provider)) == "" {
+					return fmt.Errorf("routing rule %q fallback provider_key_name requires provider to be set", governanceConfig.RoutingRules[i].ID)
+				}
+
+				keyID, err := resolveProviderKeyIDByProviderAndName(string(fallback.Provider), keyName)
+				if err != nil {
+					return fmt.Errorf("routing rule %q fallback provider_key_name resolution failed: %w", governanceConfig.RoutingRules[i].ID, err)
+				}
+				fallback.KeyID = keyID
+				fallback.ProviderKeyName = nil
 			}
 		}
 
@@ -3867,6 +3901,12 @@ func pruneGovernanceConfigToFile(ctx context.Context, config *Config, configData
 			}
 			for _, existing := range config.GovernanceConfig.RateLimits {
 				if existing.ID != "" && !keep[existing.ID] {
+					if err := tx.Exec(
+						"UPDATE governance_model_configs SET rate_limit_id = NULL WHERE rate_limit_id = ?",
+						existing.ID,
+					).Error; err != nil {
+						return fmt.Errorf("failed to unlink rate limit %s from model configs: %w", existing.ID, err)
+					}
 					if err := config.ConfigStore.DeleteRateLimit(ctx, existing.ID, tx); err != nil && !errors.Is(err, configstore.ErrNotFound) {
 						return fmt.Errorf("failed to delete rate limit %s: %w", existing.ID, err)
 					}
@@ -7004,7 +7044,8 @@ func (c *Config) GetAllKeys() ([]configstoreTables.TableKey, error) {
 			}
 			if key.AzureKeyConfig != nil {
 				cfg := *key.AzureKeyConfig // safe copy
-				cfg.Endpoint = *cfg.Endpoint.Redacted()
+				// The endpoint is a hostname, not a credential — surface it in plaintext.
+				cfg.Endpoint = *cfg.Endpoint.RedactedIfSecret()
 				cfg.ClientID = cfg.ClientID.Redacted()
 				cfg.ClientSecret = cfg.ClientSecret.Redacted()
 				cfg.TenantID = cfg.TenantID.Redacted()
@@ -7015,7 +7056,8 @@ func (c *Config) GetAllKeys() ([]configstoreTables.TableKey, error) {
 				cfg.ARN = key.BedrockKeyConfig.ARN.Redacted()
 				cfg.AccessKey = *cfg.AccessKey.Redacted()
 				cfg.ExternalID = cfg.ExternalID.Redacted()
-				cfg.Region = cfg.Region.Redacted()
+				// The region is a public identifier, not a credential — surface it in plaintext.
+				cfg.Region = cfg.Region.RedactedIfSecret()
 				cfg.RoleARN = cfg.RoleARN.Redacted()
 				cfg.RoleSessionName = cfg.RoleSessionName.Redacted()
 				cfg.SecretKey = *cfg.SecretKey.Redacted()
@@ -7027,7 +7069,8 @@ func (c *Config) GetAllKeys() ([]configstoreTables.TableKey, error) {
 				cfg.AccessKey = *cfg.AccessKey.Redacted()
 				cfg.SecretKey = *cfg.SecretKey.Redacted()
 				cfg.SessionToken = cfg.SessionToken.Redacted()
-				cfg.Region = cfg.Region.Redacted()
+				// The region is a public identifier, not a credential — surface it in plaintext.
+				cfg.Region = cfg.Region.RedactedIfSecret()
 				cfg.RoleARN = cfg.RoleARN.Redacted()
 				cfg.ExternalID = cfg.ExternalID.Redacted()
 				cfg.RoleSessionName = cfg.RoleSessionName.Redacted()
@@ -7037,7 +7080,8 @@ func (c *Config) GetAllKeys() ([]configstoreTables.TableKey, error) {
 				cfg := *key.VertexKeyConfig // safe copy
 				cfg.ProjectID = *cfg.ProjectID.Redacted()
 				cfg.ProjectNumber = *cfg.ProjectNumber.Redacted()
-				cfg.Region = *cfg.Region.Redacted()
+				// The region is a public identifier, not a credential — surface it in plaintext.
+				cfg.Region = *cfg.Region.RedactedIfSecret()
 				cfg.AuthCredentials = *cfg.AuthCredentials.Redacted()
 				configStoreKey.VertexKeyConfig = &cfg
 			}
@@ -7046,23 +7090,27 @@ func (c *Config) GetAllKeys() ([]configstoreTables.TableKey, error) {
 			}
 			if key.VLLMKeyConfig != nil {
 				cfg := *key.VLLMKeyConfig // safe copy
-				cfg.URL = *cfg.URL.Redacted()
+				// The URL is a service address, not a credential — surface it in plaintext.
+				cfg.URL = *cfg.URL.RedactedIfSecret()
 				configStoreKey.VLLMKeyConfig = &cfg
 			}
 			if key.OllamaKeyConfig != nil {
 				cfg := *key.OllamaKeyConfig // safe copy
-				cfg.URL = *cfg.URL.Redacted()
+				// The URL is a service address, not a credential — surface it in plaintext.
+				cfg.URL = *cfg.URL.RedactedIfSecret()
 				configStoreKey.OllamaKeyConfig = &cfg
 			}
 			if key.SGLKeyConfig != nil {
 				cfg := *key.SGLKeyConfig // safe copy
-				cfg.URL = *cfg.URL.Redacted()
+				// The URL is a service address, not a credential — surface it in plaintext.
+				cfg.URL = *cfg.URL.RedactedIfSecret()
 				configStoreKey.SGLKeyConfig = &cfg
 			}
 
 			if key.DatabricksKeyConfig != nil {
 				cfg := *key.DatabricksKeyConfig // safe copy
-				cfg.WorkspaceURL = *cfg.WorkspaceURL.Redacted()
+				// The workspace URL is a hostname, not a credential — surface it in plaintext.
+				cfg.WorkspaceURL = *cfg.WorkspaceURL.RedactedIfSecret()
 				cfg.ClientID = cfg.ClientID.Redacted()
 				cfg.ClientSecret = cfg.ClientSecret.Redacted()
 				configStoreKey.DatabricksKeyConfig = &cfg
@@ -7450,15 +7498,19 @@ func (c *Config) EnableMCPClient(ctx context.Context, id string) error {
 }
 
 // RedactMCPClientConfig creates a redacted copy of a MCPClientConfig configuration.
-// Connection strings and headers are redacted for safe external exposure.
+// Credentials — headers, OAuth client secrets and the TLS CA cert — are redacted
+// for safe external exposure.
 func (c *Config) RedactMCPClientConfig(config *schemas.MCPClientConfig) *schemas.MCPClientConfig {
 	// Create an actual copy of the struct (not just a pointer copy)
 	// This prevents modifying the original config when redacting
 	configCopy := *config
 
-	// Redact connection string if present
+	// The connection string is a server address, not a credential — surface it
+	// in plaintext so operators can see which host a client points at. Anything
+	// secret about the connection lives in Headers or the OAuth block below,
+	// which stay redacted.
 	if config.ConnectionString != nil {
-		configCopy.ConnectionString = config.ConnectionString.Redacted()
+		configCopy.ConnectionString = config.ConnectionString.RedactedIfSecret()
 	}
 
 	// Redact Header values if present

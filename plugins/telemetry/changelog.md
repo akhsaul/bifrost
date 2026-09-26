@@ -1,2 +1,2 @@
-- feat: add opt-in `bifrost_overhead_component_microseconds` histogram behind `overhead_breakdown_enabled`, splitting overhead latency by the `overhead_component` label (#6980)
-- chore: upgraded core to v1.8.6 and framework to v1.6.2
+- fix: persist user_labels_enabled with the telemetry config (#7490)
+- chore: upgraded core to v1.10.2 and framework to v1.7.4

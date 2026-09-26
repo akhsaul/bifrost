@@ -24,9 +24,11 @@ import { useGetAllKeysQuery, useGetProvidersQuery } from "@/lib/store/apis/provi
 import { useCreateRoutingRuleMutation, useGetRoutingRulesQuery, useUpdateRoutingRuleMutation } from "@/lib/store/apis/routingRulesApi";
 import {
 	CreateRoutingRuleRequest,
+	DEFAULT_ROUTING_FALLBACK,
 	DEFAULT_ROUTING_RULE_FORM_DATA,
 	DEFAULT_ROUTING_TARGET,
 	ROUTING_RULE_SCOPES,
+	RoutingFallbackFormData,
 	RoutingRule,
 	RoutingRuleFormData,
 	RoutingStrategy,
@@ -34,6 +36,7 @@ import {
 	RoutingTargetFormData,
 	TargetModelItem,
 } from "@/lib/types/routingRules";
+import { denormalizeFallback, normalizeFallback } from "@/lib/utils/routingRules";
 import { validateRateLimitAndBudgetRules, validateRoutingRules } from "@/lib/utils/celConverterRouting";
 import { isValidRuleGroupType, normalizeRoutingRuleGroupQuery } from "@/lib/utils/routingRuleGroupQuery";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
@@ -137,7 +140,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 			...providersData.map((p) => p.name),
 			...(targets.map((t) => t.provider).filter(Boolean) as string[]),
 			...(rules.flatMap((r) => r.targets?.map((t) => t.provider).filter(Boolean) ?? []) as string[]),
-			...rules.flatMap((r) => (r.fallbacks ?? []).map((f) => f.split("/")[0]?.trim()).filter(Boolean)),
+			...rules.flatMap((r) => (r.fallbacks ?? []).map((f) => normalizeFallback(f).provider?.trim()).filter(Boolean) as string[]),
 		]),
 	);
 	const providerOptions = availableProviders.map((prov) => ({
@@ -154,7 +157,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 			setValue("description", editingRule.description);
 			setValue("cel_expression", editingRule.cel_expression);
 			setValue("strategy", editingRule.strategy ?? "weighted");
-			setValue("fallbacks", editingRule.fallbacks || []);
+			setValue("fallbacks", (editingRule.fallbacks || []).map(normalizeFallback));
 			setValue("scope", editingRule.scope);
 			setValue("scope_id", editingRule.scope_id || "");
 			setValue("priority", editingRule.priority);
@@ -241,7 +244,13 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 			return;
 		}
 		const remaining = 1 - targets.reduce((sum, t) => sum + (t.weight || 0), 0);
-		setTargets((prev) => [...prev, { ...DEFAULT_ROUTING_TARGET, weight: Math.max(0, parseFloat(remaining.toFixed(4))) }]);
+		setTargets((prev) => [
+			...prev,
+			{
+				...DEFAULT_ROUTING_TARGET,
+				weight: Math.max(0, parseFloat(remaining.toFixed(4))),
+			},
+		]);
 	};
 
 	const removeTarget = (index: number) => {
@@ -289,6 +298,20 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 				updated.sort((a, b) => a.priority - b.priority);
 				return { ...t, models: updated };
 			}),
+		);
+	};
+
+	const updateFallback = (index: number, changes: Partial<RoutingFallbackFormData>) => {
+		setValue(
+			"fallbacks",
+			(fallbacks || []).map((fb, i) => (i === index ? { ...fb, ...changes } : fb)),
+		);
+	};
+
+	const removeFallback = (index: number) => {
+		setValue(
+			"fallbacks",
+			(fallbacks || []).filter((_, i) => i !== index),
 		);
 	};
 
@@ -357,10 +380,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 		}
 
 		// Filter out incomplete fallbacks (empty provider)
-		const validFallbacks = (data.fallbacks || []).filter((fb) => {
-			const provider = fb.split("/")[0]?.trim();
-			return provider && provider.length > 0;
-		});
+		const validFallbacks = (data.fallbacks || []).filter((fb) => (fb.provider ?? "").trim().length > 0).map(denormalizeFallback);
 
 		const finalTargets: RoutingTarget[] = targets.flatMap(({ provider, model, models, key_id, weight, priority }): RoutingTarget[] => {
 			if (currentStrategy === "group_adaptive" && models && models.length > 0) {
@@ -402,9 +422,9 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 		const submitPromise =
 			isEditing && editingRule
 				? updateRoutingRule({
-						id: editingRule.id,
-						data: payload,
-					}).unwrap()
+					id: editingRule.id,
+					data: payload,
+				}).unwrap()
 				: createRoutingRule(payload).unwrap();
 
 		submitPromise
@@ -461,7 +481,10 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 							<Input
 								id="name"
 								placeholder="e.g., Route GPT-4 to Azure"
-								{...register("name", { required: "Rule name is required", maxLength: 255 })}
+								{...register("name", {
+									required: "Rule name is required",
+									maxLength: 255,
+								})}
 							/>
 							{errors.name && <p className="text-destructive text-sm">{errors.name.message}</p>}
 						</div>
@@ -698,14 +721,14 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 								<div>
 									<Label>Fallbacks</Label>{" "}
 									<p className="text-muted-foreground mt-0.5 text-xs">
-										Provider is required, but model is optional. Leave model empty to use the incoming request value.
+										Provider is required, but model and API key are optional. Leave model empty to use the incoming request value.
 									</p>
 								</div>
 								<Button
 									type="button"
 									variant="outline"
 									size="sm"
-									onClick={() => setValue("fallbacks", [...(fallbacks || []), ""])}
+									onClick={() => setValue("fallbacks", [...(fallbacks || []), { ...DEFAULT_ROUTING_FALLBACK }])}
 									className="gap-2"
 								>
 									<Plus className="h-4 w-4" />
@@ -716,69 +739,17 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 								{(fallbacks || []).length === 0 ? (
 									<p className="text-muted-foreground text-sm">No fallbacks configured</p>
 								) : (
-									(fallbacks || []).map((fallback, index) => {
-										// Parse provider/model from fallback string
-										const parts = fallback.split("/");
-										const fbProvider = parts[0] || "";
-										const fbModel = parts.slice(1).join("/");
-
-										const handleProviderChange = (newProvider: string) => {
-											const model = fbModel || "";
-											const newFallback = `${newProvider}/${model}`;
-											const newFallbacks = [...fallbacks];
-											newFallbacks[index] = newFallback;
-											setValue("fallbacks", newFallbacks);
-										};
-
-										const handleModelChange = (newModel: string) => {
-											const prov = fbProvider || "";
-											const newFallback = `${prov}/${newModel}`;
-											const newFallbacks = [...fallbacks];
-											newFallbacks[index] = newFallback;
-											setValue("fallbacks", newFallbacks);
-										};
-
-										const handleRemove = () => {
-											const newFallbacks = fallbacks.filter((_: string, i: number) => i !== index);
-											setValue("fallbacks", newFallbacks);
-										};
-
-										return (
-											<div key={index} className="flex items-center gap-2">
-												<div className="flex-1">
-													<ComboboxSelect
-														options={providerOptions}
-														value={fbProvider || null}
-														onValueChange={(value) => handleProviderChange(value ?? "")}
-														placeholder="Select provider..."
-														className="h-9"
-														noPortal
-													/>
-												</div>
-												<div className="flex-1">
-													<ModelMultiselect
-														provider={fbProvider || undefined}
-														value={fbModel}
-														onChange={handleModelChange}
-														placeholder="Incoming (optional)"
-														isSingleSelect
-														disabled={!fbProvider}
-														className="!h-9 !min-h-9 w-full"
-													/>
-												</div>
-												<Button
-													type="button"
-													variant="ghost"
-													size="sm"
-													onClick={handleRemove}
-													className="h-9 px-2"
-													aria-label={`Remove fallback ${index + 1}`}
-												>
-													<Trash2 className="h-4 w-4" />
-												</Button>
-											</div>
-										);
-									})
+									(fallbacks || []).map((fallback, index) => (
+										<FallbackRow
+											key={index}
+											fallback={fallback}
+											index={index}
+											providerOptions={providerOptions}
+											allKeys={allKeysData}
+											onUpdate={updateFallback}
+											onRemove={removeFallback}
+										/>
+									))
 								)}
 							</div>
 							<p className="text-muted-foreground text-xs">Fallbacks will be used in the order they are defined</p>
@@ -799,11 +770,144 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 	);
 }
 
+interface ProviderKeySelectProps {
+	idPrefix: string;
+	clearLabel: string;
+	provider?: string;
+	keyId?: string;
+	allKeys: Array<{ key_id: string; name: string; provider: string }>;
+	onChange: (keyId: string) => void;
+}
+
+/** Renders nothing until a provider is chosen, since keys are scoped to one. */
+function ProviderKeySelect({ idPrefix, clearLabel, provider, keyId, allKeys, onChange }: ProviderKeySelectProps) {
+	const availableKeys = provider ? allKeys.filter((k) => k.provider === provider).map((k) => ({ id: k.key_id, name: k.name })) : [];
+	if (!provider || (availableKeys.length === 0 && !keyId)) {
+		return null;
+	}
+
+	return (
+		<div className="space-y-1.5">
+			<Label id={`${idPrefix}-apikey-label`} className="text-xs">
+				API Key <span className="text-muted-foreground">(optional; leave unset for load-balanced selection)</span>
+			</Label>
+			<div className="flex gap-1.5">
+				<Select value={keyId || ""} onValueChange={onChange}>
+					<SelectTrigger
+						id={`${idPrefix}-apikey-select`}
+						aria-labelledby={`${idPrefix}-apikey-label`}
+						className="h-9 flex-1 text-sm"
+						data-testid={`${idPrefix}-apikey-select`}
+					>
+						<SelectValue placeholder="Select key (optional)" />
+					</SelectTrigger>
+					<SelectContent>
+						{availableKeys.map((key) => (
+							<SelectItem key={key.id} value={key.id}>
+								{key.name}
+							</SelectItem>
+						))}
+						{keyId && !availableKeys.some((k) => k.id === keyId) && (
+							<SelectItem key={`pinned-${keyId}`} value={keyId}>
+								(pinned) {keyId}
+							</SelectItem>
+						)}
+					</SelectContent>
+				</Select>
+				{keyId && (
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={() => onChange("")}
+						className="h-9 w-9 p-0"
+						aria-label={clearLabel}
+						data-testid={`${idPrefix}-apikey-clear`}
+					>
+						<X className="h-3.5 w-3.5" />
+					</Button>
+				)}
+			</div>
+		</div>
+	);
+}
+
+interface FallbackRowProps {
+	fallback: RoutingFallbackFormData;
+	index: number;
+	providerOptions: Array<{
+		label: string;
+		value: string;
+		icon: React.ReactNode;
+	}>;
+	allKeys: Array<{ key_id: string; name: string; provider: string }>;
+	onUpdate: (index: number, changes: Partial<RoutingFallbackFormData>) => void;
+	onRemove: (index: number) => void;
+}
+
+function FallbackRow({ fallback, index, providerOptions, allKeys, onUpdate, onRemove }: FallbackRowProps) {
+	const provider = fallback.provider || "";
+
+	return (
+		<div className="space-y-2 rounded-lg border p-3" data-testid={`routing-fallback-${index}`}>
+			<div className="flex items-center gap-2">
+				<div className="flex-1">
+					<ComboboxSelect
+						options={providerOptions}
+						value={provider || null}
+						// A key belongs to one provider, so switching providers invalidates the pin.
+						onValueChange={(value) => onUpdate(index, { provider: value ?? "", model: "", key_id: "" })}
+						placeholder="Select provider..."
+						className="h-9"
+						data-testid={`routing-fallback-${index}-provider-select`}
+						noPortal
+					/>
+				</div>
+				<div className="flex-1" data-testid={`routing-fallback-${index}-model-select`}>
+					<ModelMultiselect
+						provider={provider || undefined}
+						value={fallback.model || ""}
+						onChange={(value) => onUpdate(index, { model: value })}
+						placeholder="Incoming (optional)"
+						isSingleSelect
+						disabled={!provider}
+						className="!h-9 !min-h-9 w-full"
+					/>
+				</div>
+				<Button
+					type="button"
+					variant="ghost"
+					size="sm"
+					onClick={() => onRemove(index)}
+					className="h-9 px-2"
+					aria-label={`Remove fallback ${index + 1}`}
+					data-testid={`routing-fallback-${index}-remove-button`}
+				>
+					<Trash2 className="h-4 w-4" />
+				</Button>
+			</div>
+
+			<ProviderKeySelect
+				idPrefix={`routing-fallback-${index}`}
+				clearLabel={`Clear API key for fallback ${index + 1}`}
+				provider={provider}
+				keyId={fallback.key_id}
+				allKeys={allKeys}
+				onChange={(value) => onUpdate(index, { key_id: value })}
+			/>
+		</div>
+	);
+}
+
 interface TargetRowProps {
 	target: RoutingTargetFormData;
 	index: number;
 	strategy: RoutingStrategy;
-	providerOptions: Array<{ label: string; value: string; icon: React.ReactNode }>;
+	providerOptions: Array<{
+		label: string;
+		value: string;
+		icon: React.ReactNode;
+	}>;
 	allKeys: Array<{ key_id: string; name: string; provider: string }>;
 	showRemove: boolean;
 	onUpdate: (index: number, field: keyof RoutingTargetFormData, value: string | number | TargetModelItem[] | undefined) => void;
@@ -833,7 +937,6 @@ function TargetRow({
 	// weighted/adaptive/group_adaptive show the probability weight input (bound to target.weight).
 	const isPriority = strategy === "priority";
 	const isGroupAdaptive = strategy === "group_adaptive";
-
 	return (
 		<div className="space-y-3 rounded-lg border p-3" data-testid={`routing-target-${index}`}>
 			<div className="flex items-center justify-between">
@@ -1026,50 +1129,14 @@ function TargetRow({
 				</div>
 			)}
 
-			{target.provider && (availableKeys.length > 0 || target.key_id) && (
-				<div className="space-y-1.5">
-					<Label id={`routing-target-${index}-apikey-label`} className="text-xs">
-						API Key <span className="text-muted-foreground">(optional; leave unset for load-balanced selection)</span>
-					</Label>
-					<div className="flex gap-1.5">
-						<Select value={target.key_id || ""} onValueChange={(value) => onUpdate(index, "key_id", value)}>
-							<SelectTrigger
-								id={`routing-target-${index}-apikey-select`}
-								aria-labelledby={`routing-target-${index}-apikey-label`}
-								className="h-9 flex-1 text-sm"
-								data-testid={`routing-target-${index}-apikey-select`}
-							>
-								<SelectValue placeholder="Select key (optional)" />
-							</SelectTrigger>
-							<SelectContent>
-								{availableKeys.map((key) => (
-									<SelectItem key={key.id} value={key.id}>
-										{key.name}
-									</SelectItem>
-								))}
-								{target.key_id && !availableKeys.some((k) => k.id === target.key_id) && (
-									<SelectItem key={`pinned-${target.key_id}`} value={target.key_id}>
-										(pinned) {target.key_id}
-									</SelectItem>
-								)}
-							</SelectContent>
-						</Select>
-						{target.key_id && (
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								onClick={() => onUpdate(index, "key_id", "")}
-								className="h-9 w-9 p-0"
-								aria-label={`Clear API key for target ${index + 1}`}
-								data-testid={`routing-target-${index}-apikey-clear`}
-							>
-								<X className="h-3.5 w-3.5" />
-							</Button>
-						)}
-					</div>
-				</div>
-			)}
+			<ProviderKeySelect
+				idPrefix={`routing-target-${index}`}
+				clearLabel={`Clear API key for target ${index + 1}`}
+				provider={target.provider}
+				keyId={target.key_id}
+				allKeys={allKeys}
+				onChange={(value) => onUpdate(index, "key_id", value)}
+			/>
 		</div>
 	);
 }

@@ -1,2 +1,4 @@
-- feat: add `framework/overhead` package computing the per-component overhead breakdown from completed trace spans, extracted from the logging plugin so the telemetry and OTel exporters share it (#6980)
-- chore: bump google.golang.org/grpc to v1.83.2 (#7019)
+- feat: RoutingFallback type accepting the legacy provider/model string or an object with a pinned key_id or provider_key_name (#7470)
+- fix: keep a routing rule's stored enabled value when an update or config sync omits it
+- fix: deep copy the async flag and union tool error in streaming Responses messages (#7241, #7242)
+- chore: upgraded core to v1.10.2

@@ -25,10 +25,21 @@ describe("logs constants", () => {
 		expect(mapUserAgentToApp("claude-cli/2.1.168 (external, cli)").name).toBe("Claude Code");
 	});
 });
-
 describe("known provider ordering", () => {
 	it("dropdown-facing provider list is alphabetical", () => {
 		const sorted = [...KnownProvidersNames].sort((a, b) => a.localeCompare(b));
 		expect(KnownProvidersNames).toEqual(sorted);
 	});
+});
+
+// Edge reports stable app keys, while gateway logs may contain display names.
+describe("Edge app icon identity", () => {
+	it.each(["claude-code", "codex-cli", "codex-desktop", "cursor", "opencode"])(
+		"resolves %s to the same icon as its display name",
+		(key) => {
+			const app = mapAppToClientApp(key);
+			expect(app.icon).toBeTruthy();
+			expect(mapAppToClientApp(app.name)).toEqual(app);
+		},
+	);
 });

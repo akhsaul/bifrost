@@ -12,6 +12,23 @@ export interface TargetModelItem {
 	priority: number;
 }
 
+/** A fallback that may pin a provider key. The API accepts and returns the legacy "provider/model" string for unpinned entries. */
+/** Wire object form of a fallback, used only when it pins a provider key. */
+export interface RoutingFallbackObject {
+	provider?: string;
+	model?: string;
+	key_id?: string;
+}
+
+export type RoutingFallbackWire = string | RoutingFallbackObject;
+
+/** Form state, split so the sheet can drive separate provider and model selects. */
+export interface RoutingFallbackFormData {
+	provider: string;
+	model: string;
+	key_id: string;
+}
+
 export interface RoutingTarget {
 	provider?: string;
 	model?: string;
@@ -29,7 +46,7 @@ export interface RoutingRule {
 	cel_expression: string;
 	strategy?: RoutingStrategy;
 	targets: RoutingTarget[];
-	fallbacks?: string[];
+	fallbacks?: RoutingFallbackWire[];
 	scope: "global" | "team" | "customer" | "virtual_key" | "user";
 	scope_id?: string;
 	priority: number;
@@ -46,7 +63,7 @@ export interface CreateRoutingRuleRequest {
 	cel_expression?: string;
 	strategy?: RoutingStrategy;
 	targets: RoutingTarget[];
-	fallbacks?: string[];
+	fallbacks?: RoutingFallbackWire[];
 	scope: string;
 	scope_id?: string;
 	priority: number;
@@ -93,7 +110,7 @@ export interface RoutingRuleFormData {
 	cel_expression: string;
 	strategy?: RoutingStrategy;
 	targets: RoutingTargetFormData[];
-	fallbacks: string[];
+	fallbacks: RoutingFallbackFormData[];
 	scope: string;
 	scope_id: string;
 	priority: number;
@@ -119,6 +136,12 @@ export const ROUTING_RULE_SCOPES = [
 	{ value: RoutingRuleScope.Customer, label: "Customer" },
 	{ value: RoutingRuleScope.VirtualKey, label: "Virtual Key" },
 ];
+
+export const DEFAULT_ROUTING_FALLBACK: RoutingFallbackFormData = {
+	provider: "",
+	model: "",
+	key_id: "",
+};
 
 export const DEFAULT_ROUTING_TARGET: RoutingTargetFormData = {
 	provider: "",

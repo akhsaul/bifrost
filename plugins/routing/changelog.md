@@ -1,1 +1,2 @@
-- chore: upgraded core to v1.8.6 and framework to v1.6.2
+- feat: honor pinned provider keys on routing-rule fallbacks (#7470)
+- chore: upgraded core to v1.10.2 and framework to v1.7.4

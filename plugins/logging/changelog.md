@@ -1,2 +1,1 @@
-- chore: overhead breakdown computation moved to the shared `framework/overhead` package (#6980)
-- chore: upgraded core to v1.8.6 and framework to v1.6.2
+- chore: upgraded core to v1.10.2 and framework to v1.7.4

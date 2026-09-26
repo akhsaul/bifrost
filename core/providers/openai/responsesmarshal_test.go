@@ -3,6 +3,7 @@ package openai
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
@@ -178,6 +179,8 @@ func TestNormalizeOpenAIReasoningEffort(t *testing.T) {
 		{"gpt-6-astra keeps max", "gpt-6-astra", "max", "max"},
 		{"gpt-5.6 variant keeps max", "gpt-5.6-terra", "max", "max"},
 		{"gpt-5.6 keeps xhigh", "gpt-5.6", "xhigh", "xhigh"},
+		{"grok-4.7 keeps xhigh", "grok-4.7", "xhigh", "xhigh"},
+		{"grok-4.7 maps max to xhigh", "grok-4.7", "max", "xhigh"},
 		{"provider-prefixed gpt-5.6 keeps max", "openai/gpt-5.6", "max", "max"},
 		{"deepseek-v4 keeps max", "deepseek-v4", "max", "max"},
 		{"glm-5.2 keeps max", "glm-5.2", "max", "max"},
@@ -1160,6 +1163,53 @@ func TestEffortPredicatesAgainstCatalogIDs(t *testing.T) {
 	}
 }
 
+// TestAllTurnsContextPredicateAgainstCatalogIDs pins the name default
+// for reasoning.context "all_turns" against model IDs as they appear in the
+// datasheet, prefixed and dated variants included. Substring matching, for the
+// same reason as the xhigh/max needles above.
+func TestAllTurnsContextPredicateAgainstCatalogIDs(t *testing.T) {
+	cases := []struct {
+		model string
+		want  bool
+	}{
+		// original gpt-5 family and its variants: only auto/current_turn
+		{"gpt-5", false},
+		{"gpt-5-pro", false},
+		{"gpt-5-pro-2025-10-06", false},
+		{"gpt-5-mini-2025-08-07", false},
+		{"gpt-5-codex", false},
+		{"azure/gpt-5-pro", false},
+		// dot-revisions before 5.4
+		{"gpt-5.1", false},
+		{"gpt-5.2-pro", false},
+		{"gpt-5.3-codex", false},
+		// o-series and non-reasoning models
+		{"o1", false},
+		{"o3-pro", false},
+		{"gpt-4o", false},
+		// families that accept all_turns
+		{"gpt-5.4", true},
+		{"azure/eu/gpt-5.4", true},
+		{"gpt-5.4-mini-2026-03-17", true},
+		{"gpt-5.5-pro-2026-04-23", true},
+		{"gpt-5.6-terra", true},
+		{"openai.gpt-5.6-sol", true},
+		{"gpt-6", true},
+	}
+	for _, c := range cases {
+		if got := acceptsAllTurnsContext(c.model); got != c.want {
+			t.Errorf("acceptsAllTurnsContext(%q) = %v, want %v", c.model, got, c.want)
+		}
+		contexts := defaultReasoningContexts(c.model)
+		if !slices.Contains(contexts, schemas.ReasoningContextAuto) || !slices.Contains(contexts, schemas.ReasoningContextCurrentTurn) {
+			t.Errorf("defaultReasoningContexts(%q) = %v, must always carry auto and current_turn", c.model, contexts)
+		}
+		if got := slices.Contains(contexts, schemas.ReasoningContextAllTurns); got != c.want {
+			t.Errorf("defaultReasoningContexts(%q) lists all_turns = %v, want %v", c.model, got, c.want)
+		}
+	}
+}
+
 // TestToOpenAIResponsesRequest_OpenRouterCacheControlBreakpoint is the
 // Responses-path parallel of TestToOpenAIChatRequest_CacheControl_OpenRouterOnly
 // (added by the Chat-path fix in #4203). Regression test for #6290.
@@ -1264,6 +1314,56 @@ func TestToOpenAIResponsesRequest_OpenRouterCacheControlBreakpoint(t *testing.T)
 		}
 		if _, present := unmarked["prompt_cache_breakpoint"]; present {
 			t.Errorf("unmarked block must not receive a prompt_cache_breakpoint; raw=%s", raw)
+		}
+	})
+
+	t.Run("openrouter non-claude model strips cache_control and adds no breakpoint", func(t *testing.T) {
+		blocks, raw := contentBlocks(t, newBifrostReq(schemas.OpenRouter, "openai/gpt-5.4"))
+
+		for i, b := range blocks {
+			block, ok := b.(map[string]any)
+			if !ok {
+				t.Fatalf("expected content[%d] to be an object; raw=%s", i, raw)
+			}
+			if _, present := block["cache_control"]; present {
+				t.Errorf("OpenRouter gpt-5.4: cache_control must be stripped on content[%d]; raw=%s", i, raw)
+			}
+			if _, present := block["prompt_cache_breakpoint"]; present {
+				t.Errorf("OpenRouter gpt-5.4: upstream rejects prompt_cache_breakpoint, none may be synthesized on content[%d]; raw=%s", i, raw)
+			}
+		}
+	})
+
+	t.Run("openrouter gpt-5.6 converts cache_control to prompt_cache_breakpoint", func(t *testing.T) {
+		blocks, raw := contentBlocks(t, newBifrostReq(schemas.OpenRouter, "openai/gpt-5.6"))
+
+		marked, _ := blocks[0].(map[string]any)
+		if _, ok := marked["prompt_cache_breakpoint"].(map[string]any); !ok {
+			t.Fatalf("OpenRouter gpt-5.6: cache_control must be converted to prompt_cache_breakpoint; raw=%s", raw)
+		}
+	})
+
+	t.Run("datasheet can disable breakpoints on an openrouter claude model", func(t *testing.T) {
+		no := false
+		setToolChoiceCaps(t, schemas.OpenRouter, "anthropic/claude-sonnet-4", schemas.ModelCapabilities{SupportsPromptCacheBreakpoints: &no})
+
+		blocks, raw := contentBlocks(t, newBifrostReq(schemas.OpenRouter, "anthropic/claude-sonnet-4"))
+		for i, b := range blocks {
+			block, _ := b.(map[string]any)
+			if _, present := block["prompt_cache_breakpoint"]; present {
+				t.Errorf("datasheet false must suppress prompt_cache_breakpoint on content[%d]; raw=%s", i, raw)
+			}
+		}
+	})
+
+	t.Run("datasheet can enable breakpoints on an openrouter model the fallback rejects", func(t *testing.T) {
+		yes := true
+		setToolChoiceCaps(t, schemas.OpenRouter, "openai/gpt-5.4", schemas.ModelCapabilities{SupportsPromptCacheBreakpoints: &yes})
+
+		blocks, raw := contentBlocks(t, newBifrostReq(schemas.OpenRouter, "openai/gpt-5.4"))
+		marked, _ := blocks[0].(map[string]any)
+		if _, ok := marked["prompt_cache_breakpoint"].(map[string]any); !ok {
+			t.Fatalf("datasheet true must produce prompt_cache_breakpoint; raw=%s", raw)
 		}
 	})
 
@@ -1586,6 +1686,9 @@ func TestToOpenAIResponsesRequest_GPT56CacheBreakpoint(t *testing.T) {
 		{"openai", schemas.OpenAI, "gpt-5.6-sol"},
 		{"azure", schemas.Azure, "eu/gpt-5.6-sol"},
 		{"bedrock mantle", schemas.BedrockMantle, "openai.gpt-5.6-terra"},
+		{"openai gpt-6", schemas.OpenAI, "gpt-6-astra"},
+		{"azure gpt-6", schemas.Azure, "gpt-6-astra"},
+		{"bedrock mantle gpt-6", schemas.BedrockMantle, "openai.gpt-6-astra"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m, raw := marshalResponses(t, gpt56CacheReq(tc.provider, tc.model))
@@ -1638,6 +1741,33 @@ func TestToOpenAIResponsesRequest_PreGPT56Unaffected(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestToOpenAIResponsesRequest_CacheBreakpointGateReadsDatasheet pins that the
+// datasheet's supports_prompt_cache_breakpoint beats the model-name fallback in both
+// directions.
+func TestToOpenAIResponsesRequest_CacheBreakpointGateReadsDatasheet(t *testing.T) {
+	t.Run("false_disables_a_named_family", func(t *testing.T) {
+		installCapabilityRecord(t, "gpt-5.6-sol", &schemas.ModelCapabilities{SupportsPromptCacheBreakpoint: new(false)})
+		m, raw := marshalResponses(t, gpt56CacheReq(schemas.OpenAI, "gpt-5.6-sol"))
+		if _, present := firstBlock(t, m, 0, raw)["prompt_cache_breakpoint"]; present {
+			t.Errorf("datasheet false must suppress the breakpoint; raw=%s", raw)
+		}
+		if _, present := m["prompt_cache_options"]; present {
+			t.Errorf("datasheet false must suppress prompt_cache_options; raw=%s", raw)
+		}
+	})
+
+	t.Run("true_enables_an_unnamed_model", func(t *testing.T) {
+		installCapabilityRecord(t, "future-openai-model", &schemas.ModelCapabilities{SupportsPromptCacheBreakpoint: new(true)})
+		m, raw := marshalResponses(t, gpt56CacheReq(schemas.OpenAI, "future-openai-model"))
+		if _, present := firstBlock(t, m, 0, raw)["prompt_cache_breakpoint"]; !present {
+			t.Errorf("datasheet true must enable the breakpoint; raw=%s", raw)
+		}
+		if _, present := m["prompt_cache_options"]; !present {
+			t.Errorf("datasheet true must enable prompt_cache_options; raw=%s", raw)
+		}
+	})
 }
 
 // TestToOpenAIResponsesRequest_GPT56RespectsCallerCacheOptions verifies Bifrost does
@@ -1855,4 +1985,219 @@ func TestToOpenAIResponsesRequest_CustomProviderResolvesBaseForCacheBreakpoints(
 			t.Errorf("an Anthropic-based provider must not gain prompt_cache_options; raw=%s", raw)
 		}
 	})
+}
+
+// Gemini's per-part media resolution rides on the shared ResponsesMessageContentBlock, and
+// OpenAI's Responses input is those blocks marshalled straight onto the wire behind a denylist.
+// A /genai request that falls back to OpenAI must therefore have the field stripped, exactly as
+// cache_control and citations are, or OpenAI 400s with "Unknown parameter".
+func TestOpenAIResponsesRequest_MarshalJSON_StripsMediaResolution(t *testing.T) {
+	messageType := schemas.ResponsesMessageTypeMessage
+	role := schemas.ResponsesInputMessageRoleUser
+	imageURL := "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
+	callID := "call_1"
+
+	input := OpenAIResponsesRequestInput{
+		OpenAIResponsesRequestInputArray: []schemas.ResponsesMessage{
+			{
+				Type: &messageType,
+				Role: &role,
+				Content: &schemas.ResponsesMessageContent{
+					ContentBlocks: []schemas.ResponsesMessageContentBlock{{
+						Type: schemas.ResponsesInputMessageContentBlockTypeImage,
+						ResponsesInputMessageContentBlockImage: &schemas.ResponsesInputMessageContentBlockImage{
+							ImageURL: &imageURL,
+						},
+						MediaResolution: &schemas.MediaResolution{Level: "MEDIA_RESOLUTION_ULTRA_HIGH"},
+					}},
+				},
+			},
+			{
+				Type: schemas.Ptr(schemas.ResponsesMessageTypeFunctionCallOutput),
+				ResponsesToolMessage: &schemas.ResponsesToolMessage{
+					CallID: &callID,
+					Output: &schemas.ResponsesToolMessageOutputStruct{
+						ResponsesFunctionToolCallOutputBlocks: []schemas.ResponsesMessageContentBlock{{
+							Type: schemas.ResponsesInputMessageContentBlockTypeImage,
+							ResponsesInputMessageContentBlockImage: &schemas.ResponsesInputMessageContentBlockImage{
+								ImageURL: &imageURL,
+							},
+							MediaResolution: &schemas.MediaResolution{Level: "MEDIA_RESOLUTION_HIGH"},
+						}},
+					},
+				},
+			},
+		},
+	}
+
+	data, err := input.MarshalJSON()
+	if err != nil {
+		t.Fatalf("MarshalJSON returned error: %v", err)
+	}
+	if strings.Contains(string(data), "media_resolution") {
+		t.Errorf("media_resolution must not reach OpenAI's wire, got: %s", string(data))
+	}
+	if !strings.Contains(string(data), "image_url") {
+		t.Errorf("stripping media_resolution must not drop the image itself, got: %s", string(data))
+	}
+
+	// The source request is shared across retries and fallbacks, so sanitizing must copy.
+	if input.OpenAIResponsesRequestInputArray[0].Content.ContentBlocks[0].MediaResolution == nil {
+		t.Error("sanitization must not mutate the caller's request")
+	}
+}
+
+// TestToOpenAIResponsesRequest_ForwardsOpenAIToolFields pins that async,
+// output_schema and tunnel_id reach the OpenAI wire unchanged.
+func TestToOpenAIResponsesRequest_ForwardsOpenAIToolFields(t *testing.T) {
+	var tools []schemas.ResponsesTool
+	if err := sonic.Unmarshal([]byte(`[
+		{"type":"function","name":"get_weather","async":true,"parameters":{"type":"object","properties":{}},"strict":true,"output_schema":{"type":"string"}},
+		{"type":"custom","name":"run_job","async":true},
+		{"type":"mcp","server_label":"internal","tunnel_id":"tunnel_0123456789abcdef0123456789abcdef"}
+	]`), &tools); err != nil {
+		t.Fatalf("unmarshal tools: %v", err)
+	}
+	m, raw := marshalResponses(t, &schemas.BifrostResponsesRequest{
+		Provider: schemas.OpenAI,
+		Model:    "gpt-6-astra",
+		Input: []schemas.ResponsesMessage{{
+			Role:    schemas.Ptr(schemas.ResponsesInputMessageRoleUser),
+			Content: &schemas.ResponsesMessageContent{ContentStr: schemas.Ptr("hi")},
+		}},
+		Params: &schemas.ResponsesParameters{Tools: tools},
+	})
+	wireTools, _ := m["tools"].([]any)
+	if len(wireTools) != 3 {
+		t.Fatalf("expected 3 tools; raw=%s", raw)
+	}
+	fn, _ := wireTools[0].(map[string]any)
+	if fn["async"] != true {
+		t.Errorf("function async lost; raw=%s", raw)
+	}
+	if schema, _ := fn["output_schema"].(map[string]any); schema["type"] != "string" {
+		t.Errorf("function output_schema lost; raw=%s", raw)
+	}
+	if custom, _ := wireTools[1].(map[string]any); custom["async"] != true {
+		t.Errorf("custom async lost; raw=%s", raw)
+	}
+	if mcp, _ := wireTools[2].(map[string]any); mcp["tunnel_id"] != "tunnel_0123456789abcdef0123456789abcdef" {
+		t.Errorf("mcp tunnel_id lost; raw=%s", raw)
+	}
+}
+
+// TestToOpenAIResponsesRequest_ForwardsAsyncOnReplayedCalls pins that a replayed
+// pending async call keeps async on the OpenAI wire; without it OpenAI rejects the
+// request with "No tool output found for function call" (live-verified on gpt-6-astra).
+func TestToOpenAIResponsesRequest_ForwardsAsyncOnReplayedCalls(t *testing.T) {
+	var input []schemas.ResponsesMessage
+	if err := sonic.Unmarshal([]byte(`[
+		{"role":"user","content":"Check the weather in Paris."},
+		{"type":"function_call","call_id":"call_1","name":"get_weather","arguments":"{\"city\":\"Paris\"}","async":true},
+		{"role":"user","content":"Thanks. Also, what is 2+2?"}
+	]`), &input); err != nil {
+		t.Fatalf("unmarshal input: %v", err)
+	}
+	m, raw := marshalResponses(t, &schemas.BifrostResponsesRequest{
+		Provider: schemas.OpenAI,
+		Model:    "gpt-6-astra",
+		Input:    input,
+	})
+	items, _ := m["input"].([]any)
+	if len(items) != 3 {
+		t.Fatalf("expected 3 input items; raw=%s", raw)
+	}
+	if call, _ := items[1].(map[string]any); call["async"] != true {
+		t.Errorf("async dropped from replayed function_call; raw=%s", raw)
+	}
+}
+
+// TestToOpenAIResponsesRequest_StripsAsyncForUnsupportedModels pins the async gate:
+// models without async tool calling 400 on async in tool definitions and in replayed
+// call items (live-verified on gpt-5.6), so it is stripped there and kept on gpt-6.
+// The datasheet wins over the name fallback, and the caller's request is not mutated.
+func TestToOpenAIResponsesRequest_StripsAsyncForUnsupportedModels(t *testing.T) {
+	newReq := func(t *testing.T, model string) *schemas.BifrostResponsesRequest {
+		t.Helper()
+		var tools []schemas.ResponsesTool
+		if err := sonic.Unmarshal([]byte(`[
+			{"type":"function","name":"get_weather","async":true,"parameters":{"type":"object","properties":{}},"strict":true},
+			{"type":"custom","name":"run_job","async":true},
+			{"type":"namespace","name":"jobs","description":"Jobs","tools":[{"type":"function","name":"start","async":true,"parameters":{"type":"object","properties":{}},"strict":true}]}
+		]`), &tools); err != nil {
+			t.Fatalf("unmarshal tools: %v", err)
+		}
+		var input []schemas.ResponsesMessage
+		if err := sonic.Unmarshal([]byte(`[
+			{"role":"user","content":"Check the weather in Paris."},
+			{"type":"function_call","call_id":"call_1","name":"get_weather","arguments":"{}","async":true},
+			{"type":"function_call_output","call_id":"call_1","output":"{\"t\":20}"}
+		]`), &input); err != nil {
+			t.Fatalf("unmarshal input: %v", err)
+		}
+		return &schemas.BifrostResponsesRequest{
+			Provider: schemas.OpenAI,
+			Model:    model,
+			Input:    input,
+			Params:   &schemas.ResponsesParameters{Tools: tools},
+		}
+	}
+
+	for _, tc := range []struct {
+		name   string
+		model  string
+		record *schemas.ModelCapabilities
+		keep   bool
+	}{
+		{name: "gpt-5.6 strips by name", model: "gpt-5.6"},
+		{name: "gpt-6-astra keeps by name", model: "gpt-6-astra", keep: true},
+		{name: "datasheet true keeps", model: "gpt-5.6", record: &schemas.ModelCapabilities{SupportsAsyncTools: new(true)}, keep: true},
+		{name: "datasheet false strips", model: "gpt-6-astra", record: &schemas.ModelCapabilities{SupportsAsyncTools: new(false)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.record != nil {
+				installCapabilityRecord(t, tc.model, tc.record)
+			}
+			req := newReq(t, tc.model)
+			_, raw := marshalResponses(t, req)
+			if got := strings.Count(raw, `"async":true`); tc.keep && got != 4 || !tc.keep && got != 0 {
+				t.Fatalf("async occurrences = %d, keep=%v; raw=%s", got, tc.keep, raw)
+			}
+
+			tools := req.Params.Tools
+			if !*tools[0].Async || !*tools[1].Async || !*tools[2].ResponsesToolNamespace.Tools[0].Async || !*req.Input[1].ResponsesToolMessage.Async {
+				t.Fatal("caller's request was mutated")
+			}
+		})
+	}
+}
+
+func TestToOpenAIResponsesRequest_StripsAsyncFromUnsupportedToolKinds(t *testing.T) {
+	var tools []schemas.ResponsesTool
+	if err := sonic.Unmarshal([]byte(`[
+		{"type":"function","name":"run_job","async":true,"parameters":{"type":"object"}},
+		{"type":"web_search","async":true}
+	]`), &tools); err != nil {
+		t.Fatalf("unmarshal tools: %v", err)
+	}
+	var input []schemas.ResponsesMessage
+	if err := sonic.Unmarshal([]byte(`[
+		{"type":"function_call","call_id":"call_1","name":"run_job","arguments":"{}","async":true},
+		{"type":"function_call_output","call_id":"call_1","output":"done","async":true}
+	]`), &input); err != nil {
+		t.Fatalf("unmarshal input: %v", err)
+	}
+
+	_, raw := marshalResponses(t, &schemas.BifrostResponsesRequest{
+		Provider: schemas.OpenAI,
+		Model:    "gpt-6-astra",
+		Input:    input,
+		Params:   &schemas.ResponsesParameters{Tools: tools},
+	})
+	if got := strings.Count(raw, `"async":true`); got != 2 {
+		t.Fatalf("async occurrences = %d, want 2 on function declaration/call only; raw=%s", got, raw)
+	}
+	if tools[1].Async == nil || input[1].ResponsesToolMessage.Async == nil {
+		t.Fatal("caller's request was mutated")
+	}
 }

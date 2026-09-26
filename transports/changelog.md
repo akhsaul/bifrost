@@ -1,25 +1,25 @@
 ## ✨ Features
 
-- **Claude Cowork Proxy Support** - `claude-cowork` user agents are identified as the Claude Cowork app in logs and dashboards, and text documents that Cowork sends as base64 data URLs (`text/*` and JSON media types) are decoded into Anthropic `text` document sources on both the chat and Responses paths instead of being forwarded as opaque base64 (#7012)
-- **Overhead Component Histogram** - New opt-in `bifrost_overhead_component_microseconds` histogram in the Prometheus and OTel exporters, split by `overhead_component`, enabled with `overhead_breakdown_enabled` on the telemetry and OTel plugin config (off by default, requires active tracing since it is computed from completed spans). The breakdown computation moves into a shared `framework/overhead` package, the Prometheus and OTel observability forms gain the toggle, and the UI latency breakdown renames the `scheduling` category to `miscellaneous` (#6980)
-- **Upstream-Authenticated Identity in MCP Server Auth** - When an upstream auth layer has already verified the bearer and stamped the user onto the request, the MCP server accepts that identity first instead of rejecting the foreign JWT on an unknown key ID. OAuth strict mode is excluded and still verifies every token itself (#7010)
-- **Standalone Virtual Key RBAC Operation** - New `CreateStandalone` RBAC operation on virtual keys decides whether a role may create keys outside access-profile governance; the VK sheet locks the governance fields and applies the access profile for roles without it (#7025)
+- **Pinned Keys on Routing Fallbacks** - Each routing-rule fallback can pin a provider key via `key_id`, or `provider_key_name` in config.json. The UI rule editor lets you pick or clear a key per fallback. Unpinned fallbacks keep the legacy `provider/model` string, so existing rules keep their config hash (#7470, #7379, #7380, #7381)
+- **OpenAI Async Tool Execution** - The `async` flag on Responses tools and tool calls, `output_schema` on function tools and `tunnel_id` on MCP tools are now forwarded to OpenAI. `async` is stripped for models without support, and the datasheet `supports_async_tools` field can override this (#7242)
+- **GPT-6 Prompt Cache Breakpoints** - Prompt-cache breakpoints now cover the GPT-6 family on OpenAI, Azure, Bedrock and Bedrock Mantle. The datasheet `supports_prompt_cache_breakpoint` field can override this (#7240)
+- **GPT-6 Sol and Luna Reasoning Off** - `reasoning.effort: "none"` is forwarded for `gpt-6-sol` and `gpt-6-luna`. Other GPT-6 models keep reasoning on (#7492)
 
 ## 🐞 Fixed
 
-- **Bedrock Tool Result Documents** - Document blocks inside tool results are preserved when converting to Bedrock Converse instead of being dropped. Document materialization is centralized, and explicitly unsupported formats or required documents with neither inline data nor a fetchable URL are rejected up front (thanks [@michaeldunn9](https://github.com/michaeldunn9)!) (#5663)
-- **MCP JWT Identity per Token Mode** - MCP JWTs no longer record every mode as an MCP token credential on the grant: vk-mode tokens settle as the virtual key they name so governance applies that key's permit, user-mode tokens attribute the request to the user, and session-mode tokens record nothing so they are refused when authentication is enforced (#7011)
-- **Streaming First-Chunk Peek Ignored Context** - The wait for a stream's first chunk now observes the request context, so a cancelled request returns 499 and an expired deadline returns 504 immediately instead of pinning the provider worker until `stream_idle_timeout_in_seconds` elapsed. An already-buffered provider chunk still wins over a simultaneous cancellation, and the source is drained in the background so the provider's send and close complete cleanly (#6993)
-
-## 🔧 Maintenance
-
-- **Dependency Upgrades** - `google.golang.org/grpc` bumped to v1.83.2 across all Go modules; the CI newman tooling pins a patched `csv-parse` through a compat shim; Python integration test dependencies refreshed (#7019)
+- **OpenAI Sampling Parameters on Reasoning Models** - `temperature`, `top_logprobs` and `logprobs` are now stripped alongside `top_p` on chat and Responses when the model and effort do not support them. An omitted `reasoning.effort` now counts as `none` only for models that default to no reasoning (#7239)
+- **Responses API Wire Shapes** - Structured MCP tool-call errors, object-form `conversation`, array-form MCP `allowed_tools`, `approval_request_id` on MCP approval responses, and `in`/`nin` file search filters now decode and re-encode correctly (#7241)
+  <Warning>Go SDK callers: `ResponsesMCPApprovalResponse.ApprovalResponseID` is now `ApprovalRequestID`, the message type is now `mcp_approval_response`, and `ResponsesToolMessage.Error` and `ResponsesParameters.Conversation` are now union types, where they used to be `*string`.</Warning>
+- **OpenRouter Anthropic Cache Breakpoints** - Anthropic models routed through OpenRouter now keep their `cache_control` breakpoints, based on the model capability (#7521)
+- **Session Affinity with Pinned Keys** - When session affinity reorders the chain, a routing rule's key pin now moves with its provider, so the pinned key is never looked up under the wrong provider (#7468)
+- **Session Affinity Route Matching** - A session's route is now matched on provider and model together. Bindings the request followed into a failure are dropped (#7473)
+- **Databricks Gemini System Prompts** - Multiple system and developer messages are merged into one for Gemini models hosted on Databricks, which reject more than one system prompt (#7461)
+- **Bedrock Encrypted Reasoning Replay** - Bedrock's "encrypted reasoning was created for a different account or model" error now triggers the strip-and-retry path for unverifiable reasoning
+- **Decisions on Bedrock Mantle** - Decision emulation now sends `tool_choice: "auto"` for gpt-oss models on Bedrock Mantle, which reject `"required"`. Leaked parameter tags with surrounding whitespace are now recovered
+- **Gemini Transcription Usage** - Usage is reported even when the transcript is empty
+- **Routing Rule Enabled State** - Syncing or updating a routing rule that omits `enabled` keeps the stored value, where it used to write NULL
+- **Telemetry User Labels Toggle** - `user_labels_enabled` is now saved with the telemetry config (#7490)
 
 ## 🗄️ Database Migrations
 
 - No new database migrations in this release.
-
-## 🐙 Closed GitHub Issues
-
-- [#5661](https://github.com/maximhq/bifrost/issues/5661) - Anthropic document blocks are dropped from Bedrock tool results
-- [#6974](https://github.com/maximhq/bifrost/issues/6974) - Streaming first-chunk peek and drain wait ignore context, pinning workers for up to stream_idle_timeout
