@@ -426,6 +426,7 @@ func HandleAntigravityChatCompletionStream(
 		streamUsage := &schemas.BifrostLLMUsage{}
 		ctx.SetValue(schemas.BifrostContextKeyStreamAccumulatedUsage, streamUsage)
 
+		readLoop:
 		for {
 			if ctx.Err() != nil {
 				return
@@ -462,16 +463,22 @@ func HandleAntigravityChatCompletionStream(
 				responseID = geminiResponse.ResponseID
 			}
 
-			response, bifrostErr, isLastChunk := geminiResponse.ToBifrostChatCompletionStream(streamState)
+			responses, bifrostErr, isLastChunk := geminiResponse.ToBifrostChatCompletionStream(streamState)
 			if bifrostErr != nil {
 				ctx.SetValue(schemas.BifrostContextKeyStreamEndIndicator, true)
 				providerUtils.ProcessAndSendBifrostError(ctx, postHookRunner, providerUtils.EnrichError(ctx, bifrostErr, jsonBody, nil, sendBackRawRequest, sendBackRawResponse, latency), responseChan, logger, postHookSpanFinalizer)
 				return
 			}
 
-			if response != nil {
+			for i, response := range responses {
+				if response == nil {
+					continue
+				}
+				isLastDelta := isLastChunk && i == len(responses)-1
 				response.ID = responseID
-				response.Model = rawModel
+				if rawModel != "" {
+					response.Model = rawModel
+				}
 				if response.Usage != nil {
 					*streamUsage = *response.Usage
 				}
@@ -480,24 +487,24 @@ func HandleAntigravityChatCompletionStream(
 					Latency:    time.Since(lastChunkTime).Milliseconds(),
 					Provider:   schemas.Antigravity,
 				}
-				if isLastChunk {
+				if isLastDelta {
 					ctx.SetValue(schemas.BifrostContextKeyStreamEndIndicator, true)
 				}
 				if sendBackRawRequest {
 					providerUtils.ParseAndSetRawRequest(&response.ExtraFields, jsonBody)
 				}
-				if sendBackRawResponse {
+				if sendBackRawResponse && i == len(responses)-1 {
 					response.ExtraFields.RawResponse = string(eventData)
 				}
 
 				lastChunkTime = time.Now()
 				chunkIndex++
 
-				if isLastChunk {
+				if isLastDelta {
 					response.ExtraFields.Latency = time.Since(startTime).Milliseconds()
 					ctx.SetValue(schemas.BifrostContextKeyStreamEndIndicator, true)
 					providerUtils.ProcessAndSendResponse(ctx, postHookRunner, providerUtils.GetBifrostResponseForStreamResponse(nil, response, nil, nil, nil, nil), responseChan, postHookSpanFinalizer)
-					break
+					break readLoop
 				}
 
 				// Process response through post-hooks and send to channel

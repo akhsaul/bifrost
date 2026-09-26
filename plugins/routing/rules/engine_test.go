@@ -543,8 +543,10 @@ func TestEvaluateRoutingRules_GroupAdaptiveStrategy(t *testing.T) {
 		ID:              "group-adapt-1",
 		Name:            "Group Adaptive Rule",
 		CelExpression:   "true",
-		Strategy:        "group_adaptive",
-		ParsedFallbacks: []string{"azure/gpt-4o"},
+		Strategy: "group_adaptive",
+		ParsedFallbacks: []configstoreTables.RoutingFallback{
+			{Fallback: schemas.Fallback{Provider: "azure", Model: "gpt-4o"}},
+		},
 		Targets: []configstoreTables.TableRoutingTarget{
 			{Provider: bifrost.Ptr("openrouter"), Model: bifrost.Ptr("qwen3.8-flash"), Priority: &prio1, Weight: 1.0},
 			{Provider: bifrost.Ptr("openrouter"), Model: bifrost.Ptr("hy3"), Priority: &prio2, Weight: 1.0},
@@ -579,7 +581,10 @@ func TestEvaluateRoutingRules_GroupAdaptiveStrategy(t *testing.T) {
 	require.NotNil(t, decision1)
 	assert.Equal(t, "openrouter", decision1.Provider)
 	assert.Equal(t, "qwen3.8-flash", decision1.Model)
-	assert.Equal(t, []string{"openrouter/hy3", "azure/gpt-4o"}, decision1.Fallbacks)
+	assert.Equal(t, []configstoreTables.RoutingFallback{
+		{Fallback: schemas.Fallback{Provider: "openrouter", Model: "hy3"}},
+		{Fallback: schemas.Fallback{Provider: "azure", Model: "gpt-4o"}},
+	}, decision1.Fallbacks)
 
 	// Request 2: must select hy3 with fallbacks: [openrouter/qwen3.8-flash, azure/gpt-4o]
 	decision2, err := engine.EvaluateRoutingRules(bgCtx, routingCtx)
@@ -587,7 +592,10 @@ func TestEvaluateRoutingRules_GroupAdaptiveStrategy(t *testing.T) {
 	require.NotNil(t, decision2)
 	assert.Equal(t, "openrouter", decision2.Provider)
 	assert.Equal(t, "hy3", decision2.Model)
-	assert.Equal(t, []string{"openrouter/qwen3.8-flash", "azure/gpt-4o"}, decision2.Fallbacks)
+	assert.Equal(t, []configstoreTables.RoutingFallback{
+		{Fallback: schemas.Fallback{Provider: "openrouter", Model: "qwen3.8-flash"}},
+		{Fallback: schemas.Fallback{Provider: "azure", Model: "gpt-4o"}},
+	}, decision2.Fallbacks)
 }
 
 // TestEvaluateRoutingRules_ScopePrecedence tests virtual_key scope takes precedence over global

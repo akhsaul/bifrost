@@ -301,7 +301,13 @@ func (re *Engine) EvaluateRoutingRules(ctx *schemas.BifrostContext, routingCtx *
 					keyID = *target.KeyID
 				}
 
-				combinedFallbacks := append([]string{}, inProviderFallbacks...)
+				combinedFallbacks := make([]configstoreTables.RoutingFallback, 0, len(inProviderFallbacks)+len(rule.ParsedFallbacks))
+				for _, fbStr := range inProviderFallbacks {
+					fbProvider, fbModel := schemas.ParseModelString(fbStr, "")
+					combinedFallbacks = append(combinedFallbacks, configstoreTables.RoutingFallback{
+						Fallback: schemas.Fallback{Provider: fbProvider, Model: fbModel},
+					})
+				}
 				combinedFallbacks = append(combinedFallbacks, rule.ParsedFallbacks...)
 
 				stepDecision = &Decision{
