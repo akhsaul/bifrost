@@ -1323,6 +1323,17 @@
                 "pages": ["GET /ws", "GET /mcp", "POST /mcp", "GET /metrics", "POST /inspect"]
               },
               {
+                "group": "API Keys",
+                "expanded": false,
+                "pages": [
+                  "GET /api/api-keys",
+                  "POST /api/api-keys",
+                  "GET /api/api-keys/{id}",
+                  "PUT /api/api-keys/{id}",
+                  "DELETE /api/api-keys/{id}"
+                ]
+              },
+              {
                 "group": "Webhooks",
                 "expanded": false,
                 "pages": [
@@ -1753,6 +1764,7 @@
             "item": "Open Source",
             "icon": "rocket",
             "pages": [
+              "changelogs/v2.2.3",
               "changelogs/v2.2.2",
               "changelogs/v2.2.1",
               "changelogs/v2.2.0",
@@ -1972,6 +1984,7 @@
             "item": "Enterprise",
             "icon": "building",
             "pages": [
+              "changelogs/ent-v2.2.3",
               "changelogs/ent-v2.2.2",
               "changelogs/ent-v2.2.1",
               "changelogs/ent-v2.2.0",
