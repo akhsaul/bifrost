@@ -3935,3 +3935,50 @@ func TestMigrationAddGithubCopilotConfigColumns_NonRollbackable(t *testing.T) {
 	assert.Equal(t, "-----BEGIN RSA PRIVATE KEY-----", got.GithubCopilotKeyConfig.PrivateKey.GetValue(),
 		"the private key must survive the refused rollback")
 }
+
+func TestMigrationAddClineKeyConfigColumns_NonRollbackable(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	columns := []string{
+		"cline_client_id",
+		"cline_refresh_token",
+	}
+
+	require.NoError(t, db.AutoMigrate(&tables.TableKey{}))
+	for _, column := range columns {
+		require.NoError(t, db.Migrator().DropColumn(&tables.TableKey{}, column))
+	}
+
+	require.NoError(t, migrationAddClineKeyConfigColumns(ctx, db, testMigrationLogger))
+	for _, column := range columns {
+		require.True(t, db.Migrator().HasColumn(&tables.TableKey{}, column),
+			"migration should have added %s", column)
+	}
+
+	// A key carrying OAuth credentials is exactly the state a rollback would destroy.
+	seed := &tables.TableKey{
+		Name:       "cline-rollback",
+		ProviderID: 1,
+		Provider:   "cline",
+		KeyID:      "cline-rollback-1",
+		ClineKeyConfig: &schemas.ClineKeyConfig{
+			RefreshToken: *schemas.NewSecretVar("refresh-token-value"),
+		},
+	}
+	require.NoError(t, db.Create(seed).Error)
+
+	err := rollbackClineKeyConfigColumns(db)
+	require.Error(t, err, "rollback must refuse: dropping the columns destroys refresh tokens Cline cannot re-supply")
+	assert.Contains(t, err.Error(), "non-rollbackable")
+	for _, column := range columns {
+		assert.True(t, db.Migrator().HasColumn(&tables.TableKey{}, column),
+			"a refused rollback must leave %s intact", column)
+	}
+
+	var got tables.TableKey
+	require.NoError(t, db.Where("key_id = ?", seed.KeyID).First(&got).Error)
+	require.NotNil(t, got.ClineKeyConfig)
+	assert.Equal(t, "refresh-token-value", got.ClineKeyConfig.RefreshToken.GetValue(),
+		"the refresh token must survive the refused rollback")
+}

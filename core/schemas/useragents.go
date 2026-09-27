@@ -31,8 +31,8 @@ var (
 	KiloCode = UserAgentIdentifiers{"kilo"}
 	// RooCode identifies requests from Roo Code clients.
 	RooCode = UserAgentIdentifiers{"roo"}
-	// Cline identifies requests from Cline clients.
-	Cline = UserAgentIdentifiers{"cline"}
+	// ClineClient identifies requests from Cline clients.
+	ClineClient = UserAgentIdentifiers{"cline"}
 	// OpenCode identifies requests from OpenCode clients.
 	OpenCode = UserAgentIdentifiers{"opencode"}
 	// Windsurf identifies requests from Windsurf clients.
@@ -129,7 +129,7 @@ var UserAgentAppMatchers = []UserAgentAppMatcher{
 	{App: "Cursor", Identifiers: Cursor},
 	{App: "Kilo Code", Identifiers: KiloCode},
 	{App: "Roo Code", Identifiers: RooCode},
-	{App: "Cline", Identifiers: Cline},
+	{App: "Cline", Identifiers: ClineClient},
 	{App: "OpenCode", Identifiers: OpenCode},
 	{App: "Windsurf", Identifiers: Windsurf},
 	{App: "Gemini CLI", Identifiers: GeminiCLI},

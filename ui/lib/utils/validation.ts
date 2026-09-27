@@ -614,3 +614,19 @@ export function hasCopilotApiToken(value: string | { value?: string; ref?: strin
 	if (typeof value === "string") return value.trim() !== "";
 	return !!value.value?.trim() || !!value.ref?.trim();
 }
+
+// hasClineApiToken reports whether a static Cline API key is present on a provider key.
+// Same two shapes as hasCopilotApiToken: bare string in the provider-level form,
+// SecretVar object in the per-key form.
+export function hasClineApiToken(value: string | { value?: string; ref?: string; type?: string } | null | undefined): boolean {
+	if (!value) return false;
+	if (typeof value === "string") return value.trim() !== "";
+	return !!value.value?.trim() || !!value.ref?.trim();
+}
+
+// hasClineOAuthRefresh reports whether a Cline OAuth refresh token is present.
+export function hasClineOAuthRefresh(value: string | { value?: string; ref?: string; type?: string } | null | undefined): boolean {
+	if (!value) return false;
+	if (typeof value === "string") return value.trim() !== "";
+	return !!value.value?.trim() || !!value.ref?.trim();
+}

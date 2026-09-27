@@ -12,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TagInput } from "@/components/ui/tagInput";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLazyGetAntigravityAuthUrlQuery, useExchangeAntigravityAuthCodeMutation } from "@/lib/store/apis/providersApi";
-import { hasCopilotApiToken, isRedacted } from "@/lib/utils/validation";
+import { hasClineApiToken, hasClineOAuthRefresh, hasCopilotApiToken, isRedacted } from "@/lib/utils/validation";
 import { CheckCircle2, Info, Loader2, RefreshCw, Copy, Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Control, UseFormReturn } from "react-hook-form";
@@ -157,10 +157,15 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 	const isAntigravity = effectiveProvider === "antigravity";
 	const isDatabricks = effectiveProvider === "databricks";
 	const isGithubCopilot = effectiveProvider === "github-copilot";
+	const isCline = effectiveProvider === "cline";
 	// Reactive, so the App-credential labels stay truthful. Once a Copilot token is present
 	// those fields genuinely are optional, and a static "(Required)" would contradict the
 	// section note telling the operator they can leave them blank.
 	const copilotAppSuffix = hasCopilotApiToken(form.watch("key.value")) ? "(Optional)" : "(Required)";
+	// Reactive, so the OAuth labels stay truthful. Once a static Cline key is present
+	// the refresh token genuinely is optional, and vice versa.
+	const clineOAuthSuffix = hasClineApiToken(form.watch("key.value")) ? "(Optional)" : "(Required)";
+	const clineKeySuffix = hasClineOAuthRefresh(form.watch("key.cline_key_config.refresh_token")) ? "(Optional)" : "";
 	const isKeylessProvider = isOllama || isSGL;
 	const supportsBatchAPI = BATCH_SUPPORTED_PROVIDERS.includes(effectiveProvider);
 
@@ -466,7 +471,8 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 					render={({ field }) => (
 						<FormItem>
 							<FormLabel>
-								{isGithubCopilot ? "Copilot API Token" : "API Key"} {isVLLM || isGithubCopilot ? "(Optional)" : ""}
+								{isGithubCopilot ? "Copilot API Token" : isCline ? "Cline API Key" : "API Key"}{" "}
+								{isVLLM || isGithubCopilot ? "(Optional)" : isCline ? clineKeySuffix : ""}
 							</FormLabel>
 							{isGithubCopilot && (
 								<FormDescription>
@@ -475,9 +481,21 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 									below for anything long-running.
 								</FormDescription>
 							)}
+							{isCline && (
+								<FormDescription>
+									A static key from the Cline dashboard, or leave blank to use OAuth below. OAuth needs no manual key: Bifrost exchanges the
+									refresh token for short-lived access tokens automatically.
+								</FormDescription>
+							)}
 							<FormControl>
 								<SecretVarInput
-									placeholder={isGithubCopilot ? "Copilot API token, or leave blank to use a GitHub App" : "API Key or env.MY_KEY"}
+									placeholder={
+										isGithubCopilot
+											? "Copilot API token, or leave blank to use a GitHub App"
+											: isCline
+												? "Cline API key, or leave blank to use OAuth"
+												: "API Key or env.MY_KEY"
+									}
 									type="text"
 									{...field}
 								/>
@@ -1297,6 +1315,58 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 								<FormDescription>Leave blank for github.com</FormDescription>
 								<FormControl>
 									<SecretVarInput data-testid="key-input-copilot-github-domain" placeholder="acme.ghe.com" {...field} />
+								</FormControl>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+				</div>
+			)}
+			{isCline && (
+				<div className="space-y-4">
+					<Separator />
+					<div className="bg-muted/50 flex items-start gap-2 rounded-md border p-3">
+						<Info className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+						<p className="text-muted-foreground text-sm">
+							Cline accepts either credential. Fill in <strong>one</strong> of the two. <strong>OAuth</strong> is the option that needs no
+							manual key: complete the WorkOS device flow once and paste the refresh token here — Bifrost exchanges it for short-lived
+							access tokens automatically. A <strong>static API key</strong> in the field above is simpler for testing.
+						</p>
+					</div>
+					<div className="space-y-1.5">
+						<Label>OAuth Credentials</Label>
+						<p className="text-muted-foreground text-sm">
+							Leave these blank if you supplied a Cline API key above. Otherwise the refresh token is needed; the client ID defaults to the
+							built-in Cline client.
+						</p>
+					</div>
+					<FormField
+						control={control}
+						name="key.cline_key_config.refresh_token"
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>Refresh Token {clineOAuthSuffix}</FormLabel>
+								<FormDescription>The OAuth refresh token from the WorkOS device flow.</FormDescription>
+								<FormControl>
+									<SecretVarInput
+										data-testid="key-input-cline-refresh-token"
+										placeholder="paste-refresh-token or env.CLINE_REFRESH_TOKEN"
+										{...field}
+									/>
+								</FormControl>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+					<FormField
+						control={control}
+						name="key.cline_key_config.client_id"
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>Client ID (Optional)</FormLabel>
+								<FormDescription>Leave blank for the built-in Cline client.</FormDescription>
+								<FormControl>
+									<SecretVarInput data-testid="key-input-cline-client-id" placeholder="client_01K3A541FN8TA3EPPHTD2325AR" {...field} />
 								</FormControl>
 								<FormMessage />
 							</FormItem>

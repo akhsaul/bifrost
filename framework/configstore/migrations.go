@@ -499,6 +499,7 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_time_of_day_pricing_columns"}, run: migrationAddTimeOfDayPricingColumns},
 	{IDs: []string{"migrate_vk_standalone_limits_to_model_configs"}, run: migrationMigrateVKStandaloneLimitsToModelConfigs},
 	{IDs: []string{"add_content_logging_on_error_column"}, run: migrationAddContentLoggingOnErrorColumn},
+	{IDs: []string{"add_cline_key_config_columns"}, run: migrationAddClineKeyConfigColumns},
 }
 
 // videoResolutionPricingColumns are the resolution-banded video output rate columns.
@@ -13554,6 +13555,49 @@ func migrationAddGithubCopilotConfigColumns(ctx context.Context, db *gorm.DB, lo
 // columns are additive, so an older binary ignores them and there is nothing to undo.
 func rollbackGithubCopilotConfigColumns(*gorm.DB) error {
 	return fmt.Errorf("add_github_copilot_config_columns is non-rollbackable: dropping the github_copilot_* columns would permanently delete every stored GitHub App private key, which GitHub only issues once and cannot re-supply; the columns are additive and older binaries safely ignore them")
+}
+
+// clineKeyConfigColumns are the Cline OAuth credential columns on the key table.
+var clineKeyConfigColumns = []string{
+	"cline_client_id",
+	"cline_refresh_token",
+}
+
+// migrationAddClineKeyConfigColumns adds the Cline OAuth credential columns to the key
+// table. There is nothing to backfill: cline is a new provider, so no existing row
+// can carry these values.
+func migrationAddClineKeyConfigColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "add_cline_key_config_columns"
+	logger.Info("[configstore] starting migration %s", migrationName)
+	defer logger.Info("[configstore] finished migration %s", migrationName)
+
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: migrationName,
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			for _, column := range clineKeyConfigColumns {
+				if err := addColumnIfNotExists(tx, logger, &tables.TableKey{}, column); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+		Rollback: rollbackClineKeyConfigColumns,
+	}})
+
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error running %s migration: %w", migrationName, err)
+	}
+	return nil
+}
+
+// rollbackClineKeyConfigColumns refuses rather than dropping, mirroring the
+// github-copilot columns. A refresh token cannot be re-supplied by Cline: the
+// operator would have to redo the interactive WorkOS device flow for every key.
+// The columns are additive, so an older binary ignores them and there is
+// nothing to undo.
+func rollbackClineKeyConfigColumns(*gorm.DB) error {
+	return fmt.Errorf("add_cline_key_config_columns is non-rollbackable: dropping the cline_* columns would permanently delete every stored OAuth refresh token, which Cline cannot re-supply and must be re-obtained through the interactive WorkOS device flow; the columns are additive and older binaries safely ignore them")
 }
 
 // migrationAddHiddenRequestTypesJSONColumn adds the hidden_request_types_json column to

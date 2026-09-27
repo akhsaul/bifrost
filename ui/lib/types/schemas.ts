@@ -336,6 +336,31 @@ export const githubCopilotKeyConfigSchema = z
 		}
 	});
 
+// clineKeyConfigComplete reports whether the OAuth refresh token is present. It is
+// the check the outer key schema uses to decide whether this block is a real credential.
+export const clineKeyConfigComplete = (data: { refresh_token?: unknown } | undefined): boolean => {
+	if (!data) return false;
+	const d = data as Record<string, { value?: string; ref?: string } | undefined>;
+	return isSecretVarSet(d.refresh_token);
+};
+
+// Cline key config schema. Both fields are optional because the whole block is
+// optional: a static Cline API key in `value` is the other valid auth mode. Once
+// the operator starts filling this block in, the refresh token becomes required.
+export const clineKeyConfigSchema = z
+	.object({
+		client_id: secretVarSchema.optional(),
+		refresh_token: secretVarSchema.optional(),
+	})
+	.superRefine((data, ctx) => {
+		const started = isSecretVarSet(data.client_id) || isSecretVarSet(data.refresh_token);
+		if (!started) return;
+
+		if (!isSecretVarSet(data.refresh_token)) {
+			ctx.addIssue({ code: "custom", path: ["refresh_token"], message: "Required when using OAuth" });
+		}
+	});
+
 // Ollama key config schema
 export const ollamaKeyConfigSchema = z
 	.object({
@@ -481,6 +506,7 @@ export const modelProviderKeySchema = z
 		antigravity_key_config: antigravityKeyConfigSchema.optional(),
 		databricks_key_config: databricksKeyConfigSchema.optional(),
 		github_copilot_key_config: githubCopilotKeyConfigSchema.optional(),
+		cline_key_config: clineKeyConfigSchema.optional(),
 		use_for_batch_api: z.boolean().optional(),
 		use_anthropic_endpoints: z.boolean().optional(),
 		use_openai_endpoints: z.boolean().optional(),
@@ -514,6 +540,10 @@ export const modelProviderKeySchema = z
 			// nested schema permits it so token auth stays valid, so this is the only place
 			// that catches a key with no usable authentication at all.
 			if (githubCopilotKeyConfigComplete(data.github_copilot_key_config)) {
+				return true;
+			}
+			// Cline authenticates from its OAuth refresh token when no static API key is given.
+			if (clineKeyConfigComplete(data.cline_key_config)) {
 				return true;
 			}
 			// Antigravity allows OAuth credentials via antigravity_key_config or top-level value

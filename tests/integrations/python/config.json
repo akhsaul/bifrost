@@ -309,6 +309,26 @@
         "default_request_timeout_in_seconds": 300
       }
     },
+    "cline": {
+      "send_back_raw_request": true,
+      "send_back_raw_response": true,
+      "store_raw_request_response": true,
+      "keys": [
+        {
+          "name": "Cline Key",
+          "value": "env.CLINE_API_KEY",
+          "weight": 1,
+          "models": ["*"],
+          "cline_key_config": {
+            "client_id": "env.CLINE_CLIENT_ID",
+            "refresh_token": "env.CLINE_REFRESH_TOKEN"
+          }
+        }
+      ],
+      "network_config": {
+        "default_request_timeout_in_seconds": 300
+      }
+    },
     "openrouter": {
       "send_back_raw_request": true,
       "send_back_raw_response": true,

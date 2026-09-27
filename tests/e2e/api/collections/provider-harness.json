@@ -170394,6 +170394,156 @@
           }
         }
       ]
+    },
+    {
+      "name": "116. Cline provider (cline)",
+      "description": "Cline is an OpenAI-compatible gateway at api.cline.bot with three wire-visible deviations pinned here: (1) non-streaming chat completions arrive wrapped in {data, success} and must be unwrapped, (2) streaming is standard OpenAI SSE ending in [DONE], (3) list models merges /v1/models with /v1/ai/cline/recommended-models, so every id carries the cline/ prefix. Requires a cline key in the harness gateway config (CLINE_API_KEY or CLINE_REFRESH_TOKEN).",
+      "item": [
+        {
+          "name": "POST /v1/chat/completions - cline envelope unwrapped - cline/cline-free/deepseek-v4.1-flash",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('cline chat succeeds', function () {",
+                  "  pm.expect(pm.response.code, 'failed: ' + pm.response.text()).to.be.below(400);",
+                  "});",
+                  "pm.test('cline envelope is unwrapped into choices', function () {",
+                  "  var body = pm.response.json();",
+                  "  var content = body.choices && body.choices[0] && body.choices[0].message && body.choices[0].message.content;",
+                  "  pm.expect(content, 'missing unwrapped content: ' + pm.response.text()).to.be.a('string');",
+                  "  pm.expect(content.length, 'empty content').to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"cline/cline-free/deepseek-v4.1-flash\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": \"Reply with exactly: cline-ok\" }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/chat/completions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "chat",
+                "completions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/chat/completions (stream) - cline SSE framing - cline/cline-free/deepseek-v4.1-flash",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('cline stream succeeds', function () {",
+                  "  pm.expect(pm.response.code, 'failed: ' + pm.response.text()).to.be.below(400);",
+                  "});",
+                  "pm.test('cline SSE framing', function () {",
+                  "  var ct = pm.response.headers.get('content-type') || '';",
+                  "  pm.expect(ct, 'expected SSE, got ' + ct).to.include('text/event-stream');",
+                  "  var lines = (pm.response.text() || '').split('\\n');",
+                  "  var chunks = 0, sawDone = false;",
+                  "  lines.forEach(function (l) {",
+                  "    if (l.indexOf('data: ') !== 0) { return; }",
+                  "    chunks++;",
+                  "    if (l.slice(6).trim() === '[DONE]') { sawDone = true; }",
+                  "  });",
+                  "  pm.expect(chunks, 'expected SSE data chunks, got ' + chunks).to.be.above(1);",
+                  "  pm.expect(sawDone, 'expected an SSE [DONE] terminator').to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"cline/cline-free/deepseek-v4.1-flash\",\n  \"stream\": true,\n  \"messages\": [\n    { \"role\": \"user\", \"content\": \"Reply with exactly: cline-ok\" }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/chat/completions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "chat",
+                "completions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /v1/models?provider=cline - merged catalog carries cline/ prefix",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('cline list models succeeds', function () {",
+                  "  pm.expect(pm.response.code, 'failed: ' + pm.response.text()).to.be.below(400);",
+                  "});",
+                  "pm.test('every cline model id carries the cline/ prefix', function () {",
+                  "  var data = pm.response.json().data || [];",
+                  "  pm.expect(data.length, 'empty cline catalog: ' + pm.response.text()).to.be.above(0);",
+                  "  var bad = data.filter(function (m) { return typeof m.id !== 'string' || m.id.indexOf('cline/') !== 0; });",
+                  "  pm.expect(bad, 'unprefixed ids: ' + JSON.stringify(bad)).to.be.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/models?provider=cline",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "models"
+              ],
+              "query": [
+                {
+                  "key": "provider",
+                  "value": "cline"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ]
 }

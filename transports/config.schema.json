@@ -560,6 +560,9 @@
         },
         "github-copilot": {
           "$ref": "#/$defs/provider_with_github_copilot_config"
+        },
+        "cline": {
+          "$ref": "#/$defs/provider_with_cline_config"
         }
       },
       "additionalProperties": true
@@ -5032,6 +5035,45 @@
         }
       ]
     },
+    "cline_key": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/base_key"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cline_key_config": {
+              "type": "object",
+              "properties": {
+                "client_id": {
+                  "type": "string",
+                  "description": "WorkOS client ID for OAuth. Leave unset for the built-in Cline client (can use env. prefix)"
+                },
+                "refresh_token": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "OAuth refresh token from the WorkOS device flow (can use env. prefix)"
+                }
+              },
+              "required": ["refresh_token"],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "anyOf": [
+            {
+              "properties": { "value": { "minLength": 1 } },
+              "required": ["value"]
+            },
+            {
+              "required": ["cline_key_config"]
+            }
+          ]
+        }
+      ]
+    },
     "github_copilot_key": {
       "allOf": [
         {
@@ -5597,6 +5639,45 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/github_copilot_key"
+          },
+          "minItems": 1,
+          "description": "API keys for this provider"
+        },
+        "network_config": {
+          "$ref": "#/$defs/network_config"
+        },
+        "concurrency_and_buffer_size": {
+          "$ref": "#/$defs/concurrency_and_buffer_size"
+        },
+        "proxy_config": {
+          "$ref": "#/$defs/proxy_config"
+        },
+        "send_back_raw_request": {
+          "type": "boolean",
+          "description": "Include raw request in BifrostResponse (default: false)"
+        },
+        "send_back_raw_response": {
+          "type": "boolean",
+          "description": "Include raw response in BifrostResponse (default: false)"
+        },
+        "store_raw_request_response": {
+          "type": "boolean",
+          "description": "Capture raw request/response for internal logging only; strip from API responses returned to clients (default: false)"
+        },
+        "custom_provider_config": {
+          "$ref": "#/$defs/custom_provider_config"
+        }
+      },
+      "required": ["keys"],
+      "additionalProperties": false
+    },
+    "provider_with_cline_config": {
+      "type": "object",
+      "properties": {
+        "keys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cline_key"
           },
           "minItems": 1,
           "description": "API keys for this provider"

@@ -151,6 +151,7 @@ type Key struct {
 	AntigravityKeyConfig   *AntigravityKeyConfig   `json:"antigravity_key_config,omitempty"`    // Antigravity-specific key configuration
 	DatabricksKeyConfig    *DatabricksKeyConfig    `json:"databricks_key_config,omitempty"`     // Databricks-specific key configuration
 	GithubCopilotKeyConfig *GithubCopilotKeyConfig `json:"github_copilot_key_config,omitempty"` // GitHub Copilot-specific key configuration
+	ClineKeyConfig         *ClineKeyConfig         `json:"cline_key_config,omitempty"`          // Cline-specific key configuration (OAuth refresh token)
 	Enabled                *bool                   `json:"enabled,omitempty"`                   // Whether the key is active (default:true)
 	UseForBatchAPI         *bool                   `json:"use_for_batch_api,omitempty"`         // Whether this key can be used for batch API operations (default:false for new keys, migrated keys default to true)
 	UseAnthropicEndpoints  *bool                   `json:"use_anthropic_endpoints,omitempty"`   // Whether to use anthropic endpoints for this key
@@ -900,6 +901,18 @@ type GithubCopilotKeyConfig struct {
 	RepositoryID   SecretVar `json:"repository_id"`           // Repository the installation token is scoped to; digits only (required)
 	PrivateKey     SecretVar `json:"private_key"`             // GitHub App private key, PKCS#1 or PKCS#8 PEM (required)
 	GithubDomain   SecretVar `json:"github_domain,omitempty"` // GitHub Enterprise domain, e.g. "acme.ghe.com". Empty means github.com.
+}
+
+// ClineKeyConfig holds the OAuth material for Cline's WorkOS device-flow auth.
+//
+// A Cline key works in two modes, checked in this order by the provider:
+//  1. Key.Value holds a static Cline API key, sent verbatim as "Bearer <value>".
+//  2. ClineKeyConfig holds the refresh token from a one-time WorkOS device flow;
+//     Bifrost exchanges it at https://api.cline.bot/api/v1/auth/refresh for a
+//     short-lived access token, sent as "Bearer workos:<access_token>".
+type ClineKeyConfig struct {
+	ClientID     SecretVar `json:"client_id,omitempty"`     // WorkOS client ID. Empty means the built-in Cline VSCode client ID.
+	RefreshToken SecretVar `json:"refresh_token,omitempty"` // OAuth refresh token from the device flow (required in OAuth mode)
 }
 
 // Account defines the interface for managing provider accounts and their configurations.

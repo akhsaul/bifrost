@@ -652,6 +652,25 @@ func (h *ProviderHandler) mergeUpdatedKey(oldRawKey, updateKey schemas.Key) (sch
 			}
 		}
 	}
+	if mergedKey.ClineKeyConfig != nil {
+		var old *schemas.ClineKeyConfig
+		if oldRawKey.ClineKeyConfig != nil {
+			old = oldRawKey.ClineKeyConfig
+		}
+		for _, field := range []struct {
+			name    string
+			updated *schemas.SecretVar
+			stored  *schemas.SecretVar
+		}{
+			{"client_id", &mergedKey.ClineKeyConfig.ClientID, clineFieldOrNil(old, func(c *schemas.ClineKeyConfig) *schemas.SecretVar { return &c.ClientID })},
+			{"refresh_token", &mergedKey.ClineKeyConfig.RefreshToken, clineFieldOrNil(old, func(c *schemas.ClineKeyConfig) *schemas.SecretVar { return &c.RefreshToken })},
+		} {
+			if err := preserve(field.updated, field.stored, "cline_key_config."+field.name); err != nil {
+
+				return schemas.Key{}, err
+			}
+		}
+	}
 
 	mergedKey.ConfigHash = oldRawKey.ConfigHash
 	mergedKey.Status = oldRawKey.Status
@@ -736,6 +755,14 @@ func isPEMPrivateKey(s string) bool {
 // fieldOrNil selects a field from a possibly-nil stored config, so a masked update against
 // a key that never had this section behaves the same as one against a missing field.
 func fieldOrNil(config *schemas.GithubCopilotKeyConfig, pick func(*schemas.GithubCopilotKeyConfig) *schemas.SecretVar) *schemas.SecretVar {
+	if config == nil {
+		return nil
+	}
+	return pick(config)
+}
+
+// clineFieldOrNil is fieldOrNil for Cline key configs.
+func clineFieldOrNil(config *schemas.ClineKeyConfig, pick func(*schemas.ClineKeyConfig) *schemas.SecretVar) *schemas.SecretVar {
 	if config == nil {
 		return nil
 	}
@@ -856,6 +883,20 @@ func validateProviderKeyURL(provider schemas.ModelProvider, key schemas.Key) err
 		}
 		if hasClientID != hasClientSecret {
 			return fmt.Errorf("databricks_key_config.client_id and databricks_key_config.client_secret must be set together")
+		}
+	case schemas.Cline:
+		// A static Cline API key in value is a valid alternative to OAuth. But a
+		// supplied OAuth config is checked either way: a half-filled block sitting
+		// behind a key persists silently and only surfaces later, when the key is
+		// removed and the key falls back to credentials that were never valid.
+		if key.ClineKeyConfig == nil {
+			if key.Value.IsSet() {
+				return nil
+			}
+			return fmt.Errorf("cline_key_config is required for Cline keys without a value")
+		}
+		if !key.ClineKeyConfig.RefreshToken.IsSet() {
+			return fmt.Errorf("cline_key_config.refresh_token is required for Cline keys")
 		}
 	}
 	return nil

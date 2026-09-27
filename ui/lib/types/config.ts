@@ -279,6 +279,18 @@ export const DefaultGithubCopilotKeyConfig: GithubCopilotKeyConfig = {
 	github_domain: { value: "", ref: "" },
 } as const satisfies Required<GithubCopilotKeyConfig>;
 
+// ClineKeyConfig matching Go's schemas.ClineKeyConfig
+export interface ClineKeyConfig {
+	client_id?: SecretVar;
+	refresh_token?: SecretVar;
+}
+
+// Default ClineKeyConfig
+export const DefaultClineKeyConfig: ClineKeyConfig = {
+	client_id: { value: "", ref: "" },
+	refresh_token: { value: "", ref: "" },
+} as const satisfies Required<ClineKeyConfig>;
+
 // Key structure matching Go's schemas.Key
 export interface ModelProviderKey {
 	id: string;
@@ -303,6 +315,7 @@ export interface ModelProviderKey {
 	antigravity_key_config?: AntigravityKeyConfig;
 	databricks_key_config?: DatabricksKeyConfig;
 	github_copilot_key_config?: GithubCopilotKeyConfig;
+	cline_key_config?: ClineKeyConfig;
 	config_hash?: string; // Present when config is synced from config.json
 	status?: "unknown" | "success" | "list_models_failed";
 	description?: string;

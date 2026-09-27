@@ -161,6 +161,20 @@ export const ProviderIcons = {
 			</svg>
 		);
 	},
+	cline: ({ size = "md", className = "" }: IconProps) => {
+		const resolvedSize = resolveSize(size);
+		return (
+			<img
+				src="/images/cline.png"
+				alt="cline"
+				width={resolvedSize}
+				height={resolvedSize}
+				loading="lazy"
+				decoding="async"
+				className={className}
+			/>
+		);
+	},
 
 	deepseek: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);

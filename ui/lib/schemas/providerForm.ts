@@ -1,5 +1,12 @@
 import { KnownProvidersNames } from "@/lib/constants/logs";
-import { aliasConfigSchema, githubCopilotKeyConfigComplete, githubCopilotKeyConfigSchema, secretVarSchema } from "@/lib/types/schemas";
+import {
+	aliasConfigSchema,
+	clineKeyConfigComplete,
+	clineKeyConfigSchema,
+	githubCopilotKeyConfigComplete,
+	githubCopilotKeyConfigSchema,
+	secretVarSchema,
+} from "@/lib/types/schemas";
 import { isValidAliases, isValidVertexAuthCredentials } from "@/lib/utils/validation";
 import { z } from "zod";
 
@@ -216,6 +223,7 @@ const KeySchema = z.object({
 	bedrock_mantle_key_config: BedrockMantleKeyConfigSchema.optional(),
 	replicate_key_config: ReplicateKeyConfigSchema.optional(),
 	github_copilot_key_config: githubCopilotKeyConfigSchema.optional(),
+	cline_key_config: clineKeyConfigSchema.optional(),
 	use_for_batch_api: z.boolean().optional(),
 });
 
@@ -320,6 +328,14 @@ export const ProviderFormSchema = z
 						ctx.addIssue({
 							code: z.ZodIssueCode.custom,
 							message: "Set a Copilot API token, or fill in all four GitHub App credentials",
+							path: ["keys", index, "value"],
+						});
+					}
+				} else if (effectiveProviderType === "cline") {
+					if (!key.value.trim() && !clineKeyConfigComplete(key.cline_key_config)) {
+						ctx.addIssue({
+							code: z.ZodIssueCode.custom,
+							message: "Set a Cline API key, or fill in the OAuth refresh token",
 							path: ["keys", index, "value"],
 						});
 					}

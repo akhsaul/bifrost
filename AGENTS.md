@@ -148,10 +148,16 @@ go.work
 
 ## Build, Test & Dev Commands
 
+### Toolchain rules (hard requirements, do not guess alternatives)
+- JS/TS: **pnpm only — never `npm`/`npx`**. Every UI command runs from `ui/` via pnpm (`pnpm install`, `pnpm run dev`, `pnpm run build`, `pnpm exec vitest run ...`). The Makefile uses pnpm exclusively.
+- Go builds: always **`make build DYNAMIC=1 LOCAL=1`**.
+  - `DYNAMIC=1` → dynamically linked binary (without it the build is static).
+  - `LOCAL=1` → build against the local `go.work` instead of released module versions.
+
 ```bash
 # Development
 make dev                                 # Full local dev (UI + API with hot reload via air)
-make build                               # Build bifrost-http binary
+make build DYNAMIC=1 LOCAL=1             # Build bifrost-http binary (UI via pnpm + Go binary)
 
 # Core tests (provider integration tests — hit live APIs)
 make test-core                           # All providers
@@ -1031,6 +1037,7 @@ We use:
 
 ## Dependency Rules
 
+- UI packages: install and run everything with **pnpm, never npm** (`cd ui && pnpm install`, `pnpm add -E <pkg>`)
 - Do NOT add new dependencies unless absolutely necessary
 - Always pin exact versions (no `^` or `~`)
 - Prefer existing libraries in the codebase
@@ -1050,13 +1057,13 @@ We use:
 After writing code:
 
 ```bash
-cd ui && npm run format
+cd ui && pnpm run format
 ````
 
 Then verify build:
 
 ```bash
-cd ui && npm run build
+cd ui && pnpm run build
 ```
 
 * Code must pass formatting and build checks

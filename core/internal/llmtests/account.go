@@ -203,6 +203,7 @@ func (account *ComprehensiveTestAccount) GetConfiguredProviders() ([]schemas.Mod
 		schemas.Wafer,
 		schemas.Databricks,
 		schemas.GithubCopilot,
+		schemas.Cline,
 		schemas.Typesafe,
 		ProviderOpenAICustom,
 	}, nil
@@ -532,6 +533,21 @@ func (account *ComprehensiveTestAccount) GetKeysForProvider(ctx context.Context,
 					InstallationID: *schemas.NewSecretVar("env.GITHUB_COPILOT_INSTALLATION_ID"),
 					RepositoryID:   *schemas.NewSecretVar("env.GITHUB_COPILOT_REPOSITORY_ID"),
 					PrivateKey:     *schemas.NewSecretVar("env.GITHUB_COPILOT_PRIVATE_KEY"),
+				},
+			},
+		}, nil
+	case schemas.Cline:
+		// Dual auth: a static key in value, or the OAuth refresh token from the
+		// WorkOS device flow. resolveCredentials prefers value when set, so one
+		// key covers both modes depending on which env is populated.
+		return []schemas.Key{
+			{
+				Value:  *schemas.NewSecretVar("env.CLINE_API_KEY"),
+				Models: []string{"*"},
+				Weight: 1.0,
+				ClineKeyConfig: &schemas.ClineKeyConfig{
+					ClientID:     *schemas.NewSecretVar("env.CLINE_CLIENT_ID"),
+					RefreshToken: *schemas.NewSecretVar("env.CLINE_REFRESH_TOKEN"),
 				},
 			},
 		}, nil
@@ -954,6 +970,19 @@ func (account *ComprehensiveTestAccount) GetConfigForProvider(providerKey schema
 				MaxRetries:                     10,
 				RetryBackoffInitial:            5 * time.Second,
 				RetryBackoffMax:                3 * time.Minute,
+			},
+			ConcurrencyAndBufferSize: schemas.ConcurrencyAndBufferSize{
+				Concurrency: Concurrency,
+				BufferSize:  10,
+			},
+		}, nil
+	case schemas.Cline:
+		return &schemas.ProviderConfig{
+			NetworkConfig: schemas.NetworkConfig{
+				DefaultRequestTimeoutInSeconds: 120,
+				MaxRetries:                     5,
+				RetryBackoffInitial:            500 * time.Millisecond,
+				RetryBackoffMax:                8 * time.Second,
 			},
 			ConcurrencyAndBufferSize: schemas.ConcurrencyAndBufferSize{
 				Concurrency: Concurrency,

@@ -97,6 +97,7 @@ const (
 	Bai            ModelProvider = "bai"
 	Antigravity    ModelProvider = "antigravity"
 	OpencodeFree   ModelProvider = "opencode-free"
+	Cline          ModelProvider = "cline"
 )
 
 // SupportedBaseProviders is the list of base providers allowed for custom providers.
@@ -166,6 +167,7 @@ var StandardProviders = []ModelProvider{
 	Bai,
 	Antigravity,
 	OpencodeFree,
+	Cline,
 }
 
 // RequestType represents the type of request being made to a provider.

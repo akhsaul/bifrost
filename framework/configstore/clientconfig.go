@@ -785,6 +785,14 @@ func (p *ProviderConfig) Redacted() *ProviderConfig {
 				GithubDomain:   *key.GithubCopilotKeyConfig.GithubDomain.Redacted(),
 			}
 		}
+		if key.ClineKeyConfig != nil {
+			// The refresh token is the whole credential, so it is redacted like
+			// any other secret rather than surfaced in a config read.
+			redactedConfig.Keys[i].ClineKeyConfig = &schemas.ClineKeyConfig{
+				ClientID:     *key.ClineKeyConfig.ClientID.Redacted(),
+				RefreshToken: *key.ClineKeyConfig.RefreshToken.Redacted(),
+			}
+		}
 	}
 	return &redactedConfig
 }

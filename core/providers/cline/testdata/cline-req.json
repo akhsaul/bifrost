@@ -1,0 +1,1 @@
+{"model":"cline-free/deepseek-v4.1-flash","max_tokens":39321,"reasoning_effort":"xhigh","messages":[{"role":"system","content":"You are helpfull assistant!"},{"role":"user","content":"who are you? kiro AI?"}],"tools":[],"tool_choice":"auto","stream":false,"stream_options":{"include_usage":true}}

@@ -1696,6 +1696,7 @@ func mergeProviderKeys(provider schemas.ModelProvider, fileKeys, dbKeys []schema
 					SGLKeyConfig:           dbKey.SGLKeyConfig,
 					DatabricksKeyConfig:    dbKey.DatabricksKeyConfig,
 					GithubCopilotKeyConfig: dbKey.GithubCopilotKeyConfig,
+					ClineKeyConfig:         dbKey.ClineKeyConfig,
 					Enabled:                dbKey.Enabled,
 					UseForBatchAPI:         dbKey.UseForBatchAPI,
 					UseAnthropicEndpoints:  dbKey.UseAnthropicEndpoints,
@@ -1781,6 +1782,7 @@ func reconcileProviderKeys(provider schemas.ModelProvider, fileKeys, dbKeys []sc
 					SGLKeyConfig:           dbKey.SGLKeyConfig,
 					DatabricksKeyConfig:    dbKey.DatabricksKeyConfig,
 					GithubCopilotKeyConfig: dbKey.GithubCopilotKeyConfig,
+					ClineKeyConfig:         dbKey.ClineKeyConfig,
 					Enabled:                dbKey.Enabled,
 					UseForBatchAPI:         dbKey.UseForBatchAPI,
 					UseAnthropicEndpoints:  dbKey.UseAnthropicEndpoints,
@@ -7123,6 +7125,12 @@ func (c *Config) GetAllKeys() ([]configstoreTables.TableKey, error) {
 				cfg.PrivateKey = *cfg.PrivateKey.Redacted()
 				cfg.GithubDomain = *cfg.GithubDomain.Redacted()
 				configStoreKey.GithubCopilotKeyConfig = &cfg
+			}
+			if key.ClineKeyConfig != nil {
+				cfg := *key.ClineKeyConfig // safe copy
+				cfg.ClientID = *cfg.ClientID.Redacted()
+				cfg.RefreshToken = *cfg.RefreshToken.Redacted()
+				configStoreKey.ClineKeyConfig = &cfg
 			}
 			keys = append(keys, configStoreKey)
 		}

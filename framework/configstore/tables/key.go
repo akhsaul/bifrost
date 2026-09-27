@@ -123,6 +123,10 @@ type TableKey struct {
 	GithubCopilotPrivateKey     *schemas.SecretVar `gorm:"type:text" json:"github_copilot_private_key,omitempty"`
 	GithubCopilotGithubDomain   *schemas.SecretVar `gorm:"type:text" json:"github_copilot_github_domain,omitempty"`
 
+	// Cline config fields (embedded)
+	ClineClientID     *schemas.SecretVar `gorm:"type:text" json:"cline_client_id,omitempty"`
+	ClineRefreshToken *schemas.SecretVar `gorm:"type:text" json:"cline_refresh_token,omitempty"`
+
 	// Virtual fields for runtime use (not stored in DB)
 	Models                 schemas.WhiteList               `gorm:"-" json:"models"` // ["*"] allows all models; empty denies all (deny-by-default)
 	BlacklistedModels      schemas.BlackList               `gorm:"-" json:"blacklisted_models"`
@@ -138,6 +142,7 @@ type TableKey struct {
 	AntigravityKeyConfig   *schemas.AntigravityKeyConfig   `gorm:"-" json:"antigravity_key_config,omitempty"`
 	DatabricksKeyConfig    *schemas.DatabricksKeyConfig    `gorm:"-" json:"databricks_key_config,omitempty"`
 	GithubCopilotKeyConfig *schemas.GithubCopilotKeyConfig `gorm:"-" json:"github_copilot_key_config,omitempty"`
+	ClineKeyConfig         *schemas.ClineKeyConfig         `gorm:"-" json:"cline_key_config,omitempty"`
 }
 
 // TableName sets the table name for each model
@@ -604,6 +609,25 @@ func (k *TableKey) BeforeSave(tx *gorm.DB) error {
 		k.GithubCopilotGithubDomain = nil
 
 	}
+	// Cline. Every SecretVar is value-copied before assignment, per the invariant
+	// above.
+	if k.ClineKeyConfig != nil {
+		if k.ClineKeyConfig.ClientID.IsSet() {
+			v := k.ClineKeyConfig.ClientID
+			k.ClineClientID = &v
+		} else {
+			k.ClineClientID = nil
+		}
+		if k.ClineKeyConfig.RefreshToken.IsSet() {
+			v := k.ClineKeyConfig.RefreshToken
+			k.ClineRefreshToken = &v
+		} else {
+			k.ClineRefreshToken = nil
+		}
+	} else {
+		k.ClineClientID = nil
+		k.ClineRefreshToken = nil
+	}
 
 	// Store plaintext SecretVar columns into the vault and rewrite them to vault refs.
 	// This must run after the columns are populated (above) and before encryption (below):
@@ -769,6 +793,14 @@ func (k *TableKey) BeforeSave(tx *gorm.DB) error {
 		if err := encryptSecretVarPtr(&k.GithubCopilotGithubDomain); err != nil {
 			return fmt.Errorf("failed to encrypt github copilot github domain: %w", err)
 		}
+		// Cline. The refresh token is the whole credential, so it must never sit
+		// in the database in plaintext when encryption is enabled.
+		if err := encryptSecretVarPtr(&k.ClineClientID); err != nil {
+			return fmt.Errorf("failed to encrypt cline client id: %w", err)
+		}
+		if err := encryptSecretVarPtr(&k.ClineRefreshToken); err != nil {
+			return fmt.Errorf("failed to encrypt cline refresh token: %w", err)
+		}
 		k.EncryptionStatus = EncryptionStatusEncrypted
 	}
 	return nil
@@ -929,6 +961,13 @@ func (k *TableKey) AfterFind(tx *gorm.DB) error {
 		}
 		if err := decryptSecretVarPtr(&k.GithubCopilotGithubDomain); err != nil {
 			return fmt.Errorf("failed to decrypt github copilot github domain: %w", err)
+		}
+		// Cline
+		if err := decryptSecretVarPtr(&k.ClineClientID); err != nil {
+			return fmt.Errorf("failed to decrypt cline client id: %w", err)
+		}
+		if err := decryptSecretVarPtr(&k.ClineRefreshToken); err != nil {
+			return fmt.Errorf("failed to decrypt cline refresh token: %w", err)
 		}
 	}
 
@@ -1209,6 +1248,19 @@ func (k *TableKey) AfterFind(tx *gorm.DB) error {
 		k.GithubCopilotKeyConfig = config
 	} else {
 		k.GithubCopilotKeyConfig = nil
+	}
+	// Reconstruct Cline config if any field is present
+	if k.ClineClientID != nil || k.ClineRefreshToken != nil {
+		config := &schemas.ClineKeyConfig{}
+		if k.ClineClientID != nil {
+			config.ClientID = *k.ClineClientID
+		}
+		if k.ClineRefreshToken != nil {
+			config.RefreshToken = *k.ClineRefreshToken
+		}
+		k.ClineKeyConfig = config
+	} else {
+		k.ClineKeyConfig = nil
 	}
 	return nil
 }

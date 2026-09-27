@@ -135,7 +135,7 @@ func providerRequiresKey(providerKey schemas.ModelProvider, customConfig *schema
 // Some providers like Vertex and Bedrock have their credentials in additional key configs.
 // Ollama and SGL are keyless (API Key is optional) but use per-key server URLs.
 func CanProviderKeyValueBeEmpty(providerKey schemas.ModelProvider) bool {
-	return providerKey == schemas.Vertex || providerKey == schemas.Bedrock || providerKey == schemas.BedrockMantle || providerKey == schemas.VLLM || providerKey == schemas.Azure || providerKey == schemas.Ollama || providerKey == schemas.SGL || providerKey == schemas.Databricks || providerKey == schemas.OpencodeFree
+	return providerKey == schemas.Vertex || providerKey == schemas.Bedrock || providerKey == schemas.BedrockMantle || providerKey == schemas.VLLM || providerKey == schemas.Azure || providerKey == schemas.Ollama || providerKey == schemas.SGL || providerKey == schemas.Databricks || providerKey == schemas.OpencodeFree || providerKey == schemas.Cline
 }
 
 // isKeySkippingAllowed gates SkipKeySelection on the provider this attempt resolved to. The flag
@@ -273,6 +273,15 @@ func validateKey(providerKey schemas.ModelProvider, key *schemas.Key) error {
 			if hasClientID != hasClientSecret {
 				return fmt.Errorf("databricks_key_config.client_id and databricks_key_config.client_secret must be set together")
 			}
+		}
+	case schemas.Cline:
+		// Two auth modes, either is sufficient: a static API key in value, or
+		// an OAuth refresh token in cline_key_config (client_id is optional).
+		if strings.TrimSpace(key.Value.GetValue()) != "" {
+			break
+		}
+		if key.ClineKeyConfig == nil || strings.TrimSpace(key.ClineKeyConfig.RefreshToken.GetValue()) == "" {
+			return fmt.Errorf("cline_key_config.refresh_token is required when value is not set")
 		}
 	}
 	return nil
