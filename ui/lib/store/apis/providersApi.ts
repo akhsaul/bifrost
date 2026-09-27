@@ -208,6 +208,28 @@ export interface AntigravityExchangeResponse {
 	name?: string;
 }
 
+export interface ClineDeviceChallenge {
+	device_code: string;
+	user_code: string;
+	verification_uri: string;
+	verification_uri_complete: string;
+	expires_in: number;
+	interval: number;
+}
+
+export interface ClineDevicePollRequest {
+	device_code: string;
+	client_id?: string;
+}
+
+export interface ClineDevicePollResponse {
+	status: "pending" | "success" | "expired" | "denied" | "error";
+	refresh_token?: string;
+	access_token?: string;
+	email?: string;
+	message?: string;
+}
+
 type UpdateProviderMutationArg = UpdateProviderRequest & {
 	name: ModelProviderName;
 };
@@ -602,6 +624,23 @@ export const providersApi = baseApi.injectEndpoints({
 			}),
 		}),
 
+		// Cline OAuth (WorkOS device flow) endpoints
+		startClineDeviceFlow: builder.mutation<ClineDeviceChallenge, { client_id?: string } | void>({
+			query: (body) => ({
+				url: "/providers/cline/oauth/device",
+				method: "POST",
+				body: body || {},
+			}),
+		}),
+
+		pollClineDeviceAuth: builder.mutation<ClineDevicePollResponse, ClineDevicePollRequest>({
+			query: (body) => ({
+				url: "/providers/cline/oauth/poll",
+				method: "POST",
+				body,
+			}),
+		}),
+
 		// Active Quota Endpoints
 		getKeyQuota: builder.query<KeyQuotaSummary, { provider: string; key_id: string }>({
 			query: ({ provider, key_id }) => ({
@@ -648,6 +687,8 @@ export const {
 	useGetAntigravityAuthUrlQuery,
 	useLazyGetAntigravityAuthUrlQuery,
 	useExchangeAntigravityAuthCodeMutation,
+	useStartClineDeviceFlowMutation,
+	usePollClineDeviceAuthMutation,
 	useGetKeyQuotaQuery,
 	useLazyGetKeyQuotaQuery,
 	useGetModelsQuotaQuery,

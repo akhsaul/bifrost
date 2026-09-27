@@ -17,6 +17,7 @@ import (
 	"github.com/fasthttp/router"
 	bifrost "github.com/maximhq/bifrost/core"
 	antigravity "github.com/maximhq/bifrost/core/providers/antigravity"
+	"github.com/maximhq/bifrost/core/providers/cline"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore"
 	"github.com/maximhq/bifrost/framework/configstore/tables"
@@ -269,6 +270,9 @@ func (h *ProviderHandler) RegisterRoutes(r *router.Router, middlewares ...schema
 	// Antigravity OAuth helper endpoints
 	r.GET("/api/providers/antigravity/oauth/auth-url", lib.ChainMiddlewares(h.getAntigravityAuthURL, middlewares...))
 	r.POST("/api/providers/antigravity/oauth/exchange", lib.ChainMiddlewares(h.exchangeAntigravityAuthCode, middlewares...))
+	// Cline OAuth (WorkOS device flow) helper endpoints
+	r.POST("/api/providers/cline/oauth/device", lib.ChainMiddlewares(h.startClineDeviceFlow, middlewares...))
+	r.POST("/api/providers/cline/oauth/poll", lib.ChainMiddlewares(h.pollClineDeviceFlow, middlewares...))
 	// Quota Information endpoints
 	r.GET("/api/providers/{provider}/keys/{key_id}/quota", lib.ChainMiddlewares(h.getKeyQuota, middlewares...))
 	r.GET("/api/providers/{provider}/keys/{key_id}/models-quota", lib.ChainMiddlewares(h.getModelsQuota, middlewares...))
@@ -1688,6 +1692,100 @@ func (h *ProviderHandler) exchangeAntigravityAuthCode(ctx *fasthttp.RequestCtx) 
 		"name":          creds.Name,
 	}
 	data, err := sonic.Marshal(resp)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
+}
+
+type clineDevicePayload struct {
+	ClientID string `json:"client_id,omitempty"`
+}
+
+// clineOAuthWorkOSBase overrides the WorkOS base URL for the Cline device
+// helpers. Empty means production. Tests point it at a mock server.
+var clineOAuthWorkOSBase = ""
+
+// startClineDeviceFlow handles POST /api/providers/cline/oauth/device.
+// It starts a WorkOS device authorization and returns the challenge the UI
+// shows to the operator: the verification URI/user code to approve, plus the
+// device code the UI polls with. The device code is short-lived (300s) and
+// single-purpose.
+func (h *ProviderHandler) startClineDeviceFlow(ctx *fasthttp.RequestCtx) {
+	var payload clineDevicePayload
+	if len(ctx.PostBody()) > 0 {
+		if err := sonic.Unmarshal(ctx.PostBody(), &payload); err != nil {
+			SendError(ctx, fasthttp.StatusBadRequest, "Invalid request payload")
+			return
+		}
+	}
+
+	challenge, bifrostErr := cline.StartDeviceFlow(ctx, cline.DeviceFlowClient(), payload.ClientID, clineOAuthWorkOSBase)
+	if bifrostErr != nil {
+		msg := "Failed to start Cline device flow"
+		if bifrostErr.Error != nil && bifrostErr.Error.Message != "" {
+			msg = bifrostErr.Error.Message
+		}
+		status := fasthttp.StatusBadGateway
+		if bifrostErr.StatusCode != nil && *bifrostErr.StatusCode >= 400 && *bifrostErr.StatusCode < 600 {
+			status = *bifrostErr.StatusCode
+		}
+		SendError(ctx, status, msg)
+		return
+	}
+
+	data, err := sonic.Marshal(challenge)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
+}
+
+type clineDevicePollPayload struct {
+	DeviceCode string `json:"device_code"`
+	ClientID   string `json:"client_id,omitempty"`
+}
+
+// pollClineDeviceFlow handles POST /api/providers/cline/oauth/poll. It
+// performs exactly one WorkOS authenticate attempt: the UI owns the 1s
+// cadence and stops on any non-pending status. A success carries the
+// refresh token the UI stores on the key; pending carries no credential.
+func (h *ProviderHandler) pollClineDeviceFlow(ctx *fasthttp.RequestCtx) {
+	var payload clineDevicePollPayload
+	if err := sonic.Unmarshal(ctx.PostBody(), &payload); err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, "Invalid request payload")
+		return
+	}
+	if strings.TrimSpace(payload.DeviceCode) == "" {
+		SendError(ctx, fasthttp.StatusBadRequest, "device_code is required")
+		return
+	}
+
+	result, bifrostErr := cline.PollDeviceAuth(ctx, cline.DeviceFlowClient(), payload.ClientID, payload.DeviceCode, clineOAuthWorkOSBase)
+	if bifrostErr != nil {
+		msg := "Failed to poll Cline device flow"
+		if bifrostErr.Error != nil && bifrostErr.Error.Message != "" {
+			msg = bifrostErr.Error.Message
+		}
+		SendError(ctx, fasthttp.StatusBadGateway, msg)
+		return
+	}
+	if result.Status == cline.DevicePollExpired {
+		SendError(ctx, fasthttp.StatusGone, result.Message)
+		return
+	}
+	if result.Status == cline.DevicePollDenied {
+		SendError(ctx, fasthttp.StatusForbidden, result.Message)
+		return
+	}
+
+	data, err := sonic.Marshal(result)
 	if err != nil {
 		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
 		return

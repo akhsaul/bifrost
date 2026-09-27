@@ -16,6 +16,7 @@ import (
 	"github.com/maximhq/bifrost/core/internal/llmtests"
 	"github.com/maximhq/bifrost/core/providers/cline"
 	"github.com/maximhq/bifrost/core/schemas"
+	"github.com/valyala/fasthttp"
 )
 
 func testContext() *schemas.BifrostContext {
@@ -448,5 +449,110 @@ func TestOAuthAdoptsRotatedRefreshToken(t *testing.T) {
 	}
 	if !strings.Contains(refreshBodies[1], `"refreshToken":"rotated-2"`) {
 		t.Errorf("second refresh must use the adopted rotated token: %s", refreshBodies[1])
+	}
+}
+
+func newWorkOSClient() *fasthttp.Client {
+	return &fasthttp.Client{
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+}
+
+func TestStartDeviceFlowMockServer(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/user_management/authorize/device" {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatal(err)
+		}
+		if r.Form.Get("client_id") != "client_01K3A541FN8TA3EPPHTD2325AR" {
+			t.Errorf("client_id = %q", r.Form.Get("client_id"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"device_code":"dev-1","user_code":"WFSB-FCKF","verification_uri":"https://authkit.cline.bot/device","verification_uri_complete":"https://authkit.cline.bot/device?user_code=WFSB-FCKF","expires_in":300,"interval":5}`))
+	}))
+	defer server.Close()
+
+	challenge, bifrostErr := cline.StartDeviceFlow(testContext(), newWorkOSClient(), "", server.URL)
+	if bifrostErr != nil {
+		t.Fatal(bifrostErr)
+	}
+	if challenge.DeviceCode != "dev-1" || challenge.UserCode != "WFSB-FCKF" {
+		t.Errorf("unexpected challenge: %#v", challenge)
+	}
+	if challenge.ExpiresIn != 300 || challenge.Interval != 5 {
+		t.Errorf("unexpected timing: %#v", challenge)
+	}
+}
+
+func TestPollDeviceAuthStatuses(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/user_management/authenticate" {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+		if err := r.ParseForm(); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(r.Form.Get("grant_type"), "device_code") {
+			t.Errorf("grant_type = %q", r.Form.Get("grant_type"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch r.Form.Get("device_code") {
+		case "pending-dev":
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"authorization_pending","error_description":"The authorization request is still pending user approval."}`))
+		case "ok-dev":
+			_, _ = w.Write([]byte(`{"access_token":"at","refresh_token":"rt","authentication_method":"GoogleOAuth","user":{"object":"user","id":"user_1","email":"user@example.com"}}`))
+		case "expired-dev":
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"expired_token","error_description":"expired"}`))
+		case "denied-dev":
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"error":"access_denied"}`))
+		default:
+			t.Errorf("unexpected device_code %q", r.Form.Get("device_code"))
+		}
+	}))
+	defer server.Close()
+
+	ctx := testContext()
+	client := newWorkOSClient()
+
+	pending, bifrostErr := cline.PollDeviceAuth(ctx, client, "", "pending-dev", server.URL)
+	if bifrostErr != nil {
+		t.Fatal(bifrostErr)
+	}
+	if pending.Status != "pending" {
+		t.Errorf("status = %q, want pending", pending.Status)
+	}
+
+	success, bifrostErr := cline.PollDeviceAuth(ctx, client, "", "ok-dev", server.URL)
+	if bifrostErr != nil {
+		t.Fatal(bifrostErr)
+	}
+	if success.Status != "success" || success.RefreshToken != "rt" || success.Email != "user@example.com" {
+		t.Errorf("unexpected success result: %#v", success)
+	}
+
+	expired, bifrostErr := cline.PollDeviceAuth(ctx, client, "", "expired-dev", server.URL)
+	if bifrostErr != nil {
+		t.Fatal(bifrostErr)
+	}
+	if expired.Status != "expired" {
+		t.Errorf("status = %q, want expired", expired.Status)
+	}
+
+	denied, bifrostErr := cline.PollDeviceAuth(ctx, client, "", "denied-dev", server.URL)
+	if bifrostErr != nil {
+		t.Fatal(bifrostErr)
+	}
+	if denied.Status != "denied" {
+		t.Errorf("status = %q, want denied", denied.Status)
+	}
+
+	if _, bifrostErr := cline.PollDeviceAuth(ctx, client, "", "", server.URL); bifrostErr == nil {
+		t.Error("expected error for empty device_code")
 	}
 }

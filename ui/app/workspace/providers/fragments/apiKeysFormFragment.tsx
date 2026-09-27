@@ -11,10 +11,16 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TagInput } from "@/components/ui/tagInput";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useLazyGetAntigravityAuthUrlQuery, useExchangeAntigravityAuthCodeMutation } from "@/lib/store/apis/providersApi";
+import {
+	useLazyGetAntigravityAuthUrlQuery,
+	useExchangeAntigravityAuthCodeMutation,
+	useStartClineDeviceFlowMutation,
+	usePollClineDeviceAuthMutation,
+	type ClineDeviceChallenge,
+} from "@/lib/store/apis/providersApi";
 import { hasClineApiToken, hasClineOAuthRefresh, hasCopilotApiToken, isRedacted } from "@/lib/utils/validation";
 import { CheckCircle2, Info, Loader2, RefreshCw, Copy, Check } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Control, UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 import { DeploymentsTable } from "./deploymentsTable";
@@ -194,6 +200,18 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 	const [getAuthUrl, { isLoading: isFetchingUrl }] = useLazyGetAntigravityAuthUrlQuery();
 	const [exchangeCode, { isLoading: isExchanging }] = useExchangeAntigravityAuthCodeMutation();
 
+	// Cline OAuth (WorkOS device flow) state. WorkOS sends no approval callback,
+	// so the UI polls the poll endpoint every second until the flow resolves.
+	const [startClineDeviceFlow, { isLoading: isStartingClineFlow }] = useStartClineDeviceFlowMutation();
+	const [pollClineDeviceAuth] = usePollClineDeviceAuthMutation();
+	const [clineChallenge, setClineChallenge] = useState<ClineDeviceChallenge | null>(null);
+	const [clinePolling, setClinePolling] = useState(false);
+	const [clineError, setClineError] = useState<string | null>(null);
+	const [clineExpiresLeft, setClineExpiresLeft] = useState(0);
+	const [clineCopied, setClineCopied] = useState<"url" | "code" | null>(null);
+	const clinePollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+	const clinePollActive = useRef(false);
+
 	// Detect Antigravity auth type
 	useEffect(() => {
 		if (form.formState.isDirty) return;
@@ -294,6 +312,94 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			setManualCode("");
 		} catch (err: any) {
 			setAuthError(err?.data?.error || err?.message || "Failed to exchange authorization code");
+		}
+	};
+
+	const stopClinePolling = () => {
+		clinePollActive.current = false;
+		setClinePolling(false);
+		if (clinePollTimer.current) {
+			clearInterval(clinePollTimer.current);
+			clinePollTimer.current = null;
+		}
+	};
+
+	// Stop polling if the form unmounts mid-flow.
+	useEffect(() => {
+		return () => {
+			clinePollActive.current = false;
+			if (clinePollTimer.current) clearInterval(clinePollTimer.current);
+		};
+	}, []);
+
+	const handleClineConnect = async () => {
+		setClineError(null);
+		stopClinePolling();
+		try {
+			const challenge = await startClineDeviceFlow({}).unwrap();
+			if (!challenge?.device_code || !challenge?.verification_uri_complete) {
+				throw new Error("No device challenge returned");
+			}
+			setClineChallenge(challenge);
+			setClineExpiresLeft(challenge.expires_in || 300);
+			// A new tab is opened automatically; popup blockers may stop it, in
+			// which case the operator uses the Open tab / Copy URL buttons below.
+			window.open(challenge.verification_uri_complete, "_blank", "noopener,noreferrer");
+			clinePollActive.current = true;
+			setClinePolling(true);
+			clinePollTimer.current = setInterval(() => {
+				void pollClineOnce(challenge.device_code);
+			}, 1000);
+		} catch (err: any) {
+			setClineError(err?.data?.error || err?.message || "Failed to start Cline device flow");
+		}
+	};
+
+	const pollClineOnce = async (deviceCode: string) => {
+		if (!clinePollActive.current) return;
+		try {
+			const res = await pollClineDeviceAuth({ device_code: deviceCode }).unwrap();
+			if (!clinePollActive.current) return;
+			if (res.status === "success" && res.refresh_token) {
+				stopClinePolling();
+				form.setValue("key.cline_key_config.refresh_token", { value: res.refresh_token, ref: "" }, { shouldDirty: true });
+				const currentName = form.getValues("key.name");
+				if (!currentName || currentName.startsWith("oauth-cline-")) {
+					form.setValue("key.name", res.email ? `oauth-cline-${res.email}` : "oauth-cline-account", {
+						shouldDirty: true,
+						shouldValidate: true,
+					});
+				}
+				setClineChallenge(null);
+				toast.success(res.email ? `Cline connected as ${res.email}!` : "Cline OAuth connected successfully!");
+			} else if (res.status === "expired" || res.status === "denied" || res.status === "error") {
+				stopClinePolling();
+				setClineError(res.message || `Device flow ${res.status}. Start over to get a new code.`);
+			}
+			// "pending" (and slow_down notes) keep the 1s cadence going.
+			setClineExpiresLeft((s) => {
+				if (s <= 1) {
+					stopClinePolling();
+					setClineError("The device code expired. Start over to get a new one.");
+					return 0;
+				}
+				return s - 1;
+			});
+		} catch (err: any) {
+			// A single failed poll (network blip, 5xx) must not kill the flow;
+			// the next tick retries. Only expired/denied stop it, via the body above.
+			if (!clinePollActive.current) return;
+		}
+	};
+
+	const handleClineCopy = async (kind: "url" | "code") => {
+		if (!clineChallenge) return;
+		try {
+			await navigator.clipboard.writeText(kind === "url" ? clineChallenge.verification_uri_complete : clineChallenge.user_code);
+			setClineCopied(kind);
+			setTimeout(() => setClineCopied(null), 2500);
+		} catch {
+			toast.error("Failed to copy to clipboard");
 		}
 	};
 
@@ -1325,6 +1431,84 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			{isCline && (
 				<div className="space-y-4">
 					<Separator />
+					<div className="bg-muted/20 space-y-3 rounded-md border p-4">
+						<div className="flex items-center justify-between gap-2">
+							<div>
+								<div className="text-sm font-semibold">Connect with Cline (OAuth)</div>
+								<p className="text-muted-foreground text-xs">
+									Approve in your browser; Bifrost fills the refresh token in automatically. No manual key needed.
+								</p>
+							</div>
+							<Button
+								type="button"
+								variant={clineChallenge || hasClineOAuthRefresh(form.watch("key.cline_key_config.refresh_token")) ? "outline" : "default"}
+								size="sm"
+								data-testid="cline-oauth-connect-btn"
+								onClick={handleClineConnect}
+								disabled={isStartingClineFlow || clinePolling}
+							>
+								{isStartingClineFlow || clinePolling ? (
+									<Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+								) : (
+									<RefreshCw className="mr-2 h-3.5 w-3.5" />
+								)}
+								{clinePolling
+									? "Waiting for approval…"
+									: hasClineOAuthRefresh(form.watch("key.cline_key_config.refresh_token"))
+										? "Reconnect"
+										: "Authenticate"}
+							</Button>
+						</div>
+						{clineError && <p className="text-destructive text-xs">{clineError}</p>}
+						{clineChallenge && (
+							<div className="space-y-2 rounded-md border p-3">
+								<div className="flex items-center justify-between gap-2">
+									<span className="text-xs font-medium">
+										User code:{" "}
+										<span data-testid="cline-oauth-user-code" className="font-mono text-sm">
+											{clineChallenge.user_code}
+										</span>
+									</span>
+									<span className="text-muted-foreground text-xs">expires in {clineExpiresLeft}s</span>
+								</div>
+								<div className="flex flex-wrap gap-2">
+									<Button type="button" variant="outline" size="sm" className="text-xs" asChild>
+										<a
+											href={clineChallenge.verification_uri_complete}
+											target="_blank"
+											rel="noopener noreferrer"
+											data-testid="cline-oauth-open-tab-btn"
+										>
+											Open approval tab
+										</a>
+									</Button>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										className="text-xs"
+										data-testid="cline-oauth-copy-url-btn"
+										onClick={() => void handleClineCopy("url")}
+									>
+										{clineCopied === "url" ? <Check className="mr-2 h-3.5 w-3.5 text-green-600" /> : <Copy className="mr-2 h-3.5 w-3.5" />}
+										{clineCopied === "url" ? "Copied!" : "Copy URL"}
+									</Button>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										className="text-xs"
+										data-testid="cline-oauth-copy-code-btn"
+										onClick={() => void handleClineCopy("code")}
+									>
+										{clineCopied === "code" ? <Check className="mr-2 h-3.5 w-3.5 text-green-600" /> : <Copy className="mr-2 h-3.5 w-3.5" />}
+										{clineCopied === "code" ? "Copied!" : "Copy code"}
+									</Button>
+								</div>
+								{clinePolling && <p className="text-muted-foreground text-xs">Checking approval every second…</p>}
+							</div>
+						)}
+					</div>
 					<div className="bg-muted/50 flex items-start gap-2 rounded-md border p-3">
 						<Info className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
 						<p className="text-muted-foreground text-sm">

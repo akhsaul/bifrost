@@ -3,6 +3,8 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -2010,4 +2012,100 @@ func TestListModels_KeyBlacklistIsCaseInsensitive(t *testing.T) {
 			t.Fatalf("gpt-3.5-turbo should be blocked by blacklist, got %v", resp.Models)
 		}
 	}
+}
+
+func TestStartClineDeviceFlow_ReturnsChallenge(t *testing.T) {
+	server := newClineWorkOSMock(t)
+	old := clineOAuthWorkOSBase
+	clineOAuthWorkOSBase = server.URL
+	defer func() { clineOAuthWorkOSBase = old }()
+
+	var ctx fasthttp.RequestCtx
+	ctx.Request.Header.SetMethod("POST")
+	ctx.Request.SetBody([]byte(`{"client_id":"client_01K3A541FN8TA3EPPHTD2325AR"}`))
+
+	(&ProviderHandler{}).startClineDeviceFlow(&ctx)
+
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("status = %d, body = %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	var challenge struct {
+		DeviceCode              string `json:"device_code"`
+		UserCode                string `json:"user_code"`
+		VerificationURIComplete string `json:"verification_uri_complete"`
+		ExpiresIn               int    `json:"expires_in"`
+	}
+	if err := sonic.Unmarshal(ctx.Response.Body(), &challenge); err != nil {
+		t.Fatal(err)
+	}
+	if challenge.DeviceCode == "" || challenge.UserCode == "" || challenge.VerificationURIComplete == "" || challenge.ExpiresIn == 0 {
+		t.Errorf("incomplete challenge: %+v", challenge)
+	}
+}
+
+func TestPollClineDeviceFlow_Statuses(t *testing.T) {
+	server := newClineWorkOSMock(t)
+	old := clineOAuthWorkOSBase
+	clineOAuthWorkOSBase = server.URL
+	defer func() { clineOAuthWorkOSBase = old }()
+
+	h := &ProviderHandler{}
+	for _, tc := range []struct {
+		deviceCode string
+		wantStatus int
+		wantField  string
+	}{
+		{"pending-dev", 200, `"status":"pending"`},
+		{"ok-dev", 200, `"status":"success"`},
+		{"expired-dev", 410, ""},
+	} {
+		var ctx fasthttp.RequestCtx
+		ctx.Request.Header.SetMethod("POST")
+		ctx.Request.SetBody([]byte(`{"device_code":"` + tc.deviceCode + `"}`))
+
+		h.pollClineDeviceFlow(&ctx)
+
+		if ctx.Response.StatusCode() != tc.wantStatus {
+			t.Errorf("%s: status = %d, want %d (body %s)", tc.deviceCode, ctx.Response.StatusCode(), tc.wantStatus, ctx.Response.Body())
+		}
+		if tc.wantField != "" && !strings.Contains(string(ctx.Response.Body()), tc.wantField) {
+			t.Errorf("%s: body %s missing %s", tc.deviceCode, ctx.Response.Body(), tc.wantField)
+		}
+	}
+
+	// Missing device_code is a 400 without touching WorkOS.
+	var ctx fasthttp.RequestCtx
+	ctx.Request.Header.SetMethod("POST")
+	ctx.Request.SetBody([]byte(`{}`))
+	h.pollClineDeviceFlow(&ctx)
+	if ctx.Response.StatusCode() != 400 {
+		t.Errorf("empty device_code: status = %d, want 400", ctx.Response.StatusCode())
+	}
+}
+
+// newClineWorkOSMock serves the WorkOS device endpoints for handler tests.
+func newClineWorkOSMock(t *testing.T) *httptest.Server {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/user_management/authorize/device", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"device_code":"dev-1","user_code":"WFSB-FCKF","verification_uri":"https://authkit.cline.bot/device","verification_uri_complete":"https://authkit.cline.bot/device?user_code=WFSB-FCKF","expires_in":300,"interval":5}`))
+	})
+	mux.HandleFunc("/user_management/authenticate", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = r.ParseForm()
+		switch r.Form.Get("device_code") {
+		case "pending-dev":
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"authorization_pending"}`))
+		case "ok-dev":
+			_, _ = w.Write([]byte(`{"access_token":"at","refresh_token":"rt","user":{"email":"user@example.com"}}`))
+		default:
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"expired_token"}`))
+		}
+	})
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	return server
 }
