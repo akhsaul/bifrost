@@ -114,15 +114,15 @@ func TestEvaluatePatterns_RedactHash(t *testing.T) {
 
 func TestEvaluatePatterns_MultiplePatternsAndMatches(t *testing.T) {
 	email := mustCompile(t, &Pattern{
-		Pattern:     `\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b`,
-		EntityType:  "EMAIL",
-		Flags:       "i",
-		Action:      PatternActionRedact,
+		Pattern:    `\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b`,
+		EntityType: "EMAIL",
+		Flags:      "i",
+		Action:     PatternActionRedact,
 	})
 	phone := mustCompile(t, &Pattern{
-		Pattern:     `\b\d{3}-\d{4}\b`,
-		EntityType:  "PHONE",
-		Action:      PatternActionRedact,
+		Pattern:    `\b\d{3}-\d{4}\b`,
+		EntityType: "PHONE",
+		Action:     PatternActionRedact,
 	})
 	ctx := schemas.NewBifrostContext(context.Background(), time.Time{})
 	_, newText, detected := evaluatePatterns(ctx, []compiledPattern{email, phone}, "a@b.com or 555-1234", schemas.RedactionPhaseInput)

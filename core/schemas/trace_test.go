@@ -8,7 +8,7 @@ func TestTraceGetSpanNilSafe(t *testing.T) {
 		t.Fatalf("nil trace GetSpan returned %v, want nil", span)
 	}
 
-	trace := &Trace{Spans: []*Span{nil, &Span{SpanID: "target"}}}
+	trace := &Trace{Spans: []*Span{nil, {SpanID: "target"}}}
 	if span := trace.GetSpan(""); span != nil {
 		t.Fatalf("empty span ID = %v, want nil", span)
 	}

@@ -452,4 +452,3 @@ func TestHooks_AssistantMessageToolCallsScannedOnInput(t *testing.T) {
 		t.Fatalf("expected [SECRET-1] in assistant tool arguments: %q", tcArgs)
 	}
 }
-

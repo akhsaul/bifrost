@@ -302,8 +302,6 @@ func TestGetLogRevealMapping(t *testing.T) {
 	}
 }
 
-
-
 // TestShouldCacheFilterDimensions_NarrowsToRawScans verifies the cache is spent
 // only where it saves real work. Matview-backed dimensions are indexed lookups
 // and a cache entry serves exactly one caller, so they are not worth caching;

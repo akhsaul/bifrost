@@ -59,8 +59,8 @@ const (
 	//
 	// Written under a distributed lock because every node updates the same row.
 	ConfigComplexitySemanticGenerationsKey = "complexity_semantic_generations"
-	ConfigRestartRequiredKey              = "restart_required"
-	ConfigHeaderFilterKey                 = "header_filter_config"
+	ConfigRestartRequiredKey               = "restart_required"
+	ConfigHeaderFilterKey                  = "header_filter_config"
 )
 
 // Keys for the ClientConfig.MetadataJSON blob.

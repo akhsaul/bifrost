@@ -67,7 +67,7 @@ func TestUseDeploymentsEndpoint_AliasOverride(t *testing.T) {
 	ctxNoCfg := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 	defer ctxNoCfg.Cancel()
 	ctxNoCfg.SetValue(schemas.BifrostContextKeyResolvedAlias, &schemas.ResolvedAlias{
-		Key: "x",
+		Key:    "x",
 		Config: &schemas.AliasConfig{ModelID: "x"},
 	})
 	if got := useDeploymentsEndpoint(ctxNoCfg, keyDeployments); !got {

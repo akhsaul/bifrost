@@ -41,13 +41,13 @@ func seedAccessToken(store *testConfigStore, oauthConfigID, authMode, tokenID, a
 		OauthConfigID: oauthConfigID,
 		// Admin rows are looked up by mcp_client_id (the key every admin row
 		// carries); the tests reuse the same identifier for both lookups.
-		MCPClientID: oauthConfigID,
-		Status:      "active",
-		AccessToken:   accessToken,
-		RefreshToken:  refreshToken,
-		TokenType:     "Bearer",
-		ExpiresAt:     expiresAt,
-		Scopes:        "[]",
+		MCPClientID:  oauthConfigID,
+		Status:       "active",
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+		ExpiresAt:    expiresAt,
+		Scopes:       "[]",
 	}
 }
 

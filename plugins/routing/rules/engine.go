@@ -57,17 +57,17 @@ type GovernanceScope struct {
 
 // EvaluationContext holds all data needed for routing rule evaluation
 type EvaluationContext struct {
-	Scope                       GovernanceScope                                                                                   // who the request is governed as
-	Provider                    schemas.ModelProvider                                                                             // Current provider
-	Model                       string                                                                                            // Current model
-	RequestType                 string                                                                                            // Request type (e.g., "chat_completion", "embedding"); streaming requests carry a distinct "_stream" suffix (e.g., "chat_completion_stream")
-	Fallbacks                   []configstoreTables.RoutingFallback                                                               // Fallback chain, each optionally pinning a provider key
-	Headers                     map[string]string                                                                                 // Request headers for dynamic routing
-	QueryParams                 map[string]string                                                                                 // Query parameters for dynamic routing
-	BudgetAndRateLimitStatus    *governance.BudgetAndRateLimitStatus                                                              // Budget and rate limit status by provider/model
-	AdaptiveTargetSelector      func(targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, bool) // Optional adaptive target selector
+	Scope                       GovernanceScope                                                                                                            // who the request is governed as
+	Provider                    schemas.ModelProvider                                                                                                      // Current provider
+	Model                       string                                                                                                                     // Current model
+	RequestType                 string                                                                                                                     // Request type (e.g., "chat_completion", "embedding"); streaming requests carry a distinct "_stream" suffix (e.g., "chat_completion_stream")
+	Fallbacks                   []configstoreTables.RoutingFallback                                                                                        // Fallback chain, each optionally pinning a provider key
+	Headers                     map[string]string                                                                                                          // Request headers for dynamic routing
+	QueryParams                 map[string]string                                                                                                          // Query parameters for dynamic routing
+	BudgetAndRateLimitStatus    *governance.BudgetAndRateLimitStatus                                                                                       // Budget and rate limit status by provider/model
+	AdaptiveTargetSelector      func(targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, bool)                          // Optional adaptive target selector
 	GroupAdaptiveTargetSelector func(ruleID string, targets []configstoreTables.TableRoutingTarget) (configstoreTables.TableRoutingTarget, []string, bool) // Optional group adaptive target selector
-	ComputeComplexity           func() *complexity.ComplexityResult                                                               // Lazy complexity computation; called at most once when a rule references "complexity_tier"
+	ComputeComplexity           func() *complexity.ComplexityResult                                                                                        // Lazy complexity computation; called at most once when a rule references "complexity_tier"
 }
 
 type RoutingContext = EvaluationContext

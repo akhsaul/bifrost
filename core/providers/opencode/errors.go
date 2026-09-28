@@ -14,7 +14,7 @@ import (
 // opencodeErrorBody is the JSON envelope returned by Opencode Zen/Go API errors.
 // Format: {"type": "error", "error": {"type": "...", "message": "..."}}
 type opencodeErrorBody struct {
-	Type  string            `json:"type"`
+	Type  string             `json:"type"`
 	Error opencodeErrorInner `json:"error"`
 }
 

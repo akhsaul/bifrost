@@ -53,7 +53,7 @@ func TestRememberedDimensionLetsARestartAdoptWithoutEmbedding(t *testing.T) {
 	// First boot measures and records.
 	first := &countingEmbed{}
 	_, namespace, dimension, err := coordinatedWarmSemanticExemplars(
-context.Background(), nil, dimensions, nil, store, &config, first.fn, nil, newSemanticEmbeddingCache())
+		context.Background(), nil, dimensions, nil, store, &config, first.fn, nil, newSemanticEmbeddingCache())
 	require.NoError(t, err)
 	require.Positive(t, first.count())
 	remembered, ok := dimensions.Dimension(semanticEmbeddingIdentity(config.Semantic))
@@ -63,7 +63,7 @@ context.Background(), nil, dimensions, nil, store, &config, first.fn, nil, newSe
 	// A restart brings an empty embedding cache but the same store and row.
 	second := &countingEmbed{}
 	loaded, restartNamespace, restartDimension, err := coordinatedWarmSemanticExemplars(
-context.Background(), nil, dimensions, nil, store, &config, second.fn, nil, newSemanticEmbeddingCache())
+		context.Background(), nil, dimensions, nil, store, &config, second.fn, nil, newSemanticEmbeddingCache())
 	require.NoError(t, err)
 	assert.Equal(t, 0, second.count(), "a restart onto an already-warmed generation must call no provider")
 	assert.Equal(t, len(semanticExemplars(&config)), loaded)
@@ -86,7 +86,7 @@ func TestRememberedDimensionIsOnlyAHint(t *testing.T) {
 
 	embed := &countingEmbed{}
 	loaded, namespace, dimension, err := coordinatedWarmSemanticExemplars(
-context.Background(), nil, dimensions, nil, store, &config, embed.fn, nil, newSemanticEmbeddingCache())
+		context.Background(), nil, dimensions, nil, store, &config, embed.fn, nil, newSemanticEmbeddingCache())
 	require.NoError(t, err)
 	assert.Positive(t, embed.count(), "a width that adopts nothing must fall back to measuring")
 	assert.Equal(t, testSemanticDimension, dimension, "the measurement wins over the stale memory")
@@ -110,7 +110,7 @@ func TestRememberedDimensionIsNotRecordedForAFailedWarm(t *testing.T) {
 		return nil, errors.New("provider down")
 	}
 	_, _, _, err := coordinatedWarmSemanticExemplars(
-context.Background(), nil, dimensions, nil, store, &config, failing, nil, newSemanticEmbeddingCache())
+		context.Background(), nil, dimensions, nil, store, &config, failing, nil, newSemanticEmbeddingCache())
 	require.Error(t, err)
 
 	_, ok := dimensions.Dimension(semanticEmbeddingIdentity(config.Semantic))
@@ -127,13 +127,13 @@ func TestAdoptingPeerRemembersTheWidthItWasGiven(t *testing.T) {
 
 	winner := &countingEmbed{}
 	_, _, dimension, err := coordinatedWarmSemanticExemplars(
-context.Background(), coordinator, nil, nil, store, &config, winner.fn, nil, newSemanticEmbeddingCache())
+		context.Background(), coordinator, nil, nil, store, &config, winner.fn, nil, newSemanticEmbeddingCache())
 	require.NoError(t, err)
 
 	peerDimensions := newFakeDimensionStore()
 	peer := &countingEmbed{}
 	_, _, _, err = coordinatedWarmSemanticExemplars(
-context.Background(), coordinator, peerDimensions, nil, store, &config, peer.fn, nil, newSemanticEmbeddingCache())
+		context.Background(), coordinator, peerDimensions, nil, store, &config, peer.fn, nil, newSemanticEmbeddingCache())
 	require.NoError(t, err)
 	require.Equal(t, 0, peer.count())
 

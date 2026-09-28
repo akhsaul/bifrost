@@ -45,9 +45,9 @@ const (
 type ProviderType string
 
 const (
-	ProviderTypeRegex           ProviderType = "regex"
-	ProviderTypeSecrets         ProviderType = "secrets"
-	ProviderTypePromptGuardrail ProviderType = "prompt-guardrail"
+	ProviderTypeRegex              ProviderType = "regex"
+	ProviderTypeSecrets            ProviderType = "secrets"
+	ProviderTypePromptGuardrail    ProviderType = "prompt-guardrail"
 	ProviderTypePromptGuardrailAlt ProviderType = "prompt_guardrail"
 )
 
@@ -56,8 +56,8 @@ type Pattern struct {
 	Pattern           string            `json:"pattern"`
 	Description       string            `json:"description,omitempty"`
 	EntityType        string            `json:"entity_type,omitempty"`
-	Flags             string            `json:"flags,omitempty"` // subset of "ims"
-	Action            PatternAction     `json:"action,omitempty"` // default: block
+	Flags             string            `json:"flags,omitempty"`              // subset of "ims"
+	Action            PatternAction     `json:"action,omitempty"`             // default: block
 	RedactionStrategy RedactionStrategy `json:"redaction_strategy,omitempty"` // default: replace
 	RedactionMode     RedactionMode     `json:"redaction_mode,omitempty"`     // default: runtime
 }
@@ -76,7 +76,7 @@ type PromptGuardrailConfig struct {
 	JudgeModel      string `json:"judge_model"`
 	Rule            string `json:"rule"`
 	PromptTemplate  string `json:"prompt_template,omitempty"`
-	Timeout         int    `json:"timeout,omitempty"` // default 30
+	Timeout         int    `json:"timeout,omitempty"`           // default 30
 	MaxOutputTokens int    `json:"max_output_tokens,omitempty"` // default 200
 }
 
@@ -106,7 +106,7 @@ type Rule struct {
 	Name              string `json:"name"`
 	Description       string `json:"description,omitempty"`
 	Enabled           bool   `json:"enabled"`
-	Target            string `json:"target,omitempty"` // "llm" | "mcp" (default: "llm")
+	Target            string `json:"target,omitempty"`         // "llm" | "mcp" (default: "llm")
 	CELExpression     string `json:"cel_expression,omitempty"` // empty => always true
 	ApplyTo           string `json:"apply_to"`                 // input | output | both
 	SamplingRate      int    `json:"sampling_rate,omitempty"`  // default 100

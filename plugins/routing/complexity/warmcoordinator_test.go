@@ -113,7 +113,7 @@ func TestCoordinatedWarmSkipsEmbeddingWhenAPeerAlreadyWarmed(t *testing.T) {
 	// First node wins the claim and does the work.
 	first := &countingEmbed{}
 	loaded, namespace, dimension, err := coordinatedWarmSemanticExemplars(
-context.Background(), coordinator, nil, nil, store, &config, first.fn, nil, newSemanticEmbeddingCache())
+		context.Background(), coordinator, nil, nil, store, &config, first.fn, nil, newSemanticEmbeddingCache())
 	require.NoError(t, err)
 	require.Equal(t, 3, loaded)
 	require.Positive(t, first.count(), "the winner must actually embed")
@@ -121,7 +121,7 @@ context.Background(), coordinator, nil, nil, store, &config, first.fn, nil, newS
 	// Second node finds the claim taken, waits, and adopts what the first wrote.
 	second := &countingEmbed{}
 	secondLoaded, secondNamespace, secondDimension, err := coordinatedWarmSemanticExemplars(
-context.Background(), coordinator, nil, nil, store, &config, second.fn, nil, newSemanticEmbeddingCache())
+		context.Background(), coordinator, nil, nil, store, &config, second.fn, nil, newSemanticEmbeddingCache())
 	require.NoError(t, err)
 
 	assert.Equal(t, 0, second.count(), "a peer that adopts a warmed generation must embed nothing")
@@ -161,7 +161,7 @@ func TestCoordinatedWarmFallsBackWhenTheWarmerDies(t *testing.T) {
 
 	embed := &countingEmbed{}
 	loaded, namespace, _, err := coordinatedWarmSemanticExemplars(
-context.Background(), coordinator, nil, nil, store, &config, embed.fn, nil, newSemanticEmbeddingCache())
+		context.Background(), coordinator, nil, nil, store, &config, embed.fn, nil, newSemanticEmbeddingCache())
 	require.NoError(t, err)
 	assert.Equal(t, 3, loaded)
 	assert.NotEmpty(t, namespace)
@@ -179,7 +179,7 @@ func TestCoordinatedWarmIgnoresAnUnavailableCoordinator(t *testing.T) {
 
 	embed := &countingEmbed{}
 	loaded, _, _, err := coordinatedWarmSemanticExemplars(
-context.Background(), coordinator, nil, nil, store, &config, embed.fn, nil, newSemanticEmbeddingCache())
+		context.Background(), coordinator, nil, nil, store, &config, embed.fn, nil, newSemanticEmbeddingCache())
 	require.NoError(t, err)
 	assert.Equal(t, 3, loaded)
 	assert.Positive(t, embed.count(), "an unreadable coordinator must degrade to warming locally")
@@ -198,7 +198,7 @@ func TestCoordinatedWarmReleasesTheClaimOnFailure(t *testing.T) {
 		return nil, errors.New("provider down")
 	}
 	_, _, _, err := coordinatedWarmSemanticExemplars(
-context.Background(), coordinator, nil, nil, store, &config, failing, nil, newSemanticEmbeddingCache())
+		context.Background(), coordinator, nil, nil, store, &config, failing, nil, newSemanticEmbeddingCache())
 	require.Error(t, err)
 
 	key := semanticWarmKey(&config, semanticExemplars(&config))
@@ -247,7 +247,7 @@ func TestCoordinatedWarmReleasesTheClaimWhenPublishFails(t *testing.T) {
 
 	embed := &countingEmbed{}
 	loaded, namespace, _, err := coordinatedWarmSemanticExemplars(
-context.Background(), coordinator, nil, nil, store, &config, embed.fn, nil, newSemanticEmbeddingCache())
+		context.Background(), coordinator, nil, nil, store, &config, embed.fn, nil, newSemanticEmbeddingCache())
 	require.NoError(t, err, "a publish failure must not fail the warm itself")
 	assert.Equal(t, 3, loaded)
 	assert.NotEmpty(t, namespace)

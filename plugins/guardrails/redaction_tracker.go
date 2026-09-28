@@ -343,4 +343,3 @@ func (t *RequestRedactionTracker) FlushReasoningCarry(choiceIndex int) string {
 	delete(t.streamReasoningCarry, choiceIndex)
 	return res
 }
-

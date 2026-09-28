@@ -87,14 +87,14 @@ type PerplexityChatResponse struct {
 }
 
 type Usage struct {
-	PromptTokens      int                  `json:"prompt_tokens"`
-	CompletionTokens  int                  `json:"completion_tokens"`
-	TotalTokens       int                  `json:"total_tokens"`
-	SearchContextSize *string              `json:"search_context_size,omitempty"`
-	CitationTokens    *int                 `json:"citation_tokens,omitempty"`
-	NumSearchQueries  *int                 `json:"num_search_queries,omitempty"`
-	ReasoningTokens   *int                 `json:"reasoning_tokens,omitempty"`
-	Cost              *perplexityCost      `json:"cost,omitempty"`
+	PromptTokens      int             `json:"prompt_tokens"`
+	CompletionTokens  int             `json:"completion_tokens"`
+	TotalTokens       int             `json:"total_tokens"`
+	SearchContextSize *string         `json:"search_context_size,omitempty"`
+	CitationTokens    *int            `json:"citation_tokens,omitempty"`
+	NumSearchQueries  *int            `json:"num_search_queries,omitempty"`
+	ReasoningTokens   *int            `json:"reasoning_tokens,omitempty"`
+	Cost              *perplexityCost `json:"cost,omitempty"`
 }
 
 // perplexityCost is Perplexity's raw cost object, a flat per-category shape. It

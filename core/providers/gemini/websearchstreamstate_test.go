@@ -385,7 +385,7 @@ func multiSourceGroundedResponse() *GenerateContentResponse {
 		Candidates: []*Candidate{{
 			FinishReason: FinishReasonStop,
 			Content: &Content{
-				Role: "model",
+				Role:  "model",
 				Parts: []*Part{{Text: "**Spain** won UEFA Euro 2024. \n\nThey defeated **England 2-1** in the final on July 14, 2024, at the Olympiastadion in Berlin. Nico Williams scored first for Spain, followed by an equalizer from England's Cole Palmer, before Mikel Oyarzabal scored the winning goal in the 86th minute. \n\nWith this victory, Spain secured a record-breaking fourth UEFA European Championship title (having previously won in 1964, 2008, and 2012)."}},
 			},
 			GroundingMetadata: &GroundingMetadata{

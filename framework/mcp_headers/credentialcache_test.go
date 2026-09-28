@@ -56,7 +56,7 @@ func TestHeaderCredentialCache_CapacityEviction(t *testing.T) {
 	c := newHeaderCredentialCache(2)
 
 	for i := 1; i <= 3; i++ {
-		_, err := c.Fill(context.Background(), 
+		_, err := c.Fill(context.Background(),
 			fmt.Sprintf("k%d", i),
 			fillWithCredential(testCredential(fmt.Sprintf("c%d", i), nil)),
 		)

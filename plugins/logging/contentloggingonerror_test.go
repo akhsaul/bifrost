@@ -13,9 +13,9 @@ import (
 // content-logging-on-error tests.
 func contentLoggingOnErrorTestPlugin(disableContentLogging, contentLoggingOnError *bool) *LoggerPlugin {
 	return &LoggerPlugin{
-		disableContentLogging:  disableContentLogging,
+		disableContentLogging: disableContentLogging,
 		contentLoggingOnError: contentLoggingOnError,
-		logger:                 testLogger{},
+		logger:                testLogger{},
 	}
 }
 
@@ -107,7 +107,7 @@ func TestPostLLMHookErrorKeepsContentWithContentLoggingDisabled(t *testing.T) {
 		store := newTestStore(t)
 		defer store.Close(context.Background())
 		plugin, err := Init(context.Background(), &Config{
-			DisableContentLogging:  boolPtr(true),
+			DisableContentLogging: boolPtr(true),
 			ContentLoggingOnError: boolPtr(true),
 		}, testLogger{}, store, nil, nil, nil)
 		if err != nil {
@@ -142,8 +142,8 @@ func TestPostLLMHookErrorKeepsContentWithContentLoggingDisabled(t *testing.T) {
 			StatusCode:     &statusCode,
 			Error:          &schemas.ErrorField{Message: "provider failed"},
 			ExtraFields: schemas.BifrostErrorExtraFields{
-				RequestType:  schemas.ChatCompletionRequest,
-				Provider:     schemas.OpenAI,
+				RequestType: schemas.ChatCompletionRequest,
+				Provider:    schemas.OpenAI,
 				RawRequest:  rawReqBody,
 				RawResponse: rawRespBody,
 			},
@@ -185,7 +185,7 @@ func TestPostLLMHookErrorKeepsContentWithContentLoggingDisabled(t *testing.T) {
 		store := newTestStore(t)
 		defer store.Close(context.Background())
 		plugin, err := Init(context.Background(), &Config{
-			DisableContentLogging:  boolPtr(true),
+			DisableContentLogging: boolPtr(true),
 			ContentLoggingOnError: boolPtr(true),
 		}, testLogger{}, store, nil, nil, nil)
 		if err != nil {
@@ -329,7 +329,7 @@ func TestPostLLMHookSuccessStripsContentEvenIfGlobalDisableIsFalse(t *testing.T)
 	store := newTestStore(t)
 	defer store.Close(context.Background())
 	plugin, err := Init(context.Background(), &Config{
-		DisableContentLogging:  boolPtr(false),
+		DisableContentLogging: boolPtr(false),
 		ContentLoggingOnError: boolPtr(true),
 	}, testLogger{}, store, nil, nil, nil)
 	if err != nil {

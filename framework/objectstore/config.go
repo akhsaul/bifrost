@@ -17,7 +17,7 @@ const (
 
 // Config holds the configuration for an object store.
 type Config struct {
-	Type   StoreType      `json:"type"` // "s3" or "gcs"
+	Type   StoreType         `json:"type"` // "s3" or "gcs"
 	Bucket schemas.SecretVar `json:"bucket"`
 
 	// Common fields (apply to all store types)
@@ -31,7 +31,7 @@ type Config struct {
 	SecretAccessKey *schemas.SecretVar `json:"secret_access_key,omitempty"`
 	SessionToken    *schemas.SecretVar `json:"session_token,omitempty"`
 	RoleARN         *schemas.SecretVar `json:"role_arn,omitempty"`
-	ForcePathStyle  bool            `json:"force_path_style,omitempty"`
+	ForcePathStyle  bool               `json:"force_path_style,omitempty"`
 
 	// GCS fields (used when Type == "gcs")
 	Credentials     *schemas.SecretVar `json:"credentials,omitempty"`      // Deprecated: use credentials_json

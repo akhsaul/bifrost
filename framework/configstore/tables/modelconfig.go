@@ -67,7 +67,6 @@ type SourceRef struct {
 	SourceName string `gorm:"-" json:"source_name,omitempty"`
 }
 
-
 // IsValidModelConfigScope reports whether scope is a recognized model config scope.
 func IsValidModelConfigScope(scope string) bool {
 	validModelConfigScopesMu.RLock()

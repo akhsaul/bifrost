@@ -153,7 +153,7 @@ func TestStoreOwnedVaultSecretVars_WalksMap(t *testing.T) {
 	m := &model{
 		Headers: map[string]SecretVar{
 			"Authorization": {Val: "secret-token"},
-			"X-Env":         SecretVar{ref: "env.X", SecretType: SecretTypeEnv},
+			"X-Env":         {ref: "env.X", SecretType: SecretTypeEnv},
 		},
 	}
 
@@ -192,8 +192,8 @@ func TestRemoveOwnedVaultSecretVars_WalksMap(t *testing.T) {
 	}
 	m := &model{
 		Headers: map[string]SecretVar{
-			"Owned":    SecretVar{Val: "vault.bifrost/m/1/headers/Owned", ref: "vault.bifrost/m/1/headers/Owned", SecretType: SecretTypeVault},
-			"External": SecretVar{Val: "vault.external/db#key", ref: "vault.external/db#key", SecretType: SecretTypeVault},
+			"Owned":    {Val: "vault.bifrost/m/1/headers/Owned", ref: "vault.bifrost/m/1/headers/Owned", SecretType: SecretTypeVault},
+			"External": {Val: "vault.external/db#key", ref: "vault.external/db#key", SecretType: SecretTypeVault},
 		},
 	}
 

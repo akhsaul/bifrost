@@ -381,7 +381,7 @@ func runClaimedDeliveriesWithDeadCaller(t *testing.T, n int, fail bool) {
 		case <-time.After(5 * time.Second):
 			t.Fatalf("iteration %d: worker never reached the provider", i)
 		}
-		cancel()                      // the caller's context ends...
+		cancel()                       // the caller's context ends...
 		upstream.release <- struct{}{} // ...and the upstream completes at that same instant
 
 		// The caller has NOT abandoned: this models tryRequest losing the CAS race.

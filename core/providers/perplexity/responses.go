@@ -117,7 +117,6 @@ func ToPerplexityResponsesRequest(bifrostReq *schemas.BifrostResponsesRequest) *
 				perplexityReq.ResponseFormat = &responseFormat
 			}
 
-
 			// Perplexity-specific request fields
 			if numSearchResults, ok := schemas.SafeExtractIntPointer(bifrostReq.Params.ExtraParams["num_search_results"]); ok {
 				perplexityReq.NumSearchResults = numSearchResults

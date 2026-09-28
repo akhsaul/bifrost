@@ -409,6 +409,7 @@ func cellBudget(sc scenario) time.Duration {
 const maxRateLimitRetries = 3
 
 var rateLimitWaitRE = regexp.MustCompile(`(?i)(?:please\s+wait|try\s+again\s+in|retry\s+after)\s+(\d+)\s*(?:seconds?|secs?|s)\b`)
+
 // rateLimitSignalRE requires a failure word alongside the phrase, not the phrase
 // alone.
 //
@@ -1134,7 +1135,7 @@ func renderCellCard(result cellResult) string {
 	fmt.Fprintf(&b, `<span class="badge">%s</span>`, html.EscapeString(turnsLabel(len(result.Turns))))
 	fmt.Fprintf(&b, `<span class="badge">%s</span>`, html.EscapeString(result.Provider))
 	fmt.Fprintf(&b, `<span class="dur">%s</span>`,
-		html.EscapeString((time.Duration(result.DurationMs)*time.Millisecond).Round(time.Millisecond).String()))
+		html.EscapeString((time.Duration(result.DurationMs) * time.Millisecond).Round(time.Millisecond).String()))
 	b.WriteString(`</summary><div class="cell-body">`)
 
 	if result.Reason != "" {

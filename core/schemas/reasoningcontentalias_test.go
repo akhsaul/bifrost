@@ -227,4 +227,3 @@ func TestEmptyReasoningNoiseIsNotAmplified(t *testing.T) {
 		assert.Equal(t, "We", decoded["reasoning_content"])
 	})
 }
-

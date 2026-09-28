@@ -51,7 +51,7 @@ func TestUserTokenCache_CapacityEviction(t *testing.T) {
 	c := newUserTokenCache(2)
 
 	for i := 1; i <= 3; i++ {
-		_, err := c.Fill(context.Background(), 
+		_, err := c.Fill(context.Background(),
 			fmt.Sprintf("k%d", i),
 			fillWith(testToken(fmt.Sprintf("t%d", i), fmt.Sprintf("access-%d", i), nil)),
 		)

@@ -293,7 +293,6 @@ func TestApplyUpscaleStreamOutputResolution(t *testing.T) {
 	})
 }
 
-
 func TestResolveUpscaleOutputPixels_RejectsNonFiniteTarget(t *testing.T) {
 	// A non-finite target must not saturate the conversion into a
 	// billion-pixel output that then selects the top pricing tier.

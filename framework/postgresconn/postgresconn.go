@@ -100,13 +100,13 @@ func (c *passwordCache) get(ctx context.Context, config *PasswordCommandConfig) 
 
 // Config is the shared Postgres connection configuration used by framework stores.
 type Config struct {
-	Host            *schemas.SecretVar        `json:"host"`
-	Port            *schemas.SecretVar        `json:"port"`
-	User            *schemas.SecretVar        `json:"user"`
-	Password        *schemas.SecretVar        `json:"password"`
+	Host            *schemas.SecretVar     `json:"host"`
+	Port            *schemas.SecretVar     `json:"port"`
+	User            *schemas.SecretVar     `json:"user"`
+	Password        *schemas.SecretVar     `json:"password"`
 	PasswordCommand *PasswordCommandConfig `json:"password_command,omitempty"`
-	DBName          *schemas.SecretVar        `json:"db_name"`
-	SSLMode         *schemas.SecretVar        `json:"ssl_mode"`
+	DBName          *schemas.SecretVar     `json:"db_name"`
+	SSLMode         *schemas.SecretVar     `json:"ssl_mode"`
 	MaxIdleConns    int                    `json:"max_idle_conns"`
 	MaxOpenConns    int                    `json:"max_open_conns"`
 	ConnMaxLifetime string                 `json:"conn_max_lifetime,omitempty"`

@@ -90,4 +90,3 @@ func (p *TablePlugin) AfterFind(tx *gorm.DB) error {
 
 	return nil
 }
-

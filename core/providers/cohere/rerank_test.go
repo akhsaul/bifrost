@@ -16,12 +16,12 @@ func TestCohereRerankResponseToBifrostRerankResponse(t *testing.T) {
 			{
 				Index:          1,
 				RelevanceScore: 0.62,
-				Document: &CohereRerankDocument{Text: "provider-doc-1", ID: schemas.Ptr("doc-1"), Metadata: map[string]interface{}{"topic": "geography"}},
+				Document:       &CohereRerankDocument{Text: "provider-doc-1", ID: schemas.Ptr("doc-1"), Metadata: map[string]interface{}{"topic": "geography"}},
 			},
 			{
 				Index:          0,
 				RelevanceScore: 0.91,
-				Document: &CohereRerankDocument{Text: "provider-doc-0"},
+				Document:       &CohereRerankDocument{Text: "provider-doc-0"},
 			},
 		},
 	}).ToBifrostRerankResponse(nil, false)
@@ -51,12 +51,12 @@ func TestCohereRerankResponseToBifrostRerankResponseReturnDocuments(t *testing.T
 			{
 				Index:          1,
 				RelevanceScore: 0.62,
-				Document: &CohereRerankDocument{Text: "provider-doc-1"},
+				Document:       &CohereRerankDocument{Text: "provider-doc-1"},
 			},
 			{
 				Index:          0,
 				RelevanceScore: 0.91,
-				Document: &CohereRerankDocument{Text: "provider-doc-0"},
+				Document:       &CohereRerankDocument{Text: "provider-doc-0"},
 			},
 		},
 	}).ToBifrostRerankResponse(requestDocs, true)

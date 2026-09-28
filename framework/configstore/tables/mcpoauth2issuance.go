@@ -62,8 +62,8 @@ func (c *TableOAuth2Client) AfterFind(tx *gorm.DB) error {
 type OAuth2AuthorizeRequestStatus string
 
 const (
-	OAuth2AuthorizeRequestStatusPending    OAuth2AuthorizeRequestStatus = "pending"    // waiting for consent
-	OAuth2AuthorizeRequestStatusConsented  OAuth2AuthorizeRequestStatus = "consented"  // identity resolved, code minted
+	OAuth2AuthorizeRequestStatusPending    OAuth2AuthorizeRequestStatus = "pending"     // waiting for consent
+	OAuth2AuthorizeRequestStatusConsented  OAuth2AuthorizeRequestStatus = "consented"   // identity resolved, code minted
 	OAuth2AuthorizeRequestStatusCodeIssued OAuth2AuthorizeRequestStatus = "code_issued" // token exchanged, one-time consumed
 )
 
@@ -86,8 +86,8 @@ type TableOAuth2AuthorizeRequest struct {
 	CodeChallengeMethod string                       `gorm:"type:varchar(10);not null" json:"-"`  // always "S256"
 	Status              OAuth2AuthorizeRequestStatus `gorm:"type:varchar(20);not null;index" json:"status"`
 	// Set by the consent flow once the user approves:
-	BfMode   string `gorm:"type:varchar(20)" json:"bf_mode,omitempty"` // user|vk|session
-	BfSub    string `gorm:"type:varchar(255)" json:"bf_sub,omitempty"` // resolved identity
+	BfMode string `gorm:"type:varchar(20)" json:"bf_mode,omitempty"` // user|vk|session
+	BfSub  string `gorm:"type:varchar(255)" json:"bf_sub,omitempty"` // resolved identity
 	// nil while pending; set to SHA256(auth_code) at consent. A pointer so unset
 	// rows store SQL NULL — NULLs are distinct under the unique index, letting many
 	// requests stay pending at once while still enforcing uniqueness for real hashes.
@@ -114,7 +114,7 @@ func (TableOAuth2AuthorizeRequest) TableName() string { return "oauth2_authorize
 // are revoked immediately, per the OAuth 2.0 Security BCP (RFC 9700 §2.2.2).
 type TableOAuth2RefreshToken struct {
 	ID         string     `gorm:"type:varchar(255);primaryKey" json:"id"`
-	TokenHash  string     `gorm:"type:varchar(255);uniqueIndex;not null" json:"-"` // SHA256 hex
+	TokenHash  string     `gorm:"type:varchar(255);uniqueIndex;not null" json:"-"`   // SHA256 hex
 	FamilyID   string     `gorm:"type:varchar(255);not null;index" json:"family_id"` // authorize request ID
 	ClientID   string     `gorm:"type:varchar(255);not null;index" json:"client_id"`
 	BfMode     string     `gorm:"type:varchar(20);not null" json:"bf_mode"` // user|vk|session

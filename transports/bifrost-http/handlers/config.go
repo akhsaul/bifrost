@@ -905,7 +905,6 @@ func formatExportGovernanceConfig(g *configstore.GovernanceConfig) map[string]an
 	return out
 }
 
-
 // updateMetadata handles POST /api/config/metadata - merges a JSON object of
 // key/value pairs into the ClientConfig metadata blob. Keys with a nil value
 // are removed. Intended for UI/admin preferences (onboarding state, dismissed

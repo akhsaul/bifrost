@@ -1088,7 +1088,7 @@ type MCPToolLogCallback func(*logstore.MCPToolLog)
 // Config controls logging plugin behavior.
 type Config struct {
 	DisableContentLogging        *bool                  `json:"disable_content_logging"`
-	ContentLoggingOnError       *bool                  `json:"content_logging_on_error"`
+	ContentLoggingOnError        *bool                  `json:"content_logging_on_error"`
 	RetainContentInObjectStorage *bool                  `json:"retain_content_in_object_storage"` // Pointer to live config value; when true, content-disabled requests are offloaded to object storage as hidden instead of dropped
 	LoggingHeaders               *[]string              `json:"logging_headers"`                  // Pointer to live config slice; changes are reflected immediately without restart
 	RedactSensitiveHeaders       *[]string              `json:"redact_sensitive_headers"`         // Pointer to live redaction patterns
@@ -1143,7 +1143,7 @@ type LoggerPlugin struct {
 	store                        logstore.LogStore
 	batchStore                   jobaccounting.SweepStore // configstore-backed mutable batch coordination state (nil disables batch accounting)
 	disableContentLogging        *bool
-	contentLoggingOnError       *bool
+	contentLoggingOnError        *bool
 	retainContentInObjectStorage *bool     // Pointer to live config value; when true, content-disabled requests are stored hidden instead of dropped
 	objectStorageEnabled         bool      // Log store offloads payloads to object storage; required for retain_content_in_object_storage
 	retainWarnOnce               sync.Once // Warns once when retention is configured without object storage
@@ -1221,7 +1221,7 @@ func Init(ctx context.Context, config *Config, logger schemas.Logger, logsStore 
 		pricingManager:               pricingManager,
 		mcpCatalog:                   mcpCatalog,
 		disableContentLogging:        config.DisableContentLogging,
-		contentLoggingOnError:       config.ContentLoggingOnError,
+		contentLoggingOnError:        config.ContentLoggingOnError,
 		retainContentInObjectStorage: config.RetainContentInObjectStorage,
 		objectStorageEnabled:         config.ObjectStorageEnabled,
 		loggingHeaders:               config.LoggingHeaders,

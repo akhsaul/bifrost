@@ -604,8 +604,8 @@ func RunFileUploadTest(t *testing.T, client *bifrost.Bifrost, ctx context.Contex
 			fileContent := []byte(`{"custom_id": "test-1", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Hello"}]}}
 `)
 			request := &schemas.BifrostFileUploadRequest{
-				Provider:    testConfig.Provider,
-				File:        fileContent,
+				Provider:      testConfig.Provider,
+				File:          fileContent,
 				Filename:      "test_batch.jsonl",
 				Purpose:       "batch",
 				ExtraParams:   testConfig.FileExtraParams,
@@ -745,8 +745,8 @@ func RunFileRetrieveTest(t *testing.T, client *bifrost.Bifrost, ctx context.Cont
 			fileContent := []byte(`{"custom_id": "test-retrieve-1", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Hello"}]}}
 `)
 			uploadRequest := &schemas.BifrostFileUploadRequest{
-				Provider:    testConfig.Provider,
-				File:        fileContent,
+				Provider:      testConfig.Provider,
+				File:          fileContent,
 				Filename:      "test_retrieve.jsonl",
 				Purpose:       "batch",
 				ExtraParams:   testConfig.FileExtraParams,
@@ -864,8 +864,8 @@ func RunFileDeleteTest(t *testing.T, client *bifrost.Bifrost, ctx context.Contex
 			fileContent := []byte(`{"custom_id": "test-delete-1", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Hello"}]}}
 `)
 			uploadRequest := &schemas.BifrostFileUploadRequest{
-				Provider:    testConfig.Provider,
-				File:        fileContent,
+				Provider:      testConfig.Provider,
+				File:          fileContent,
 				Filename:      "test_delete.jsonl",
 				Purpose:       "batch",
 				ExtraParams:   testConfig.FileExtraParams,
@@ -983,8 +983,8 @@ func RunFileContentTest(t *testing.T, client *bifrost.Bifrost, ctx context.Conte
 			originalContent := []byte(`{"custom_id": "test-content-1", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Hello"}]}}
 `)
 			uploadRequest := &schemas.BifrostFileUploadRequest{
-				Provider:    testConfig.Provider,
-				File:        originalContent,
+				Provider:      testConfig.Provider,
+				File:          originalContent,
 				Filename:      "test_content.jsonl",
 				Purpose:       "batch",
 				ExtraParams:   testConfig.FileExtraParams,
@@ -1123,8 +1123,8 @@ func RunFileAndBatchIntegrationTest(t *testing.T, client *bifrost.Bifrost, ctx c
 `)
 
 		uploadRequest := &schemas.BifrostFileUploadRequest{
-			Provider:    testConfig.Provider,
-			File:        fileContent,
+			Provider:      testConfig.Provider,
+			File:          fileContent,
 			Filename:      "integration_test_batch.jsonl",
 			Purpose:       "batch",
 			ExtraParams:   testConfig.FileExtraParams,

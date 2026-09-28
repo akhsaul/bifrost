@@ -540,10 +540,10 @@ func TestEvaluateRoutingRules_GroupAdaptiveStrategy(t *testing.T) {
 	prio1 := 1
 	prio2 := 2
 	rule := &configstoreTables.TableRoutingRule{
-		ID:              "group-adapt-1",
-		Name:            "Group Adaptive Rule",
-		CelExpression:   "true",
-		Strategy: "group_adaptive",
+		ID:            "group-adapt-1",
+		Name:          "Group Adaptive Rule",
+		CelExpression: "true",
+		Strategy:      "group_adaptive",
 		ParsedFallbacks: []configstoreTables.RoutingFallback{
 			{Fallback: schemas.Fallback{Provider: "azure", Model: "gpt-4o"}},
 		},

@@ -129,7 +129,7 @@ func resolveProviderKeyConfigs(names []string, keyModelIdx map[string][]Provider
 
 	// perProvider accumulates UUIDs of keys to attach, keyed by provider.
 	perProvider := map[string]map[string]bool{} // provider → set of keyIDs
-	fullWildcard := map[string]bool{}            // provider → granted via "<provider>/*"
+	fullWildcard := map[string]bool{}           // provider → granted via "<provider>/*"
 	var provOrder []string
 	var unmapped []string
 

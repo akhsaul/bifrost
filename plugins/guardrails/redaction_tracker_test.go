@@ -144,4 +144,3 @@ func TestRedactionTracker_StreamingReplacement(t *testing.T) {
 		assert.Equal(t, "[SEC", flushed)
 	})
 }
-

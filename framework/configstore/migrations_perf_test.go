@@ -198,7 +198,7 @@ func seedSyntheticMCPClients(t *testing.T, db *gorm.DB, count int) {
 // migrationMergeOauthTokenTables walks to derive
 // mcp_oauth_tokens.oauth_config_id/mcp_client_id for shared tokens. Without
 // these linked rows every seeded token would only exercise that join's
-// COALESCE(...,'') miss branch, never a real hit.
+// COALESCE(...,”) miss branch, never a real hit.
 //
 // The join reads oauth_configs.token_id — a column TableOauthConfig no
 // longer maps a Go field to (see its doc comment: the FK shortcut is

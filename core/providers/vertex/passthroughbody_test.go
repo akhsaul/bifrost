@@ -147,4 +147,3 @@ func BenchmarkRewriteWithMatch(b *testing.B) {
 		})
 	}
 }
-

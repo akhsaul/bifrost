@@ -15,21 +15,21 @@ import (
 )
 
 var DefaultHeaders = map[string]string{
-	"http-referer":                  "https://hermes-agent.nousresearch.com",
-	"user-agent":                    "OpenAI/Python 2.24.0",
-	"x-openrouter-cache":            "false",
-	"x-openrouter-cache-ttl":        "0",
-	"x-openrouter-categories":       "productivity,cli-agent",
-	"x-stainless-arch":              "x64",
-	"x-stainless-async":             "false",
-	"x-stainless-lang":              "python",
-	"x-stainless-os":                "Linux",
-	"x-stainless-package-version":  "2.24.0",
-	"x-stainless-read-timeout":      "300.0",
-	"x-stainless-retry-count":       "0",
-	"x-stainless-runtime":           "CPython",
-	"x-stainless-runtime-version":  "3.11.16",
-	"x-title":                       "Hermes Agent",
+	"http-referer":                "https://hermes-agent.nousresearch.com",
+	"user-agent":                  "OpenAI/Python 2.24.0",
+	"x-openrouter-cache":          "false",
+	"x-openrouter-cache-ttl":      "0",
+	"x-openrouter-categories":     "productivity,cli-agent",
+	"x-stainless-arch":            "x64",
+	"x-stainless-async":           "false",
+	"x-stainless-lang":            "python",
+	"x-stainless-os":              "Linux",
+	"x-stainless-package-version": "2.24.0",
+	"x-stainless-read-timeout":    "300.0",
+	"x-stainless-retry-count":     "0",
+	"x-stainless-runtime":         "CPython",
+	"x-stainless-runtime-version": "3.11.16",
+	"x-title":                     "Hermes Agent",
 }
 
 // Provider implements the Provider interface for OpenRouter's API.
