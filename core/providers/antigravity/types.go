@@ -65,7 +65,17 @@ type AntigravityModelDetails struct {
 
 // AntigravityFetchModelsResponse is the top-level payload returned by /v1internal:fetchAvailableModels.
 type AntigravityFetchModelsResponse struct {
-	Models map[string]AntigravityModelDetails `json:"models"`
+	Models                 map[string]AntigravityModelDetails `json:"models"`
+	WebSearchModelIDs      []string                           `json:"webSearchModelIds,omitempty"`
+	DefaultAgentModelID    string                             `json:"defaultAgentModelId,omitempty"`
+	CommandModelIDs        []string                           `json:"commandModelIds,omitempty"`
+	TabModelIDs            []string                           `json:"tabModelIds,omitempty"`
+	ImageGenerationModelIDs []string                          `json:"imageGenerationModelIds,omitempty"`
+	MqueryModelIDs         []string                           `json:"mqueryModelIds,omitempty"`
+	DeprecatedModelIDs     []string                           `json:"deprecatedModelIds,omitempty"`
+	CommitMessageModelIDs  []string                           `json:"commitMessageModelIds,omitempty"`
+	AudioTranscriptionModelIDs []string                       `json:"audioTranscriptionModelIds,omitempty"`
+	TieredModelIDs         []string                           `json:"tieredModelIds,omitempty"`
 }
 
 // AntigravityQuotaBucket represents bucket inside group in retrieveUserQuotaSummary.

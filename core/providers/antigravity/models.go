@@ -227,6 +227,10 @@ func FetchAvailableModelsFromAPI(
 	}
 
 	var models []schemas.Model
+	webSearchSet := make(map[string]bool, len(fetchResp.WebSearchModelIDs))
+	for _, id := range fetchResp.WebSearchModelIDs {
+		webSearchSet[id] = true
+	}
 	for modelID, details := range fetchResp.Models {
 		if details.IsInternal {
 			continue
@@ -287,6 +291,12 @@ func FetchAvailableModelsFromAPI(
 		}
 		if details.ModelProvider != "" {
 			attrs["model_provider"] = details.ModelProvider
+		}
+		if webSearchSet[modelID] {
+			attrs["google_search"] = "true"
+		}
+		if fetchResp.DefaultAgentModelID == modelID {
+			attrs["default_agent_model"] = "true"
 		}
 		if len(attrs) > 0 {
 			model.AdditionalAttributes = attrs
