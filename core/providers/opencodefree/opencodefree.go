@@ -1,7 +1,7 @@
 // Package opencodefree implements the isolated Opencode Free AI gateway provider.
-// It connects anonymously to https://opencode.ai/zen/v1 without an API key,
-// mandates attribution and stainless headers (with dynamic session affinity),
-// and injects reasoning into the Responses API request body.
+// It forwards to https://opencode.ai/zen/v1 with the opencode CLI headers
+// (authorization, x-opencode-client, b3/traceparent tracing, session affinity)
+// and fills Responses API body defaults matching the working opencode capture.
 package opencodefree
 
 import (
@@ -67,8 +67,130 @@ func (p *opencodeFreeProvider) GetProviderKey() schemas.ModelProvider {
 	return p.providerKey
 }
 
-// ensureResponsesReasoning guarantees that reasoning and store fields are populated on Responses API requests.
-func ensureResponsesReasoning(request *schemas.BifrostResponsesRequest) {
+// dummyFunctionTool builds one of the placeholder function tools from the
+// working opencode capture (edit/read/shell). These deprecated dummies exist
+// only to satisfy the upstream shape when the client sends no tools.
+func dummyFunctionTool(name string) schemas.ResponsesTool {
+	toolType := schemas.ResponsesToolTypeFunction
+	return schemas.ResponsesTool{
+		Type:        toolType,
+		Name:        schemas.Ptr(name),
+		Description: schemas.Ptr("deprecated function, don't use it!"),
+		ResponsesToolFunction: &schemas.ResponsesToolFunction{
+			Parameters: &schemas.ToolFunctionParameters{
+				Type: "object",
+				Properties: schemas.NewOrderedMapFromPairs(
+					schemas.KV("deprecated", map[string]any{"type": "string"}),
+				),
+				Required:             []string{"deprecated"},
+				AdditionalProperties: &schemas.AdditionalPropertiesStruct{AdditionalPropertiesBool: schemas.Ptr(false)},
+			},
+			Strict: schemas.Ptr(false),
+		},
+	}
+}
+
+// requiredOpencodeFreeToolNames are the placeholder tools the upstream expects.
+// Merge is by name: a client tool with the same name counts as provided and is
+// never overwritten.
+var requiredOpencodeFreeToolNames = []string{"edit", "read", "shell"}
+
+// ensureOpencodeFreeTools appends a dummy placeholder for each of
+// edit/read/shell the client did not send. Client tools always win; only the
+// missing names are filled in.
+func ensureOpencodeFreeTools(params *schemas.ResponsesParameters) {
+	if params == nil {
+		return
+	}
+	present := make(map[string]bool, len(params.Tools))
+	for _, tool := range params.Tools {
+		if tool.Name != nil && *tool.Name != "" {
+			present[*tool.Name] = true
+		}
+	}
+	for _, name := range requiredOpencodeFreeToolNames {
+		if !present[name] {
+			params.Tools = append(params.Tools, dummyFunctionTool(name))
+		}
+	}
+}
+
+// isSystemPromptMessage reports whether a Responses input item is a plain
+// system-prompt message (not a tool call, output, or reasoning item).
+func isSystemPromptMessage(msg schemas.ResponsesMessage) bool {
+	if msg.Role == nil || *msg.Role != schemas.ResponsesInputMessageRoleSystem {
+		return false
+	}
+	if msg.Type != nil && *msg.Type != schemas.ResponsesMessageTypeMessage {
+		return false
+	}
+	if msg.ResponsesToolMessage != nil || msg.ResponsesReasoning != nil {
+		return false
+	}
+	return msg.Content != nil
+}
+
+// systemPromptText extracts the text of a system-prompt message, handling both
+// plain string content and input/output text blocks.
+func systemPromptText(msg schemas.ResponsesMessage) string {
+	if msg.Content == nil {
+		return ""
+	}
+	if msg.Content.ContentStr != nil {
+		return strings.TrimSpace(*msg.Content.ContentStr)
+	}
+	var parts []string
+	for _, block := range msg.Content.ContentBlocks {
+		if block.Text == nil {
+			continue
+		}
+		switch block.Type {
+		case schemas.ResponsesInputMessageContentBlockTypeText,
+			schemas.ResponsesOutputMessageContentTypeText:
+			if text := strings.TrimSpace(*block.Text); text != "" {
+				parts = append(parts, text)
+			}
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+// extractSystemPromptToInstructions moves system-prompt messages from input
+// into the top-level instructions field the upstream expects. It runs only
+// when the client left instructions unset, so explicit instructions are never
+// overwritten. Idempotent: a second pass finds no system messages left.
+func extractSystemPromptToInstructions(request *schemas.BifrostResponsesRequest) {
+	if request == nil || request.Params == nil {
+		return
+	}
+	if request.Params.Instructions != nil && *request.Params.Instructions != "" {
+		return
+	}
+	if len(request.Input) == 0 {
+		return
+	}
+	var texts []string
+	kept := make([]schemas.ResponsesMessage, 0, len(request.Input))
+	for _, msg := range request.Input {
+		if !isSystemPromptMessage(msg) {
+			kept = append(kept, msg)
+			continue
+		}
+		if text := systemPromptText(msg); text != "" {
+			texts = append(texts, text)
+		}
+	}
+	if len(texts) == 0 {
+		return
+	}
+	request.Params.Instructions = schemas.Ptr(strings.Join(texts, "\n"))
+	request.Input = kept
+}
+
+// ensureOpencodeFreeDefaults fills Responses API body fields to match the working
+// opencode capture. Client-supplied values always win; defaults apply only to
+// fields the client left unset.
+func ensureOpencodeFreeDefaults(request *schemas.BifrostResponsesRequest, sessionID string) {
 	if request == nil {
 		return
 	}
@@ -77,20 +199,35 @@ func ensureResponsesReasoning(request *schemas.BifrostResponsesRequest) {
 	}
 	if request.Params.Reasoning == nil {
 		request.Params.Reasoning = &schemas.ResponsesParametersReasoning{
-			Effort:  schemas.Ptr("high"),
-			Summary: schemas.Ptr("auto"),
+			Effort:  schemas.Ptr(DefaultReasoningEffort),
+			Summary: schemas.Ptr(DefaultReasoningSummary),
 		}
 	} else {
 		if request.Params.Reasoning.Effort == nil || *request.Params.Reasoning.Effort == "" {
-			request.Params.Reasoning.Effort = schemas.Ptr("high")
+			request.Params.Reasoning.Effort = schemas.Ptr(DefaultReasoningEffort)
 		}
 		if request.Params.Reasoning.Summary == nil || *request.Params.Reasoning.Summary == "" {
-			request.Params.Reasoning.Summary = schemas.Ptr("auto")
+			request.Params.Reasoning.Summary = schemas.Ptr(DefaultReasoningSummary)
 		}
 	}
 	if request.Params.Store == nil {
 		request.Params.Store = schemas.Ptr(false)
 	}
+	// System prompts arrive as system-role input messages on the chat path
+	// (ToResponsesRequest has no instructions equivalent); hoist them into
+	// instructions before the default below would bury them under a generic one.
+	extractSystemPromptToInstructions(request)
+	if request.Params.Instructions == nil || *request.Params.Instructions == "" {
+		request.Params.Instructions = schemas.Ptr(DefaultInstructions)
+	}
+	if request.Params.PromptCacheKey == nil || *request.Params.PromptCacheKey == "" {
+		if sessionID != "" {
+			request.Params.PromptCacheKey = schemas.Ptr(sessionID)
+		} else {
+			request.Params.PromptCacheKey = schemas.Ptr(DefaultPromptCacheKeyFallback)
+		}
+	}
+	ensureOpencodeFreeTools(request.Params)
 }
 
 // ListModels performs a list models request to the Opencode Free API.
@@ -220,17 +357,37 @@ func (p *opencodeFreeProvider) ChatCompletionStream(ctx *schemas.BifrostContext,
 	)
 }
 
+// preserveOpencodeReasoning restores client-supplied effort/summary verbatim on
+// the wire request. The shared openai converter normalizes effort through
+// datasheet caps that know nothing about opencode-native models, downgrading
+// "xhigh"→"high" and rewriting "auto"; opencode accepts both, so they must
+// pass through untouched.
+func preserveOpencodeReasoning(wireReq *openai.OpenAIResponsesRequest, request *schemas.BifrostResponsesRequest) *openai.OpenAIResponsesRequest {
+	if wireReq == nil || request == nil || request.Params == nil || request.Params.Reasoning == nil {
+		return wireReq
+	}
+	if wireReq.Reasoning == nil {
+		wireReq.Reasoning = &schemas.ResponsesParametersReasoning{}
+	}
+	wireReq.Reasoning.Effort = request.Params.Reasoning.Effort
+	wireReq.Reasoning.Summary = request.Params.Reasoning.Summary
+	return wireReq
+}
+
 // Responses performs a responses request to the Opencode Free API.
 func (p *opencodeFreeProvider) Responses(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostResponsesRequest) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
-	ensureResponsesReasoning(request)
-	authHeader := map[string]string{"Authorization": ""}
-	extraHeaders := BuildHeaders(ctx, p.networkConfig.ExtraHeaders, false)
-	return openai.HandleOpenAIResponsesRequest(
+	// Resolve once: the generated session ID feeds both prompt_cache_key and
+	// the session headers. A second resolution would generate a DIFFERENT
+	// random session for the headers (counter advanced), breaking the invariant.
+	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders)
+	ensureOpencodeFreeDefaults(request, resolved.SessionID)
+	extraHeaders := headersFromResolved(ctx, p.networkConfig.ExtraHeaders, resolved, false)
+	return openai.HandleOpenAIResponsesRequestWithOpencodeConverter(
 		ctx,
 		p.client,
 		p.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, "/v1/responses"),
 		request,
-		authHeader,
+		nil,
 		extraHeaders,
 		providerUtils.ShouldSendBackRawRequest(ctx, p.sendBackRawRequest),
 		providerUtils.ShouldSendBackRawResponse(ctx, p.sendBackRawResponse),
@@ -239,20 +396,28 @@ func (p *opencodeFreeProvider) Responses(ctx *schemas.BifrostContext, key schema
 		parseOpencodeFreeError,
 		nil,
 		p.logger,
+		func(req *schemas.BifrostResponsesRequest) (providerUtils.RequestBodyWithExtraParams, error) {
+			return preserveOpencodeReasoning(openai.ToOpenAIResponsesRequest(ctx, req), req), nil
+		},
 	)
 }
 
 // ResponsesStream performs a streaming responses request to the Opencode Free API.
 func (p *opencodeFreeProvider) ResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostResponsesRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
-	ensureResponsesReasoning(request)
-	authHeader := map[string]string{"Authorization": ""}
-	extraHeaders := BuildHeaders(ctx, p.networkConfig.ExtraHeaders, true)
+	// Same single-resolution invariant as Responses: headers must carry the
+	// exact session ID used for prompt_cache_key.
+	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders)
+	ensureOpencodeFreeDefaults(request, resolved.SessionID)
+	extraHeaders := headersFromResolved(ctx, p.networkConfig.ExtraHeaders, resolved, true)
+	postRequestConverter := func(wireReq *openai.OpenAIResponsesRequest) *openai.OpenAIResponsesRequest {
+		return preserveOpencodeReasoning(wireReq, request)
+	}
 	return openai.HandleOpenAIResponsesStreaming(
 		ctx,
 		p.streamingClient,
 		p.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, "/v1/responses"),
 		request,
-		authHeader,
+		nil,
 		extraHeaders,
 		p.networkConfig.StreamIdleTimeoutInSeconds,
 		providerUtils.ShouldSendBackRawRequest(ctx, p.sendBackRawRequest),
@@ -261,7 +426,7 @@ func (p *opencodeFreeProvider) ResponsesStream(ctx *schemas.BifrostContext, post
 		postHookRunner,
 		nil,
 		parseOpencodeFreeError,
-		nil,
+		postRequestConverter,
 		nil,
 		nil,
 		p.logger,

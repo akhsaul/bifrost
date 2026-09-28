@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"regexp"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -121,20 +122,11 @@ func TestOpencodeFreeMandatoryHeadersAndReasoning(t *testing.T) {
 		t.Errorf("expected path /v1/responses, got %s", capReq.path)
 	}
 
-	// Verify mandatory headers
+	// Verify headers match the working opencode capture
 	expectedHeaders := map[string]string{
-		"Http-Referer":                "https://hermes-agent.nousresearch.com",
-		"User-Agent":                  "HermesAgent/0.21.2",
-		"X-Stainless-Arch":            "x64",
-		"X-Stainless-Async":           "false",
-		"X-Stainless-Lang":            "python",
-		"X-Stainless-Os":              "Linux",
-		"X-Stainless-Package-Version": "2.24.0",
-		"X-Stainless-Read-Timeout":    "1800.0",
-		"X-Stainless-Retry-Count":     "0",
-		"X-Stainless-Runtime":         "CPython",
-		"X-Stainless-Runtime-Version": "3.11.16",
-		"X-Title":                     "Hermes Agent",
+		"Authorization":     "Bearer public",
+		"User-Agent":        DefaultUserAgent,
+		"X-Opencode-Client": "cli",
 	}
 
 	for k, expectedVal := range expectedHeaders {
@@ -143,15 +135,41 @@ func TestOpencodeFreeMandatoryHeadersAndReasoning(t *testing.T) {
 			t.Errorf("header %q = %q (present=%v), want %q", k, gotVal, ok, expectedVal)
 		}
 	}
+	for _, removed := range []string{
+		"Http-Referer", "X-Title", "X-Stainless-Arch", "X-Stainless-Lang",
+		"X-Stainless-Os", "X-Stainless-Runtime",
+	} {
+		if _, ok := capReq.headers[removed]; ok {
+			t.Errorf("header %q must not be sent", removed)
+		}
+	}
 
-	// Dynamic x-opencode-session header regex check: YYYYMMDD_HHMMSS_<6 hex chars>
+	// Dynamic x-opencode-session header: ses_<12hex><14base62>; the trio must agree.
 	sessionHdr, hasSession := capReq.headers["X-Opencode-Session"]
 	if !hasSession {
 		t.Errorf("missing x-opencode-session header")
 	} else {
-		re := regexp.MustCompile(`^\d{8}_\d{6}_[a-f0-9]{6}$`)
+		re := regexp.MustCompile(`^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$`)
 		if !re.MatchString(sessionHdr) {
 			t.Errorf("x-opencode-session %q does not match regex %s", sessionHdr, re.String())
+		}
+		if capReq.headers["X-Session-Affinity"] != sessionHdr || capReq.headers["X-Session-Id"] != sessionHdr {
+			t.Errorf("session trio diverged: session=%q affinity=%q id=%q",
+				sessionHdr, capReq.headers["X-Session-Affinity"], capReq.headers["X-Session-Id"])
+		}
+	}
+	if _, ok := capReq.headers["X-Opencode-Project"]; !ok {
+		t.Errorf("missing x-opencode-project header")
+	}
+	// traceparent/b3 must share trace-id and span-id.
+	traceparent, hasTP := capReq.headers["Traceparent"]
+	b3, hasB3 := capReq.headers["B3"]
+	if !hasTP || !hasB3 {
+		t.Errorf("missing trace headers (traceparent=%v b3=%v)", hasTP, hasB3)
+	} else {
+		parts := strings.Split(traceparent, "-")
+		if len(parts) != 4 || !strings.HasPrefix(b3, parts[1]+"-"+parts[2]+"-1-") {
+			t.Errorf("trace headers diverged: traceparent=%q b3=%q", traceparent, b3)
 		}
 	}
 
@@ -160,8 +178,8 @@ func TestOpencodeFreeMandatoryHeadersAndReasoning(t *testing.T) {
 	if !hasReasoning {
 		t.Fatalf("request body missing 'reasoning' object: %+v", capReq.body)
 	}
-	if reasoningObj["effort"] != "high" {
-		t.Errorf("expected reasoning.effort 'high', got %v", reasoningObj["effort"])
+	if reasoningObj["effort"] != "auto" {
+		t.Errorf("expected reasoning.effort 'auto', got %v", reasoningObj["effort"])
 	}
 	if reasoningObj["summary"] != "auto" {
 		t.Errorf("expected reasoning.summary 'auto', got %v", reasoningObj["summary"])
@@ -170,6 +188,24 @@ func TestOpencodeFreeMandatoryHeadersAndReasoning(t *testing.T) {
 	storeVal, hasStore := capReq.body["store"].(bool)
 	if !hasStore || storeVal != false {
 		t.Errorf("expected store: false, got %v (present=%v)", storeVal, hasStore)
+	}
+
+	// Verify instructions, prompt_cache_key (== session), and dummy tools
+	if capReq.body["instructions"] != DefaultInstructions {
+		t.Errorf("expected instructions %q, got %v", DefaultInstructions, capReq.body["instructions"])
+	}
+	if capReq.body["prompt_cache_key"] != sessionHdr {
+		t.Errorf("expected prompt_cache_key == session %q, got %v", sessionHdr, capReq.body["prompt_cache_key"])
+	}
+	tools, hasTools := capReq.body["tools"].([]any)
+	if !hasTools || len(tools) != 3 {
+		t.Fatalf("expected 3 default tools, got %v (present=%v)", capReq.body["tools"], hasTools)
+	}
+	for i, want := range []string{"edit", "read", "shell"} {
+		tool, ok := tools[i].(map[string]any)
+		if !ok || tool["name"] != want || tool["type"] != "function" {
+			t.Errorf("tool[%d] = %v, want function tool %q", i, tools[i], want)
+		}
 	}
 }
 
@@ -296,14 +332,20 @@ func TestOpencodeFreeChatCompletionAndReasoning(t *testing.T) {
 	if !hasReasoning {
 		t.Fatalf("request body missing 'reasoning' object: %+v", body)
 	}
-	if reasoningObj["effort"] != "high" {
-		t.Errorf("expected reasoning.effort 'high', got %v", reasoningObj["effort"])
+	if reasoningObj["effort"] != "auto" {
+		t.Errorf("expected reasoning.effort 'auto', got %v", reasoningObj["effort"])
 	}
 	if reasoningObj["summary"] != "auto" {
 		t.Errorf("expected reasoning.summary 'auto', got %v", reasoningObj["summary"])
 	}
 	if storeVal, hasStore := body["store"].(bool); !hasStore || storeVal != false {
 		t.Errorf("expected store: false, got %v (present=%v)", storeVal, hasStore)
+	}
+	if body["instructions"] != DefaultInstructions {
+		t.Errorf("expected instructions %q, got %v", DefaultInstructions, body["instructions"])
+	}
+	if tools, ok := body["tools"].([]any); !ok || len(tools) != 3 {
+		t.Errorf("expected 3 default tools on chat path, got %v", body["tools"])
 	}
 }
 
@@ -444,16 +486,27 @@ func TestOpencodeFreeListModels(t *testing.T) {
 	if calledPath != "/v1/models" {
 		t.Errorf("expected path /v1/models, got %s", calledPath)
 	}
-	// Verify mandatory authorization header presence (empty string)
-	if auth, exists := headers["Authorization"]; !exists || auth != "" {
-		t.Errorf("expected Authorization header to be empty string, got %q (exists=%v)", auth, exists)
+	// Verify headers match the working opencode capture
+	if auth, exists := headers["Authorization"]; !exists || auth != DefaultAuth {
+		t.Errorf("expected Authorization header %q, got %q (exists=%v)", DefaultAuth, auth, exists)
 	}
-	// Verify mandatory telemetry / identity headers
 	if headers["User-Agent"] != DefaultUserAgent {
 		t.Errorf("expected User-Agent %q, got %q", DefaultUserAgent, headers["User-Agent"])
 	}
+	if headers["X-Opencode-Client"] != "cli" {
+		t.Errorf("expected X-Opencode-Client cli, got %q", headers["X-Opencode-Client"])
+	}
 	if _, hasSession := headers["X-Opencode-Session"]; !hasSession {
 		t.Errorf("expected X-Opencode-Session header to be present")
+	}
+	if _, ok := headers["X-Opencode-Project"]; !ok {
+		t.Errorf("expected X-Opencode-Project header to be present")
+	}
+	if _, ok := headers["Traceparent"]; !ok {
+		t.Errorf("expected Traceparent header to be present")
+	}
+	if _, ok := headers["B3"]; !ok {
+		t.Errorf("expected B3 header to be present")
 	}
 }
 
@@ -501,6 +554,303 @@ func TestOpencodeFreeListModelsKeyless(t *testing.T) {
 	defer mu.Unlock()
 	if calledPath != "/v1/models" {
 		t.Errorf("expected path /v1/models, got %s", calledPath)
+	}
+}
+
+func TestOpencodeFreeClientValuesWinOverDefaults(t *testing.T) {
+	var body map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bodyBytes, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(bodyBytes, &body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+	}))
+	defer server.Close()
+
+	cfg := &schemas.ProviderConfig{
+		NetworkConfig: schemas.NetworkConfig{
+			BaseURL: server.URL,
+		},
+	}
+	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	if err != nil {
+		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+	}
+
+	customName := "my_tool"
+	ctx := schemas.NewBifrostContext(nil, time.Time{})
+	req := &schemas.BifrostResponsesRequest{
+		Model: "muse-spark-1.3-contributor-free",
+		Input: []schemas.ResponsesMessage{
+			{
+				Role: schemas.Ptr(schemas.ResponsesInputMessageRoleUser),
+				Content: &schemas.ResponsesMessageContent{
+					ContentStr: schemas.Ptr("hi"),
+				},
+			},
+		},
+		Params: &schemas.ResponsesParameters{
+			Instructions:   schemas.Ptr("custom instructions"),
+			PromptCacheKey: schemas.Ptr("custom-cache-key"),
+			Reasoning: &schemas.ResponsesParametersReasoning{
+				Effort:  schemas.Ptr("xhigh"),
+				Summary: schemas.Ptr("detailed"),
+			},
+			Tools: []schemas.ResponsesTool{
+				{
+					Type: schemas.ResponsesToolTypeFunction,
+					Name: &customName,
+					ResponsesToolFunction: &schemas.ResponsesToolFunction{
+						Strict: schemas.Ptr(false),
+					},
+				},
+			},
+		},
+	}
+
+	if _, bErr := provider.Responses(ctx, schemas.Key{}, req); bErr != nil {
+		t.Fatalf("Responses request failed: %v", bErr.Error)
+	}
+
+	reasoningObj, ok := body["reasoning"].(map[string]any)
+	if !ok {
+		t.Fatalf("request body missing 'reasoning' object: %+v", body)
+	}
+	if reasoningObj["effort"] != "xhigh" {
+		t.Errorf("client reasoning.effort must win, got %v", reasoningObj["effort"])
+	}
+	if reasoningObj["summary"] != "detailed" {
+		t.Errorf("client reasoning.summary must win, got %v", reasoningObj["summary"])
+	}
+	if body["instructions"] != "custom instructions" {
+		t.Errorf("client instructions must win, got %v", body["instructions"])
+	}
+	if body["prompt_cache_key"] != "custom-cache-key" {
+		t.Errorf("client prompt_cache_key must win, got %v", body["prompt_cache_key"])
+	}
+	tools, ok := body["tools"].([]any)
+	if !ok || len(tools) != 4 {
+		t.Fatalf("client tools must win plus missing dummies filled (4 tools), got %v", body["tools"])
+	}
+	if tool, ok := tools[0].(map[string]any); !ok || tool["name"] != customName {
+		t.Errorf("client tool must win, got %v", tools[0])
+	}
+	names := map[string]bool{}
+	for _, item := range tools {
+		if tool, ok := item.(map[string]any); ok {
+			if name, ok := tool["name"].(string); ok {
+				names[name] = true
+			}
+		}
+	}
+	for _, want := range []string{"edit", "read", "shell"} {
+		if !names[want] {
+			t.Errorf("missing dummy tool %q must have been filled in, got names %v", want, names)
+		}
+	}
+}
+
+func TestOpencodeFreePartialToolsMerge(t *testing.T) {
+	var body map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bodyBytes, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(bodyBytes, &body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+	}))
+	defer server.Close()
+
+	cfg := &schemas.ProviderConfig{
+		NetworkConfig: schemas.NetworkConfig{
+			BaseURL: server.URL,
+		},
+	}
+	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	if err != nil {
+		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+	}
+
+	// Client sends a REAL "read" tool plus an unrelated custom tool: only the
+	// missing edit/shell dummies may be added, and the client's read must stay.
+	clientReadDesc := "real read implementation"
+	ctx := schemas.NewBifrostContext(nil, time.Time{})
+	req := &schemas.BifrostResponsesRequest{
+		Model: "muse-spark-1.3-contributor-free",
+		Input: []schemas.ResponsesMessage{
+			{
+				Role: schemas.Ptr(schemas.ResponsesInputMessageRoleUser),
+				Content: &schemas.ResponsesMessageContent{
+					ContentStr: schemas.Ptr("hi"),
+				},
+			},
+		},
+		Params: &schemas.ResponsesParameters{
+			Tools: []schemas.ResponsesTool{
+				{
+					Type:        schemas.ResponsesToolTypeFunction,
+					Name:        schemas.Ptr("read"),
+					Description: schemas.Ptr(clientReadDesc),
+					ResponsesToolFunction: &schemas.ResponsesToolFunction{
+						Strict: schemas.Ptr(false),
+					},
+				},
+				{
+					Type: schemas.ResponsesToolTypeFunction,
+					Name: schemas.Ptr("custom"),
+					ResponsesToolFunction: &schemas.ResponsesToolFunction{
+						Strict: schemas.Ptr(false),
+					},
+				},
+			},
+		},
+	}
+
+	if _, bErr := provider.Responses(ctx, schemas.Key{}, req); bErr != nil {
+		t.Fatalf("Responses request failed: %v", bErr.Error)
+	}
+
+	tools, ok := body["tools"].([]any)
+	if !ok || len(tools) != 4 {
+		t.Fatalf("expected 4 tools (2 client + 2 missing dummies), got %v", body["tools"])
+	}
+	byName := map[string]map[string]any{}
+	for _, item := range tools {
+		tool, ok := item.(map[string]any)
+		if !ok {
+			t.Fatalf("tool entry is not an object: %v", item)
+		}
+		name, _ := tool["name"].(string)
+		byName[name] = tool
+	}
+	if byName["read"]["description"] != clientReadDesc {
+		t.Errorf("client 'read' tool must not be overwritten, got %v", byName["read"])
+	}
+	if byName["custom"] == nil {
+		t.Errorf("client 'custom' tool must be preserved, got names %v", byName)
+	}
+	for _, want := range []string{"edit", "shell"} {
+		if byName[want] == nil {
+			t.Errorf("missing dummy %q must have been filled in", want)
+		}
+	}
+}
+
+func TestOpencodeFreeSystemPromptExtractedToInstructions(t *testing.T) {
+	var body map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bodyBytes, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(bodyBytes, &body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+	}))
+	defer server.Close()
+
+	cfg := &schemas.ProviderConfig{
+		NetworkConfig: schemas.NetworkConfig{
+			BaseURL: server.URL,
+		},
+	}
+	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	if err != nil {
+		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+	}
+
+	ctx := schemas.NewBifrostContext(nil, time.Time{})
+	req := &schemas.BifrostResponsesRequest{
+		Model: "muse-spark-1.3-contributor-free",
+		Input: []schemas.ResponsesMessage{
+			{
+				Role: schemas.Ptr(schemas.ResponsesInputMessageRoleSystem),
+				Content: &schemas.ResponsesMessageContent{
+					ContentStr: schemas.Ptr("Be concise."),
+				},
+			},
+			{
+				Role: schemas.Ptr(schemas.ResponsesInputMessageRoleUser),
+				Content: &schemas.ResponsesMessageContent{
+					ContentStr: schemas.Ptr("hi"),
+				},
+			},
+		},
+	}
+
+	if _, bErr := provider.Responses(ctx, schemas.Key{}, req); bErr != nil {
+		t.Fatalf("Responses request failed: %v", bErr.Error)
+	}
+
+	if body["instructions"] != "Be concise." {
+		t.Errorf("system message must move to instructions, got %v", body["instructions"])
+	}
+	input, ok := body["input"].([]any)
+	if !ok {
+		t.Fatalf("expected input array, got %v", body["input"])
+	}
+	for _, item := range input {
+		if msg, ok := item.(map[string]any); ok && msg["role"] == "system" {
+			t.Errorf("system message must be removed from input, got %v", body["input"])
+		}
+	}
+	if len(input) != 1 {
+		t.Errorf("expected 1 remaining input message, got %v", body["input"])
+	}
+}
+
+func TestOpencodeFreeExplicitInstructionsUntouched(t *testing.T) {
+	var body map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bodyBytes, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(bodyBytes, &body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+	}))
+	defer server.Close()
+
+	cfg := &schemas.ProviderConfig{
+		NetworkConfig: schemas.NetworkConfig{
+			BaseURL: server.URL,
+		},
+	}
+	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	if err != nil {
+		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+	}
+
+	ctx := schemas.NewBifrostContext(nil, time.Time{})
+	req := &schemas.BifrostResponsesRequest{
+		Model: "muse-spark-1.3-contributor-free",
+		Input: []schemas.ResponsesMessage{
+			{
+				Role: schemas.Ptr(schemas.ResponsesInputMessageRoleSystem),
+				Content: &schemas.ResponsesMessageContent{
+					ContentStr: schemas.Ptr("system stays"),
+				},
+			},
+			{
+				Role: schemas.Ptr(schemas.ResponsesInputMessageRoleUser),
+				Content: &schemas.ResponsesMessageContent{
+					ContentStr: schemas.Ptr("hi"),
+				},
+			},
+		},
+		Params: &schemas.ResponsesParameters{
+			Instructions: schemas.Ptr("explicit"),
+		},
+	}
+
+	if _, bErr := provider.Responses(ctx, schemas.Key{}, req); bErr != nil {
+		t.Fatalf("Responses request failed: %v", bErr.Error)
+	}
+
+	if body["instructions"] != "explicit" {
+		t.Errorf("explicit instructions must win, got %v", body["instructions"])
+	}
+	input, ok := body["input"].([]any)
+	if !ok || len(input) != 2 {
+		t.Errorf("input must be untouched when instructions are explicit, got %v", body["input"])
 	}
 }
 

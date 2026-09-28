@@ -1863,6 +1863,78 @@ func HandleOpenAIResponsesRequest(
 	signer providerUtils.BodySigner,
 	logger schemas.Logger,
 ) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
+	return handleOpenAIResponsesRequest(
+		ctx,
+		client,
+		url,
+		request,
+		authHeader,
+		extraHeaders,
+		sendBackRawRequest,
+		sendBackRawResponse,
+		providerName,
+		customResponseHandler,
+		customErrorConverter,
+		signer,
+		logger,
+		nil,
+	)
+}
+
+// HandleOpenAIResponsesRequestWithOpencodeConverter is the opencode-free entry
+// point: identical to HandleOpenAIResponsesRequest except the wire body comes
+// from a caller-supplied converter, so opencode-native reasoning values
+// ("auto"/"xhigh") pass through without the shared caps normalization.
+func HandleOpenAIResponsesRequestWithOpencodeConverter(
+	ctx *schemas.BifrostContext,
+	client *fasthttp.Client,
+	url string,
+	request *schemas.BifrostResponsesRequest,
+	authHeader map[string]string,
+	extraHeaders map[string]string,
+	sendBackRawRequest bool,
+	sendBackRawResponse bool,
+	providerName schemas.ModelProvider,
+	customResponseHandler responseHandler[schemas.BifrostResponsesResponse],
+	customErrorConverter ErrorConverter,
+	signer providerUtils.BodySigner,
+	logger schemas.Logger,
+	converter func(*schemas.BifrostResponsesRequest) (providerUtils.RequestBodyWithExtraParams, error),
+) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
+	return handleOpenAIResponsesRequest(
+		ctx,
+		client,
+		url,
+		request,
+		authHeader,
+		extraHeaders,
+		sendBackRawRequest,
+		sendBackRawResponse,
+		providerName,
+		customResponseHandler,
+		customErrorConverter,
+		signer,
+		logger,
+		converter,
+	)
+}
+
+func handleOpenAIResponsesRequest(
+	ctx *schemas.BifrostContext,
+	client *fasthttp.Client,
+	url string,
+	request *schemas.BifrostResponsesRequest,
+	authHeader map[string]string,
+	extraHeaders map[string]string,
+	sendBackRawRequest bool,
+	sendBackRawResponse bool,
+	providerName schemas.ModelProvider,
+	customResponseHandler responseHandler[schemas.BifrostResponsesResponse],
+	customErrorConverter ErrorConverter,
+	signer providerUtils.BodySigner,
+	logger schemas.Logger,
+	converter func(*schemas.BifrostResponsesRequest) (providerUtils.RequestBodyWithExtraParams, error),
+) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
 	// Create request
 	req := fasthttp.AcquireRequest()
 	resp := fasthttp.AcquireResponse()
@@ -1906,11 +1978,14 @@ func HandleOpenAIResponsesRequest(
 		}, nil
 	}
 
-	// Use centralized converter
+	// Use centralized converter (or the opencode-provided override)
 	jsonData, bifrostErr := providerUtils.CheckContextAndGetRequestBody(
 		ctx,
 		request,
 		func() (providerUtils.RequestBodyWithExtraParams, error) {
+			if converter != nil {
+				return converter(request)
+			}
 			return ToOpenAIResponsesRequest(ctx, request), nil
 		})
 	if bifrostErr != nil {
