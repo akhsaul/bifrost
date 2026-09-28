@@ -936,6 +936,208 @@ func TestOpencodeFreeReasoningItemWithoutSummary(t *testing.T) {
 	}
 }
 
+func TestOpencodeFreeMintedReasoningIDStripped(t *testing.T) {
+	var body map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bodyBytes, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(bodyBytes, &body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+	}))
+	defer server.Close()
+
+	cfg := &schemas.ProviderConfig{
+		NetworkConfig: schemas.NetworkConfig{
+			BaseURL: server.URL,
+		},
+	}
+	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	if err != nil {
+		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+	}
+
+	// Bifrost-minted id (rs_<50hex>, as produced by chat→responses conversion)
+	// with summary but no encrypted_content: a dangling server reference the
+	// upstream rejects with "was not found or has expired". The id must go,
+	// the summary text must stay as context.
+	reasoningType := schemas.ResponsesMessageTypeReasoning
+	summaryText := "thinking out loud"
+	ctx := schemas.NewBifrostContext(nil, time.Time{})
+	req := &schemas.BifrostResponsesRequest{
+		Model: "muse-spark-1.3-contributor-free",
+		Input: []schemas.ResponsesMessage{
+			{
+				Role: schemas.Ptr(schemas.ResponsesInputMessageRoleUser),
+				Content: &schemas.ResponsesMessageContent{
+					ContentStr: schemas.Ptr("hi"),
+				},
+			},
+			{
+				ID:   schemas.Ptr("rs_8cba6e71bc32a717b4bb24f25a58741111e23baf71bf30a897"),
+				Type: &reasoningType,
+				ResponsesReasoning: &schemas.ResponsesReasoning{
+					Summary: []schemas.ResponsesReasoningSummary{
+						{Type: schemas.ResponsesReasoningContentBlockTypeSummaryText, Text: summaryText},
+					},
+				},
+			},
+		},
+	}
+
+	if _, bErr := provider.Responses(ctx, schemas.Key{}, req); bErr != nil {
+		t.Fatalf("Responses request failed: %v", bErr.Error)
+	}
+
+	input, ok := body["input"].([]any)
+	if !ok || len(input) != 2 {
+		t.Fatalf("expected 2 input items on the wire, got %v", body["input"])
+	}
+	item, ok := input[1].(map[string]any)
+	if !ok {
+		t.Fatalf("input[1] is not an object: %v", input[1])
+	}
+	if id, hasID := item["id"]; hasID {
+		t.Errorf("dangling reasoning id must be stripped, got %v", id)
+	}
+	summary, ok := item["summary"].([]any)
+	if !ok || len(summary) != 1 {
+		t.Fatalf("summary must be preserved as context, got %v", item["summary"])
+	}
+	if entry, ok := summary[0].(map[string]any); !ok || entry["text"] != summaryText {
+		t.Errorf("summary text must be preserved, got %v", summary[0])
+	}
+}
+
+func TestOpencodeFreeGenuineReasoningStateRestored(t *testing.T) {
+	var body map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bodyBytes, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(bodyBytes, &body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+	}))
+	defer server.Close()
+
+	cfg := &schemas.ProviderConfig{
+		NetworkConfig: schemas.NetworkConfig{
+			BaseURL: server.URL,
+		},
+	}
+	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	if err != nil {
+		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+	}
+
+	// Genuine server-issued replay state (compound id + encrypted_content, as
+	// in the working direct capture): the shared converter strips the blob
+	// for unknown models, so the provider must restore it and keep the id.
+	reasoningType := schemas.ResponsesMessageTypeReasoning
+	genuineID := "rs_6aba254700e7cd92187d4a10:rs_01a0e721a0577245b00d933b8f5c8b04"
+	blob := "gfp_encrypted_blob"
+	ctx := schemas.NewBifrostContext(nil, time.Time{})
+	req := &schemas.BifrostResponsesRequest{
+		Model: "muse-spark-1.3-contributor-free",
+		Input: []schemas.ResponsesMessage{
+			{
+				Role: schemas.Ptr(schemas.ResponsesInputMessageRoleUser),
+				Content: &schemas.ResponsesMessageContent{
+					ContentStr: schemas.Ptr("hi"),
+				},
+			},
+			{
+				ID:   schemas.Ptr(genuineID),
+				Type: &reasoningType,
+				ResponsesReasoning: &schemas.ResponsesReasoning{
+					Summary: []schemas.ResponsesReasoningSummary{
+						{Type: schemas.ResponsesReasoningContentBlockTypeSummaryText, Text: "prior thinking"},
+					},
+					EncryptedContent: &blob,
+				},
+			},
+		},
+	}
+
+	if _, bErr := provider.Responses(ctx, schemas.Key{}, req); bErr != nil {
+		t.Fatalf("Responses request failed: %v", bErr.Error)
+	}
+
+	input, ok := body["input"].([]any)
+	if !ok || len(input) != 2 {
+		t.Fatalf("expected 2 input items on the wire, got %v", body["input"])
+	}
+	item, ok := input[1].(map[string]any)
+	if !ok {
+		t.Fatalf("input[1] is not an object: %v", input[1])
+	}
+	if item["id"] != genuineID {
+		t.Errorf("genuine reasoning id must be kept, got %v", item["id"])
+	}
+	if item["encrypted_content"] != blob {
+		t.Errorf("encrypted_content must be restored on the wire, got %v", item["encrypted_content"])
+	}
+}
+
+func TestOpencodeFreeIncludeReasoningEncryptedDefault(t *testing.T) {
+	var body map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bodyBytes, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(bodyBytes, &body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+	}))
+	defer server.Close()
+
+	cfg := &schemas.ProviderConfig{
+		NetworkConfig: schemas.NetworkConfig{
+			BaseURL: server.URL,
+		},
+	}
+	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	if err != nil {
+		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+	}
+
+	ctx := schemas.NewBifrostContext(nil, time.Time{})
+	req := &schemas.BifrostResponsesRequest{
+		Model: "muse-spark-1.3-contributor-free",
+		Input: []schemas.ResponsesMessage{
+			{
+				Role: schemas.Ptr(schemas.ResponsesInputMessageRoleUser),
+				Content: &schemas.ResponsesMessageContent{
+					ContentStr: schemas.Ptr("hi"),
+				},
+			},
+		},
+		Params: &schemas.ResponsesParameters{
+			Include: []string{"code_interpreter_call.outputs"},
+		},
+	}
+
+	if _, bErr := provider.Responses(ctx, schemas.Key{}, req); bErr != nil {
+		t.Fatalf("Responses request failed: %v", bErr.Error)
+	}
+
+	include, ok := body["include"].([]any)
+	if !ok {
+		t.Fatalf("expected include array on the wire, got %v", body["include"])
+	}
+	found := map[string]bool{}
+	for _, v := range include {
+		if s, ok := v.(string); ok {
+			found[s] = true
+		}
+	}
+	if !found["code_interpreter_call.outputs"] {
+		t.Errorf("client include value must be preserved, got %v", body["include"])
+	}
+	if !found["reasoning.encrypted_content"] {
+		t.Errorf("reasoning.encrypted_content must be defaulted, got %v", body["include"])
+	}
+}
+
 func TestOpencodeFreeErrorParsing(t *testing.T) {
 	resp := &fasthttp.Response{}
 	resp.SetStatusCode(fasthttp.StatusBadRequest)

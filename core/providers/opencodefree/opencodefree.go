@@ -227,6 +227,20 @@ func ensureOpencodeFreeDefaults(request *schemas.BifrostResponsesRequest, sessio
 			request.Params.PromptCacheKey = schemas.Ptr(DefaultPromptCacheKeyFallback)
 		}
 	}
+	// Ask the upstream to return encrypted_content on reasoning items (as the
+	// working direct capture does), so later turns can replay genuine
+	// server-issued state instead of dangling references. Client-supplied
+	// include values are preserved; the value is only appended when missing.
+	hasReasoningInclude := false
+	for _, inc := range request.Params.Include {
+		if inc == opencodeIncludeReasoningEncryptedContent {
+			hasReasoningInclude = true
+			break
+		}
+	}
+	if !hasReasoningInclude {
+		request.Params.Include = append(request.Params.Include, opencodeIncludeReasoningEncryptedContent)
+	}
 	ensureOpencodeFreeTools(request.Params)
 }
 
@@ -362,6 +376,10 @@ func (p *opencodeFreeProvider) ChatCompletionStream(ctx *schemas.BifrostContext,
 // datasheet caps that know nothing about opencode-native models, downgrading
 // "xhigh"→"high" and rewriting "auto"; opencode accepts both, so they must
 // pass through untouched.
+// opencodeIncludeReasoningEncryptedContent is the include value the working
+// direct capture sends so responses carry encrypted_content for later replay.
+const opencodeIncludeReasoningEncryptedContent = "reasoning.encrypted_content"
+
 // ensureOpencodeReasoningItemSummaries converts reasoning_text content on
 // reasoning input items into summary_text entries, which is what the upstream
 // requires. Items decoded without summary/encrypted_content keys (e.g. harness
@@ -430,6 +448,60 @@ func ensureOpencodeReasoningItemSummaries(wireReq *openai.OpenAIResponsesRequest
 	return wireReq
 }
 
+// normalizeOpencodeReasoningItems repairs replayed reasoning items on the wire
+// copy so the upstream accepts them:
+//
+//  1. The shared openai converter strips encrypted_content for models the
+//     datasheet doesn't know (like muse-spark), but the upstream needs the blob
+//     to resume reasoning. Restore it from the caller's original input,
+//     matched by item id.
+//  2. An id without encrypted_content is a dangling server-state reference:
+//     Bifrost-minted ids (rs_<50hex> from chat→responses conversion) or stale
+//     foreign ids make the upstream fail with "Referenced reasoning item ...
+//     was not found or has expired". Strip the id and keep the summary text as
+//     plain context instead.
+//
+// Items carrying encrypted_content keep their id untouched. Operates on the
+// wire copy only, never the caller's request.
+func normalizeOpencodeReasoningItems(wireReq *openai.OpenAIResponsesRequest, request *schemas.BifrostResponsesRequest) *openai.OpenAIResponsesRequest {
+	if wireReq == nil {
+		return wireReq
+	}
+	var encryptedByID map[string]*string
+	if request != nil {
+		for _, msg := range request.Input {
+			if msg.ID == nil || *msg.ID == "" || msg.ResponsesReasoning == nil || msg.ResponsesReasoning.EncryptedContent == nil {
+				continue
+			}
+			if encryptedByID == nil {
+				encryptedByID = make(map[string]*string)
+			}
+			encryptedByID[*msg.ID] = msg.ResponsesReasoning.EncryptedContent
+		}
+	}
+	items := wireReq.Input.OpenAIResponsesRequestInputArray
+	for i := range items {
+		msg := &items[i]
+		if msg.Type == nil || *msg.Type != schemas.ResponsesMessageTypeReasoning {
+			continue
+		}
+		if msg.ResponsesReasoning == nil {
+			msg.ResponsesReasoning = &schemas.ResponsesReasoning{
+				Summary: []schemas.ResponsesReasoningSummary{},
+			}
+		}
+		if msg.ResponsesReasoning.EncryptedContent == nil && msg.ID != nil && *msg.ID != "" {
+			if enc, ok := encryptedByID[*msg.ID]; ok && enc != nil {
+				msg.ResponsesReasoning.EncryptedContent = enc
+			}
+		}
+		if msg.ResponsesReasoning.EncryptedContent == nil {
+			msg.ID = nil
+		}
+	}
+	return wireReq
+}
+
 func preserveOpencodeReasoning(wireReq *openai.OpenAIResponsesRequest, request *schemas.BifrostResponsesRequest) *openai.OpenAIResponsesRequest {
 	if wireReq == nil || request == nil || request.Params == nil || request.Params.Reasoning == nil {
 		return wireReq
@@ -465,7 +537,9 @@ func (p *opencodeFreeProvider) Responses(ctx *schemas.BifrostContext, key schema
 		nil,
 		p.logger,
 		func(req *schemas.BifrostResponsesRequest) (providerUtils.RequestBodyWithExtraParams, error) {
-			return ensureOpencodeReasoningItemSummaries(preserveOpencodeReasoning(openai.ToOpenAIResponsesRequest(ctx, req), req)), nil
+			wireReq := preserveOpencodeReasoning(openai.ToOpenAIResponsesRequest(ctx, req), req)
+			wireReq = ensureOpencodeReasoningItemSummaries(wireReq)
+			return normalizeOpencodeReasoningItems(wireReq, req), nil
 		},
 	)
 }
@@ -478,7 +552,9 @@ func (p *opencodeFreeProvider) ResponsesStream(ctx *schemas.BifrostContext, post
 	ensureOpencodeFreeDefaults(request, resolved.SessionID)
 	extraHeaders := headersFromResolved(ctx, p.networkConfig.ExtraHeaders, resolved, true)
 	postRequestConverter := func(wireReq *openai.OpenAIResponsesRequest) *openai.OpenAIResponsesRequest {
-		return ensureOpencodeReasoningItemSummaries(preserveOpencodeReasoning(wireReq, request))
+		wireReq = preserveOpencodeReasoning(wireReq, request)
+		wireReq = ensureOpencodeReasoningItemSummaries(wireReq)
+		return normalizeOpencodeReasoningItems(wireReq, request)
 	}
 	return openai.HandleOpenAIResponsesStreaming(
 		ctx,
