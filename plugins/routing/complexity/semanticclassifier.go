@@ -904,6 +904,12 @@ func warmSemanticExemplars(
 	// the runtime dimension for this generation, so no operator-entered width is
 	// needed in config.json or the management API.
 	cache.useIdentity(semanticEmbeddingIdentity(config.Semantic))
+	// Exemplar embeds are provider calls billed to the operator's key, so they
+	// are paced to the configured per-minute rate and rate-limited calls wait
+	// out the quota window instead of failing the warmup. One pacer covers the
+	// probe below and every batch after it, so the rate holds for the whole
+	// warmup rather than per phase.
+	pacer := newWarmupPacer(config.Semantic.WarmupMaxRequestsPerMinute)
 	vectors := make([][]float32, len(exemplars))
 	pending := make([]int, 0, len(exemplars))
 	dimension := 0
@@ -925,7 +931,7 @@ func warmSemanticExemplars(
 			for index, exemplarIndex := range batch {
 				phrases[index] = exemplars[exemplarIndex].Phrase
 			}
-			embeddings, err := embedBatch(ctx, config.Semantic, phrases)
+			embeddings, err := embedWarmupBatch(ctx, pacer, embedBatch, config.Semantic, phrases)
 			if err == nil && len(embeddings) != len(batch) {
 				err = fmt.Errorf("%w: expected %d vectors, got %d", ErrBatchEmbeddingsUnsupported, len(batch), len(embeddings))
 			}
@@ -956,7 +962,7 @@ func warmSemanticExemplars(
 			// The scalar result is retained as useful warmup work rather than a
 			// throwaway probe request.
 			first := pending[0]
-			embedding, err := embed(ctx, config.Semantic, exemplars[first].Phrase)
+			embedding, err := embedWarmupPhrase(ctx, pacer, embed, config.Semantic, exemplars[first].Phrase)
 			if err != nil {
 				return 0, "", 0, fmt.Errorf("detect semantic embedding dimension: %w", err)
 			}
@@ -1013,7 +1019,7 @@ func warmSemanticExemplars(
 				phrases[index] = exemplars[exemplarIndex].Phrase
 			}
 			var err error
-			embeddings, err = embedBatch(ctx, config.Semantic, phrases)
+			embeddings, err = embedWarmupBatch(ctx, pacer, embedBatch, config.Semantic, phrases)
 			if err == nil && len(embeddings) != len(batch) {
 				err = fmt.Errorf("%w: expected %d vectors, got %d", ErrBatchEmbeddingsUnsupported, len(batch), len(embeddings))
 			}
@@ -1032,7 +1038,7 @@ func warmSemanticExemplars(
 			embeddings = make([][]float32, len(batch))
 			for index, exemplarIndex := range batch {
 				exemplar := exemplars[exemplarIndex]
-				embedding, err := embed(ctx, config.Semantic, exemplar.Phrase)
+				embedding, err := embedWarmupPhrase(ctx, pacer, embed, config.Semantic, exemplar.Phrase)
 				if err != nil {
 					return 0, namespace, dimension, fmt.Errorf("embed %s exemplar %d: %w", strings.ToLower(exemplar.Tier), exemplarIndex+1, err)
 				}

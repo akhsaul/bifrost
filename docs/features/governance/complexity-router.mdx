@@ -227,6 +227,7 @@ Reference-phrase lists are stored in the existing `keywords` fields (`simple_key
 | `semantic.min_similarity` | number | `0` | Similarity floor. Below it no tier is published. `0` accepts the nearest eligible match |
 | `semantic.message_history_count` | integer | `1` | Number of recent user messages joined into the embedded text (1–10) |
 | `semantic.count_toward_budgets` | boolean | `false` | Count embedding usage toward virtual-key budgets (record-only, never enforced) |
+| `semantic.warmup_max_requests_per_minute` | integer | `60` | Cap how fast exemplar warmup may call the embedding provider, so saving a config cannot burst through a per-minute key quota. A rate-limited call waits one minute for the quota window to reset and retries (up to 5 retries). Raise for keys with headroom; very high effectively disables pacing |
 | `semantic.vector_store` | string | `embedded` | Where phrase vectors are kept. `embedded` uses Bifrost's built-in in-memory store, which is private to one node and re-embeds every phrase on restart. `vector_store` uses the configured top-level `vector_store`; with a shared backend (Qdrant, Weaviate, Redis, Pinecone) vectors are shared between nodes and survive restarts, while a Chromem backend stays node-local and only persists when its `path` is set. If no vector store is configured it falls back to `embedded` and says so in the status response and the log. See [Where phrase vectors live](#where-phrase-vectors-live). |
 | `semantic.fallback` | string | `none` | What answers when semantic classification produces no tier: `none` records the request as skipped; `llm` asks the model configured in `llm` below. Requires `llm` to be set |
 | `llm.provider` | string | Required when `fallback` is `llm` | Provider used to run the classification chat completion; must have an enabled key |
@@ -283,6 +284,8 @@ When using Pinecone, the configured index dimension must match the embedding mod
 ## Classifier status and warmup
 
 Reference phrases are embedded in the background (**warmup**) whenever the configuration changes. Bifrost detects the embedding dimension automatically. Within a running process, unchanged phrase vectors are reused; changing provider or model re-embeds every phrase.
+
+Warmup paces its embedding calls to `semantic.warmup_max_requests_per_minute` (default `60`) so saving a config cannot burst through a per-minute key quota: the 150 default phrases embed in about 5 seconds, a full 750-phrase set in about 24 seconds. If the provider still reports rate limiting — a key shared with other traffic, or a limit below the pacing rate — the warmup waits one minute for the quota window to reset and retries the same call (up to 5 retries) instead of failing. Raise the field for keys with headroom; a very high value effectively disables pacing. Only rate limiting is retried — auth, model, timeout, and response failures fail the warmup immediately, as before.
 
 The badge in the UI header and `GET /api/routing/complexity-analyzer-status` report:
 

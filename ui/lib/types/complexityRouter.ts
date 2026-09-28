@@ -42,6 +42,9 @@ export interface SemanticConfig {
 	// text. 1 (the default) embeds only the latest message.
 	message_history_count?: number;
 	count_toward_budgets?: boolean;
+	// Cap on how fast exemplar warmup may call the embedding provider, in
+	// provider requests per minute. Absent means the gateway default.
+	warmup_max_requests_per_minute?: number;
 	vector_store?: SemanticVectorStore;
 	fallback?: SemanticFallback;
 }
@@ -182,6 +185,12 @@ export const MAX_SEMANTIC_MESSAGE_HISTORY = 10;
 export const MAX_SEMANTIC_PHRASE_CHARACTERS = 2000;
 export const MAX_SEMANTIC_PHRASES = 750;
 
+// Mirrors DefaultComplexitySemanticWarmupMaxRequestsPerMinute in
+// framework/configstore. The gateway normalizes an absent value to the
+// default; the form always sends an explicit number.
+export const DEFAULT_SEMANTIC_WARMUP_MAX_REQUESTS_PER_MINUTE = 60;
+export const MIN_SEMANTIC_WARMUP_MAX_REQUESTS_PER_MINUTE = 1;
+
 // Seeded when a deployment has no semantic block saved yet. Provider and model
 // stay blank because only the operator knows them.
 export const DEFAULT_SEMANTIC_CONFIG: SemanticConfig = {
@@ -191,6 +200,7 @@ export const DEFAULT_SEMANTIC_CONFIG: SemanticConfig = {
 	min_similarity: 0,
 	message_history_count: 1,
 	count_toward_budgets: false,
+	warmup_max_requests_per_minute: DEFAULT_SEMANTIC_WARMUP_MAX_REQUESTS_PER_MINUTE,
 	vector_store: "embedded",
 	fallback: "none",
 };

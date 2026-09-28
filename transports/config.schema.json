@@ -4299,6 +4299,12 @@
           "type": "boolean",
           "description": "Record classification embedding cost against governance budgets (record-only, never enforced; default: false)"
         },
+        "warmup_max_requests_per_minute": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Cap how fast exemplar warmup may call the embedding provider, in provider requests per minute. Saving a config embeds every reference phrase in batches, and without pacing that burst trips per-minute key quotas and fails the whole warmup on the first 429; a rate-limited call additionally waits one minute before retrying (default: 60). Set higher for keys with headroom.",
+          "default": 60
+        },
         "vector_store": {
           "type": "string",
           "enum": ["embedded", "vector_store"],

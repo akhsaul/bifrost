@@ -182,6 +182,13 @@ const (
 // DefaultComplexitySemanticTimeout bounds per-request embedding generation.
 const DefaultComplexitySemanticTimeout = 1500 * time.Millisecond
 
+// DefaultComplexitySemanticWarmupMaxRequestsPerMinute paces exemplar warmup
+// embedding so a save cannot burst through a per-minute key quota: 150 default
+// phrases embed in ~5 provider batches (~5 seconds), and a full 750-phrase set
+// in ~24 batches (~24 seconds). Raise it for keys with headroom; a very high
+// value effectively disables pacing.
+const DefaultComplexitySemanticWarmupMaxRequestsPerMinute = 60
+
 // ComplexitySemanticConfig configures the embedding-based complexity
 // classifier. A non-nil value enables semantic classification. The classifier
 // embeds the analyzer's shared per-tier keyword lists as its exemplars; there
@@ -214,6 +221,14 @@ type ComplexitySemanticConfig struct {
 	MessageHistoryCount int    `json:"message_history_count,omitempty"`
 	CountTowardBudgets  bool   `json:"count_toward_budgets,omitempty"`
 	VectorStore         string `json:"vector_store,omitempty"`
+	// WarmupMaxRequestsPerMinute caps how fast exemplar warmup may call the
+	// embedding provider, in provider requests per minute. Saving a config
+	// embeds every reference phrase (up to 750) in batches, and without pacing
+	// that burst trips per-minute key quotas — failing the whole warmup on the
+	// first 429. Zero means the default; persisted configs always carry an
+	// explicit value after normalization, so zero only reaches the warmer from
+	// unnormalized callers (tests), where it means no pacing.
+	WarmupMaxRequestsPerMinute int `json:"warmup_max_requests_per_minute,omitempty"`
 	// Fallback names what answers when semantic classification produces no
 	// tier: "none" (the default) records the request as skipped, "llm" asks
 	// the analyzer's llm block. The field lives here rather than at the top
@@ -232,14 +247,15 @@ func (c *ComplexitySemanticConfig) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	allowed := map[string]struct{}{
-		"provider":              {},
-		"embedding_model":       {},
-		"timeout":               {},
-		"min_similarity":        {},
-		"message_history_count": {},
-		"count_toward_budgets":  {},
-		"vector_store":          {},
-		"fallback":              {},
+		"provider":                       {},
+		"embedding_model":                {},
+		"timeout":                        {},
+		"min_similarity":                 {},
+		"message_history_count":          {},
+		"count_toward_budgets":           {},
+		"vector_store":                   {},
+		"warmup_max_requests_per_minute": {},
+		"fallback":                       {},
 	}
 	for field := range fields {
 		if _, ok := allowed[field]; !ok {
@@ -307,14 +323,15 @@ func (c *ComplexitySemanticConfig) normalized() *ComplexitySemanticConfig {
 		return nil
 	}
 	out := &ComplexitySemanticConfig{
-		Provider:            schemas.ModelProvider(strings.ToLower(strings.TrimSpace(string(c.Provider)))),
-		EmbeddingModel:      strings.TrimSpace(c.EmbeddingModel),
-		Timeout:             c.Timeout,
-		MinSimilarity:       c.MinSimilarity,
-		MessageHistoryCount: c.MessageHistoryCount,
-		CountTowardBudgets:  c.CountTowardBudgets,
-		VectorStore:         strings.ToLower(strings.TrimSpace(c.VectorStore)),
-		Fallback:            strings.ToLower(strings.TrimSpace(c.Fallback)),
+		Provider:                   schemas.ModelProvider(strings.ToLower(strings.TrimSpace(string(c.Provider)))),
+		EmbeddingModel:             strings.TrimSpace(c.EmbeddingModel),
+		Timeout:                    c.Timeout,
+		MinSimilarity:              c.MinSimilarity,
+		MessageHistoryCount:        c.MessageHistoryCount,
+		CountTowardBudgets:         c.CountTowardBudgets,
+		VectorStore:                strings.ToLower(strings.TrimSpace(c.VectorStore)),
+		WarmupMaxRequestsPerMinute: c.WarmupMaxRequestsPerMinute,
+		Fallback:                   strings.ToLower(strings.TrimSpace(c.Fallback)),
 	}
 	if out.Timeout == 0 {
 		out.Timeout = DefaultComplexitySemanticTimeout
@@ -324,6 +341,9 @@ func (c *ComplexitySemanticConfig) normalized() *ComplexitySemanticConfig {
 	}
 	if out.MessageHistoryCount == 0 {
 		out.MessageHistoryCount = DefaultComplexitySemanticMessageHistoryCount
+	}
+	if out.WarmupMaxRequestsPerMinute <= 0 {
+		out.WarmupMaxRequestsPerMinute = DefaultComplexitySemanticWarmupMaxRequestsPerMinute
 	}
 	if out.Fallback == "" {
 		out.Fallback = ComplexitySemanticFallbackNone

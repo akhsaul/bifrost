@@ -892,6 +892,13 @@ func (s *semanticLifecycleProbeStore) CreateNamespace(ctx context.Context, names
 	return s.VectorStore.CreateNamespace(ctx, namespace, dimension, properties)
 }
 
+// testWarmupMaxRequestsPerMinute keeps classifier warmups in tests fast:
+// production configs reach the warmer normalized (default 60/min, i.e. a
+// one-second spacing), which would push every multi-call warmup past the
+// one-second readiness assertions below. An explicit fast rate preserves the
+// real paced path at negligible intervals.
+const testWarmupMaxRequestsPerMinute = 3600
+
 // testSemanticClassifierConfig returns the smallest valid semantic config with
 // one distinct shared phrase per routing tier.
 func testSemanticClassifierConfig(vectorStore string) AnalyzerConfig {
@@ -903,10 +910,11 @@ func testSemanticClassifierConfig(vectorStore string) AnalyzerConfig {
 			ComplexKeywords: []string{"complex exemplar"},
 		},
 		Semantic: &SemanticConfig{
-			Provider:       schemas.ModelProvider("openai"),
-			EmbeddingModel: "test-embedding-model",
-			Timeout:        time.Second,
-			VectorStore:    vectorStore,
+			Provider:                   schemas.ModelProvider("openai"),
+			EmbeddingModel:             "test-embedding-model",
+			Timeout:                    time.Second,
+			VectorStore:                vectorStore,
+			WarmupMaxRequestsPerMinute: testWarmupMaxRequestsPerMinute,
 		},
 	}
 }
@@ -1168,4 +1176,181 @@ func TestSemanticClassifierStatusReportsCacheCoverage(t *testing.T) {
 
 	assert.Equal(t, len(semanticExemplars(&config)), classifier.Status().CachedPhrases,
 		"a warmed classifier holds one vector per active phrase")
+}
+
+// TestWarmupPacerSpacesCalls pins the pacer's contract: the first call fires
+// immediately and every later call waits a full interval, while a nil pacer
+// (an unnormalized config, i.e. tests) never waits and cancellation aborts a
+// pending wait.
+func TestWarmupPacerSpacesCalls(t *testing.T) {
+	pacer := newWarmupPacer(600)
+	require.NotNil(t, pacer)
+
+	ctx := context.Background()
+	require.NoError(t, pacer.wait(ctx), "the first call must fire immediately")
+
+	start := time.Now()
+	require.NoError(t, pacer.wait(ctx))
+	require.NoError(t, pacer.wait(ctx))
+	elapsed := time.Since(start)
+	// Two intervals at 600/min is 200ms; the bound stays generous so loaded
+	// CI does not flake, while an unpaced loop (microseconds) cannot pass.
+	assert.GreaterOrEqual(t, elapsed, 150*time.Millisecond, "two paced waits must cover two intervals")
+
+	require.NoError(t, (*warmupPacer)(nil).wait(ctx), "a nil pacer must never wait")
+
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	require.NoError(t, pacer.wait(cancelCtx), "immediate first wait keeps the setup honest")
+	cancel()
+	waitErr := pacer.wait(cancelCtx)
+	require.ErrorIs(t, waitErr, context.Canceled, "cancellation must abort a pending wait")
+}
+
+// TestWarmSemanticExemplarsPacesProviderCalls proves the warmup loop spaces
+// its provider calls end to end: 40 phrases need a probe batch plus one main
+// batch, and at 600/min those two calls must land at least one interval
+// apart instead of back to back.
+func TestWarmSemanticExemplarsPacesProviderCalls(t *testing.T) {
+	store, err := vectorstore.NewVectorStore(context.Background(), &vectorstore.Config{
+		Enabled: true,
+		Type:    vectorstore.VectorStoreTypeChromem,
+		Config:  vectorstore.ChromemConfig{},
+	}, bifrost.NewDefaultLogger(schemas.LogLevelError))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, store.Close(context.Background(), SemanticVectorStoreNamespace))
+	})
+
+	config := testSemanticClassifierConfig(configstore.ComplexitySemanticVectorStoreEmbedded)
+	config.Keywords.SimpleKeywords = makeSemanticTestPhrases("simple", 14)
+	config.Keywords.MediumKeywords = makeSemanticTestPhrases("medium", 13)
+	config.Keywords.ComplexKeywords = makeSemanticTestPhrases("complex", 13)
+	config.Semantic.WarmupMaxRequestsPerMinute = 600
+
+	var mu sync.Mutex
+	var callTimes []time.Time
+	batch := func(_ context.Context, _ *SemanticConfig, texts []string) ([][]float32, error) {
+		mu.Lock()
+		callTimes = append(callTimes, time.Now())
+		mu.Unlock()
+		embeddings := make([][]float32, len(texts))
+		for index := range texts {
+			embeddings[index] = []float32{1, 0}
+		}
+		return embeddings, nil
+	}
+	single := func(_ context.Context, _ *SemanticConfig, text string) ([]float32, error) {
+		return nil, fmt.Errorf("unexpected single-input call for %q", text)
+	}
+
+	loaded, _, _, err := warmSemanticExemplars(context.Background(), nil, store, &config, single, batch, nil)
+	require.NoError(t, err)
+	require.Equal(t, 40, loaded)
+	require.Len(t, callTimes, 2, "40 phrases need a probe batch plus one main batch")
+	assert.GreaterOrEqual(t, callTimes[1].Sub(callTimes[0]), 50*time.Millisecond,
+		"the two batches must be spaced by the pacing interval, not fired back to back")
+}
+
+// withShrunkWarmupRetryDelay runs fn with the one-minute rate-limit wait
+// shrunk to milliseconds so retry tests stay fast.
+func withShrunkWarmupRetryDelay(t *testing.T, fn func()) {
+	t.Helper()
+	original := warmupRateLimitRetryDelay
+	warmupRateLimitRetryDelay = 5 * time.Millisecond
+	t.Cleanup(func() { warmupRateLimitRetryDelay = original })
+	fn()
+}
+
+// TestWarmSemanticExemplarsRetriesRateLimitedCalls proves a 429 does not fail
+// the warmup: the probe batch is retried after the quota wait and the warmup
+// completes once the provider answers.
+func TestWarmSemanticExemplarsRetriesRateLimitedCalls(t *testing.T) {
+	withShrunkWarmupRetryDelay(t, func() {
+		store, err := vectorstore.NewVectorStore(context.Background(), &vectorstore.Config{
+			Enabled: true,
+			Type:    vectorstore.VectorStoreTypeChromem,
+			Config:  vectorstore.ChromemConfig{},
+		}, bifrost.NewDefaultLogger(schemas.LogLevelError))
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, store.Close(context.Background(), SemanticVectorStoreNamespace))
+		})
+
+		config := testSemanticClassifierConfig(configstore.ComplexitySemanticVectorStoreEmbedded)
+
+		var calls atomic.Int32
+		batch := func(_ context.Context, _ *SemanticConfig, texts []string) ([][]float32, error) {
+			if calls.Add(1) <= 2 {
+				return nil, categorizedSemanticWarmupError{reason: SemanticFailureRateLimited}
+			}
+			embeddings := make([][]float32, len(texts))
+			for index := range texts {
+				embeddings[index] = []float32{1, 0}
+			}
+			return embeddings, nil
+		}
+
+		loaded, _, _, err := warmSemanticExemplars(context.Background(), nil, store, &config, testSemanticEmbedding, batch, nil)
+		require.NoError(t, err)
+		require.Equal(t, 3, loaded)
+		assert.EqualValues(t, 3, calls.Load(), "two rate-limited attempts plus the answering call")
+	})
+}
+
+// TestWarmSemanticExemplarsFailsAfterRateLimitRetries bounds the wait: a
+// permanently exhausted quota fails with the rate-limited reason after the
+// configured retries instead of stalling the warmup worker.
+func TestWarmSemanticExemplarsFailsAfterRateLimitRetries(t *testing.T) {
+	withShrunkWarmupRetryDelay(t, func() {
+		store, err := vectorstore.NewVectorStore(context.Background(), &vectorstore.Config{
+			Enabled: true,
+			Type:    vectorstore.VectorStoreTypeChromem,
+			Config:  vectorstore.ChromemConfig{},
+		}, bifrost.NewDefaultLogger(schemas.LogLevelError))
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			require.NoError(t, store.Close(context.Background(), SemanticVectorStoreNamespace))
+		})
+
+		config := testSemanticClassifierConfig(configstore.ComplexitySemanticVectorStoreEmbedded)
+
+		var calls atomic.Int32
+		batch := func(_ context.Context, _ *SemanticConfig, _ []string) ([][]float32, error) {
+			calls.Add(1)
+			return nil, categorizedSemanticWarmupError{reason: SemanticFailureRateLimited}
+		}
+
+		_, _, _, err = warmSemanticExemplars(context.Background(), nil, store, &config, testSemanticEmbedding, batch, nil)
+		require.Error(t, err)
+		assert.Equal(t, SemanticFailureRateLimited, semanticWarmupFailureReason(err))
+		assert.EqualValues(t, 1+warmupRateLimitMaxRetries, calls.Load(), "one attempt plus every retry")
+	})
+}
+
+// TestWarmSemanticExemplarsFailsFastOnOtherErrors pins the retry gate: only
+// rate limiting waits out the quota window, every other provider failure
+// fails the warmup on the first attempt exactly as before.
+func TestWarmSemanticExemplarsFailsFastOnOtherErrors(t *testing.T) {
+	store, err := vectorstore.NewVectorStore(context.Background(), &vectorstore.Config{
+		Enabled: true,
+		Type:    vectorstore.VectorStoreTypeChromem,
+		Config:  vectorstore.ChromemConfig{},
+	}, bifrost.NewDefaultLogger(schemas.LogLevelError))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, store.Close(context.Background(), SemanticVectorStoreNamespace))
+	})
+
+	config := testSemanticClassifierConfig(configstore.ComplexitySemanticVectorStoreEmbedded)
+
+	var calls atomic.Int32
+	batch := func(_ context.Context, _ *SemanticConfig, _ []string) ([][]float32, error) {
+		calls.Add(1)
+		return nil, categorizedSemanticWarmupError{reason: SemanticFailureAuthentication}
+	}
+
+	_, _, _, err = warmSemanticExemplars(context.Background(), nil, store, &config, testSemanticEmbedding, batch, nil)
+	require.Error(t, err)
+	assert.Equal(t, SemanticFailureAuthentication, semanticWarmupFailureReason(err))
+	assert.EqualValues(t, 1, calls.Load(), "a non-rate-limited failure must not be retried")
 }

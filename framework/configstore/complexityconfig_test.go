@@ -117,7 +117,31 @@ func TestComplexitySemanticConfigNormalizedDefaults(t *testing.T) {
 
 	assert.Equal(t, DefaultComplexitySemanticTimeout, normalized.Timeout)
 	assert.Equal(t, ComplexitySemanticVectorStoreEmbedded, normalized.VectorStore)
+	assert.Equal(t, DefaultComplexitySemanticWarmupMaxRequestsPerMinute, normalized.WarmupMaxRequestsPerMinute)
 	require.NoError(t, normalized.Validate())
+}
+
+func TestComplexitySemanticConfigWarmupPacingDecoding(t *testing.T) {
+	var cfg ComplexitySemanticConfig
+	require.NoError(t, json.Unmarshal([]byte(`{"provider":"openai","embedding_model":"text-embedding-3-small","warmup_max_requests_per_minute":90}`), &cfg))
+	assert.Equal(t, 90, cfg.WarmupMaxRequestsPerMinute)
+
+	normalized := cfg.normalized()
+	assert.Equal(t, 90, normalized.WarmupMaxRequestsPerMinute, "an explicit pacing rate must survive normalization")
+	require.NoError(t, normalized.Validate())
+}
+
+func TestComplexitySemanticConfigWarmupPacingDefaults(t *testing.T) {
+	// Absent and zero both mean the default: persisted configs always carry an
+	// explicit value after normalization.
+	for _, payload := range []string{
+		`{"provider":"openai","embedding_model":"text-embedding-3-small"}`,
+		`{"provider":"openai","embedding_model":"text-embedding-3-small","warmup_max_requests_per_minute":0}`,
+	} {
+		var cfg ComplexitySemanticConfig
+		require.NoError(t, json.Unmarshal([]byte(payload), &cfg))
+		assert.Equal(t, DefaultComplexitySemanticWarmupMaxRequestsPerMinute, cfg.normalized().WarmupMaxRequestsPerMinute)
+	}
 }
 
 func TestComplexitySemanticConfigValidation(t *testing.T) {

@@ -12,6 +12,7 @@ import {
 	MAX_SEMANTIC_MESSAGE_HISTORY,
 	MIN_LLM_MESSAGE_HISTORY,
 	MIN_SEMANTIC_MESSAGE_HISTORY,
+	MIN_SEMANTIC_WARMUP_MAX_REQUESTS_PER_MINUTE,
 	SEMANTIC_FALLBACK_OPTIONS,
 	SEMANTIC_VECTOR_STORE_OPTIONS,
 } from "@/lib/types/complexityRouter";
@@ -371,6 +372,38 @@ export default function EmbeddingConfigSheet({
 										</p>
 									)}
 								</div>
+							</div>
+
+							{/* Warmup pacing. Full width rather than a third grid cell:
+						    it paces a background job the operator runs once per save,
+						    so it reads as its own concern next to the fallback
+						    selector, not as another per-request tuning knob. */}
+							<div className="space-y-2 border-t pt-4">
+								<FieldLabel
+									htmlFor="semantic-warmup-max-requests-per-minute"
+									tooltip="Caps how fast saving embeds reference phrases, in provider requests per minute. Without pacing, a save bursts through per-minute key quotas and fails the whole warmup on the first 429. A rate-limited call additionally waits one minute for the quota window to reset and retries."
+								>
+									Warmup requests per minute
+								</FieldLabel>
+								<Input
+									id="semantic-warmup-max-requests-per-minute"
+									data-testid="complexity-router-semantic-warmup-rate-input"
+									type="number"
+									min={MIN_SEMANTIC_WARMUP_MAX_REQUESTS_PER_MINUTE}
+									step={1}
+									disabled={!canUpdate || !isConfigured}
+									aria-invalid={errors?.warmup_max_requests_per_minute ? true : undefined}
+									className={cn("font-mono", errors?.warmup_max_requests_per_minute && "border-destructive focus-visible:ring-destructive")}
+									{...register("semantic.warmup_max_requests_per_minute", { valueAsNumber: true })}
+								/>
+								{errors?.warmup_max_requests_per_minute ? (
+									<p className="text-destructive text-xs">{errors.warmup_max_requests_per_minute.message}</p>
+								) : (
+									<p className="text-muted-foreground text-xs leading-relaxed">
+										Lower this below a tight key quota (e.g. 100/min) so saves never trip it. Raise it for keys with headroom; very high
+										effectively disables pacing.
+									</p>
+								)}
 							</div>
 
 							{/* Fallback classifier. Lives here rather than in its own sheet

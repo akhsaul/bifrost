@@ -1,5 +1,13 @@
 import { describe, expect, test } from "vitest";
-import { analyzerConfigSchema, countCanonicalSemanticPhrases, DEFAULT_FORM_VALUES, shouldSeedLLMPrompt } from "./formSchema";
+import {
+	analyzerConfigSchema,
+	countCanonicalSemanticPhrases,
+	DEFAULT_FORM_VALUES,
+	DEFAULT_SEMANTIC_FORM_VALUES,
+	shouldSeedLLMPrompt,
+	toAnalyzerPayload,
+	toFormValues,
+} from "./formSchema";
 
 describe("fallback prompt initialization", () => {
 	test("initializes an untouched empty prompt", () => {
@@ -54,5 +62,40 @@ describe("semantic complexity phrase limit", () => {
 
 	test("does not cap a form that will omit the semantic block", () => {
 		expect(analyzerConfigSchema.safeParse(formValues(750, false)).success).toBe(true);
+	});
+});
+
+describe("semantic warmup pacing", () => {
+	test("accepts a positive whole-number rate", () => {
+		const values = formValues(1, true);
+		values.semantic.warmup_max_requests_per_minute = 90;
+		expect(analyzerConfigSchema.safeParse(values).success).toBe(true);
+	});
+
+	test("rejects zero, negative, and fractional rates", () => {
+		for (const rate of [0, -5, 1.5]) {
+			const values = formValues(1, true);
+			values.semantic.warmup_max_requests_per_minute = rate;
+			const result = analyzerConfigSchema.safeParse(values);
+			expect(result.success).toBe(false);
+			if (result.success) return;
+			expect(result.error.issues.some((issue) => issue.path.join(".") === "semantic.warmup_max_requests_per_minute")).toBe(true);
+		}
+	});
+
+	test("defaults to the gateway rate and round-trips an explicit one", () => {
+		expect(DEFAULT_SEMANTIC_FORM_VALUES.warmup_max_requests_per_minute).toBe(60);
+		const keywords = { simple_keywords: ["a"], medium_keywords: ["b"], complex_keywords: ["c"] };
+		const defaulted = toAnalyzerPayload(
+			toFormValues({ keywords, semantic: { provider: "openai", embedding_model: "text-embedding-3-small" } }),
+		);
+		expect(defaulted.semantic?.warmup_max_requests_per_minute).toBe(60);
+		const explicit = toAnalyzerPayload(
+			toFormValues({
+				keywords,
+				semantic: { provider: "openai", embedding_model: "text-embedding-3-small", warmup_max_requests_per_minute: 90 },
+			}),
+		);
+		expect(explicit.semantic?.warmup_max_requests_per_minute).toBe(90);
 	});
 });

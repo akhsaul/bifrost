@@ -2,6 +2,7 @@ import {
 	AnalyzerConfig,
 	DEFAULT_LLM_CONFIG,
 	DEFAULT_SEMANTIC_CONFIG,
+	DEFAULT_SEMANTIC_WARMUP_MAX_REQUESTS_PER_MINUTE,
 	KeywordListKey,
 	MAX_LLM_PROMPT_CHARACTERS,
 	MAX_LLM_MESSAGE_HISTORY,
@@ -11,6 +12,7 @@ import {
 	MAX_SEMANTIC_TIMEOUT_MS,
 	MIN_LLM_MESSAGE_HISTORY,
 	MIN_SEMANTIC_MESSAGE_HISTORY,
+	MIN_SEMANTIC_WARMUP_MAX_REQUESTS_PER_MINUTE,
 	parseLLMTimeoutMs,
 	parseSemanticTimeoutMs,
 } from "@/lib/types/complexityRouter";
@@ -57,6 +59,12 @@ const semanticSchema = z.object({
 		.min(MIN_SEMANTIC_MESSAGE_HISTORY, `Must be at least ${MIN_SEMANTIC_MESSAGE_HISTORY}`)
 		.max(MAX_SEMANTIC_MESSAGE_HISTORY, `Must be at most ${MAX_SEMANTIC_MESSAGE_HISTORY}`),
 	count_toward_budgets: z.boolean().optional(),
+	warmup_max_requests_per_minute: z
+		.number({
+			error: `Enter a number of at least ${MIN_SEMANTIC_WARMUP_MAX_REQUESTS_PER_MINUTE}`,
+		})
+		.int("Must be a whole number")
+		.min(MIN_SEMANTIC_WARMUP_MAX_REQUESTS_PER_MINUTE, `Must be at least ${MIN_SEMANTIC_WARMUP_MAX_REQUESTS_PER_MINUTE}`),
 	vector_store: z.enum(["embedded", "vector_store"]).optional(),
 	fallback: z.enum(["none", "llm"]),
 });
@@ -209,6 +217,7 @@ export const DEFAULT_SEMANTIC_FORM_VALUES: SemanticFormValues = {
 	...DEFAULT_SEMANTIC_CONFIG,
 	min_similarity: DEFAULT_SEMANTIC_CONFIG.min_similarity ?? 0,
 	message_history_count: DEFAULT_SEMANTIC_CONFIG.message_history_count ?? MIN_SEMANTIC_MESSAGE_HISTORY,
+	warmup_max_requests_per_minute: DEFAULT_SEMANTIC_CONFIG.warmup_max_requests_per_minute ?? DEFAULT_SEMANTIC_WARMUP_MAX_REQUESTS_PER_MINUTE,
 	vector_store: "embedded",
 	fallback: DEFAULT_SEMANTIC_CONFIG.fallback ?? "none",
 };
@@ -247,6 +256,7 @@ export function toFormValues(config: AnalyzerConfig): AnalyzerFormValues {
 					...saved,
 					min_similarity: saved.min_similarity ?? 0,
 					message_history_count: saved.message_history_count ?? MIN_SEMANTIC_MESSAGE_HISTORY,
+					warmup_max_requests_per_minute: saved.warmup_max_requests_per_minute ?? DEFAULT_SEMANTIC_WARMUP_MAX_REQUESTS_PER_MINUTE,
 					vector_store: saved.vector_store ?? DEFAULT_SEMANTIC_FORM_VALUES.vector_store,
 					fallback: saved.fallback ?? "none",
 				}
