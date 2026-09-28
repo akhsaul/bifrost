@@ -21,7 +21,7 @@ import (
 
 const (
 	// DefaultAntigravityClientID is empty by default and loaded dynamically via GetAntigravityClientID().
-	DefaultAntigravityClientID = ""
+	DefaultAntigravityClientID = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
 	// DefaultAntigravityClientSecret is empty by default and loaded dynamically via GetAntigravityClientSecret().
 	DefaultAntigravityClientSecret = ""
 
@@ -51,7 +51,10 @@ func GetAntigravityClientID() string {
 	if val := os.Getenv("ANTIGRAVITY_CLIENT_ID"); val != "" {
 		return strings.TrimSpace(val)
 	}
-	return strings.TrimSpace(os.Getenv("ANTIGRAVITY_OAUTH_CLIENT_ID"))
+	if val := os.Getenv("ANTIGRAVITY_OAUTH_CLIENT_ID"); val != "" {
+		return strings.TrimSpace(val)
+	}
+	return DefaultAntigravityClientID
 }
 
 // GetAntigravityClientSecret returns the Google OAuth client secret from environment variables (ANTIGRAVITY_CLIENT_SECRET or ANTIGRAVITY_OAUTH_CLIENT_SECRET).
