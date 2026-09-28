@@ -854,6 +854,88 @@ func TestOpencodeFreeExplicitInstructionsUntouched(t *testing.T) {
 	}
 }
 
+func TestOpencodeFreeReasoningItemWithoutSummary(t *testing.T) {
+	var body map[string]any
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bodyBytes, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(bodyBytes, &body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+	}))
+	defer server.Close()
+
+	cfg := &schemas.ProviderConfig{
+		NetworkConfig: schemas.NetworkConfig{
+			BaseURL: server.URL,
+		},
+	}
+	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	if err != nil {
+		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+	}
+
+	// Shape of opencode-req-bug.json: a reasoning item carrying only
+	// reasoning_text content (no summary key) at input[2]. The upstream
+	// rejects it with "`input[2]` missing required field `summary`".
+	reasoningType := schemas.ResponsesMessageTypeReasoning
+	reasoningText := "Let me investigate the codebase first."
+	ctx := schemas.NewBifrostContext(nil, time.Time{})
+	req := &schemas.BifrostResponsesRequest{
+		Model: "muse-spark-1.3-contributor-free",
+		Input: []schemas.ResponsesMessage{
+			{
+				Role: schemas.Ptr(schemas.ResponsesInputMessageRoleUser),
+				Content: &schemas.ResponsesMessageContent{
+					ContentStr: schemas.Ptr("plan reminder"),
+				},
+			},
+			{
+				Role: schemas.Ptr(schemas.ResponsesInputMessageRoleUser),
+				Content: &schemas.ResponsesMessageContent{
+					ContentStr: schemas.Ptr("help me fix embedding"),
+				},
+			},
+			{
+				ID:   schemas.Ptr("rs_3fc246866df43e3b9ac9e7f97f38c4c34ae1801703c759dee6"),
+				Type: &reasoningType,
+				Content: &schemas.ResponsesMessageContent{
+					ContentBlocks: []schemas.ResponsesMessageContentBlock{
+						{
+							Type: schemas.ResponsesOutputMessageContentTypeReasoning,
+							Text: &reasoningText,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if _, bErr := provider.Responses(ctx, schemas.Key{}, req); bErr != nil {
+		t.Fatalf("Responses request failed: %v", bErr.Error)
+	}
+
+	input, ok := body["input"].([]any)
+	if !ok || len(input) != 3 {
+		t.Fatalf("expected 3 input items on the wire, got %v", body["input"])
+	}
+	item, ok := input[2].(map[string]any)
+	if !ok {
+		t.Fatalf("input[2] is not an object: %v", input[2])
+	}
+	summary, ok := item["summary"].([]any)
+	if !ok || len(summary) == 0 {
+		t.Fatalf("input[2] must carry a non-empty summary array, got %v", item["summary"])
+	}
+	entry, ok := summary[0].(map[string]any)
+	if !ok || entry["type"] != "summary_text" || entry["text"] != reasoningText {
+		t.Errorf("summary must be converted from reasoning_text content, got %v", summary[0])
+	}
+	if content, hasContent := item["content"]; hasContent {
+		t.Errorf("reasoning_text content must be removed after conversion, got %v", content)
+	}
+}
+
 func TestOpencodeFreeErrorParsing(t *testing.T) {
 	resp := &fasthttp.Response{}
 	resp.SetStatusCode(fasthttp.StatusBadRequest)

@@ -362,6 +362,74 @@ func (p *opencodeFreeProvider) ChatCompletionStream(ctx *schemas.BifrostContext,
 // datasheet caps that know nothing about opencode-native models, downgrading
 // "xhigh"→"high" and rewriting "auto"; opencode accepts both, so they must
 // pass through untouched.
+// ensureOpencodeReasoningItemSummaries converts reasoning_text content on
+// reasoning input items into summary_text entries, which is what the upstream
+// requires. Items decoded without summary/encrypted_content keys (e.g. harness
+// replays carrying only reasoning_text content, like opencode-req-bug.json
+// input[2]) would otherwise fail with
+// "`input[N]` missing required field `summary`".
+//
+// The reasoning_text blocks (and plain string content) are removed after
+// conversion, so the text lives only in summary. Blocks of any other type are
+// kept; when nothing remains, content is dropped entirely. Existing non-empty
+// summaries are left untouched. Operates on the wire copy only, never the
+// caller's request.
+func ensureOpencodeReasoningItemSummaries(wireReq *openai.OpenAIResponsesRequest) *openai.OpenAIResponsesRequest {
+	if wireReq == nil {
+		return wireReq
+	}
+	items := wireReq.Input.OpenAIResponsesRequestInputArray
+	for i := range items {
+		msg := &items[i]
+		if msg.Type == nil || *msg.Type != schemas.ResponsesMessageTypeReasoning {
+			continue
+		}
+		var encrypted *string
+		if msg.ResponsesReasoning != nil {
+			if len(msg.ResponsesReasoning.Summary) > 0 {
+				continue
+			}
+			encrypted = msg.ResponsesReasoning.EncryptedContent
+		}
+		summary := make([]schemas.ResponsesReasoningSummary, 0, 1)
+		var kept []schemas.ResponsesMessageContentBlock
+		if msg.Content != nil {
+			if msg.Content.ContentStr != nil {
+				if text := strings.TrimSpace(*msg.Content.ContentStr); text != "" {
+					summary = append(summary, schemas.ResponsesReasoningSummary{
+						Type: schemas.ResponsesReasoningContentBlockTypeSummaryText,
+						Text: text,
+					})
+				}
+			}
+			for _, block := range msg.Content.ContentBlocks {
+				if block.Type == schemas.ResponsesOutputMessageContentTypeReasoning {
+					if block.Text != nil {
+						if text := strings.TrimSpace(*block.Text); text != "" {
+							summary = append(summary, schemas.ResponsesReasoningSummary{
+								Type: schemas.ResponsesReasoningContentBlockTypeSummaryText,
+								Text: text,
+							})
+						}
+					}
+					continue
+				}
+				kept = append(kept, block)
+			}
+		}
+		msg.ResponsesReasoning = &schemas.ResponsesReasoning{
+			Summary:          summary,
+			EncryptedContent: encrypted,
+		}
+		if len(kept) == 0 {
+			msg.Content = nil
+		} else {
+			msg.Content = &schemas.ResponsesMessageContent{ContentBlocks: kept}
+		}
+	}
+	return wireReq
+}
+
 func preserveOpencodeReasoning(wireReq *openai.OpenAIResponsesRequest, request *schemas.BifrostResponsesRequest) *openai.OpenAIResponsesRequest {
 	if wireReq == nil || request == nil || request.Params == nil || request.Params.Reasoning == nil {
 		return wireReq
@@ -397,7 +465,7 @@ func (p *opencodeFreeProvider) Responses(ctx *schemas.BifrostContext, key schema
 		nil,
 		p.logger,
 		func(req *schemas.BifrostResponsesRequest) (providerUtils.RequestBodyWithExtraParams, error) {
-			return preserveOpencodeReasoning(openai.ToOpenAIResponsesRequest(ctx, req), req), nil
+			return ensureOpencodeReasoningItemSummaries(preserveOpencodeReasoning(openai.ToOpenAIResponsesRequest(ctx, req), req)), nil
 		},
 	)
 }
@@ -410,7 +478,7 @@ func (p *opencodeFreeProvider) ResponsesStream(ctx *schemas.BifrostContext, post
 	ensureOpencodeFreeDefaults(request, resolved.SessionID)
 	extraHeaders := headersFromResolved(ctx, p.networkConfig.ExtraHeaders, resolved, true)
 	postRequestConverter := func(wireReq *openai.OpenAIResponsesRequest) *openai.OpenAIResponsesRequest {
-		return preserveOpencodeReasoning(wireReq, request)
+		return ensureOpencodeReasoningItemSummaries(preserveOpencodeReasoning(wireReq, request))
 	}
 	return openai.HandleOpenAIResponsesStreaming(
 		ctx,
