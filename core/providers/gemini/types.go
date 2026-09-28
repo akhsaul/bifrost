@@ -541,6 +541,28 @@ func (s *SearchTypes) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// GoogleSearchImageSearchConfig is the Antigravity image-search configuration
+// inside googleSearch.enhancedContent.
+type GoogleSearchImageSearchConfig struct {
+	MaxResultCount int32 `json:"maxResultCount,omitempty"`
+}
+
+// GoogleSearchWebSearchConfig is the Antigravity web-search configuration
+// inside googleSearch.enhancedContent.
+type GoogleSearchWebSearchConfig struct {
+	MaxResultCount int32 `json:"maxResultCount,omitempty"`
+}
+
+// GoogleSearchEnhancedContent is the Antigravity-only enhanced content
+// configuration for the googleSearch tool (e.g. from the agy CLI wire
+// format {"googleSearch":{"enhancedContent":{"imageSearch":{"maxResultCount":5}}}}).
+// Gemini and Vertex ignore unknown tool subfields, so adding it here is
+// safe for the shared struct.
+type GoogleSearchEnhancedContent struct {
+	ImageSearch *GoogleSearchImageSearchConfig `json:"imageSearch,omitempty"`
+	WebSearch   *GoogleSearchWebSearchConfig   `json:"webSearch,omitempty"`
+}
+
 // GoogleSearch is a tool to support Google Search in Model. Powered by Google.
 type GoogleSearch struct {
 	// Optional. Filter search results to a specific time range.
@@ -551,6 +573,8 @@ type GoogleSearch struct {
 	ExcludeDomains []string `json:"excludeDomains,omitempty"`
 	// Optional. The set of search types to enable. Web search when unset.
 	SearchTypes *SearchTypes `json:"searchTypes,omitempty"`
+	// Optional. Antigravity-only enhanced content configuration.
+	EnhancedContent *GoogleSearchEnhancedContent `json:"enhancedContent,omitempty"`
 }
 
 // UnmarshalJSON handles both camelCase and snake_case
@@ -559,9 +583,10 @@ func (g *GoogleSearch) UnmarshalJSON(data []byte) error {
 	aux := &struct {
 		*Alias
 		// snake_case alternatives
-		TimeRangeFilterSnake *Interval    `json:"time_range_filter,omitempty"`
-		ExcludeDomainsSnake  []string     `json:"exclude_domains,omitempty"`
-		SearchTypesSnake     *SearchTypes `json:"search_types,omitempty"`
+		TimeRangeFilterSnake *Interval                    `json:"time_range_filter,omitempty"`
+		ExcludeDomainsSnake  []string                     `json:"exclude_domains,omitempty"`
+		SearchTypesSnake     *SearchTypes                 `json:"search_types,omitempty"`
+		EnhancedContentSnake *GoogleSearchEnhancedContent `json:"enhanced_content,omitempty"`
 	}{
 		Alias: (*Alias)(g),
 	}
@@ -579,6 +604,9 @@ func (g *GoogleSearch) UnmarshalJSON(data []byte) error {
 	}
 	if g.SearchTypes == nil && aux.SearchTypesSnake != nil {
 		g.SearchTypes = aux.SearchTypesSnake
+	}
+	if g.EnhancedContent == nil && aux.EnhancedContentSnake != nil {
+		g.EnhancedContent = aux.EnhancedContentSnake
 	}
 
 	return nil

@@ -269,20 +269,52 @@ func (provider *AntigravityProvider) ChatCompletionStream(
 	)
 }
 
-// Responses performs a responses request using the chat completion path internally.
+// Responses performs a responses request using the Antigravity Responses converter.
 func (provider *AntigravityProvider) Responses(
 	ctx *schemas.BifrostContext,
 	key schemas.Key,
 	request *schemas.BifrostResponsesRequest,
 ) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
-	chatResponse, err := provider.ChatCompletion(ctx, key, request.ToChatRequest())
-	if err != nil {
-		return nil, err
+	accessToken, projectID, authErr := GetAccessTokenAndProject(ctx, provider.client, key, provider.networkConfig.BaseURL, provider.logger)
+	if authErr != nil {
+		return nil, authErr
 	}
-	return chatResponse.ToBifrostResponsesResponse(), nil
+
+	if projectID == "" {
+		return nil, newAuthenticationError("missing Google Cloud project ID for Antigravity account (ensure Gemini Code Assist onboarding is completed)", nil)
+	}
+
+	creds := GetCredentials(key)
+	_, jsonBytes, err := ToAntigravityResponsesRequest(ctx, request, projectID)
+	if err != nil {
+		return nil, providerUtils.NewBifrostOperationError(schemas.ErrRequestBodyConversion, err)
+	}
+
+	targetURL := provider.networkConfig.BaseURL + providerUtils.GetPathFromContext(ctx, GenerateContentPath)
+	headers := map[string]string{
+		"Authorization": "Bearer " + accessToken,
+		"User-Agent":    resolveUserAgent(creds.ClientProfile, provider.networkConfig.ExtraHeaders),
+	}
+
+	chatResp, bErr := HandleAntigravityChatCompletion(
+		ctx,
+		provider.client,
+		targetURL,
+		jsonBytes,
+		headers,
+		provider.networkConfig.ExtraHeaders,
+		request.Model,
+		providerUtils.ShouldSendBackRawRequest(ctx, provider.sendBackRawRequest),
+		providerUtils.ShouldSendBackRawResponse(ctx, provider.sendBackRawResponse),
+		provider.logger,
+	)
+	if bErr != nil {
+		return nil, bErr
+	}
+	return chatResp.ToBifrostResponsesResponse(), nil
 }
 
-// ResponsesStream performs a streaming responses request using the chat completion stream internally.
+// ResponsesStream performs a streaming responses request using the Antigravity Responses converter.
 func (provider *AntigravityProvider) ResponsesStream(
 	ctx *schemas.BifrostContext,
 	postHookRunner schemas.PostHookRunner,
@@ -291,12 +323,42 @@ func (provider *AntigravityProvider) ResponsesStream(
 	request *schemas.BifrostResponsesRequest,
 ) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
 	ctx.SetValue(schemas.BifrostContextKeyIsResponsesToChatCompletionFallback, true)
-	return provider.ChatCompletionStream(
+
+	accessToken, projectID, authErr := GetAccessTokenAndProject(ctx, provider.client, key, provider.networkConfig.BaseURL, provider.logger)
+	if authErr != nil {
+		return nil, authErr
+	}
+
+	if projectID == "" {
+		return nil, newAuthenticationError("missing Google Cloud project ID for Antigravity account (ensure Gemini Code Assist onboarding is completed)", nil)
+	}
+
+	creds := GetCredentials(key)
+	_, jsonBytes, err := ToAntigravityResponsesRequest(ctx, request, projectID)
+	if err != nil {
+		return nil, providerUtils.NewBifrostOperationError(schemas.ErrRequestBodyConversion, err)
+	}
+
+	targetURL := provider.networkConfig.BaseURL + providerUtils.GetPathFromContext(ctx, StreamGeneratePath)
+	headers := map[string]string{
+		"Authorization": "Bearer " + accessToken,
+		"User-Agent":    resolveUserAgent(creds.ClientProfile, provider.networkConfig.ExtraHeaders),
+	}
+
+	return HandleAntigravityChatCompletionStream(
 		ctx,
+		provider.streamingClient,
+		targetURL,
+		jsonBytes,
+		headers,
+		provider.networkConfig.ExtraHeaders,
+		request.Model,
+		provider.networkConfig.StreamIdleTimeoutInSeconds,
+		providerUtils.ShouldSendBackRawRequest(ctx, provider.sendBackRawRequest),
+		providerUtils.ShouldSendBackRawResponse(ctx, provider.sendBackRawResponse),
 		postHookRunner,
 		postHookSpanFinalizer,
-		key,
-		request.ToChatRequest(),
+		provider.logger,
 	)
 }
 

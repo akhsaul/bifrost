@@ -107,8 +107,8 @@ type AntigravityRequestEnvelope struct {
 	Project            string                   `json:"project"`
 	Model              string                   `json:"model,omitempty"`
 	UserAgent          string                   `json:"userAgent"` // "antigravity"
-	RequestID          string                   `json:"requestId"`
-	RequestType        string                   `json:"requestType"` // "agent" or "image_gen"
+	RequestID          string                   `json:"requestId,omitempty"`
+	RequestType        string                   `json:"requestType"` // "agent" or "web_search"
 	Request            *AntigravityInnerRequest `json:"request"`
 	EnabledCreditTypes []string                 `json:"enabledCreditTypes,omitempty"`
 }

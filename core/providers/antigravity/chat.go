@@ -46,17 +46,21 @@ func ToAntigravityChatRequest(
 
 	sanitizeAntigravityRequest(geminiReq, resolvedModel)
 
+	isWebSearch := prepareAntigravityRequest(geminiReq, extractMaxResultCount(bifrostReq.Params))
+
 	// The Antigravity internal API only accepts the Gemini proto Schema form
 	// ("parameters" with UPPERCASE types), not parametersJsonSchema.
 	if err := convertToolsToAntigravityFormat(geminiReq.Tools); err != nil {
 		return nil, nil, err
 	}
 
-	// The agy CLI always sends a thinkingConfig; the Antigravity endpoint
-	// expects one even when the client sends no reasoning parameters. Inject
-	// the agy default (dynamic budget) only when none was derived from the
-	// client request.
-	applyDefaultThinkingConfig(geminiReq)
+	if !isWebSearch {
+		// The agy CLI always sends a thinkingConfig; the Antigravity endpoint
+		// expects one even when the client sends no reasoning parameters. Inject
+		// the agy default (dynamic budget) only when none was derived from the
+		// client request.
+		applyDefaultThinkingConfig(geminiReq)
+	}
 
 	var sysInstruction *gemini.Content
 	if geminiReq.SystemInstruction != nil && len(geminiReq.SystemInstruction.Parts) > 0 {
@@ -64,7 +68,8 @@ func ToAntigravityChatRequest(
 	}
 
 	var genConfig *gemini.GenerationConfig
-	if geminiReq.GenerationConfig.MaxOutputTokens > 0 ||
+	if geminiReq.GenerationConfig.CandidateCount > 0 ||
+		geminiReq.GenerationConfig.MaxOutputTokens > 0 ||
 		geminiReq.GenerationConfig.Temperature != nil ||
 		geminiReq.GenerationConfig.TopP != nil ||
 		geminiReq.GenerationConfig.TopK != nil ||
@@ -74,8 +79,14 @@ func ToAntigravityChatRequest(
 		genConfig = &cfgCopy
 	}
 
-	sessionID := GenerateAntigravitySessionID()
-	reqID := GenerateAntigravityRequestID(sessionID, resolvedModel, "agent", len(geminiReq.Contents))
+	var sessionID, reqID string
+	requestType := "agent"
+	if isWebSearch {
+		requestType = "web_search"
+	} else {
+		sessionID = GenerateAntigravitySessionID()
+		reqID = GenerateAntigravityRequestID(sessionID, resolvedModel, "agent", len(geminiReq.Contents))
+	}
 
 	innerReq := &AntigravityInnerRequest{
 		SessionID:         sessionID,
@@ -84,7 +95,8 @@ func ToAntigravityChatRequest(
 		GenerationConfig:  genConfig,
 		SafetySettings:    geminiReq.SafetySettings,
 		Tools:             geminiReq.Tools,
-		ToolConfig:        geminiReq.ToolConfig,
+		// ToolConfig is rejected with 400 by daily-cloudcode-pa.googleapis.com
+		ToolConfig: nil,
 	}
 
 	envelope := &AntigravityRequestEnvelope{
@@ -92,7 +104,7 @@ func ToAntigravityChatRequest(
 		Model:       resolvedModel,
 		UserAgent:   "antigravity",
 		RequestID:   reqID,
-		RequestType: "agent",
+		RequestType: requestType,
 		Request:     innerReq,
 	}
 
@@ -128,17 +140,21 @@ func ToAntigravityResponsesRequest(
 
 	sanitizeAntigravityRequest(geminiReq, resolvedModel)
 
+	isWebSearch := prepareAntigravityRequest(geminiReq, extractResponsesMaxResultCount(bifrostReq.Params))
+
 	// The Antigravity internal API only accepts the Gemini proto Schema form
 	// ("parameters" with UPPERCASE types), not parametersJsonSchema.
 	if err := convertToolsToAntigravityFormat(geminiReq.Tools); err != nil {
 		return nil, nil, err
 	}
 
-	// The agy CLI always sends a thinkingConfig; the Antigravity endpoint
-	// expects one even when the client sends no reasoning parameters. Inject
-	// the agy default (dynamic budget) only when none was derived from the
-	// client request.
-	applyDefaultThinkingConfig(geminiReq)
+	if !isWebSearch {
+		// The agy CLI always sends a thinkingConfig; the Antigravity endpoint
+		// expects one even when the client sends no reasoning parameters. Inject
+		// the agy default (dynamic budget) only when none was derived from the
+		// client request.
+		applyDefaultThinkingConfig(geminiReq)
+	}
 
 	var sysInstruction *gemini.Content
 	if geminiReq.SystemInstruction != nil && len(geminiReq.SystemInstruction.Parts) > 0 {
@@ -146,7 +162,8 @@ func ToAntigravityResponsesRequest(
 	}
 
 	var genConfig *gemini.GenerationConfig
-	if geminiReq.GenerationConfig.MaxOutputTokens > 0 ||
+	if geminiReq.GenerationConfig.CandidateCount > 0 ||
+		geminiReq.GenerationConfig.MaxOutputTokens > 0 ||
 		geminiReq.GenerationConfig.Temperature != nil ||
 		geminiReq.GenerationConfig.TopP != nil ||
 		geminiReq.GenerationConfig.TopK != nil ||
@@ -156,8 +173,14 @@ func ToAntigravityResponsesRequest(
 		genConfig = &cfgCopy
 	}
 
-	sessionID := GenerateAntigravitySessionID()
-	reqID := GenerateAntigravityRequestID(sessionID, resolvedModel, "agent", len(geminiReq.Contents))
+	var sessionID, reqID string
+	requestType := "agent"
+	if isWebSearch {
+		requestType = "web_search"
+	} else {
+		sessionID = GenerateAntigravitySessionID()
+		reqID = GenerateAntigravityRequestID(sessionID, resolvedModel, "agent", len(geminiReq.Contents))
+	}
 
 	innerReq := &AntigravityInnerRequest{
 		SessionID:         sessionID,
@@ -166,7 +189,8 @@ func ToAntigravityResponsesRequest(
 		GenerationConfig:  genConfig,
 		SafetySettings:    geminiReq.SafetySettings,
 		Tools:             geminiReq.Tools,
-		ToolConfig:        geminiReq.ToolConfig,
+		// ToolConfig is rejected with 400 by daily-cloudcode-pa.googleapis.com
+		ToolConfig: nil,
 	}
 
 	envelope := &AntigravityRequestEnvelope{
@@ -174,7 +198,7 @@ func ToAntigravityResponsesRequest(
 		Model:       resolvedModel,
 		UserAgent:   "antigravity",
 		RequestID:   reqID,
-		RequestType: "agent",
+		RequestType: requestType,
 		Request:     innerReq,
 	}
 
@@ -184,6 +208,134 @@ func ToAntigravityResponsesRequest(
 	}
 
 	return envelope, jsonBytes, nil
+}
+
+// prepareAntigravityRequest adjusts tools, enhancedContent, systemInstruction,
+// and candidateCount for Antigravity, and reports whether the request is a
+// pure web_search request.
+func prepareAntigravityRequest(geminiReq *gemini.GeminiGenerationRequest, maxResultsOverride *int) bool {
+	hasGoogleSearch := false
+	hasFunctionTools := false
+	for _, tool := range geminiReq.Tools {
+		if tool.GoogleSearch != nil {
+			hasGoogleSearch = true
+		}
+		if len(tool.FunctionDeclarations) > 0 {
+			hasFunctionTools = true
+		}
+	}
+
+	// Antigravity internal endpoint rejects tool combinations ("Please enable tool_config.include_server_side_tool_invocations").
+	// But sending tool_config itself returns "Unknown name toolConfig".
+	// Therefore, if function declarations exist alongside GoogleSearch, drop GoogleSearch to prevent 400.
+	if hasFunctionTools && hasGoogleSearch {
+		var filtered []gemini.Tool
+		for _, tool := range geminiReq.Tools {
+			if len(tool.FunctionDeclarations) > 0 {
+				filtered = append(filtered, tool)
+			}
+		}
+		geminiReq.Tools = filtered
+		hasGoogleSearch = false
+	}
+
+	isWebSearch := hasGoogleSearch && !hasFunctionTools
+
+	if isWebSearch {
+		maxCount := int32(5)
+		if maxResultsOverride != nil && *maxResultsOverride > 0 {
+			maxCount = int32(*maxResultsOverride)
+		}
+		for i := range geminiReq.Tools {
+			if geminiReq.Tools[i].GoogleSearch != nil {
+				gs := geminiReq.Tools[i].GoogleSearch
+				if gs.EnhancedContent == nil {
+					gs.EnhancedContent = &gemini.GoogleSearchEnhancedContent{}
+				}
+				if gs.EnhancedContent.ImageSearch == nil {
+					gs.EnhancedContent.ImageSearch = &gemini.GoogleSearchImageSearchConfig{
+						MaxResultCount: maxCount,
+					}
+				} else if gs.EnhancedContent.ImageSearch.MaxResultCount == 0 {
+					gs.EnhancedContent.ImageSearch.MaxResultCount = maxCount
+				}
+			}
+		}
+
+		if geminiReq.SystemInstruction == nil || len(geminiReq.SystemInstruction.Parts) == 0 {
+			geminiReq.SystemInstruction = &gemini.Content{
+				Role: "user",
+				Parts: []*gemini.Part{
+					{
+						Text: "You are a search engine bot. You will be given a query from a user. Your task is to search the web for relevant information that will help the user. You MUST perform a web search. Do not respond or interact with the user, please respond as if they typed the query into a search bar.",
+					},
+				},
+			}
+		} else {
+			geminiReq.SystemInstruction.Role = "user"
+		}
+
+		geminiReq.GenerationConfig.CandidateCount = 1
+	}
+
+	return isWebSearch
+}
+
+func extractMaxResultCount(params *schemas.ChatParameters) *int {
+	if params == nil {
+		return nil
+	}
+	if params.ExtraParams != nil {
+		for _, key := range []string{"max_result_count", "maxResultCount", "image_search_max_result_count", "imageSearchMaxResultCount"} {
+			if val, ok := params.ExtraParams[key]; ok {
+				switch v := val.(type) {
+				case int:
+					return &v
+				case int32:
+					iv := int(v)
+					return &iv
+				case int64:
+					iv := int(v)
+					return &iv
+				case float64:
+					iv := int(v)
+					return &iv
+				}
+			}
+		}
+	}
+	for _, tool := range params.Tools {
+		if tool.MaxUses != nil && *tool.MaxUses > 0 {
+			return tool.MaxUses
+		}
+	}
+	return nil
+}
+
+func extractResponsesMaxResultCount(params *schemas.ResponsesParameters) *int {
+	if params == nil {
+		return nil
+	}
+	if params.ExtraParams != nil {
+		for _, key := range []string{"max_result_count", "maxResultCount", "image_search_max_result_count", "imageSearchMaxResultCount"} {
+			if val, ok := params.ExtraParams[key]; ok {
+				switch v := val.(type) {
+				case int:
+					return &v
+				case int32:
+					iv := int(v)
+					return &iv
+				case int64:
+					iv := int(v)
+					return &iv
+				case float64:
+					iv := int(v)
+					return &iv
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // sanitizeAntigravityRequest applies provider-specific safety and model adjustments.
@@ -426,7 +578,7 @@ func HandleAntigravityChatCompletionStream(
 		streamUsage := &schemas.BifrostLLMUsage{}
 		ctx.SetValue(schemas.BifrostContextKeyStreamAccumulatedUsage, streamUsage)
 
-		readLoop:
+	readLoop:
 		for {
 			if ctx.Err() != nil {
 				return

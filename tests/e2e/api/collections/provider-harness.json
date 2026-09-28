@@ -30536,6 +30536,45 @@
                   ]
                 }
               }
+            },
+            {
+              "name": "Cross-cut: antigravity/gemini-3.1-flash-lite google_search",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('Status code is 200', function () { pm.expect(pm.response.code, pm.response.text()).to.equal(200); });",
+                      "pm.test('Web search: response non-empty', function () { var j = pm.response.json(); var c = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || ''; pm.expect(c).to.be.a('string').and.not.empty; });"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"model\": \"antigravity/gemini-3.1-flash-lite\",\n  \"messages\": [{\"role\":\"user\",\"content\":\"Latest news\"}],\n  \"tools\": [{\"type\":\"google_search\"}]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/v1/chat/completions",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "chat",
+                    "completions"
+                  ]
+                }
+              }
             }
           ]
         },

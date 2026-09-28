@@ -78,7 +78,22 @@ func ToGeminiChatCompletionRequestWithImageURLSchemes(ctx *schemas.BifrostContex
 					}
 				}
 			}
-			geminiReq.Tools = append(geminiReq.Tools, Tool{GoogleSearch: googleSearch})
+			merged := false
+			for i := range geminiReq.Tools {
+				if geminiReq.Tools[i].GoogleSearch != nil {
+					if len(googleSearch.ExcludeDomains) > 0 {
+						geminiReq.Tools[i].GoogleSearch.ExcludeDomains = googleSearch.ExcludeDomains
+					}
+					if googleSearch.TimeRangeFilter != nil {
+						geminiReq.Tools[i].GoogleSearch.TimeRangeFilter = googleSearch.TimeRangeFilter
+					}
+					merged = true
+					break
+				}
+			}
+			if !merged {
+				geminiReq.Tools = append(geminiReq.Tools, Tool{GoogleSearch: googleSearch})
+			}
 		}
 
 		if bifrostReq.Params.IncludeServerSideToolInvocations != nil && *bifrostReq.Params.IncludeServerSideToolInvocations {

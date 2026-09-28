@@ -1442,7 +1442,8 @@ func mapBifrostServiceTierToGemini(tier schemas.BifrostServiceTier) ServiceTier 
 
 // convertBifrostToolsToGemini converts Bifrost tools to Gemini format
 func convertBifrostToolsToGemini(bifrostTools []schemas.ChatTool) ([]Tool, error) {
-	geminiTool := Tool{}
+	var functionDeclarations []*FunctionDeclaration
+	var googleSearch *GoogleSearch
 
 	for _, tool := range bifrostTools {
 		if tool.Type == "" {
@@ -1462,12 +1463,34 @@ func convertBifrostToolsToGemini(bifrostTools []schemas.ChatTool) ([]Tool, error
 			if tool.Function.Description != nil {
 				fd.Description = *tool.Function.Description
 			}
-			geminiTool.FunctionDeclarations = append(geminiTool.FunctionDeclarations, fd)
+			functionDeclarations = append(functionDeclarations, fd)
+		} else if tool.Type == "google_search" || tool.Type == "googleSearch" || tool.Type == "web_search" {
+			if googleSearch == nil {
+				googleSearch = &GoogleSearch{}
+			}
+			if len(tool.BlockedDomains) > 0 {
+				googleSearch.ExcludeDomains = tool.BlockedDomains
+			}
+			if tool.MaxUses != nil && *tool.MaxUses > 0 {
+				if googleSearch.EnhancedContent == nil {
+					googleSearch.EnhancedContent = &GoogleSearchEnhancedContent{}
+				}
+				googleSearch.EnhancedContent.ImageSearch = &GoogleSearchImageSearchConfig{
+					MaxResultCount: int32(*tool.MaxUses),
+				}
+			}
 		}
 	}
 
-	if len(geminiTool.FunctionDeclarations) > 0 {
-		return []Tool{geminiTool}, nil
+	var geminiTools []Tool
+	if len(functionDeclarations) > 0 {
+		geminiTools = append(geminiTools, Tool{FunctionDeclarations: functionDeclarations})
+	}
+	if googleSearch != nil {
+		geminiTools = append(geminiTools, Tool{GoogleSearch: googleSearch})
+	}
+	if len(geminiTools) > 0 {
+		return geminiTools, nil
 	}
 	return []Tool{}, nil
 }

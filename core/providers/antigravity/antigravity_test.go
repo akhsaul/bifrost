@@ -707,11 +707,11 @@ var serverUA string
 
 func TestGetUserAgent_CLI(t *testing.T) {
 	ua := GetUserAgent("cli")
-	if !strings.Contains(ua, "antigravity/cli/1.1.22") {
-		t.Errorf("GetUserAgent(cli) = %q, want version 1.1.22", ua)
+	if !strings.Contains(ua, "antigravity/cli/1.2.12") {
+		t.Errorf("GetUserAgent(cli) = %q, want version 1.2.12", ua)
 	}
-	if !strings.Contains(ua, "cl=971564011") {
-		t.Errorf("GetUserAgent(cli) = %q, want cl=971564011", ua)
+	if !strings.Contains(ua, "cl=989022288") {
+		t.Errorf("GetUserAgent(cli) = %q, want cl=989022288", ua)
 	}
 }
 

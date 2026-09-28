@@ -38,7 +38,7 @@ const (
 
 	DefaultClientProfile = "cli"
 	DefaultIDEVersion    = "2.1.1"
-	DefaultCLIVersion    = "1.1.22"
+	DefaultCLIVersion    = "1.2.12"
 	DefaultOS            = "darwin"
 	DefaultArch          = "arm64"
 
@@ -87,7 +87,7 @@ func ClearTokenCache() {
 // GetUserAgent returns the appropriate User-Agent string for the given Antigravity client profile.
 func GetUserAgent(profile string) string {
 	if strings.ToLower(profile) == "cli" {
-		return fmt.Sprintf("antigravity/cli/%s (aidev_client; os_type=linux; arch=amd64; cl=971564011; auth_method=consumer)", DefaultCLIVersion)
+		return fmt.Sprintf("antigravity/cli/%s (aidev_client; os_type=linux; arch=amd64; cl=989022288; auth_method=consumer)", DefaultCLIVersion)
 	}
 	return fmt.Sprintf("antigravity/ide/%s %s/%s", DefaultIDEVersion, DefaultOS, DefaultArch)
 }
