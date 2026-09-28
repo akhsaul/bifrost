@@ -68,7 +68,7 @@ func (p *RoutingPlugin) computeComplexity(
 	}
 
 	if !sessionActive {
-		proposal := p.classifyComplexityInput(ctx, input)
+		proposal := p.classifyComplexityInput(ctx, req, input)
 		publishComplexityProposal(ctx, proposal)
 		return proposal.Result
 	}
@@ -77,7 +77,7 @@ func (p *RoutingPlugin) computeComplexity(
 	priorTier, priorFound, loadErr := p.sessionStore.load(key, false)
 	if loadErr != nil {
 		p.logComplexitySessionStoreError("inspect", loadErr)
-		proposal := p.classifyComplexityInput(ctx, input)
+		proposal := p.classifyComplexityInput(ctx, req, input)
 		publishComplexityProposal(ctx, proposal)
 		return proposal.Result
 	}
@@ -101,7 +101,7 @@ func (p *RoutingPlugin) computeComplexity(
 		// current human turn instead of routing from a stale read.
 	}
 
-	proposal := p.classifyComplexityInput(ctx, input)
+	proposal := p.classifyComplexityInput(ctx, req, input)
 	proposedTier := ""
 	if proposal.Result != nil {
 		proposedTier = proposal.Result.Tier
@@ -158,7 +158,7 @@ func (p *RoutingPlugin) computeComplexity(
 	return result
 }
 
-func (p *RoutingPlugin) classifyComplexityInput(ctx *schemas.BifrostContext, input complexity.ComplexityInput) complexityProposal {
+func (p *RoutingPlugin) classifyComplexityInput(ctx *schemas.BifrostContext, req *schemas.BifrostRequest, input complexity.ComplexityInput) complexityProposal {
 	if p.semanticClassifier == nil || !p.semanticClassifier.IsConfigured() {
 		if p.logger != nil {
 			p.logger.Debug("[Routing] %s", noSemanticClassifierLog)
@@ -169,6 +169,27 @@ func (p *RoutingPlugin) classifyComplexityInput(ctx *schemas.BifrostContext, inp
 			LogMessage: noSemanticClassifierLog,
 		}
 	}
+
+	// Guardrails gate the text before either classifier can forward it. The
+	// sub-requests skip the plugin pipeline (they must not recurse), so this is
+	// the only place their payload can be inspected; blocking here means no
+	// embedding or judge call is made, and the main request is still refused by
+	// the guardrail plugin's own PreLLMHook.
+	guardedInput, guardrailErr := p.evaluateComplexityInputGuardrails(ctx, req, input)
+	if guardrailErr != nil {
+		if p.logger != nil {
+			p.logger.Debug("[Routing] Complexity classification skipped by guardrails: %v", guardrailErr)
+		}
+		return complexityProposal{
+			Mechanism: complexity.MechanismSkipped,
+			LogLevel:  schemas.LogLevelWarn,
+			LogMessage: fmt.Sprintf(
+				"Guardrail rule blocked the complexity classification input, so no complexity tier is published: %s",
+				guardrailErr.GetErrorString(),
+			),
+		}
+	}
+	input = guardedInput
 
 	semanticResult, err := p.semanticClassifier.Classify(ctx, input)
 	var rejectedResult *complexity.SemanticResult

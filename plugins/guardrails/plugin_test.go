@@ -96,6 +96,134 @@ func TestPreLLMHook_RedactMutatesRequest(t *testing.T) {
 	}
 }
 
+func TestEvaluateInputText_BlockReturnsViolation(t *testing.T) {
+	p := blockEmailPlugin(t, PatternActionBlock, ApplyToInput)
+	text := "email me at a@b.com"
+	got, bifrostErr := p.EvaluateInputText(celCtx(nil), chatReq(text), text)
+	if bifrostErr == nil {
+		t.Fatal("expected a guardrail violation")
+	}
+	if got != text {
+		t.Fatalf("blocked text must come back unchanged, got %q", got)
+	}
+	if bifrostErr.StatusCode == nil || *bifrostErr.StatusCode != 400 {
+		t.Fatalf("expected 400, got %v", bifrostErr.StatusCode)
+	}
+	if bifrostErr.AllowFallbacks == nil || *bifrostErr.AllowFallbacks {
+		t.Fatal("guardrail block must not allow fallbacks")
+	}
+	if !strings.Contains(bifrostErr.Error.Message, "pii-rule") {
+		t.Fatalf("block reason should name the rule, got %q", bifrostErr.Error.Message)
+	}
+}
+
+func TestEvaluateInputText_Redacts(t *testing.T) {
+	p := blockEmailPlugin(t, PatternActionRedact, ApplyToInput)
+	got, bifrostErr := p.EvaluateInputText(celCtx(nil), chatReq("a@b.com"), "email me at a@b.com")
+	if bifrostErr != nil {
+		t.Fatalf("redact should not fail, got %v", bifrostErr)
+	}
+	if got != "email me at [EMAIL-1]" {
+		t.Fatalf("text not redacted, got %q", got)
+	}
+}
+
+func TestEvaluateInputText_IgnoresOutputRules(t *testing.T) {
+	p := blockEmailPlugin(t, PatternActionBlock, ApplyToOutput)
+	got, bifrostErr := p.EvaluateInputText(celCtx(nil), chatReq("a@b.com"), "a@b.com")
+	if bifrostErr != nil || got != "a@b.com" {
+		t.Fatalf("output-only rule must not gate input text, got %q err=%v", got, bifrostErr)
+	}
+}
+
+func TestEvaluateInputText_IgnoresMCPRules(t *testing.T) {
+	p := blockEmailPlugin(t, PatternActionBlock, ApplyToInput)
+	// The compiled config is what EvaluateInputText reads, so switching the
+	// target on it is enough to pin the gate.
+	p.config.cfg.GuardrailRules[0].Target = "mcp"
+	got, bifrostErr := p.EvaluateInputText(celCtx(nil), chatReq("a@b.com"), "a@b.com")
+	if bifrostErr != nil || got != "a@b.com" {
+		t.Fatalf("mcp-target rule must not gate classifier text, got %q err=%v", got, bifrostErr)
+	}
+}
+
+func TestEvaluateInputText_HonorsCELGate(t *testing.T) {
+	p := blockEmailPlugin(t, PatternActionBlock, ApplyToInput)
+	cfg := &Config{
+		GuardrailProviders: p.config.cfg.GuardrailProviders,
+		GuardrailRules: []Rule{{
+			ID: 201, Name: "pii-rule", Enabled: true, ApplyTo: ApplyToInput,
+			CELExpression: `model == "other-model"`, ProviderConfigIDs: []int{20},
+		}},
+	}
+	gated, err := Init(cfg, nil)
+	if err != nil {
+		t.Fatalf("Init: %v", err)
+	}
+
+	// The request's model does not satisfy the gate: text passes untouched.
+	got, bifrostErr := gated.EvaluateInputText(celCtx(nil), chatReq("a@b.com"), "a@b.com")
+	if bifrostErr != nil || got != "a@b.com" {
+		t.Fatalf("CEL-gated-off rule must not fire, got %q err=%v", got, bifrostErr)
+	}
+
+	// A request whose model satisfies the gate is blocked.
+	matching := chatReq("a@b.com")
+	matching.ChatRequest.Model = "other-model"
+	_, bifrostErr = gated.EvaluateInputText(celCtx(nil), matching, "a@b.com")
+	if bifrostErr == nil {
+		t.Fatal("CEL-gated rule should have blocked matching input")
+	}
+
+	// A nil request leaves request fields empty rather than failing evaluation;
+	// the unconditional config blocks regardless.
+	unconditional := blockEmailPlugin(t, PatternActionBlock, ApplyToInput)
+	if _, bifrostErr := unconditional.EvaluateInputText(celCtx(nil), nil, "a@b.com"); bifrostErr == nil {
+		t.Fatal("nil request must still evaluate with empty request fields")
+	}
+}
+
+func TestEvaluateInputText_IgnoresSampling(t *testing.T) {
+	original := randSource
+	randSource = func(int) int { return 99 }
+	defer func() { randSource = original }()
+
+	p := blockEmailPlugin(t, PatternActionRedact, ApplyToInput)
+	p.config.cfg.GuardrailRules[0].SamplingRate = 50
+
+	got, bifrostErr := p.EvaluateInputText(celCtx(nil), chatReq("a@b.com"), "a@b.com")
+	if bifrostErr != nil {
+		t.Fatalf("unexpected error: %v", bifrostErr)
+	}
+	if got != "[EMAIL-1]" {
+		t.Fatalf("sampling must not leak raw text, got %q", got)
+	}
+}
+
+func TestEvaluateInputText_PlaceholderMatchesHookPath(t *testing.T) {
+	p := blockEmailPlugin(t, PatternActionRedact, ApplyToInput)
+	ctx := celCtx(nil)
+
+	evaluated, bifrostErr := p.EvaluateInputText(ctx, chatReq("a@b.com"), "a@b.com")
+	if bifrostErr != nil {
+		t.Fatalf("unexpected error: %v", bifrostErr)
+	}
+	if evaluated != "[EMAIL-1]" {
+		t.Fatalf("unexpected placeholder %q", evaluated)
+	}
+
+	// The hook path reuses the same context-scoped tracker, so the live request
+	// must get the same placeholder rather than a second one.
+	req := chatReq("a@b.com")
+	_, sc, err := p.PreLLMHook(ctx, req)
+	if err != nil || sc != nil {
+		t.Fatalf("hook path should not short-circuit, got sc=%v err=%v", sc, err)
+	}
+	if got := *req.ChatRequest.Input[0].Content.ContentStr; got != evaluated {
+		t.Fatalf("hook placeholder %q does not match evaluated placeholder %q", got, evaluated)
+	}
+}
+
 func TestPreLLMHook_DetectOnlyKeepsContent(t *testing.T) {
 	p := blockEmailPlugin(t, PatternActionDetectOnly, ApplyToInput)
 	req := chatReq("email me at a@b.com")

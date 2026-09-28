@@ -1181,6 +1181,26 @@ func (s *BifrostHTTPServer) getRoutingPlugin() (*routing.RoutingPlugin, error) {
 	return plugin, nil
 }
 
+// wireComplexityGuardrailEvaluator points the routing plugin's guardrail text
+// evaluator at the currently loaded guardrails plugin, or clears it when none is
+// loaded. Classification runs in PreRequestHook, before any PreLLMHook, and its
+// classifier sub-requests skip the plugin pipeline — so the routing plugin asks
+// guardrails directly about the text it is about to forward, and this wiring is
+// what gives it someone to ask. Called at bootstrap and whenever guardrails or
+// routing is reloaded, where the live instances change.
+func (s *BifrostHTTPServer) wireComplexityGuardrailEvaluator() {
+	routingPlugin, err := s.getRoutingPlugin()
+	if err != nil {
+		return
+	}
+	guardrailsPlugin, err := lib.FindPluginAs[*guardrails.Plugin](s.Config, guardrails.PluginName)
+	if err != nil || guardrailsPlugin == nil {
+		routingPlugin.SetGuardrailTextEvaluator(nil)
+		return
+	}
+	routingPlugin.SetGuardrailTextEvaluator(guardrailsPlugin)
+}
+
 // ValidateComplexityAnalyzerConfig checks runtime-only semantic dependencies
 // before a handler persists a complexity configuration.
 func (s *BifrostHTTPServer) ValidateComplexityAnalyzerConfig(_ context.Context, config *complexity.AnalyzerConfig) error {
@@ -2271,7 +2291,17 @@ func (s *BifrostHTTPServer) ReloadPlugin(ctx context.Context, name string, path 
 	if routingResponsesPlugin, ok := plugin.(routing.ResponsesExecutorSetter); ok {
 		routingResponsesPlugin.SetResponsesRequestExecutor(s.Client.ResponsesRequest)
 	}
-	return s.SyncLoadedPlugin(ctx, name, plugin, placement, order)
+	if err := s.SyncLoadedPlugin(ctx, name, plugin, placement, order); err != nil {
+		return err
+	}
+	// The live instance changed: re-point the cross-plugin wiring that depends
+	// on it. The complexity router reads the current guardrails instance to gate
+	// its classifier sub-requests, so reloading either side must refresh the
+	// pointer or guardrails silently stops covering classifier traffic.
+	if name == guardrails.PluginName || name == routing.PluginName {
+		s.wireComplexityGuardrailEvaluator()
+	}
+	return nil
 }
 
 // RemovePlugin removes a plugin from the server.
@@ -2304,6 +2334,13 @@ func (s *BifrostHTTPServer) RemovePlugin(ctx context.Context, displayName string
 	// 3. Reload observability plugins if necessary
 	if isObservability {
 		s.reloadObservabilityPlugins()
+	}
+
+	// 3b. Unregistered guardrails must stop gating classifier traffic at once:
+	// the routing plugin still holds the evaluator pointer, so clear it while
+	// the removed instance is no longer the plugin of record.
+	if name == guardrails.PluginName {
+		s.wireComplexityGuardrailEvaluator()
 	}
 
 	// 4. Update status and marshaller
@@ -2968,6 +3005,11 @@ func (s *BifrostHTTPServer) Bootstrap(ctx context.Context) error {
 	if err == nil && guardrailsPlugin != nil {
 		guardrailsPlugin.SetChatRequestExecutor(s.Client.ChatCompletionRequest)
 	}
+	// Let the complexity router gate the text it forwards to its classifier
+	// providers. Classification runs in PreRequestHook, before any PreLLMHook,
+	// and its sub-requests skip the plugin pipeline, so without this the
+	// embedding/LLM provider would receive text no guardrail ever inspected.
+	s.wireComplexityGuardrailEvaluator()
 
 	// Initialize Sidekiq runner for background jobs
 	if s.Config != nil && s.Config.ConfigStore != nil {

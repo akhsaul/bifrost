@@ -35,6 +35,10 @@ Complexity classification is **semantic** (embedding-based). The older lexical k
 
 If the nearest phrase scores below `min_similarity`, no tier is published. At `0` (the default), Bifrost accepts the nearest eligible match; a positive value makes the classifier abstain on weak matches. If the embedding call fails or times out, no tier is published either; in both cases the request falls through to your normal routing path rather than being blocked.
 
+<Note>
+When the OSS guardrails plugin is loaded, its input rules (regex and secrets detectors) gate the classifier text first: the extracted user text is evaluated before any embedding or fallback-judge call leaves Bifrost, redactions are applied to the text that gets classified, and a blocking rule skips classification with no tier published. Sampling is ignored on this path so raw text never leaks through an unsampled percentage. The LLM-as-a-judge (`prompt-guardrail`) provider does not run inline here — a judge call would consume the classifier's own timeout budget — but it still evaluates the live request in its normal hook phase.
+</Note>
+
 ### Reference phrases
 
 Reference phrases are example requests you label with a tier. The classifier's entire knowledge of "simple" vs "complex" comes from them. Bifrost ships **150 default phrases (50 per tier)** balanced across use cases (coding, math, writing, knowledge, conversation, extraction, translation, agentic) and writing styles, so the classifier learns *requested work* rather than subject matter or verbosity.

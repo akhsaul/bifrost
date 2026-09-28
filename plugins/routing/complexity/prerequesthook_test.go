@@ -3,6 +3,7 @@ package complexity_test
 import (
 	"context"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -17,6 +18,48 @@ import (
 	"github.com/maximhq/bifrost/plugins/routing/complexity"
 	"github.com/maximhq/bifrost/plugins/routing/rules"
 )
+
+// fakeGuardrailTextEvaluator stands in for the guardrails plugin. It blocks any
+// text containing blockOn, rewrites entries in replace, and records every
+// evaluation so tests can assert what the router asked it to guard.
+type fakeGuardrailTextEvaluator struct {
+	mu      sync.Mutex
+	blockOn string
+	replace map[string]string
+	calls   []string
+}
+
+func (f *fakeGuardrailTextEvaluator) EvaluateInputText(_ *schemas.BifrostContext, _ *schemas.BifrostRequest, text string) (string, *schemas.BifrostError) {
+	f.mu.Lock()
+	f.calls = append(f.calls, text)
+	f.mu.Unlock()
+
+	if f.blockOn != "" && strings.Contains(text, f.blockOn) {
+		return text, &schemas.BifrostError{
+			IsBifrostError: true,
+			StatusCode:     schemas.Ptr(400),
+			Error:          &schemas.ErrorField{Message: "blocked by fake guardrail"},
+			AllowFallbacks: schemas.Ptr(false),
+		}
+	}
+	out := text
+	for from, to := range f.replace {
+		out = strings.ReplaceAll(out, from, to)
+	}
+	return out, nil
+}
+
+func (f *fakeGuardrailTextEvaluator) evaluatedTexts() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.calls...)
+}
+
+func (f *fakeGuardrailTextEvaluator) resetCalls() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = nil
+}
 
 func chatString(text string) *schemas.ChatMessageContent {
 	return &schemas.ChatMessageContent{ContentStr: &text}
@@ -515,4 +558,157 @@ func TestPreRequestHook_ComplexitySkippedWhenNoRulesReferenceIt(t *testing.T) {
 			t.Fatalf("expected no complexity logs when no rules reference complexity_tier, got: %s", entry.Message)
 		}
 	}
+}
+
+// semanticAnalyzerConfig is the non-session semantic configuration the
+// guardrail tests use: a usable embedding classifier with no session state.
+func semanticAnalyzerConfig() *complexity.AnalyzerConfig {
+	return &complexity.AnalyzerConfig{
+		Keywords: configstore.ComplexityEditableKeywordConfig{
+			SimpleKeywords:  []string{"a casual greeting"},
+			MediumKeywords:  []string{"an implementation detail question"},
+			ComplexKeywords: []string{"a deep architectural tradeoff analysis"},
+		},
+		Semantic: &configstore.ComplexitySemanticConfig{
+			Provider:       "openai",
+			EmbeddingModel: "test-embedding-model",
+		},
+	}
+}
+
+// TestPreRequestHook_GuardrailBlockSkipsClassification pins that a blocking
+// guardrail rule stops classification before the embedding provider is called:
+// no classification sub-request leaves the process, no tier is published, and
+// the decision is named in the routing log.
+func TestPreRequestHook_GuardrailBlockSkipsClassification(t *testing.T) {
+	plugin := newComplexityRuleFixture(t)
+	var embedCalls atomic.Int64
+	plugin.SetEmbeddingRequestExecutor(func(ctx *schemas.BifrostContext, req *schemas.BifrostEmbeddingRequest) (*schemas.BifrostEmbeddingResponse, *schemas.BifrostError) {
+		embedCalls.Add(1)
+		return testEmbeddingExecutor(ctx, req)
+	})
+	require.NoError(t, plugin.ReloadComplexityAnalyzerConfig(semanticAnalyzerConfig()))
+	waitForSemanticClassifier(t, plugin)
+
+	before := embedCalls.Load()
+	evaluator := &fakeGuardrailTextEvaluator{blockOn: "social security"}
+	plugin.SetGuardrailTextEvaluator(evaluator)
+
+	req := chatRequest("here is my social security number")
+	bfCtx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	require.NoError(t, plugin.PreRequestHook(bfCtx, req))
+
+	require.Equal(t, before, embedCalls.Load(), "blocked classification must not reach the embedding provider")
+	require.Equal(t, []string{"here is my social security number"}, evaluator.evaluatedTexts())
+	require.Equal(t, complexity.MechanismSkipped, bfCtx.Value(schemas.BifrostContextKeyGovernanceComplexityMechanism))
+	_, hasTier := bfCtx.Value(schemas.BifrostContextKeyGovernanceComplexityTier).(string)
+	require.False(t, hasTier, "blocked classification must not publish a tier")
+
+	var sawGuardrailLog bool
+	for _, entry := range bfCtx.GetRoutingEngineLogs() {
+		if strings.Contains(entry.Message, "Guardrail rule blocked the complexity classification input") {
+			sawGuardrailLog = true
+		}
+	}
+	require.True(t, sawGuardrailLog, "the routing log should name the guardrail outcome")
+
+	// The complexity rule could not match an unpublished tier, so the request
+	// keeps the model it arrived with.
+	_, modelOut, _ := req.GetRequestFields()
+	require.Equal(t, "gpt-4o", modelOut)
+}
+
+// TestPreRequestHook_GuardrailRedactionReachesClassifier pins the other half of
+// the contract: when guardrails redact rather than block, the embedding
+// provider receives the redacted text, never the raw input.
+func TestPreRequestHook_GuardrailRedactionReachesClassifier(t *testing.T) {
+	plugin := newComplexityRuleFixture(t)
+	var mu sync.Mutex
+	var embedded []string
+	plugin.SetEmbeddingRequestExecutor(func(ctx *schemas.BifrostContext, req *schemas.BifrostEmbeddingRequest) (*schemas.BifrostEmbeddingResponse, *schemas.BifrostError) {
+		if req.Input != nil && req.Input.Text != nil {
+			mu.Lock()
+			embedded = append(embedded, *req.Input.Text)
+			mu.Unlock()
+		}
+		return testEmbeddingExecutor(ctx, req)
+	})
+	require.NoError(t, plugin.ReloadComplexityAnalyzerConfig(semanticAnalyzerConfig()))
+	waitForSemanticClassifier(t, plugin)
+
+	mu.Lock()
+	embedded = nil
+	mu.Unlock()
+	plugin.SetGuardrailTextEvaluator(&fakeGuardrailTextEvaluator{replace: map[string]string{"casual greeting": "[GREETING]"}})
+
+	bfCtx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	require.NoError(t, plugin.PreRequestHook(bfCtx, chatRequest("a casual greeting")))
+
+	mu.Lock()
+	got := append([]string(nil), embedded...)
+	mu.Unlock()
+	require.Contains(t, got, "a [GREETING]")
+	require.NotContains(t, got, "a casual greeting", "raw text must not reach the embedding provider")
+	require.Equal(t, complexity.MechanismSemantic, bfCtx.Value(schemas.BifrostContextKeyGovernanceComplexityMechanism))
+}
+
+// TestPreRequestHook_GuardrailEvaluatesPriorTurns pins that the router guards
+// every user turn it carries, not only the latest one: a match on an earlier
+// turn skips classification rather than being forwarded.
+func TestPreRequestHook_GuardrailEvaluatesPriorTurns(t *testing.T) {
+	plugin := newComplexityRuleFixture(t)
+	var embedCalls atomic.Int64
+	plugin.SetEmbeddingRequestExecutor(func(ctx *schemas.BifrostContext, req *schemas.BifrostEmbeddingRequest) (*schemas.BifrostEmbeddingResponse, *schemas.BifrostError) {
+		embedCalls.Add(1)
+		return testEmbeddingExecutor(ctx, req)
+	})
+	require.NoError(t, plugin.ReloadComplexityAnalyzerConfig(semanticAnalyzerConfig()))
+	waitForSemanticClassifier(t, plugin)
+
+	before := embedCalls.Load()
+	evaluator := &fakeGuardrailTextEvaluator{blockOn: "ssn"}
+	plugin.SetGuardrailTextEvaluator(evaluator)
+
+	req := &schemas.BifrostRequest{
+		RequestType: schemas.ChatCompletionRequest,
+		ChatRequest: &schemas.BifrostChatRequest{
+			Provider: schemas.OpenAI,
+			Model:    "gpt-4o",
+			Input: []schemas.ChatMessage{
+				{Role: schemas.ChatMessageRoleUser, Content: chatString("my ssn is 123-45-6789")},
+				{Role: schemas.ChatMessageRoleAssistant, Content: chatString("noted")},
+				{Role: schemas.ChatMessageRoleUser, Content: chatString("what's the weather?")},
+			},
+		},
+	}
+	bfCtx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	require.NoError(t, plugin.PreRequestHook(bfCtx, req))
+
+	require.Equal(t, before, embedCalls.Load(), "a blocked prior turn must stop classification")
+	require.Contains(t, evaluator.evaluatedTexts(), "my ssn is 123-45-6789")
+	require.Equal(t, complexity.MechanismSkipped, bfCtx.Value(schemas.BifrostContextKeyGovernanceComplexityMechanism))
+}
+
+// TestPreRequestHook_GuardrailNotConsultedOnSessionReuse pins that guardrails
+// only gate classification: a session-reused tier sends no text to any provider,
+// so the evaluator is not consulted at all.
+func TestPreRequestHook_GuardrailNotConsultedOnSessionReuse(t *testing.T) {
+	plugin := newSessionComplexityRuleFixture(t)
+	plugin.SetEmbeddingRequestExecutor(testEmbeddingExecutor)
+	require.NoError(t, plugin.ReloadComplexityAnalyzerConfig(sessionAnalyzerConfig()))
+	waitForSemanticClassifier(t, plugin)
+
+	evaluator := &fakeGuardrailTextEvaluator{}
+	plugin.SetGuardrailTextEvaluator(evaluator)
+
+	firstCtx := complexitySessionContext("guardrail-reuse")
+	require.NoError(t, plugin.PreRequestHook(firstCtx, chatRequest("a complex request")))
+	require.Equal(t, complexity.TierComplex, firstCtx.Value(schemas.BifrostContextKeyGovernanceComplexityTier))
+	require.NotEmpty(t, evaluator.evaluatedTexts(), "a classified turn must be guarded")
+
+	evaluator.resetCalls()
+	secondCtx := complexitySessionContext("guardrail-reuse")
+	require.NoError(t, plugin.PreRequestHook(secondCtx, chatRequest("a simple request")))
+	require.Equal(t, complexity.MechanismSession, secondCtx.Value(schemas.BifrostContextKeyGovernanceComplexityMechanism))
+	require.Empty(t, evaluator.evaluatedTexts(), "a session-reused tier sends nothing to a provider, so guardrails are not consulted")
 }

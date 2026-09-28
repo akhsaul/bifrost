@@ -345,6 +345,31 @@ type MCPPlugin interface {
 	PostMCPHook(ctx *BifrostContext, resp *BifrostMCPResponse, bifrostErr *BifrostError) (*BifrostMCPResponse, *BifrostError, error)
 }
 
+// GuardrailTextEvaluator is an optional capability of guardrail plugins. Bifrost
+// core never calls it: plugins that forward content to a provider on their own
+// behalf use it to apply the caller's guardrail input rules to that content
+// before it leaves the process. The motivating case is the complexity router's
+// classifier sub-requests, which are issued from PreRequestHook — before any
+// PreLLMHook has run — and are marked to skip the plugin pipeline so they cannot
+// recurse; without this capability, the classifier provider would receive text
+// no guardrail ever inspected.
+//
+// The guardrail plugin stays the owner of rule matching, redaction strategy, and
+// blocking semantics. The caller supplies the text and, when it has one, the
+// request the text belongs to so CEL conditions can see model/provider/headers;
+// it decides for itself what a block means (skipping its own work, recording the
+// violation, or surfacing it).
+type GuardrailTextEvaluator interface {
+	// EvaluateInputText applies the configured input-phase rules for LLM traffic
+	// to text and returns the possibly-redacted result. A nil error means the
+	// text may be forwarded. A non-nil error is the guardrail violation: the
+	// caller must not forward the original text. Implementations must be safe
+	// for concurrent use and must not mutate req. req may be nil when the caller
+	// has no request to offer; rules conditioned on request fields then see
+	// those fields as empty.
+	EvaluateInputText(ctx *BifrostContext, req *BifrostRequest, text string) (string, *BifrostError)
+}
+
 // MCPConnectionPlugin is an optional, typed extension interface for handling MCP
 // Connect events. Connect is morally separate from the other MCP lifecycle ops
 // (Ping/ListTools/ExecuteTool) — it establishes the transport before a usable

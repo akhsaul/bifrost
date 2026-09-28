@@ -110,6 +110,51 @@ func (p *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.BifrostReq
 	return req, nil, nil
 }
 
+// EvaluateInputText applies the enabled input-phase LLM rules to one piece of
+// text outside the hook pipeline and returns the possibly-redacted result, or
+// the violation when a blocking rule matched. It implements
+// schemas.GuardrailTextEvaluator.
+//
+// The complexity router calls it for text it is about to forward to its
+// classifier providers from PreRequestHook, where no PreLLMHook has run yet and
+// the sub-request is marked to skip the plugin pipeline. Only the local
+// providers (regex, secrets) run here: a prompt-judge call inline on the
+// classifier path would consume the classifier's own budget. Rules keep their
+// CEL gates, evaluated against req when the caller has one.
+//
+// Sampling is deliberately ignored. Sampling exists to bound the cost of
+// external guardrail calls; these providers are local, and honoring a sampling
+// rate here would forward raw text to the classifier on the unsampled
+// percentage, which is the leak this method exists to close.
+//
+// Redaction reuses the context-scoped tracker, so text rewritten here reuses
+// the same placeholder when PreLLMHook later evaluates the live request instead
+// of minting a second one.
+func (p *Plugin) EvaluateInputText(ctx *schemas.BifrostContext, req *schemas.BifrostRequest, text string) (string, *schemas.BifrostError) {
+	if text == "" {
+		return text, nil
+	}
+	newText := text
+	for i := range p.config.cfg.GuardrailRules {
+		rule := &p.config.cfg.GuardrailRules[i]
+		if !rule.Enabled || (rule.Target != "llm" && rule.Target != "") {
+			continue
+		}
+		if rule.ApplyTo != ApplyToInput && rule.ApplyTo != ApplyToBoth {
+			continue
+		}
+		if !p.ruleMatches(rule, ctx, req, nil) {
+			continue
+		}
+		errResp, evaluated := p.applyRulesToText(ctx, rule, newText, schemas.RedactionPhaseInput)
+		if errResp != nil {
+			return text, errResp
+		}
+		newText = evaluated
+	}
+	return newText, nil
+}
+
 // PostLLMHook scans the response output for rules with apply_to output|both.
 // block invalidates the response (returns an error instead); redact rewrites
 // the response content in place; detect_only logs. An incoming provider error
@@ -619,4 +664,3 @@ func restoreEgress(resp *schemas.BifrostResponse, ctx *schemas.BifrostContext) {
 		}
 	}
 }
-

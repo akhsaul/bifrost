@@ -112,6 +112,14 @@ type RoutingPlugin struct {
 	// a chat completion is rejected because the judge model requires
 	// /v1/responses; it stays nil until wired, in which case no fallback runs.
 	responsesRequestExecutor atomic.Pointer[ResponsesRequestExecutor]
+
+	// guardrailEvaluator is wired by the HTTP server when a guardrail plugin is
+	// loaded, via SetGuardrailTextEvaluator. The complexity router asks it to
+	// evaluate the text it is about to forward to its classifier providers,
+	// because those sub-requests run in PreRequestHook — before any PreLLMHook —
+	// and skip the plugin pipeline. Nil means no guardrails are configured and
+	// classification text is forwarded as it always was.
+	guardrailEvaluator atomic.Pointer[schemas.GuardrailTextEvaluator]
 }
 
 // Init initializes and returns a routing plugin instance.
