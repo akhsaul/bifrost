@@ -459,6 +459,90 @@ func TestAntigravityProvider_ListModels(t *testing.T) {
 	}
 }
 
+func TestAntigravityProvider_ListModels_KeyStatuses(t *testing.T) {
+	ClearTokenCache()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "fetchAvailableModels") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+				"models": {
+					"gemini-3.6-flash-high": {
+						"displayName": "Gemini 3.6 Flash (High)",
+						"maxTokens": 1048576
+					}
+				},
+				"webSearchModelIds": ["gemini-3.6-flash-high"],
+				"tieredModelIds": {
+					"flashLite": ["gemini-3.5-flash-lite"],
+					"flash": ["gemini-3.8-flash-tiered"],
+					"pro": ["gemini-3.1-pro-low"]
+				},
+				"deprecatedModelIds": {
+					"gemini-3.1-pro-high": {
+						"newModelId": "gemini-pro-agent"
+					}
+				}
+			}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	provider, err := NewAntigravityProvider(&schemas.ProviderConfig{
+		NetworkConfig: schemas.NetworkConfig{
+			BaseURL: server.URL,
+		},
+	}, nil)
+	if err != nil {
+		t.Fatalf("failed to create provider: %v", err)
+	}
+
+	goodKey := schemas.Key{
+		ID:     "good-key-1",
+		Name:   "good-antigravity",
+		Models: schemas.WhiteList{"*"},
+		AntigravityKeyConfig: &schemas.AntigravityKeyConfig{
+			ProjectID:   schemas.NewSecretVar("test-project"),
+			AccessToken: schemas.NewSecretVar("ya29.test-access-token"),
+		},
+	}
+
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	resp, bErr := provider.ListModels(ctx, []schemas.Key{goodKey}, &schemas.BifrostListModelsRequest{Provider: schemas.Antigravity})
+	if bErr != nil {
+		t.Fatalf("ListModels failed: %v", bErr)
+	}
+	if len(resp.KeyStatuses) != 1 {
+		t.Fatalf("expected 1 KeyStatus, got %d", len(resp.KeyStatuses))
+	}
+	if resp.KeyStatuses[0].KeyID != "good-key-1" || resp.KeyStatuses[0].Status != schemas.KeyStatusSuccess {
+		t.Errorf("expected KeyStatus success for good-key-1, got %+v", resp.KeyStatuses[0])
+	}
+
+	// Failure case: invalid credentials
+	badKey := schemas.Key{
+		ID:                   "bad-key-1",
+		Name:                 "bad-antigravity",
+		Models:               schemas.WhiteList{"*"},
+		AntigravityKeyConfig: &schemas.AntigravityKeyConfig{
+			// No refresh token and no access token
+		},
+	}
+	_, bErr = provider.ListModels(ctx, []schemas.Key{badKey}, &schemas.BifrostListModelsRequest{Provider: schemas.Antigravity})
+	if bErr == nil {
+		t.Fatal("expected error for bad key")
+	}
+	if len(bErr.ExtraFields.KeyStatuses) != 1 {
+		t.Fatalf("expected 1 KeyStatus on error, got %d", len(bErr.ExtraFields.KeyStatuses))
+	}
+	if bErr.ExtraFields.KeyStatuses[0].KeyID != "bad-key-1" || bErr.ExtraFields.KeyStatuses[0].Status != schemas.KeyStatusListModelsFailed {
+		t.Errorf("expected KeyStatus list_models_failed for bad-key-1, got %+v", bErr.ExtraFields.KeyStatuses[0])
+	}
+}
+
 func TestAntigravityProvider_ChatCompletionStream(t *testing.T) {
 	ClearTokenCache()
 

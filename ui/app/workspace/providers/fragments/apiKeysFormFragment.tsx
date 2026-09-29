@@ -18,7 +18,7 @@ import {
 	usePollClineDeviceAuthMutation,
 	type ClineDeviceChallenge,
 } from "@/lib/store/apis/providersApi";
-import { hasClineApiToken, hasClineOAuthRefresh, hasCopilotApiToken, isRedacted } from "@/lib/utils/validation";
+import { hasAntigravityOAuthRefresh, hasClineApiToken, hasClineOAuthRefresh, hasCopilotApiToken, isRedacted } from "@/lib/utils/validation";
 import { CheckCircle2, Info, Loader2, RefreshCw, Copy, Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Control, UseFormReturn } from "react-hook-form";
@@ -295,11 +295,8 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 				redirect_uri: uri,
 			}).unwrap();
 
-			form.setValue("key.value", { value: res.refresh_token, ref: "" }, { shouldDirty: true, shouldValidate: true });
+			form.setValue("key.value", { value: "", ref: "" }, { shouldDirty: true, shouldValidate: true });
 			form.setValue("key.antigravity_key_config.refresh_token", { value: res.refresh_token, ref: "" }, { shouldDirty: true });
-			if (res.access_token) {
-				form.setValue("key.antigravity_key_config.access_token", { value: res.access_token, ref: "" }, { shouldDirty: true });
-			}
 			if (res.project_id) {
 				form.setValue("key.antigravity_key_config.project_id", { value: res.project_id, ref: "" }, { shouldDirty: true });
 			}
@@ -2082,7 +2079,9 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 
 					{antigravityAuthType === "oauth" ? (
 						<div className="bg-muted/20 space-y-4 rounded-md border p-4">
-							{Boolean(form.watch("key.value")?.value || form.watch("key.antigravity_key_config.refresh_token")?.value) ? (
+							{Boolean(
+								hasAntigravityOAuthRefresh(form.watch("key.antigravity_key_config.refresh_token")) || form.watch("key.value")?.value,
+							) ? (
 								<div className="flex flex-col gap-3">
 									<div className="flex items-center gap-3 rounded-md border border-green-200 bg-green-50 p-3 text-green-700 dark:border-green-800/40 dark:bg-green-950/40 dark:text-green-400">
 										<CheckCircle2 className="h-5 w-5 shrink-0" />

@@ -1,6 +1,8 @@
 package githubcopilot
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	schemas "github.com/maximhq/bifrost/core/schemas"
@@ -321,5 +323,50 @@ func TestUnsupportedOperations(t *testing.T) {
 		_, bErr := provider.ListModels(ctx, nil, &schemas.BifrostListModelsRequest{})
 		require.NotNil(t, bErr)
 		assert.Contains(t, bErr.Error.Message, "no keys configured")
+	})
+
+	t.Run("list models key statuses success and failure", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("Authorization") == "Bearer good-token" {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"object":"list","data":[{"id":"gpt-4o","object":"model"}]}`))
+				return
+			}
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"error":{"message":"unauthorized"}}`))
+		}))
+		defer server.Close()
+
+		p, err := NewGithubCopilotProvider(&schemas.ProviderConfig{
+			NetworkConfig: schemas.NetworkConfig{
+				BaseURL: server.URL,
+			},
+		}, nil)
+		require.NoError(t, err)
+
+		goodKey := schemas.Key{
+			ID:     "good-copilot-key",
+			Name:   "good-copilot",
+			Value:  *schemas.NewSecretVar("good-token"),
+			Models: schemas.WhiteList{"*"},
+		}
+		resp, bErr := p.ListModels(ctx, []schemas.Key{goodKey}, &schemas.BifrostListModelsRequest{Provider: schemas.GithubCopilot})
+		require.Nil(t, bErr)
+		require.Len(t, resp.KeyStatuses, 1)
+		assert.Equal(t, "good-copilot-key", resp.KeyStatuses[0].KeyID)
+		assert.Equal(t, schemas.KeyStatusSuccess, resp.KeyStatuses[0].Status)
+
+		badKey := schemas.Key{
+			ID:     "bad-copilot-key",
+			Name:   "bad-copilot",
+			Value:  *schemas.NewSecretVar("bad-token"),
+			Models: schemas.WhiteList{"*"},
+		}
+		_, bErr = p.ListModels(ctx, []schemas.Key{badKey}, &schemas.BifrostListModelsRequest{Provider: schemas.GithubCopilot})
+		require.NotNil(t, bErr)
+		require.Len(t, bErr.ExtraFields.KeyStatuses, 1)
+		assert.Equal(t, "bad-copilot-key", bErr.ExtraFields.KeyStatuses[0].KeyID)
+		assert.Equal(t, schemas.KeyStatusListModelsFailed, bErr.ExtraFields.KeyStatuses[0].Status)
 	})
 }

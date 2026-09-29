@@ -136,6 +136,50 @@ func TestVaultCallbacks_SelfManagedStoresPlaintext(t *testing.T) {
 	}
 }
 
+// TestVaultCallbacks_AntigravityOAuthStoresOnlyRefreshTokenAndProjectID pins the
+// Antigravity OAuth contract: the vault holds the refresh token and project ID only.
+// The access token rotates on every refresh and the generic value is a duplicate, so
+// neither must ever be persisted.
+func TestVaultCallbacks_AntigravityOAuthStoresOnlyRefreshTokenAndProjectID(t *testing.T) {
+	stored, _ := stubVaultHooks(t)
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	RegisterVaultCallbacks(db)
+	require.NoError(t, db.AutoMigrate(&tables.TableKey{}))
+
+	keyID := "antigravity-oauth-key"
+	key := &tables.TableKey{
+		Name:     "oauth-antigravity-test",
+		KeyID:    keyID,
+		Provider: "antigravity",
+		Value:    schemas.SecretVar{},
+		Models:   schemas.WhiteList{"*"},
+		AntigravityKeyConfig: &schemas.AntigravityKeyConfig{
+			ProjectID:    schemas.NewSecretVar("my-gcp-project"),
+			RefreshToken: schemas.NewSecretVar("1//0refresh-token"),
+			AccessToken:  schemas.NewSecretVar("ya29.access-token"),
+		},
+	}
+	require.NoError(t, db.Create(key).Error)
+
+	base := fmt.Sprintf("bifrost/config_keys/%s", keyID)
+	require.Equal(t, "1//0refresh-token", stored[base+"/antigravity_refresh_token"], "refresh token must be vaulted")
+	// NB: toSnakeCase naively lowercases acronym runs, so "ProjectID"/"ClientID"
+	// become "..._project_i_d"/"..._client_i_d". Cline never persisting a
+	// project ID has kept this invisible until now.
+	require.Equal(t, "my-gcp-project", stored[base+"/antigravity_project_i_d"], "project id must be vaulted")
+	require.NotContains(t, stored, base+"/antigravity_access_token", "access token must not be vaulted")
+	require.NotContains(t, stored, base+"/value", "generic value must not be vaulted for oauth keys")
+
+	// The persisted row must carry no access token either.
+	var row tables.TableKey
+	require.NoError(t, db.First(&row, "key_id = ?", keyID).Error)
+	require.Nil(t, row.AntigravityAccessToken, "access token column must stay empty")
+	require.NotNil(t, row.AntigravityRefreshToken)
+	require.NotNil(t, row.AntigravityProjectID)
+}
+
 // TestVaultCallbacks_SelfManagedRemovesVaultSecrets verifies that deleting a TableKey
 // (a self-managed model) removes all its owned vault secrets via the global remove callback.
 func TestVaultCallbacks_SelfManagedRemovesVaultSecrets(t *testing.T) {

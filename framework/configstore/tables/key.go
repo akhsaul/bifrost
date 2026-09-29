@@ -88,7 +88,7 @@ type TableKey struct {
 	// Antigravity config fields (embedded)
 	AntigravityProjectID     *schemas.SecretVar `gorm:"type:text" json:"antigravity_project_id,omitempty"`
 	AntigravityRefreshToken  *schemas.SecretVar `gorm:"type:text" json:"antigravity_refresh_token,omitempty"`
-	AntigravityAccessToken   *schemas.SecretVar `gorm:"type:text" json:"antigravity_access_token,omitempty"`
+	AntigravityAccessToken   *schemas.SecretVar `gorm:"-" json:"antigravity_access_token,omitempty"`
 	AntigravityClientID      *schemas.SecretVar `gorm:"type:text" json:"antigravity_client_id,omitempty"`
 	AntigravityClientSecret  *schemas.SecretVar `gorm:"type:text" json:"antigravity_client_secret,omitempty"`
 	AntigravityClientProfile *string            `gorm:"type:varchar(50)" json:"antigravity_client_profile,omitempty"`
@@ -501,12 +501,8 @@ func (k *TableKey) BeforeSave(tx *gorm.DB) error {
 		} else {
 			k.AntigravityRefreshToken = nil
 		}
-		if k.AntigravityKeyConfig.AccessToken != nil && k.AntigravityKeyConfig.AccessToken.IsSet() {
-			at := *k.AntigravityKeyConfig.AccessToken
-			k.AntigravityAccessToken = &at
-		} else {
-			k.AntigravityAccessToken = nil
-		}
+		// Antigravity access token is rotated frequently and kept in memory only; do not persist.
+		k.AntigravityAccessToken = nil
 		if k.AntigravityKeyConfig.ClientID != nil && k.AntigravityKeyConfig.ClientID.IsSet() {
 			cid := *k.AntigravityKeyConfig.ClientID
 			k.AntigravityClientID = &cid
@@ -757,9 +753,6 @@ func (k *TableKey) BeforeSave(tx *gorm.DB) error {
 		if err := encryptSecretVarPtr(&k.AntigravityRefreshToken); err != nil {
 			return fmt.Errorf("failed to encrypt antigravity refresh token: %w", err)
 		}
-		if err := encryptSecretVarPtr(&k.AntigravityAccessToken); err != nil {
-			return fmt.Errorf("failed to encrypt antigravity access token: %w", err)
-		}
 		if err := encryptSecretVarPtr(&k.AntigravityClientID); err != nil {
 			return fmt.Errorf("failed to encrypt antigravity client id: %w", err)
 		}
@@ -925,9 +918,6 @@ func (k *TableKey) AfterFind(tx *gorm.DB) error {
 		// Antigravity
 		if err := decryptSecretVarPtr(&k.AntigravityRefreshToken); err != nil {
 			return fmt.Errorf("failed to decrypt antigravity refresh token: %w", err)
-		}
-		if err := decryptSecretVarPtr(&k.AntigravityAccessToken); err != nil {
-			return fmt.Errorf("failed to decrypt antigravity access token: %w", err)
 		}
 		if err := decryptSecretVarPtr(&k.AntigravityClientID); err != nil {
 			return fmt.Errorf("failed to decrypt antigravity client id: %w", err)
@@ -1156,11 +1146,10 @@ func (k *TableKey) AfterFind(tx *gorm.DB) error {
 		k.SGLKeyConfig = nil
 	}
 	// Reconstruct Antigravity config if fields are present
-	if k.AntigravityProjectID != nil || k.AntigravityRefreshToken != nil || k.AntigravityAccessToken != nil || k.AntigravityClientID != nil || k.AntigravityClientSecret != nil || k.AntigravityClientProfile != nil {
+	if k.AntigravityProjectID != nil || k.AntigravityRefreshToken != nil || k.AntigravityClientID != nil || k.AntigravityClientSecret != nil || k.AntigravityClientProfile != nil {
 		k.AntigravityKeyConfig = &schemas.AntigravityKeyConfig{
 			ProjectID:     k.AntigravityProjectID,
 			RefreshToken:  k.AntigravityRefreshToken,
-			AccessToken:   k.AntigravityAccessToken,
 			ClientID:      k.AntigravityClientID,
 			ClientSecret:  k.AntigravityClientSecret,
 			ClientProfile: k.AntigravityClientProfile,

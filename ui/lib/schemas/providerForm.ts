@@ -1,6 +1,8 @@
 import { KnownProvidersNames } from "@/lib/constants/logs";
 import {
 	aliasConfigSchema,
+	antigravityKeyConfigComplete,
+	antigravityKeyConfigSchema,
 	clineKeyConfigComplete,
 	clineKeyConfigSchema,
 	githubCopilotKeyConfigComplete,
@@ -224,6 +226,7 @@ const KeySchema = z.object({
 	replicate_key_config: ReplicateKeyConfigSchema.optional(),
 	github_copilot_key_config: githubCopilotKeyConfigSchema.optional(),
 	cline_key_config: clineKeyConfigSchema.optional(),
+	antigravity_key_config: antigravityKeyConfigSchema.optional(),
 	use_for_batch_api: z.boolean().optional(),
 });
 
@@ -336,6 +339,14 @@ export const ProviderFormSchema = z
 						ctx.addIssue({
 							code: z.ZodIssueCode.custom,
 							message: "Set a Cline API key, or fill in the OAuth refresh token",
+							path: ["keys", index, "value"],
+						});
+					}
+				} else if (effectiveProviderType === "antigravity") {
+					if (!key.value.trim() && !antigravityKeyConfigComplete(key.antigravity_key_config)) {
+						ctx.addIssue({
+							code: z.ZodIssueCode.custom,
+							message: "Set an API key or authenticate with Google OAuth",
 							path: ["keys", index, "value"],
 						});
 					}

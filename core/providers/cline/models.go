@@ -18,14 +18,21 @@ import (
 // free, clinePass and clineCloud buckets). Both are fetched with the same
 // credentials and merged with dedupe by model ID.
 //
-// Like githubcopilot, only keys[0] is used: credentials resolve per key, and
-// a second key would only repeat the same catalog. The recommended fetch is
-// fail-soft — if it fails, the /v1/models result is still returned.
+// The recommended fetch is fail-soft — if it fails, the /v1/models result is still returned.
 func (provider *ClineProvider) ListModels(ctx *schemas.BifrostContext, keys []schemas.Key, request *schemas.BifrostListModelsRequest) (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
 	if len(keys) == 0 {
 		return nil, configurationError("cline: no keys configured")
 	}
-	key := keys[0]
+
+	return providerUtils.HandleMultipleListModelsRequests(
+		ctx,
+		keys,
+		request,
+		provider.listModelsByKey,
+	)
+}
+
+func (provider *ClineProvider) listModelsByKey(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostListModelsRequest) (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
 	unfiltered := request != nil && request.Unfiltered
 
 	authValue, isOAuth, bErr := provider.resolveAuth(ctx, key)

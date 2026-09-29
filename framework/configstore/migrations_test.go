@@ -3982,3 +3982,52 @@ func TestMigrationAddClineKeyConfigColumns_NonRollbackable(t *testing.T) {
 	assert.Equal(t, "refresh-token-value", got.ClineKeyConfig.RefreshToken.GetValue(),
 		"the refresh token must survive the refused rollback")
 }
+
+// TestMigrationCleanupAntigravityOAuthKeys pins the cleanup that drops the legacy
+// duplicate value and the never-reused access_token from Antigravity OAuth keys,
+// leaving refresh_token and project_id as the only persisted credentials.
+func TestMigrationCleanupAntigravityOAuthKeys(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	require.NoError(t, db.AutoMigrate(&tables.TableKey{}))
+	// Simulate a pre-cleanup row: the access_token column exists because the old
+	// binary mapped it. On a fresh DB the field is unmapped, so add it by raw SQL.
+	if !db.Migrator().HasColumn(&tables.TableKey{}, "antigravity_access_token") {
+		require.NoError(t, db.Exec(`ALTER TABLE config_keys ADD COLUMN antigravity_access_token text`).Error)
+	}
+
+	seed := &tables.TableKey{
+		Name:       "oauth-antigravity",
+		ProviderID: 1,
+		Provider:   "antigravity",
+		KeyID:      "ag-migration-1",
+		// Legacy duplicate: the refresh token lived in the generic value column too.
+		Value:  *schemas.NewSecretVar("1//0refresh-token"),
+		Models: schemas.WhiteList{"*"},
+		AntigravityKeyConfig: &schemas.AntigravityKeyConfig{
+			RefreshToken: schemas.NewSecretVar("1//0refresh-token"),
+			ProjectID:    schemas.NewSecretVar("my-project"),
+		},
+	}
+	require.NoError(t, db.Create(seed).Error)
+	// Force the legacy access token into the row directly; BeforeSave no longer writes it.
+	require.NoError(t, db.Exec(`UPDATE config_keys SET antigravity_access_token = ? WHERE key_id = ?`,
+		"ya29.legacy-access-token", seed.KeyID).Error)
+
+	require.NoError(t, migrationCleanupAntigravityOAuthKeys(ctx, db, testMigrationLogger))
+
+	var got tables.TableKey
+	require.NoError(t, db.Where("key_id = ?", seed.KeyID).First(&got).Error)
+	assert.Empty(t, got.Value.GetValue(), "generic value must be cleared")
+	require.NotNil(t, got.AntigravityRefreshToken)
+	assert.Equal(t, "1//0refresh-token", got.AntigravityRefreshToken.GetValue(), "refresh token must survive")
+	require.NotNil(t, got.AntigravityProjectID)
+	assert.Equal(t, "my-project", got.AntigravityProjectID.GetValue(), "project id must survive")
+
+	var rawAccessToken *string
+	require.NoError(t, db.Raw(`SELECT antigravity_access_token FROM config_keys WHERE key_id = ?`, seed.KeyID).Scan(&rawAccessToken).Error)
+	if rawAccessToken != nil {
+		assert.Empty(t, *rawAccessToken, "access token column must be cleared")
+	}
+}

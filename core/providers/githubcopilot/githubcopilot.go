@@ -110,14 +110,23 @@ func (p *githubCopilotProvider) ListModels(ctx *schemas.BifrostContext, keys []s
 		return nil, configurationError("github copilot: no keys configured")
 	}
 
-	creds, bErr := resolveCredentials(ctx, keys[0], p.exchangeClient, p.networkConfig.BaseURL, p.logger)
+	return providerUtils.HandleMultipleListModelsRequests(
+		ctx,
+		keys,
+		request,
+		p.listModelsByKey,
+	)
+}
+
+func (p *githubCopilotProvider) listModelsByKey(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostListModelsRequest) (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
+	creds, bErr := resolveCredentials(ctx, key, p.exchangeClient, p.networkConfig.BaseURL, p.logger)
 	if bErr != nil {
 		return nil, bErr
 	}
 
 	// ListModelsByKey reads key.Value for the Authorization header, so hand it the
 	// resolved token rather than the stored credential.
-	authKey := keys[0]
+	authKey := key
 	authKey.Value = *schemas.NewSecretVar(creds.Token)
 
 	return openai.ListModelsByKey(

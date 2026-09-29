@@ -135,7 +135,7 @@ func providerRequiresKey(providerKey schemas.ModelProvider, customConfig *schema
 // Some providers like Vertex and Bedrock have their credentials in additional key configs.
 // Ollama and SGL are keyless (API Key is optional) but use per-key server URLs.
 func CanProviderKeyValueBeEmpty(providerKey schemas.ModelProvider) bool {
-	return providerKey == schemas.Vertex || providerKey == schemas.Bedrock || providerKey == schemas.BedrockMantle || providerKey == schemas.VLLM || providerKey == schemas.Azure || providerKey == schemas.Ollama || providerKey == schemas.SGL || providerKey == schemas.Databricks || providerKey == schemas.OpencodeFree || providerKey == schemas.Cline
+	return providerKey == schemas.Vertex || providerKey == schemas.Bedrock || providerKey == schemas.BedrockMantle || providerKey == schemas.VLLM || providerKey == schemas.Azure || providerKey == schemas.Ollama || providerKey == schemas.SGL || providerKey == schemas.Databricks || providerKey == schemas.OpencodeFree || providerKey == schemas.Cline || providerKey == schemas.GithubCopilot || providerKey == schemas.Antigravity
 }
 
 // isKeySkippingAllowed gates SkipKeySelection on the provider this attempt resolved to. The flag
@@ -282,6 +282,20 @@ func validateKey(providerKey schemas.ModelProvider, key *schemas.Key) error {
 		}
 		if key.ClineKeyConfig == nil || strings.TrimSpace(key.ClineKeyConfig.RefreshToken.GetValue()) == "" {
 			return fmt.Errorf("cline_key_config.refresh_token is required when value is not set")
+		}
+	case schemas.Antigravity:
+		// Two auth modes, either is sufficient: a manual credential in value (refresh token,
+		// ya29. access token, or JSON), or an OAuth refresh token in antigravity_key_config.
+		if strings.TrimSpace(key.Value.GetValue()) != "" {
+			break
+		}
+		if key.AntigravityKeyConfig == nil {
+			return fmt.Errorf("antigravity_key_config is required when value is not set")
+		}
+		hasRefreshToken := key.AntigravityKeyConfig.RefreshToken != nil && strings.TrimSpace(key.AntigravityKeyConfig.RefreshToken.GetValue()) != ""
+		hasAccessToken := key.AntigravityKeyConfig.AccessToken != nil && strings.TrimSpace(key.AntigravityKeyConfig.AccessToken.GetValue()) != ""
+		if !hasRefreshToken && !hasAccessToken {
+			return fmt.Errorf("antigravity_key_config.refresh_token is required when value is not set")
 		}
 	}
 	return nil

@@ -262,11 +262,14 @@ func TestListModelsMergesRecommended(t *testing.T) {
 	provider := newTestProvider(t, server.URL)
 	resp, bifrostErr := provider.ListModels(
 		testContext(),
-		[]schemas.Key{{Value: *schemas.NewSecretVar("static-key"), Models: schemas.WhiteList{"*"}}},
+		[]schemas.Key{{ID: "cline-key-1", Value: *schemas.NewSecretVar("static-key"), Models: schemas.WhiteList{"*"}}},
 		&schemas.BifrostListModelsRequest{Provider: schemas.Cline},
 	)
 	if bifrostErr != nil {
 		t.Fatal(bifrostErr)
+	}
+	if len(resp.KeyStatuses) != 1 || resp.KeyStatuses[0].Status != schemas.KeyStatusSuccess || resp.KeyStatuses[0].KeyID != "cline-key-1" {
+		t.Errorf("expected KeyStatus success for cline-key-1, got %+v", resp.KeyStatuses)
 	}
 	ids := map[string]bool{}
 	for _, m := range resp.Data {
@@ -312,6 +315,37 @@ func TestListModelsNoKeys(t *testing.T) {
 	provider := newTestProvider(t, "http://localhost")
 	if _, bifrostErr := provider.ListModels(testContext(), nil, &schemas.BifrostListModelsRequest{}); bifrostErr == nil {
 		t.Error("expected error for missing keys")
+	}
+}
+
+func TestListModelsKeyStatuses_Failure(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"unauthorized","success":false}`))
+	}))
+	defer server.Close()
+
+	provider := newTestProvider(t, server.URL)
+	key := schemas.Key{
+		ID:     "bad-cline-key",
+		Name:   "bad-cline",
+		Value:  *schemas.NewSecretVar("invalid-key"),
+		Models: schemas.WhiteList{"*"},
+	}
+	_, bifrostErr := provider.ListModels(
+		testContext(),
+		[]schemas.Key{key},
+		&schemas.BifrostListModelsRequest{Provider: schemas.Cline},
+	)
+	if bifrostErr == nil {
+		t.Fatal("expected error")
+	}
+	if len(bifrostErr.ExtraFields.KeyStatuses) != 1 {
+		t.Fatalf("expected 1 KeyStatus on error, got %d", len(bifrostErr.ExtraFields.KeyStatuses))
+	}
+	if bifrostErr.ExtraFields.KeyStatuses[0].KeyID != "bad-cline-key" || bifrostErr.ExtraFields.KeyStatuses[0].Status != schemas.KeyStatusListModelsFailed {
+		t.Errorf("expected list_models_failed for bad-cline-key, got %+v", bifrostErr.ExtraFields.KeyStatuses[0])
 	}
 }
 

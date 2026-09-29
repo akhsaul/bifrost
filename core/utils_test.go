@@ -515,3 +515,71 @@ func TestWaitRetryBackoffReportsCancellationAtTimerExpiry(t *testing.T) {
 		}
 	}
 }
+
+func TestCanProviderKeyValueBeEmpty(t *testing.T) {
+	assert.True(t, CanProviderKeyValueBeEmpty(schemas.Antigravity), "Antigravity should allow empty key value")
+	assert.True(t, CanProviderKeyValueBeEmpty(schemas.GithubCopilot), "GithubCopilot should allow empty key value")
+	assert.True(t, CanProviderKeyValueBeEmpty(schemas.Cline), "Cline should allow empty key value")
+	assert.False(t, CanProviderKeyValueBeEmpty(schemas.OpenAI), "OpenAI requires key value")
+}
+
+func TestValidateKeyAntigravity(t *testing.T) {
+	tests := []struct {
+		name      string
+		key       schemas.Key
+		wantError string
+	}{
+		{
+			name: "a manual token is sufficient",
+			key:  schemas.Key{Value: *schemas.NewSecretVar("my-manual-token")},
+		},
+		{
+			name: "oauth refresh token is sufficient",
+			key: schemas.Key{
+				AntigravityKeyConfig: &schemas.AntigravityKeyConfig{
+					RefreshToken: schemas.NewSecretVar("1//0oauth-refresh-token"),
+				},
+			},
+		},
+		{
+			name: "oauth access token is sufficient",
+			key: schemas.Key{
+				AntigravityKeyConfig: &schemas.AntigravityKeyConfig{
+					AccessToken: schemas.NewSecretVar("ya29.test-access-token"),
+				},
+			},
+		},
+		{
+			name:      "no credential at all",
+			key:       schemas.Key{},
+			wantError: "antigravity_key_config is required when value is not set",
+		},
+		{
+			name:      "whitespace-only value with empty config",
+			key:       schemas.Key{Value: *schemas.NewSecretVar("   ")},
+			wantError: "antigravity_key_config is required when value is not set",
+		},
+		{
+			name: "config without refresh_token or access_token",
+			key: schemas.Key{
+				AntigravityKeyConfig: &schemas.AntigravityKeyConfig{
+					ProjectID: schemas.NewSecretVar("my-project"),
+				},
+			},
+			wantError: "antigravity_key_config.refresh_token is required when value is not set",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key := tt.key
+			err := validateKey(schemas.Antigravity, &key)
+			if tt.wantError == "" {
+				assert.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantError)
+		})
+	}
+}

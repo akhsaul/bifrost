@@ -250,7 +250,7 @@ func tableKeyFromSchemaKey(provider tables.TableProvider, key schemas.Key) (tabl
 	if key.AntigravityKeyConfig != nil {
 		dbKey.AntigravityProjectID = key.AntigravityKeyConfig.ProjectID
 		dbKey.AntigravityRefreshToken = key.AntigravityKeyConfig.RefreshToken
-		dbKey.AntigravityAccessToken = key.AntigravityKeyConfig.AccessToken
+		dbKey.AntigravityAccessToken = nil
 		dbKey.AntigravityClientID = key.AntigravityKeyConfig.ClientID
 		dbKey.AntigravityClientSecret = key.AntigravityKeyConfig.ClientSecret
 		dbKey.AntigravityClientProfile = key.AntigravityKeyConfig.ClientProfile
@@ -845,7 +845,7 @@ func (s *RDBConfigStore) UpdateProvidersConfig(ctx context.Context, providers ma
 			if key.AntigravityKeyConfig != nil {
 				dbKey.AntigravityProjectID = key.AntigravityKeyConfig.ProjectID
 				dbKey.AntigravityRefreshToken = key.AntigravityKeyConfig.RefreshToken
-				dbKey.AntigravityAccessToken = key.AntigravityKeyConfig.AccessToken
+				dbKey.AntigravityAccessToken = nil
 				dbKey.AntigravityClientID = key.AntigravityKeyConfig.ClientID
 				dbKey.AntigravityClientSecret = key.AntigravityKeyConfig.ClientSecret
 				dbKey.AntigravityClientProfile = key.AntigravityKeyConfig.ClientProfile
@@ -1103,7 +1103,7 @@ func (s *RDBConfigStore) UpdateProvider(ctx context.Context, provider schemas.Mo
 		if key.AntigravityKeyConfig != nil {
 			dbKey.AntigravityProjectID = key.AntigravityKeyConfig.ProjectID
 			dbKey.AntigravityRefreshToken = key.AntigravityKeyConfig.RefreshToken
-			dbKey.AntigravityAccessToken = key.AntigravityKeyConfig.AccessToken
+			dbKey.AntigravityAccessToken = nil
 			dbKey.AntigravityClientID = key.AntigravityKeyConfig.ClientID
 			dbKey.AntigravityClientSecret = key.AntigravityKeyConfig.ClientSecret
 			dbKey.AntigravityClientProfile = key.AntigravityKeyConfig.ClientProfile
@@ -1269,7 +1269,7 @@ func (s *RDBConfigStore) AddProvider(ctx context.Context, provider schemas.Model
 		if key.AntigravityKeyConfig != nil {
 			dbKey.AntigravityProjectID = key.AntigravityKeyConfig.ProjectID
 			dbKey.AntigravityRefreshToken = key.AntigravityKeyConfig.RefreshToken
-			dbKey.AntigravityAccessToken = key.AntigravityKeyConfig.AccessToken
+			dbKey.AntigravityAccessToken = nil
 			dbKey.AntigravityClientID = key.AntigravityKeyConfig.ClientID
 			dbKey.AntigravityClientSecret = key.AntigravityKeyConfig.ClientSecret
 			dbKey.AntigravityClientProfile = key.AntigravityKeyConfig.ClientProfile

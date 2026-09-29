@@ -381,6 +381,13 @@ export const sglKeyConfigSchema = z
 		path: ["url"],
 	});
 
+// antigravityKeyConfigComplete reports whether the OAuth refresh token (or access token) is present.
+export const antigravityKeyConfigComplete = (data: { refresh_token?: unknown; access_token?: unknown } | undefined): boolean => {
+	if (!data) return false;
+	const d = data as Record<string, { value?: string; ref?: string } | undefined>;
+	return isSecretVarSet(d.refresh_token) || isSecretVarSet(d.access_token);
+};
+
 // Antigravity key config schema
 export const antigravityKeyConfigSchema = z.object({
 	_auth_type: z.enum(["oauth", "manual"]).optional(),

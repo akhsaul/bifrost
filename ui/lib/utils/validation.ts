@@ -630,3 +630,10 @@ export function hasClineOAuthRefresh(value: string | { value?: string; ref?: str
 	if (typeof value === "string") return value.trim() !== "";
 	return !!value.value?.trim() || !!value.ref?.trim();
 }
+
+// hasAntigravityOAuthRefresh reports whether an Antigravity OAuth refresh token is present.
+export function hasAntigravityOAuthRefresh(value: string | { value?: string; ref?: string; type?: string } | null | undefined): boolean {
+	if (!value) return false;
+	if (typeof value === "string") return value.trim() !== "";
+	return !!value.value?.trim() || !!value.ref?.trim();
+}

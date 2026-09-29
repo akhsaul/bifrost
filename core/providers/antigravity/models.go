@@ -312,33 +312,10 @@ func FetchAvailableModelsFromAPI(
 	return models, nil
 }
 
-// HandleListModels returns the list of supported Antigravity models.
-func HandleListModels(
-	ctx *schemas.BifrostContext,
-	client *fasthttp.Client,
-	keys []schemas.Key,
-	baseURL string,
-	extraHeaders map[string]string,
-	logger schemas.Logger,
-) (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
-	if len(keys) > 0 {
-		for _, key := range keys {
-			accessToken, projectID, err := GetAccessTokenAndProject(ctx, client, key, baseURL, logger)
-			if err == nil && accessToken != "" && projectID != "" {
-				if dynamicModels, fetchErr := FetchAvailableModelsFromAPI(ctx, client, accessToken, projectID, baseURL, extraHeaders, logger); fetchErr == nil && len(dynamicModels) > 0 {
-					return &schemas.BifrostListModelsResponse{
-						Data: dynamicModels,
-						ExtraFields: schemas.BifrostResponseExtraFields{
-							Provider: schemas.Antigravity,
-							Latency:  0,
-						},
-					}, nil
-				}
-			}
-		}
-	}
-
-	// Fallback to static public models
+// StaticListModelsResponse returns the compiled static Antigravity model list.
+// It is the fallback for a direct ListModels call with no keys configured; the
+// live discovery path always supplies keys and reports per-key statuses instead.
+func StaticListModelsResponse() *schemas.BifrostListModelsResponse {
 	models := make([]schemas.Model, len(AntigravityPublicModels))
 	copy(models, AntigravityPublicModels)
 
@@ -348,5 +325,5 @@ func HandleListModels(
 			Provider: schemas.Antigravity,
 			Latency:  0,
 		},
-	}, nil
+	}
 }

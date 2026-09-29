@@ -3,6 +3,7 @@ package antigravity
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -69,7 +70,65 @@ func (provider *AntigravityProvider) ListModels(
 	keys []schemas.Key,
 	request *schemas.BifrostListModelsRequest,
 ) (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
-	return HandleListModels(ctx, provider.client, keys, provider.networkConfig.BaseURL, provider.networkConfig.ExtraHeaders, provider.logger)
+	if len(keys) == 0 {
+		return StaticListModelsResponse(), nil
+	}
+
+	return providerUtils.HandleMultipleListModelsRequests(
+		ctx,
+		keys,
+		request,
+		provider.listModelsByKey,
+	)
+}
+
+func (provider *AntigravityProvider) listModelsByKey(
+	ctx *schemas.BifrostContext,
+	key schemas.Key,
+	request *schemas.BifrostListModelsRequest,
+) (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
+	accessToken, projectID, authErr := GetAccessTokenAndProject(ctx, provider.client, key, provider.networkConfig.BaseURL, provider.logger)
+	if authErr != nil {
+		return nil, authErr
+	}
+
+	if projectID == "" {
+		return nil, newAuthenticationError("missing Google Cloud project ID for Antigravity account", nil)
+	}
+
+	dynamicModels, fetchErr := FetchAvailableModelsFromAPI(ctx, provider.client, accessToken, projectID, provider.networkConfig.BaseURL, provider.networkConfig.ExtraHeaders, provider.logger)
+	if fetchErr != nil {
+		return nil, providerUtils.NewProviderAPIError(fmt.Sprintf("failed to fetch models from Antigravity API: %v", fetchErr), nil, 0, nil, nil)
+	}
+
+	unfiltered := request != nil && request.Unfiltered
+	pipeline := &providerUtils.ListModelsPipeline{
+		AllowedModels:     key.Models,
+		BlacklistedModels: key.BlacklistedModels,
+		Aliases:           key.Aliases,
+		Unfiltered:        unfiltered,
+		ProviderKey:       provider.GetProviderKey(),
+		MatchFns:          providerUtils.DefaultMatchFns(),
+	}
+
+	var filteredModels []schemas.Model
+	for _, m := range dynamicModels {
+		for _, result := range pipeline.FilterModel(m.ID) {
+			cp := m
+			cp.ID = result.ResolvedID
+			if result.AliasValue != "" {
+				cp.Alias = schemas.Ptr(result.AliasValue)
+			}
+			filteredModels = append(filteredModels, cp)
+		}
+	}
+
+	return &schemas.BifrostListModelsResponse{
+		Data: filteredModels,
+		ExtraFields: schemas.BifrostResponseExtraFields{
+			Provider: provider.GetProviderKey(),
+		},
+	}, nil
 }
 
 // GetKeyQuotaSummary fetches aggregated quota and limits per bucket from /v1internal:retrieveUserQuotaSummary.

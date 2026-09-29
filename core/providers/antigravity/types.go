@@ -72,10 +72,10 @@ type AntigravityFetchModelsResponse struct {
 	TabModelIDs                []string                           `json:"tabModelIds,omitempty"`
 	ImageGenerationModelIDs    []string                           `json:"imageGenerationModelIds,omitempty"`
 	MqueryModelIDs             []string                           `json:"mqueryModelIds,omitempty"`
-	DeprecatedModelIDs         []string                           `json:"deprecatedModelIds,omitempty"`
+	DeprecatedModelIDs         any                                `json:"deprecatedModelIds,omitempty"`
 	CommitMessageModelIDs      []string                           `json:"commitMessageModelIds,omitempty"`
 	AudioTranscriptionModelIDs []string                           `json:"audioTranscriptionModelIds,omitempty"`
-	TieredModelIDs             []string                           `json:"tieredModelIds,omitempty"`
+	TieredModelIDs             any                                `json:"tieredModelIds,omitempty"`
 }
 
 // AntigravityQuotaBucket represents bucket inside group in retrieveUserQuotaSummary.
