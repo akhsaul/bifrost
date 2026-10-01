@@ -146,6 +146,58 @@ python3 tools/gen_pricing_fields.py --check  # CI: fail if stale
 Go stays the source of truth. The day someone adds an `Options` field and
 regenerates, the tool picks it up — it never silently strips newly added fields.
 
+### Field descriptions and typed inputs
+
+`model_parameters.json` carries no documentation: nothing in it says what
+`reasoning_effort_levels` means, that it holds a list of strings, or which effort
+labels Bifrost knows. The Go source is the only place that says, so the Add Field
+dialog assembles it from there and from the loaded data.
+
+`model_parameters.json` is parsed into `schemas.ModelCapabilities`
+(`core/schemas/modelcapabilities.go`), and that struct's **doc comments** are
+carried across into the snapshot:
+
+```bash
+python3 tools/gen_param_fields.py          # regenerate
+python3 tools/gen_param_fields.py --check  # CI: fail if stale
+```
+
+For a selected field the dialog reports:
+
+- **the shape** — `true or false`, `list of text`, `whole number`;
+- **what it means** — the Go doc comment, or a summary derived from the data
+  (`true on 1,997 models, false on 518`) when the struct has none;
+- **where it is used** — present in N of 12,595 models, and the observed range;
+- **which file Bifrost reads it from.** Only 40 of the 121 top-level parameters
+  fields are declared on `ModelCapabilities`. The rest either come from
+  `model_pricing.json` (`max_input_tokens`, `base_model`, `is_deprecated` — the
+  capability lookup runs against the pricing file) or are read by nothing at all
+  (`supports_vision`, `comment`, `deprecation_date`). Editing the wrong file is
+  accepted by the merge and then silently does nothing, so the dialog says which
+  one before you type.
+
+The value control follows the shape:
+
+| Shape | Control |
+|---|---|
+| `true or false` | checkbox |
+| text, closed vocabulary (≤ 20 distinct values) | dropdown, **editable** |
+| list of text, closed vocabulary | tick-list, plus a box for a value the datasheet has not caught up with |
+| anything else | JSON text area, as before |
+
+Enums are only offered when **Go consumes the field** and its observed vocabulary
+is small. That is a deliberate limit, not an omission: `base_model` has 9,265
+distinct values and presenting them as a dropdown would be a worse editor than the
+text box it replaced. Dropdowns stay editable so a provider can add a tier or an
+effort level before the datasheet follows.
+
+For `model_parameters` descriptors the same panel uses the playground's own
+`label` and `helpText`, plus the `options` a `select` declares. Worth knowing:
+Bifrost models **only the descriptor's `id`** (`ModelParameterDescriptor`), which
+feeds the request-parameter allowlist. `label`, `helpText`, `type`, `default`,
+`range` and `options` are served to the UI verbatim from the stored row — editing
+them is still meaningful, Go just never inspects them.
+
 ## Capability fields live in both files
 
 The same facts are maintained twice, and **the two copies currently disagree on
@@ -202,11 +254,20 @@ misleading half-view, not a convenient shortcut.
   editable combos seeded from the values already in the data so the new model
   shows up under the right filters. You can include a pricing section or not.
 - **Add Parameter Field…** / **Add Pricing Field…** add a single field to the
-  selected model. The name is a combo seeded from the fields in that dataset, and
-  the value is parsed as JSON when valid, so numbers, booleans, arrays and
-  objects are all reachable. Putting a field in the wrong section is refused with
-  the reason — the dialog asks the merge engine's own placement rule, so the
-  editor cannot offer something the merge would reject.
+  selected model. Picking a field name shows **what it is** and swaps the value
+  control to match its shape, because the JSON files document nothing on their
+  own (see *Field descriptions and typed inputs* below). Putting a field in the
+  wrong section is refused with the reason — the dialog asks the merge engine's
+  own placement rule, so the editor cannot offer something the merge would
+  reject.
+- **Where the value goes is chosen, not guessed.** The parameters dialog asks
+  whether you are adding a **top-level field** (a column of the entry) or a
+  **parameter descriptor** (an entry of the `model_parameters` array). These are
+  different vocabularies: `reasoning_effort` exists only as a descriptor, and
+  writing it as a top-level key would produce a field Go never reads. Choosing the
+  descriptor target writes `model_parameters[id=…]`, which the merge folds in by
+  id and reports as a single change line. The pricing dialog does not offer the
+  choice — `model_parameters` is not part of a pricing entry.
 - **Search** is plain text — no regex, case-insensitive **contains** across model
   ID, provider, base model, and mode. So `onnet` finds `claude-sonnet`. `Ctrl+F`
   focuses it, `Esc` clears.
@@ -258,7 +319,7 @@ misleading half-view, not a convenient shortcut.
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/ -q
 ```
 
-171 tests. The GUI tests are skipped without PySide6. They cover the merge rules
+251 tests. The GUI tests are skipped without PySide6. They cover the merge rules
 against both hand-built cases and slices of the real 20MB file, and pin two Qt
 interop and lifetime traps that make a window render nothing while looking
 healthy:
@@ -271,6 +332,10 @@ healthy:
   reference is dropped is collected mid-run and its `QObject` signals are
   destroyed with it. Closing the window during a load then raised "Signal source
   has been deleted" on the worker thread.
+- Qt does not apply a layout until the event loop runs, and a widget parented to
+  the right container still renders nothing if that container was detached from
+  its form. The Add Field dialog's Value row rendered empty while every
+  parent-level assertion passed; only geometry catches that.
 
 There is also a regression test for a subtler merge bug: the by-id
 `model_parameters` merge used to mutate the original descriptors in place, so the
@@ -283,14 +348,17 @@ itself and reported no change at all.
 editor/
 ├── datasheet_editor/
 │   ├── fields.py        # read-set + cost/capability classification
+│   ├── fieldinfo.py     # what each field means and what shape its value takes
 │   ├── format.py        # exponent-free numbers + per-1M price readings
 │   ├── pricing_fields.json   # GENERATED from types.go — do not edit
+│   ├── param_fields.json     # GENERATED from modelcapabilities.go — do not edit
 │   ├── dataset.py       # load/save, key order, atomic writes
 │   ├── merge.py         # the merge engine (pure, no Qt, no IO)
 │   ├── validate.py      # errors, warnings, conflict detection
 │   ├── cli.py
 │   └── gui/              # models, workers, typed field editor, add dialogs
 ├── tools/gen_pricing_fields.py
+├── tools/gen_param_fields.py
 └── tests/
 ```
 

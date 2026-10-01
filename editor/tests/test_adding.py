@@ -211,7 +211,7 @@ def test_unparseable_value_falls_back_to_the_literal_string():
 
 def test_added_field_reaches_the_output(field_dialog):
     field_dialog.name_combo.setCurrentText("supports_reasoning")
-    field_dialog.value_edit.setPlainText("true")
+    assert field_dialog.set_value_text("true")
     name, value = field_dialog.values()
     res = merge({"m": {"provider": "openai"}}, {}, {"m": {"parameters": {name: value}}})
     assert res.parameters["m"]["supports_reasoning"] is True
@@ -226,10 +226,153 @@ def test_added_pricing_field_reaches_the_output(app):
         existing={"provider"},
     )
     dialog.name_combo.setCurrentText("input_cost_per_token")
-    dialog.value_edit.setPlainText("0.000002")
+    assert dialog.set_value_text("0.000002")
     name, value = dialog.values()
     res = merge({}, {"m": {"provider": "openai"}}, {"m": {"pricing": {name: value}}})
     assert res.pricing["m"]["input_cost_per_token"] == 2e-06
+
+
+# --------------------------------------------------------------------------- #
+# window wiring
+# --------------------------------------------------------------------------- #
+
+#: "m" is the model being edited and deliberately carries almost nothing, so a
+#: field can be added to it. "other" exists only to give the catalog something to
+#: learn the field types from -- which is how the real datasheet works, since the
+#: shape of a field is known from the thousands of other models that have it.
+PARAMS = {
+    "m": {"mode": "chat", "model_parameters": [
+        {"id": "temperature", "type": "number", "range": {"min": 0, "max": 2}}]},
+    "other": {
+        "mode": "chat",
+        "supports_vision": True,
+        "model_parameters": [
+            {"id": "temperature", "type": "number", "range": {"min": 0, "max": 2}},
+            {"id": "reasoning_effort", "type": "select", "label": "Reasoning Effort",
+             "options": [{"value": "low"}, {"value": "high"}], "default": "low"},
+        ],
+    },
+}
+PRICING = {"m": {"provider": "openai"}, "other": {"provider": "openai"}}
+
+
+def _window(app, monkeypatch, overlay=None):
+    """A MainWindow with data loaded but no worker thread."""
+    from datasheet_editor.fieldinfo import build_catalog
+    from datasheet_editor.gui.main_window import MainWindow
+    from datasheet_editor.gui.models import build_rows
+
+    # Constructing the window with nothing loaded raises the both-files-required
+    # modal, which would block the test run headless.
+    monkeypatch.setattr(QMessageBox, "information", staticmethod(lambda *a, **k: QMessageBox.Ok))
+
+    window = MainWindow()
+    window.parameters = PARAMS
+    window.pricing = PRICING
+    window.overlay = overlay or {}
+    window.conflicts = {}
+    window.param_catalog = build_catalog(PARAMS, PRICING)
+    window.pricing_catalog = build_catalog(PRICING, PRICING, source="pricing")
+    # The row list drives _selected_model(), so it has to be populated before a
+    # model can be selected -- otherwise _on_add_field bails out at "no model
+    # selected" and never opens the dialog under test.
+    window._populate_rows(build_rows(PARAMS, PRICING, window.overlay))
+    window._select_model("m")
+    return window
+
+
+def _drive(monkeypatch, script):
+    """Answer the Add Field dialog with ``script(dialog)``.
+
+    Returns Rejected when the dialog is showing an error, mirroring the real
+    flow: OK is disabled while validation fails, so a refused dialog can never
+    reach the caller as Accepted.
+    """
+    from PySide6.QtWidgets import QDialog
+
+    def fake_exec(self):
+        script(self)
+        return QDialog.Rejected if self.error_label.text() else QDialog.Accepted
+
+    monkeypatch.setattr(AddFieldDialog, "exec", fake_exec)
+
+
+def test_window_adds_a_top_level_field(app, monkeypatch):
+    window = _window(app, monkeypatch)
+    _drive(monkeypatch, lambda d: (d.name_combo.setCurrentText("supports_vision"),
+                                   d._checkbox.setChecked(False)))
+    window._on_add_field("parameters")
+    assert window.overlay["m"]["parameters"]["supports_vision"] is False
+    assert "Added m.parameters.supports_vision" in window.status_label.text()
+
+
+def test_window_routes_a_descriptor_into_the_param_array(app, monkeypatch):
+    """The whole point of the target selector: no bogus top-level key."""
+    window = _window(app, monkeypatch)
+    window.overlay = {"m": {"parameters": {"model_parameters": [
+        {"id": "already_added", "type": "boolean"}]}}}
+
+    def script(d):
+        d.target_combo.setCurrentIndex(1)
+        d.name_combo.setCurrentText("reasoning_effort")
+        d._combo.setCurrentText("high")
+
+    _drive(monkeypatch, script)
+    window._on_add_field("parameters")
+
+    section = window.overlay["m"]["parameters"]
+    assert "reasoning_effort" not in section, "descriptor leaked into a top-level key"
+    ids = [i["id"] for i in section["model_parameters"]]
+    # The overlay has to repeat the whole array for the id-keyed merge to work:
+    # previously added descriptors and the original's own must all survive.
+    assert ids == ["already_added", "temperature", "reasoning_effort"]
+    assert "model_parameters[id=reasoning_effort]" in window.status_label.text()
+
+
+def test_window_descriptor_result_merges_against_the_original(app, monkeypatch):
+    """End of the chain: what the window wrote must land in the merged output."""
+    from datasheet_editor.merge import merge
+
+    window = _window(app, monkeypatch)
+
+    def script(d):
+        d.target_combo.setCurrentIndex(1)
+        d.name_combo.setCurrentText("reasoning_effort")
+        d._combo.setCurrentText("high")
+
+    _drive(monkeypatch, script)
+    window._on_add_field("parameters")
+
+    result = merge(PARAMS, PRICING, window.overlay)
+    added = next(d for d in result.parameters["m"]["model_parameters"] if d["id"] == "reasoning_effort")
+    assert added["type"] == "select"
+    assert added["default"] == "high"
+    # The other model's descriptors are untouched.
+    assert len(result.parameters["other"]["model_parameters"]) == 2
+
+
+def test_window_refuses_to_add_a_descriptor_the_model_already_has(app, monkeypatch):
+    window = _window(app, monkeypatch)
+    _drive(monkeypatch, lambda d: (d.target_combo.setCurrentIndex(1),
+                                   d.name_combo.setCurrentText("temperature")))
+    window._on_add_field("parameters")
+    assert window.overlay == {}, "a refused dialog must not write to the overlay"
+
+
+def test_window_passes_the_catalog_to_the_dialog(app, monkeypatch):
+    """Without the catalog the dialog has no descriptions and no typed controls."""
+    from PySide6.QtWidgets import QDialog
+
+    window = _window(app, monkeypatch)
+    seen = {}
+
+    def fake_exec(self):
+        seen["catalog"] = self._catalog
+        return QDialog.Rejected
+
+    monkeypatch.setattr(AddFieldDialog, "exec", fake_exec)
+    window._on_add_field("parameters")
+    assert seen["catalog"] is window.param_catalog
 
 
 # --------------------------------------------------------------------------- #

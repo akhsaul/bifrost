@@ -20,6 +20,7 @@ from typing import Any
 from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 
 from ..dataset import DatasetKind, load_dataset, write_json_atomic
+from ..fieldinfo import build_catalog
 from ..merge import ParamArrayMode, PricingFieldPolicy, merge
 from ..validate import find_cross_file_conflicts
 
@@ -161,6 +162,13 @@ class LoadWorker(QRunnable):
             grouped: dict[str, list[str]] = {}
             for conflict in conflicts:
                 grouped.setdefault(conflict["model"], []).append(conflict["field"])
+
+            # The field catalogs scan every entry, which is a couple of seconds
+            # over 12,595 models. Built here so opening "Add Field" later is
+            # instant instead of freezing the window at the moment the user is
+            # trying to read a description.
+            param_catalog = build_catalog(params.data, pricing.data)
+            pricing_catalog = build_catalog(pricing.data, pricing.data, source="pricing")
             if self._cancelled():
                 self._abort()
                 return
@@ -173,6 +181,8 @@ class LoadWorker(QRunnable):
                     "overlay": overlay,
                     "conflicts": grouped,
                     "conflict_count": len(conflicts),
+                    "param_catalog": param_catalog,
+                    "pricing_catalog": pricing_catalog,
                 },
             )
         except Exception as exc:  # surfaced in the UI, not swallowed

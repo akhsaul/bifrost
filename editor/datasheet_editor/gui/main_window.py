@@ -72,6 +72,10 @@ class MainWindow(QMainWindow):
         self.dirty = False
         self._loading = False
         self._load_worker: LoadWorker | None = None
+        #: What each field means and what shape its value takes, built by the load
+        #: worker. Feeds the Add Field dialog's descriptions and typed inputs.
+        self.param_catalog = None
+        self.pricing_catalog = None
         self._progress_dialog: QProgressDialog | None = None
 
         self.model_list = ModelListModel(self)
@@ -542,6 +546,8 @@ class MainWindow(QMainWindow):
         self.pricing = payload["pricing"].data
         self.overlay = payload["overlay"]
         self.conflicts = payload["conflicts"]
+        self.param_catalog = payload.get("param_catalog")
+        self.pricing_catalog = payload.get("pricing_catalog")
 
         rows = build_rows(self.parameters, self.pricing, self.overlay, self.conflicts)
         # "Done" is claimed only once the list is actually on screen. Doing this
@@ -846,27 +852,44 @@ class MainWindow(QMainWindow):
 
         dataset = self.parameters if section == "parameters" else self.pricing
         base = dataset.get(model_id) or {}
-        existing = set(base) | set(self.overlay.get(model_id, {}).get(section, {}))
+        overlay_section = self.overlay.get(model_id, {}).get(section, {})
+        existing = set(base) | set(overlay_section)
         known = sorted({name for entry in dataset.values() for name in entry})
+
+        catalog = self.param_catalog if section == "parameters" else self.pricing_catalog
         dialog = AddFieldDialog(
             section=section,
             model_id=model_id,
             known_fields=known,
             existing=existing,
+            catalog=catalog,
+            descriptor_names=catalog.descriptor_names() if section == "parameters" else None,
+            descriptors_present=_descriptor_ids(base) | _descriptor_ids(overlay_section),
             parent=self,
         )
         if dialog.exec() != QDialog.Accepted:
             return
 
         name, value = dialog.values()
-        self.overlay.setdefault(model_id, {}).setdefault(section, {})[name] = value
+        target_section = self.overlay.setdefault(model_id, {}).setdefault(section, {})
+        if dialog.is_descriptor():
+            # A descriptor is an element of the model_parameters array, not a
+            # new top-level key. The merge keys that array on `id`, so a
+            # one-element list merges into the existing descriptor of the same id
+            # and reports a single change line -- writing a bare
+            # `reasoning_effort` key instead would land a field Go never reads.
+            target_section[PARAMS_FIELD] = _merged_descriptor_array(
+                base.get(PARAMS_FIELD), overlay_section.get(PARAMS_FIELD), value
+            )
+            described = f"{model_id}.{section}.{PARAMS_FIELD}[id={name}]"
+        else:
+            target_section[name] = value
+            described = f"{model_id}.{section}.{name}"
         self.dirty = True
         self._mark_row(model_id)
         self._rebuild_field_panes(model_id)
         self.btn_save_custom.setEnabled(True)
-        self.status_label.setText(
-            f"Added {model_id}.{section}.{name}. Save Custom to keep it."
-        )
+        self.status_label.setText(f"Added {described}. Save Custom to keep it.")
 
     def _populate_rows(self, rows: list[dict[str, Any]]) -> None:
         """Replace the model list, facets and filters in one pass.
@@ -1100,4 +1123,56 @@ def _merged_param_array(original: list[Any], overlay: list[Any]) -> list[Any]:
                     target[key] = deepcopy(value)
         else:
             merged.append(deepcopy(item))
+    return merged
+
+
+def _descriptor_ids(entry: dict[str, Any]) -> set[str]:
+    """Ids of the ``model_parameters`` descriptors an entry already carries."""
+    raw = entry.get(PARAMS_FIELD)
+    if not isinstance(raw, list):
+        return set()
+    return {
+        item["id"]
+        for item in raw
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+
+
+def _merged_descriptor_array(
+    original: Any,
+    overlay: Any,
+    descriptor: dict[str, Any],
+) -> list[Any]:
+    """Combine what is already there with the one descriptor being added.
+
+    The overlay must repeat the whole array: the merge reads the overlay's
+    ``model_parameters`` as a list and deep-merges it against the original by
+    ``id``, so a one-element list adds or updates just that parameter instead of
+    replacing the model's parameter set. Taking only the entry for the new id --
+    rather than the overlay's full array -- means previously added descriptors are
+    not silently dropped from the overlay.
+    """
+    merged: list[Any] = []
+    seen: set[str] = set()
+    param_id = descriptor.get("id")
+
+    for source in (overlay, original):
+        if not isinstance(source, list):
+            continue
+        for item in source:
+            if not isinstance(item, dict):
+                continue
+            item_id = item.get("id")
+            if not isinstance(item_id, str) or item_id in seen:
+                continue
+            seen.add(item_id)
+            merged.append(dict(item))
+
+    if isinstance(param_id, str) and param_id not in seen:
+        merged.append(descriptor)
+    elif isinstance(param_id, str):
+        for item in merged:
+            if item.get("id") == param_id:
+                item.update(descriptor)
+                break
     return merged
