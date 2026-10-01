@@ -227,6 +227,19 @@ misleading half-view, not a convenient shortcut.
   ("Reading model_parameters.json", "Comparing both datasets") with a working
   **Cancel** — the phases are separable, so cancelling skips the conflict scan
   rather than pretending to abort a `json.load` already in flight.
+- **The dialog never reads 100% before the data is on screen.** Reading the files
+  is only part of it; the last step belongs to building the model list, so 100%
+  means the rows are actually visible rather than "the files finished parsing".
+- Getting from "files loaded" to "12,595 rows displayed" is the expensive part,
+  and three things dominated it, all fixed:
+  - Clearing filters re-mapped all rows **three times** (once per condition), and
+    did so even when the filters were already empty. Both are now coalesced into
+    one call that is skipped entirely when nothing changed — ~11s saved.
+  - Populating the model re-mapped it inside `endResetModel`, costing ~2.4s. The
+    source is now detached from the proxy for the duration of the reset — ~30ms.
+  - A `sort()` was forced after every load, but `build_rows` already emits models
+    in ascending ID order, so it was a second full re-mapping for an identical
+    result. Column sorting still works when a header is clicked.
 - **Merge**, **Save Output**, and **Save Custom** stay disabled until there is
   actually data, not merely until paths have been chosen. A cancelled load
   leaves both paths set and nothing loaded, and must not leave Merge clickable.
@@ -239,7 +252,7 @@ misleading half-view, not a convenient shortcut.
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/ -q
 ```
 
-140 tests. The GUI tests are skipped without PySide6. They cover the merge rules
+150 tests. The GUI tests are skipped without PySide6. They cover the merge rules
 against both hand-built cases and slices of the real 20MB file, and pin two Qt
 interop and lifetime traps that make a window render nothing while looking
 healthy:

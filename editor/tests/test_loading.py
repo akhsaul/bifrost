@@ -19,7 +19,12 @@ from PySide6.QtCore import QEventLoop, QThreadPool, QTimer  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from datasheet_editor.gui.main_window import MainWindow  # noqa: E402
-from datasheet_editor.gui.workers import LOAD_STEPS, LoadSignals, LoadWorker  # noqa: E402
+from datasheet_editor.gui.workers import (  # noqa: E402
+    LOAD_STEPS,
+    TOTAL_STEPS,
+    LoadSignals,
+    LoadWorker,
+)
 
 REPO_EDITOR = Path(__file__).resolve().parents[1]
 PARAMS = REPO_EDITOR / "model_parameters.json"
@@ -83,11 +88,50 @@ def test_worker_reports_every_phase_in_order(app):
 
     out = _run_worker(worker)
     assert out.get("kind") == "finished", out
-    assert [v for v, _, _ in steps] == list(range(LOAD_STEPS + 1))
-    assert all(t == LOAD_STEPS for _, t, _ in steps)
+    # The worker owns steps 0..LOAD_STEPS-1 and deliberately never claims the
+    # last one: TOTAL_STEPS belongs to the window, which reaches it only once the
+    # model list is actually on screen.
+    assert [v for v, _, _ in steps] == list(range(LOAD_STEPS))
+    assert all(t == TOTAL_STEPS for _, t, _ in steps)
     # Each phase names the file it is working on.
     assert params.name in steps[0][2]
     assert pricing.name in steps[1][2]
+
+
+@needs_files
+def test_window_claims_the_final_step_only_after_the_list_is_built(app):
+    """Reaching 100% while the window is still empty is the bug being pinned."""
+    from datasheet_editor.gui.main_window import MainWindow
+
+    params, pricing = _existing()
+    window = MainWindow()
+    seen: list[tuple[int, int, int]] = []
+    rows_when_final: list[int] = []
+
+    orig_progress = window._on_load_progress
+
+    def spy(label, value, total):
+        orig_progress(label, value, total)
+        seen.append((value, total, window.model_list.rowCount()))
+
+    window._on_load_progress = spy
+    orig_loaded = window._on_loaded
+
+    def done(payload):
+        orig_loaded(payload)
+
+    window._on_loaded = done
+    loop = QEventLoop()
+    window._on_loaded = lambda payload: (done(payload), loop.quit())
+    window.load_paths(params, pricing, None)
+    QTimer.singleShot(30000, loop.quit)
+    loop.exec()
+
+    assert window.model_list.rowCount() > 1000
+    finals = [row for value, total, row in seen if value == TOTAL_STEPS]
+    assert finals, [s for s in seen]
+    # 100% must never be claimed before the models are there.
+    assert all(count > 1000 for count in finals), finals
 
 
 @needs_files

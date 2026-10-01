@@ -40,14 +40,13 @@ from ..validate import validate_overlay
 from .adddialogs import AddFieldDialog, AddModelDialog
 from .fieldeditor import FieldRow
 from .models import (
-    COL_ID,
     ChangeListModel,
     ModelFilterProxy,
     ModelListModel,
     ParamDescriptorModel,
     build_rows,
 )
-from .workers import LOAD_STEPS, LoadWorker, MergeWorker, SaveWorker
+from .workers import BUILD_STEP, TOTAL_STEPS, LoadWorker, MergeWorker, SaveWorker
 
 PARAMETERS_FILENAME = "model_parameters.json"
 PRICING_FILENAME = "model_pricing.json"
@@ -476,7 +475,7 @@ class MainWindow(QMainWindow):
     # -- progress dialog -------------------------------------------------- #
 
     def _show_progress_dialog(self) -> None:
-        dialog = QProgressDialog("Starting…", "Cancel", 0, LOAD_STEPS, self)
+        dialog = QProgressDialog("Starting…", "Cancel", 0, TOTAL_STEPS, self)
         dialog.setWindowTitle("Loading datasheets")
         dialog.setWindowModality(Qt.WindowModal)
         dialog.setMinimumDuration(0)
@@ -521,10 +520,12 @@ class MainWindow(QMainWindow):
         self.conflicts = payload["conflicts"]
 
         rows = build_rows(self.parameters, self.pricing, self.overlay, self.conflicts)
-        self.model_list.set_rows(rows)
-        self.proxy.sort(COL_ID, Qt.AscendingOrder)
-        self._populate_facet_combos()
-        self._clear_filters()
+        # "Done" is claimed only once the list is actually on screen. Doing this
+        # work first and labelling it keeps the progress dialog honest: reaching
+        # 100% while the window is still empty (and unresponsive) is worse than
+        # no bar at all.
+        self._on_load_progress("Building model list…", BUILD_STEP, TOTAL_STEPS)
+        self._populate_rows(rows)
         self._close_progress_dialog()
         self._load_worker = None
         self._update_path_label()
@@ -535,6 +536,7 @@ class MainWindow(QMainWindow):
         )
         if rows:
             self.table.selectRow(0)
+        self._on_load_progress("Done", TOTAL_STEPS, TOTAL_STEPS)
         if self.conflicts:
             self.conflict_text.setPlainText(self._conflict_summary())
             self.tabs.setTabText(self._conflicts_tab, f"Conflicts ({len(self.conflicts):,})")
@@ -638,18 +640,16 @@ class MainWindow(QMainWindow):
         self._update_filter_state()
 
     def _clear_filters(self) -> None:
-        for widget, slot in ((self.search_edit, self._apply_search), (self.provider_combo, self._on_provider_changed),
-                             (self.mode_combo, self._on_mode_changed)):
+        for widget in (self.search_edit, self.provider_combo, self.mode_combo):
             widget.blockSignals(True)
         self.search_edit.clear()
         self.provider_combo.setCurrentIndex(0)
         self.mode_combo.setCurrentIndex(0)
-        for widget, slot in ((self.search_edit, self._apply_search), (self.provider_combo, self._on_provider_changed),
-                             (self.mode_combo, self._on_mode_changed)):
+        for widget in (self.search_edit, self.provider_combo, self.mode_combo):
             widget.blockSignals(False)
-        self.proxy.set_search("")
-        self.proxy.set_providers(set())
-        self.proxy.set_modes(set())
+        # One coalesced call: setting the three filters separately re-maps all
+        # 12,595 rows three times.
+        self.proxy.set_filters("", set(), set())
         self._update_filter_state()
 
     def _on_escape(self) -> None:
@@ -832,12 +832,21 @@ class MainWindow(QMainWindow):
             f"Added {model_id}.{section}.{name}. Save Custom to keep it."
         )
 
-    def _refresh_rows(self) -> None:
-        rows = build_rows(self.parameters, self.pricing, self.overlay, self.conflicts)
-        self.model_list.set_rows(rows)
-        self.proxy.sort(COL_ID, Qt.AscendingOrder)
+    def _populate_rows(self, rows: list[dict[str, Any]]) -> None:
+        """Replace the model list, facets and filters in one pass.
+
+        ``build_rows`` already emits models in ascending ID order, so no explicit
+        sort is issued: forcing one costs a further full re-mapping pass, and the
+        result is identical. Column sorting still works when the user clicks a
+        header.
+        """
+        self.model_list.attach_proxy(self.proxy)
+        self.model_list.reset_source(rows)
         self._populate_facet_combos()
         self._clear_filters()
+
+    def _refresh_rows(self) -> None:
+        self._populate_rows(build_rows(self.parameters, self.pricing, self.overlay, self.conflicts))
 
     def _select_model(self, model_id: str) -> None:
         for i in range(self.proxy.rowCount()):

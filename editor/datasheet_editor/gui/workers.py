@@ -26,8 +26,13 @@ from ..validate import find_cross_file_conflicts
 PARAMETERS_FILENAME = "model_parameters.json"
 PRICING_FILENAME = "model_pricing.json"
 
-#: Total number of phases reported by LoadWorker.
+#: Phases performed off-thread by LoadWorker (reported as steps 0..3).
 LOAD_STEPS = 4
+#: Main-thread phase that builds the model list (step 4). Reported by the window
+#: so the dialog cannot reach 100% while the list is still empty.
+BUILD_STEP = 4
+#: Dialog maximum. Reaching this value means the data is genuinely displayed.
+TOTAL_STEPS = 5
 
 
 #: Strong references to running workers.
@@ -112,7 +117,7 @@ class LoadWorker(QRunnable):
     @Slot()
     def run(self) -> None:
         try:
-            total = LOAD_STEPS
+            total = TOTAL_STEPS
 
             _emit(
                 self.signals.progress,
@@ -160,7 +165,6 @@ class LoadWorker(QRunnable):
                 self._abort()
                 return
 
-            _emit(self.signals.progress, "Done", total, total)
             _emit(
                 self.signals.finished,
                 {
