@@ -170,6 +170,7 @@
                   "providers/supported-providers/hcnsec",
                   "providers/supported-providers/neuralwatt",
                   "providers/supported-providers/bai",
+                  "providers/supported-providers/bitdeer",
                   "providers/supported-providers/huggingface",
                   "providers/supported-providers/mistral",
                   "providers/supported-providers/nebius",

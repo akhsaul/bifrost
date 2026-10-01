@@ -1,0 +1,18 @@
+---
+title: "Bitdeer"
+description: "Configure Bitdeer through its OpenAI-compatible API"
+---
+
+Bitdeer exposes an OpenAI-compatible API at `https://api-inference.bitdeer.ai/v1`. Bifrost uses `/chat/completions`, `/responses`, and `/models`.
+
+```json
+{
+  "providers": {
+    "bitdeer": {
+      "keys": [{ "name": "bitdeer", "value": "env.BITDEER_API_KEY" }]
+    }
+  }
+}
+```
+
+Requests use Bearer authentication. Chat completions, streaming, model listing, and the native OpenAI Responses API are supported.

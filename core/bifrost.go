@@ -27,6 +27,7 @@ import (
 	"github.com/maximhq/bifrost/core/providers/bai"
 	"github.com/maximhq/bifrost/core/providers/bedrock"
 	"github.com/maximhq/bifrost/core/providers/bedrockmantle"
+	"github.com/maximhq/bifrost/core/providers/bitdeer"
 	"github.com/maximhq/bifrost/core/providers/byteplus"
 	"github.com/maximhq/bifrost/core/providers/cerebras"
 	"github.com/maximhq/bifrost/core/providers/cline"
@@ -4672,6 +4673,8 @@ func (bifrost *Bifrost) createBaseProvider(providerKey schemas.ModelProvider, co
 		return parasail.NewParasailProvider(config, bifrost.logger)
 	case schemas.Perplexity:
 		return perplexity.NewPerplexityProvider(config, bifrost.logger)
+	case schemas.Bitdeer:
+		return bitdeer.NewBitdeerProvider(config, bifrost.logger)
 	case schemas.Cerebras:
 		return cerebras.NewCerebrasProvider(config, bifrost.logger)
 	case schemas.Cline:

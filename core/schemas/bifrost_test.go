@@ -16,6 +16,15 @@ func TestBaiProviderRegistered(t *testing.T) {
 	}
 }
 
+func TestBitdeerProviderRegistered(t *testing.T) {
+	if schemas.Bitdeer != "bitdeer" {
+		t.Fatalf("Bitdeer = %q, want %q", schemas.Bitdeer, "bitdeer")
+	}
+	if !slices.Contains(schemas.StandardProviders, schemas.Bitdeer) {
+		t.Fatalf("StandardProviders must contain %q", schemas.Bitdeer)
+	}
+}
+
 func TestOpencodeZenFreeProviderRegistered(t *testing.T) {
 	if schemas.OpencodeZenFree != "opencode-zen-free" {
 		t.Fatalf("OpencodeZenFree = %q, want %q", schemas.OpencodeZenFree, "opencode-zen-free")

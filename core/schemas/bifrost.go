@@ -49,6 +49,7 @@ const (
 	Anthropic       ModelProvider = "anthropic"
 	Bedrock         ModelProvider = "bedrock"
 	BedrockMantle   ModelProvider = "bedrock_mantle"
+	Bitdeer         ModelProvider = "bitdeer"
 	Cohere          ModelProvider = "cohere"
 	Vertex          ModelProvider = "vertex"
 	Mistral         ModelProvider = "mistral"
@@ -118,6 +119,7 @@ var StandardProviders = []ModelProvider{
 	Azure,
 	Bedrock,
 	BedrockMantle,
+	Bitdeer,
 	Cerebras,
 	Cohere,
 	DeepSeek,

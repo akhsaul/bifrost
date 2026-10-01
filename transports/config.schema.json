@@ -489,6 +489,9 @@
         "bai": {
           "$ref": "#/$defs/provider"
         },
+        "bitdeer": {
+          "$ref": "#/$defs/provider"
+        },
         "antigravity": {
           "$ref": "#/$defs/provider"
         },
@@ -9197,6 +9200,7 @@
 			"hcnsec",
 			"neuralwatt",
 			"bai",
+			"bitdeer",
 			"antigravity",
             "opencode-go",
             "opencode-zen",

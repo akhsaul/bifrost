@@ -1003,6 +1003,21 @@ export const ProviderIcons = {
 			</svg>
 		);
 	},
+	bitdeer: ({ size = "md", className = "" }: IconProps) => {
+		const resolvedSize = resolveSize(size);
+		return (
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Bitdeer">
+				<title>Bitdeer</title>
+				<path
+					d="M4 5h16v5H4zM4 14h7v5H4zM14 14h6v5h-6z"
+					stroke="currentColor"
+					strokeWidth="2"
+					strokeLinecap="round"
+					strokeLinejoin="round"
+				/>
+			</svg>
+		);
+	},
 	antigravity: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
 		return (
