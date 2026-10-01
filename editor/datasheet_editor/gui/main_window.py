@@ -35,7 +35,16 @@ from PySide6.QtWidgets import (
 
 from ..dataset import write_json_atomic
 from ..fields import is_cost_field
-from ..merge import PARAMS_FIELD, ParamArrayMode, PricingFieldPolicy, merge
+from ..merge import (
+    PARAM_ID_FIELD as PARAMS_ID_FIELD,
+)
+from ..merge import (
+    PARAMS_FIELD,
+    ParamArrayMode,
+    PricingFieldPolicy,
+    merge,
+    merge_param_array,
+)
 from ..validate import validate_overlay
 from .adddialogs import AddFieldDialog, AddModelDialog
 from .fieldeditor import FieldRow
@@ -81,7 +90,12 @@ class MainWindow(QMainWindow):
         self.model_list = ModelListModel(self)
         self.proxy = ModelFilterProxy(self)
         self.proxy.setSourceModel(self.model_list)
-        self.param_model = ParamDescriptorModel(self)
+        self.param_model = ParamDescriptorModel(
+            self, self._on_param_cell_edited, self._descriptor_info
+        )
+        #: Descriptor whose row the table should re-select after a rebuild, so an
+        #: edit does not move the user's selection to the top of the list.
+        self._param_focus_id: str | None = None
         self.change_model = ChangeListModel(self)
 
         self._build_ui()
@@ -270,10 +284,7 @@ class MainWindow(QMainWindow):
         self.params_layout = QVBoxLayout(params_page)
         self.params_layout.setContentsMargins(6, 6, 6, 6)
 
-        # Entries carry up to 48 fields, so both panes scroll inside a splitter
-        # rather than squeezing each other to nothing.
-        params_splitter = QSplitter(Qt.Vertical)
-
+        # Entries carry up to 48 fields, so the pane scrolls rather than squeezing.
         self.params_fields_box = QGroupBox("Parameter fields")
         params_box_layout = QVBoxLayout(self.params_fields_box)
         # Above the form, not below: an entry can have 48 fields, and a button
@@ -286,29 +297,8 @@ class MainWindow(QMainWindow):
         params_box_layout.addLayout(self.params_form)
         params_scroll = QScrollArea()
         params_scroll.setWidgetResizable(True)
-        params_scroll.setMinimumHeight(240)
         params_scroll.setWidget(self.params_fields_box)
-        params_splitter.addWidget(params_scroll)
-
-        self.param_array_box = QGroupBox("model_parameters  (merged by id)")
-        array_layout = QVBoxLayout(self.param_array_box)
-        self.param_table = QTableView()
-        self.param_table.setModel(self.param_model)
-        self.param_table.verticalHeader().setVisible(False)
-        self.param_table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
-        self.param_table.setColumnWidth(0, 150)
-        self.param_table.setColumnWidth(1, 150)
-        self.param_table.setMinimumHeight(150)
-        array_layout.addWidget(self.param_table)
-        array_layout.addWidget(QLabel(
-            "Editing a descriptor's default or range merges into the original by id; "
-            "new ids are appended."
-        ))
-        params_splitter.addWidget(self.param_array_box)
-        params_splitter.setStretchFactor(0, 3)
-        params_splitter.setStretchFactor(1, 2)
-        params_splitter.setSizes([340, 260])
-        self.params_layout.addWidget(params_splitter, 1)
+        self.params_layout.addWidget(params_scroll, 1)
         self.tabs.addTab(params_page, "Parameters")
 
         pricing_page = QWidget()
@@ -335,6 +325,49 @@ class MainWindow(QMainWindow):
         pricing_layout.addWidget(pricing_scroll, 1)
         self.tabs.addTab(pricing_page, "Pricing")
 
+        # The prompt-playground descriptors live in their own tab rather than below
+        # the fields. Two reasons: they are a different vocabulary (an array of
+        # parameter controls, keyed by id, versus the entry's own columns), which is
+        # the same split the Add Field dialog asks about; and squeezed into a
+        # splitter a model's ten-to-fifteen descriptors got five visible rows, so
+        # the row being edited was usually below the fold.
+        descriptors_page = QWidget()
+        descriptors_layout = QVBoxLayout(descriptors_page)
+        descriptors_layout.setContentsMargins(6, 6, 6, 6)
+        self.descriptors_hint = QLabel(
+            "Each row is one prompt-playground control Bifrost renders for this "
+            "model. Bifrost reads only the id, which feeds the request-parameter "
+            "allowlist; label and default are passed to the playground unchanged. "
+            "Editing a value records an override keyed by id — the id and type "
+            "columns are read-only."
+        )
+        self.descriptors_hint.setWordWrap(True)
+        self.descriptors_hint.setStyleSheet("color:#475569;")
+        descriptors_layout.addWidget(self.descriptors_hint)
+
+        self.param_array_box = QGroupBox("model_parameters  (merged by id)")
+        array_layout = QVBoxLayout(self.param_array_box)
+        self.param_table = QTableView()
+        self.param_table.setModel(self.param_model)
+        self.param_table.verticalHeader().setVisible(False)
+        self.param_table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.param_table.horizontalHeader().setStretchLastSection(True)
+        self.param_table.setColumnWidth(0, 170)
+        self.param_table.setColumnWidth(1, 230)
+        self.param_table.setColumnWidth(2, 110)
+        self.param_table.setColumnWidth(3, 110)
+        self.param_table.setAlternatingRowColors(True)
+        array_layout.addWidget(self.param_table)
+        self.descriptors_empty = QLabel(
+            "This model publishes no model_parameters descriptors."
+        )
+        self.descriptors_empty.setAlignment(Qt.AlignCenter)
+        self.descriptors_empty.setStyleSheet("color:#64748b;font-style:italic;")
+        array_layout.addWidget(self.descriptors_empty)
+        descriptors_layout.addWidget(self.param_array_box, 1)
+        # Added after the conflicts tab below, so the order reads Parameters,
+        # Pricing, Conflicts, model_parameters.
+
         # A QGroupBox used directly as a tab page sizes to its hint and ends up
         # vertically centred, leaving dead space above and below. Wrapping it in
         # a plain page with a filling layout makes it occupy the whole tab.
@@ -358,6 +391,7 @@ class MainWindow(QMainWindow):
         self.conflict_layout.addWidget(self.conflict_text, 1)
         conflicts_layout.addWidget(self.conflict_box, 1)
         self._conflicts_tab = self.tabs.addTab(conflicts_page, "Conflicts")
+        self._descriptors_tab = self.tabs.addTab(descriptors_page, "model_parameters")
 
         return self.tabs
 
@@ -377,7 +411,7 @@ class MainWindow(QMainWindow):
 
     def _wire(self) -> None:
         self.table.selectionModel().selectionChanged.connect(self._on_selection_changed)
-        self.param_table.doubleClicked.connect(self._on_param_double_clicked)
+        self.param_table.clicked.connect(self._on_param_clicked)
 
     # ------------------------------------------------------------ loading -- #
 
@@ -743,6 +777,10 @@ class MainWindow(QMainWindow):
         self._clear_form(self.params_form)
         self._clear_form(self.pricing_form)
         self.param_model.set_items([])
+        self.tabs.setTabEnabled(self._descriptors_tab, False)
+        self.param_array_box.setEnabled(False)
+        self.param_table.setVisible(False)
+        self.descriptors_empty.setVisible(False)
         for button in (self.btn_add_param_field, self.btn_add_pricing_field):
             button.setEnabled(bool(model_id) and not self._loading)
         if not model_id:
@@ -795,12 +833,15 @@ class MainWindow(QMainWindow):
                     )
                 )
 
-        array = params_entry.get(PARAMS_FIELD) or overlay.get("parameters", {}).get(PARAMS_FIELD) or []
-        if isinstance(array, list):
-            self.param_model.set_items(array)
-            self.param_array_box.setEnabled(True)
-        else:
-            self.param_array_box.setEnabled(False)
+        array = _param_view(model_id, self)
+        self.param_model.set_items(array)
+        has_array = bool(array)
+        self.param_array_box.setEnabled(has_array)
+        self.param_table.setVisible(has_array)
+        self.descriptors_empty.setVisible(not has_array)
+        # Disabling the tab, rather than leaving an empty one, keeps the tab row
+        # from carrying a dead entry for the many models with no descriptors.
+        self.tabs.setTabEnabled(self._descriptors_tab, has_array)
 
     # ------------------------------------------------------------ adding -- #
 
@@ -871,19 +912,18 @@ class MainWindow(QMainWindow):
             return
 
         name, value = dialog.values()
-        target_section = self.overlay.setdefault(model_id, {}).setdefault(section, {})
         if dialog.is_descriptor():
-            # A descriptor is an element of the model_parameters array, not a
-            # new top-level key. The merge keys that array on `id`, so a
-            # one-element list merges into the existing descriptor of the same id
-            # and reports a single change line -- writing a bare
-            # `reasoning_effort` key instead would land a field Go never reads.
-            target_section[PARAMS_FIELD] = _merged_descriptor_array(
-                base.get(PARAMS_FIELD), overlay_section.get(PARAMS_FIELD), value
-            )
+            # A descriptor is an element of the model_parameters array, not a new
+            # top-level key -- writing a bare `reasoning_effort` key would land a
+            # field no Go struct declares. The merge keys the array on `id`, so the
+            # overlay carries just this one descriptor and the engine folds it in.
+            self._param_focus_id = name
+            for key, item in value.items():
+                if key != PARAMS_ID_FIELD:
+                    _set_param_field(self, model_id, name, key, item)
             described = f"{model_id}.{section}.{PARAMS_FIELD}[id={name}]"
         else:
-            target_section[name] = value
+            self.overlay.setdefault(model_id, {}).setdefault(section, {})[name] = value
             described = f"{model_id}.{section}.{name}"
         self.dirty = True
         self._mark_row(model_id)
@@ -948,68 +988,36 @@ class MainWindow(QMainWindow):
         right = self.model_list.index(row_index, 4)
         self.model_list.dataChanged.emit(left, right)
 
-    def _on_param_double_clicked(self, index: Any) -> None:
+    def _descriptor_info(self, param_id: str) -> Any:
+        """Catalog entry for a parameter id, for the table's row tooltips."""
+        catalog = self.param_catalog
+        return catalog.descriptor(param_id) if (catalog and param_id) else None
+
+    def _on_param_clicked(self, index: Any) -> None:
+        """Remember the clicked descriptor so a rebuild can put the selection back.
+
+        Selection, not editing: the cell editors come from the model's ``setData``
+        and the view's own edit triggers, which apply to single-click, double-click
+        and F2 alike. A bespoke double-click editor meant F2 and typing into a
+        selected cell silently did nothing.
+        """
+        item = self.param_model.item_at(index.row())
+        param_id = item.get(PARAMS_ID_FIELD) if isinstance(item, dict) else None
+        self._param_focus_id = param_id if isinstance(param_id, str) else None
+
+    def _on_param_cell_edited(self, param_id: str, key: str, value: Any) -> None:
+        """A descriptor cell was edited in the table; record it as an override."""
         model_id = self._selected_model()
         if not model_id:
             return
-        item = self.param_model.item_at(index.row())
-        if not item or index.column() not in (0, 1, 2, 3):
-            return
-        key = ("id", "label", "type", "default", "role")[index.column()]
-        editor = self.param_table.edit(index)
-        if editor is None:
-            return
-        if isinstance(editor, QLineEdit):
-            editor.editingFinished.connect(
-                lambda item=item, key=key, ed=editor: self._commit_param(model_id, item, key, ed.text())
-            )
-
-    def _commit_param(self, model_id: str, item: dict[str, Any], key: str, text: str) -> None:
-        original = self.parameters.get(model_id, {}).get(PARAMS_FIELD, [])
-        original_item = next(
-            (p for p in original if isinstance(p, dict) and p.get("id") == item.get("id")), None
+        self._param_focus_id = param_id
+        _set_param_field(self, model_id, param_id, key, value)
+        kept = bool((self.overlay.get(model_id) or {}).get("parameters", {}).get(PARAMS_FIELD))
+        self.status_label.setText(
+            f"{model_id}.parameters.{PARAMS_FIELD}[id={param_id}].{key} = "
+            f"{_short_json(value)}"
+            + (". Save Custom to keep it." if kept else " (matches the original, nothing to keep).")
         )
-        if key == "default":
-            try:
-                value: Any = json.loads(text)
-            except json.JSONDecodeError:
-                try:
-                    value = int(text)
-                except ValueError:
-                    try:
-                        value = float(text)
-                    except ValueError:
-                        value = text
-        else:
-            value = text
-        item[key] = value
-
-        descriptor = {key: value}
-        if original_item is not None and key != "id":
-            baseline = original_item.get(key)
-            if value == baseline:
-                item[key] = value
-                self._remove_param_override(model_id, item["id"], key)
-                return
-        self._on_field_edit(model_id, "parameters", PARAMS_FIELD, None)
-        entry = self.overlay[model_id]["parameters"]
-        entry[PARAMS_FIELD] = _merged_param_array(original, entry.get(PARAMS_FIELD, []))
-        self.param_model.set_items(entry[PARAMS_FIELD])
-        self.param_table.selectRow(next((i for i, p in enumerate(entry[PARAMS_FIELD]) if p is item), 0))
-
-    def _remove_param_override(self, model_id: str, param_id: str, key: str) -> None:
-        entry = self.overlay.get(model_id, {}).get("parameters", {})
-        array = entry.get(PARAMS_FIELD)
-        if not isinstance(array, list):
-            return
-        for item in array:
-            if isinstance(item, dict) and item.get("id") == param_id:
-                item.pop(key, None)
-                if set(item) <= {"id"}:
-                    array.remove(item)
-                    if not array:
-                        entry.pop(PARAMS_FIELD, None)
-        self.param_model.set_items(entry.get(PARAMS_FIELD) or [])
 
     # ------------------------------------------------------------- actions -- #
 
@@ -1101,29 +1109,103 @@ class MainWindow(QMainWindow):
         event.accept()
 
 
-def _merged_param_array(original: list[Any], overlay: list[Any]) -> list[Any]:
-    """Local helper mirroring the engine's by-id merge, for live sub-table edits."""
-    from copy import deepcopy
+def _short_json(value: Any) -> str:
+    """Compact rendering of an edited value for the status line."""
+    text = json.dumps(value) if not isinstance(value, str) else json.dumps(value)
+    return text if len(text) <= 60 else text[:57] + "..."
 
-    by_id = {}
-    merged: list[Any] = []
-    for item in original:
-        if isinstance(item, dict) and isinstance(item.get("id"), str):
-            by_id[item["id"]] = item
-            merged.append(item)
-    for item in overlay:
-        if not isinstance(item, dict):
-            merged.append(deepcopy(item))
-            continue
-        item_id = item.get("id")
-        if isinstance(item_id, str) and item_id in by_id:
-            target = by_id[item_id]
-            for key, value in item.items():
-                if key != "id":
-                    target[key] = deepcopy(value)
-        else:
-            merged.append(deepcopy(item))
-    return merged
+
+def _param_view(model_id: str, window: "MainWindow") -> list[Any]:
+    """The effective ``model_parameters`` array: original overlaid with the overlay.
+
+    Uses the engine's own by-id merge, so the table shows what a merge would
+    produce and no dict is shared with the loaded dataset.
+    """
+    original = (window.parameters.get(model_id) or {}).get(PARAMS_FIELD) or []
+    overlay = _param_overlay(window, model_id)
+    return merge_param_array(original, overlay)
+
+
+def _param_overlay(window: "MainWindow", model_id: str) -> list[Any]:
+    """The overlay's ``model_parameters`` list, or an empty one.
+
+    Only descriptors the user added or touched belong here. The engine matches on
+    ``id`` and deep-merges the remaining keys, so restating a model's whole array
+    would bloat the custom file and put original data where an override belongs.
+    """
+    array = (window.overlay.get(model_id) or {}).get("parameters", {}).get(PARAMS_FIELD)
+    return array if isinstance(array, list) else []
+
+
+def _set_param_field(window: "MainWindow", model_id: str, param_id: str, key: str, value: Any) -> None:
+    """Record (or clear) one key of one descriptor in the overlay."""
+    section = window.overlay.setdefault(model_id, {}).setdefault("parameters", {})
+    array = section.get(PARAMS_FIELD)
+    if not isinstance(array, list):
+        array = []
+        section[PARAMS_FIELD] = array
+
+    entry = next(
+        (i for i in array if isinstance(i, dict) and i.get(PARAMS_ID_FIELD) == param_id), None
+    )
+
+    original_item = next(
+        (
+            p
+            for p in (window.parameters.get(model_id) or {}).get(PARAMS_FIELD, [])
+            if isinstance(p, dict) and p.get(PARAMS_ID_FIELD) == param_id
+        ),
+        None,
+    )
+    baseline = original_item.get(key) if isinstance(original_item, dict) else None
+    # Absent in the original counts as "no value", so typing the original's value
+    # back in is a revert rather than an override that changes nothing.
+    if key not in (original_item or {}) and value is None:
+        baseline = None
+        reverting = True
+    else:
+        reverting = value == baseline
+
+    if reverting:
+        if entry is None:
+            return
+        entry.pop(key, None)
+        # A descriptor carrying nothing but its id says nothing; drop it so the
+        # overlay does not accumulate hollow entries.
+        if set(entry) <= {PARAMS_ID_FIELD}:
+            array.remove(entry)
+        if not array:
+            section.pop(PARAMS_FIELD, None)
+        window.dirty = True
+        window.btn_save_custom.setEnabled(True)
+        window._mark_row(model_id)
+        _refresh_param_table(window, model_id)
+        return
+
+    if entry is None:
+        entry = {PARAMS_ID_FIELD: param_id}
+        array.append(entry)
+    entry[key] = value
+    window.dirty = True
+    window.btn_save_custom.setEnabled(True)
+    window._mark_row(model_id)
+    _refresh_param_table(window, model_id)
+
+
+def _refresh_param_table(window: "MainWindow", model_id: str) -> None:
+    """Re-render the descriptor table after an overlay change, keeping the row."""
+    keep = window._param_focus_id
+    window.param_model.set_items(_param_view(model_id, window))
+    if keep:
+        row = window.param_model.row_for(keep)
+        if row >= 0:
+            # selectRow does not scroll, so on a model with a dozen descriptors the
+            # row just edited can sit below the fold while the edit is recorded.
+            window.param_table.scrollTo(window.param_model.index(row, 0))
+            window.param_table.selectRow(row)
+            return
+    if window.param_model.rowCount():
+        window.param_table.selectRow(0)
 
 
 def _descriptor_ids(entry: dict[str, Any]) -> set[str]:
@@ -1132,47 +1214,8 @@ def _descriptor_ids(entry: dict[str, Any]) -> set[str]:
     if not isinstance(raw, list):
         return set()
     return {
-        item["id"]
+        item[PARAMS_ID_FIELD]
         for item in raw
-        if isinstance(item, dict) and isinstance(item.get("id"), str)
+        if isinstance(item, dict) and isinstance(item.get(PARAMS_ID_FIELD), str)
     }
 
-
-def _merged_descriptor_array(
-    original: Any,
-    overlay: Any,
-    descriptor: dict[str, Any],
-) -> list[Any]:
-    """Combine what is already there with the one descriptor being added.
-
-    The overlay must repeat the whole array: the merge reads the overlay's
-    ``model_parameters`` as a list and deep-merges it against the original by
-    ``id``, so a one-element list adds or updates just that parameter instead of
-    replacing the model's parameter set. Taking only the entry for the new id --
-    rather than the overlay's full array -- means previously added descriptors are
-    not silently dropped from the overlay.
-    """
-    merged: list[Any] = []
-    seen: set[str] = set()
-    param_id = descriptor.get("id")
-
-    for source in (overlay, original):
-        if not isinstance(source, list):
-            continue
-        for item in source:
-            if not isinstance(item, dict):
-                continue
-            item_id = item.get("id")
-            if not isinstance(item_id, str) or item_id in seen:
-                continue
-            seen.add(item_id)
-            merged.append(dict(item))
-
-    if isinstance(param_id, str) and param_id not in seen:
-        merged.append(descriptor)
-    elif isinstance(param_id, str):
-        for item in merged:
-            if item.get("id") == param_id:
-                item.update(descriptor)
-                break
-    return merged

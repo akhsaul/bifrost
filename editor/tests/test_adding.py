@@ -322,11 +322,17 @@ def test_window_routes_a_descriptor_into_the_param_array(app, monkeypatch):
 
     section = window.overlay["m"]["parameters"]
     assert "reasoning_effort" not in section, "descriptor leaked into a top-level key"
-    ids = [i["id"] for i in section["model_parameters"]]
-    # The overlay has to repeat the whole array for the id-keyed merge to work:
-    # previously added descriptors and the original's own must all survive.
-    assert ids == ["already_added", "temperature", "reasoning_effort"]
+    # The overlay carries only what the user added. The engine matches on id, so
+    # restating the model's own descriptors would bloat the custom file and put
+    # original data where an override belongs.
+    assert [i["id"] for i in section["model_parameters"]] == ["already_added", "reasoning_effort"]
     assert "model_parameters[id=reasoning_effort]" in window.status_label.text()
+
+    result = merge(PARAMS, PRICING, window.overlay)
+    ids = [i["id"] for i in result.parameters["m"]["model_parameters"]]
+    # Everything survives: the overlay's own entry, the original's temperature,
+    # and the one just added.
+    assert ids == ["temperature", "already_added", "reasoning_effort"]
 
 
 def test_window_descriptor_result_merges_against_the_original(app, monkeypatch):

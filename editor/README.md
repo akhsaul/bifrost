@@ -281,6 +281,21 @@ misleading half-view, not a convenient shortcut.
   can be filtered by it.
 - **Filtering is view-only.** Merging always covers every model, never just the
   filtered subset — the status line says so whenever a filter is active.
+- Four tabs: **Parameters**, **Pricing**, **Conflicts**, **model_parameters**.
+  The last one holds the playground descriptors — a different vocabulary from the
+  entry's own columns (an array of controls keyed by `id`), and given its own tab
+  because squeezed into a splitter a model's fifteen descriptors showed five rows.
+  It is disabled for models that publish none.
+- In that table only **label** and **default** are editable. `id` is the key the
+  merge matches on, so renaming one is really a delete plus an add. `type` picks
+  which control the playground renders and is only coherent together with the keys
+  it implies — `options`, `range`, `array` — which that table does not edit, so a
+  cell that could be flipped on its own would be editable but wrong; change it
+  through **Add Parameter Field…** instead. Each read-only column's header says why
+  on hover, and a row's own tooltip carries the playground's `helpText`.
+- Editing a descriptor records a minimal overlay entry (`{"id": …, "default": …}`)
+  and typing the original value back drops it again, so the custom file never
+  accumulates hollow records or a copy of the model's whole array.
 - **Parameters** and **Pricing** tabs. Every pricing field is badged `cost`,
   `capability`, or `ignored`, with a tooltip explaining whether Bifrost's
   `datasheet.Entry` reads it — so the 222 fields outside the read-set are visible
@@ -319,7 +334,7 @@ misleading half-view, not a convenient shortcut.
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/ -q
 ```
 
-251 tests. The GUI tests are skipped without PySide6. They cover the merge rules
+296 tests. The GUI tests are skipped without PySide6. They cover the merge rules
 against both hand-built cases and slices of the real 20MB file, and pin two Qt
 interop and lifetime traps that make a window render nothing while looking
 healthy:

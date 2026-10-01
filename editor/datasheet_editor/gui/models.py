@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+import json
+from copy import deepcopy
+from typing import Any, Callable
 
 from PySide6.QtCore import (
     QAbstractTableModel,
@@ -287,7 +289,17 @@ class ModelFilterProxy(QSortFilterProxyModel):
 
 
 class ParamDescriptorModel(QAbstractTableModel):
-    """The ``model_parameters`` array of one model, one row per descriptor."""
+    """The ``model_parameters`` array of one model, one row per descriptor.
+
+    Holds **copies**. The rows are handed the effective (original + overlay) array
+    straight out of the loaded dataset, so storing those dicts by reference meant
+    every ``item[key] = value`` in an editor rewrote the original file entry in
+    memory -- and since the baseline was then read back from that same object, the
+    edit compared equal to itself and was thrown away.
+
+    Editing is routed out through ``on_edit`` rather than mutated silently here, so
+    the window stays the one place that decides what an edit means for the overlay.
+    """
 
     COL_ID = 0
     COL_LABEL = 1
@@ -295,14 +307,46 @@ class ParamDescriptorModel(QAbstractTableModel):
     COL_DEFAULT = 3
     COL_RANGE = 4
     HEADERS = ["id", "label", "type", "default", "range"]
+    #: Column index -> key. Only two columns are editable, and the exclusions are
+    #: deliberate rather than unfinished:
+    #:
+    #: - ``id`` is the key the merge matches on, so renaming one is "delete and
+    #:   add" -- far more often a slip than an intent.
+    #: - ``type`` selects which control the playground renders, and it is only
+    #:   coherent together with the keys it implies: ``select`` needs ``options``,
+    #:   ``number`` needs ``range``, ``array`` needs ``array``. Flipping ``type`` on
+    #:   its own leaves a control whose input cannot be satisfied, and Bifrost never
+    #:   reads it, so the cell would be editable but wrong. Change it deliberately
+    #:   through the Add Field dialog instead.
+    #: - ``range`` is a nested object; typing JSON into a one-line cell loses its
+    #:   shape silently.
+    KEYS = ("id", "label", "type", "default", "range")
+    EDITABLE_COLUMNS = (1, 3)
+    #: Column -> why it is read-only, shown as a header tooltip.
+    COLUMN_NOTES = {
+        COL_ID: "Read-only. This is the key descriptors are matched on; renaming one "
+                "is really a delete plus an add.",
+        COL_TYPE: "Read-only. Selects which control the playground renders and is only "
+                  "coherent together with the keys it implies (options, range, array), "
+                  "which this table does not edit.",
+        COL_RANGE: "Read-only. A nested object; edit it through Add Parameter Field… so "
+                   "the shape is checked.",
+    }
 
-    def __init__(self, parent: QObject | None = None) -> None:
+    def __init__(
+        self,
+        parent: QObject | None = None,
+        on_edit: Callable[[str, str, Any], None] | None = None,
+        descriptor_info: Callable[[str], Any] | None = None,
+    ) -> None:
         super().__init__(parent)
         self._items: list[dict[str, Any]] = []
+        self._on_edit = on_edit
+        self._descriptor_info = descriptor_info or (lambda _id: None)
 
     def set_items(self, items: list[dict[str, Any]]) -> None:
         self.beginResetModel()
-        self._items = [i for i in items if isinstance(i, dict)]
+        self._items = [deepcopy(i) for i in items if isinstance(i, dict)]
         self.endResetModel()
 
     def items(self) -> list[dict[str, Any]]:
@@ -310,6 +354,12 @@ class ParamDescriptorModel(QAbstractTableModel):
 
     def item_at(self, row: int) -> dict[str, Any] | None:
         return self._items[row] if 0 <= row < len(self._items) else None
+
+    def row_for(self, param_id: str) -> int:
+        for i, item in enumerate(self._items):
+            if item.get("id") == param_id:
+                return i
+        return -1
 
     def rowCount(self, parent: QModelIndex | None = None) -> int:  # noqa: N802
         if parent is not None and parent.isValid():
@@ -322,31 +372,84 @@ class ParamDescriptorModel(QAbstractTableModel):
         return len(self.HEADERS)
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Any:  # noqa: N802
-        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+        if orientation != Qt.Horizontal:
+            return None
+        if role == Qt.DisplayRole:
             return self.HEADERS[section]
+        if role == Qt.ToolTipRole:
+            return self.COLUMN_NOTES.get(section)
         return None
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
         if not index.isValid():
             return None
         item = self._items[index.row()]
-        key = ("id", "label", "type", "default", "range")[index.column()]
-        value = item.get(key)
+        value = item.get(self.KEYS[index.column()])
         if role == Qt.DisplayRole:
             if isinstance(value, (dict, list)):
-                import json
-
                 return json.dumps(value, separators=(",", ":"))
             return "" if value is None else str(value)
         if role == Qt.EditRole:
             return value
+        if role == Qt.ToolTipRole:
+            note = self.COLUMN_NOTES.get(index.column())
+            if note:
+                return note
+            current = item.get("id")
+            info = self._descriptor_info(current) if isinstance(current, str) else None
+            # The catalog is absent until a load completes, and a parameter can be
+            # one no other model publishes, so both are ordinary cases here.
+            return getattr(info, "description", None) or None
         return None
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:  # noqa: N802
         base = Qt.ItemIsEnabled | Qt.ItemIsSelectable
-        if index.column() in (0, 1, 2, 3):
+        if index.column() in self.EDITABLE_COLUMNS:
             return base | Qt.ItemIsEditable
         return base
+
+    def setData(self, index: QModelIndex, value: Any, role: int = Qt.EditRole) -> bool:  # noqa: N802
+        """Accept a cell edit and hand it to the window.
+
+        Without this, Qt's default rejects every edit and the view silently snaps
+        the cell back to its DisplayRole value -- the typed number reverts with no
+        error and no trace, which is exactly the symptom a typed-in default appeared
+        not to stick.
+        """
+        if role != Qt.EditRole or not index.isValid():
+            return False
+        column = index.column()
+        if column not in self.EDITABLE_COLUMNS:
+            return False
+        item = self._items[index.row()]
+        key = self.KEYS[column]
+        parsed = _parse_cell_value(value)
+        if parsed == item.get(key):
+            return False
+        item[key] = parsed
+        param_id = item.get("id")
+        if isinstance(param_id, str) and self._on_edit is not None:
+            self._on_edit(param_id, key, parsed)
+        self.dataChanged.emit(index, index)
+        return True
+
+
+def _parse_cell_value(value: Any) -> Any:
+    """Coerce a cell's text into the JSON type the key expects.
+
+    ``default`` is typed, so ``32768`` has to land as a number and not the string
+    ``"32768"`` -- a quoted default would serialise into the datasheet as a string
+    and change what the playground sends.
+    """
+    if not isinstance(value, str):
+        return value
+    text = value.strip()
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return text
 
 
 class ChangeListModel(QAbstractTableModel):

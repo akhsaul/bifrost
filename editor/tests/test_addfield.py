@@ -33,9 +33,8 @@ from datasheet_editor.gui.adddialogs import (  # noqa: E402
 )
 from datasheet_editor.gui.main_window import (  # noqa: E402
     _descriptor_ids,
-    _merged_descriptor_array,
 )
-from datasheet_editor.merge import PARAMS_FIELD, merge  # noqa: E402
+from datasheet_editor.merge import PARAMS_FIELD, merge, merge_param_array  # noqa: E402
 
 
 @pytest.fixture(scope="session")
@@ -392,27 +391,41 @@ def test_descriptor_ids_are_read_from_an_entry():
 
 
 def test_new_descriptor_is_appended_without_disturbing_the_rest():
+    """A brand-new id lands alongside the originals, which keep every key."""
     original = [{"id": "temperature", "range": {"min": 0, "max": 2}}]
-    out = _merged_descriptor_array(original, None, {"id": "thinking", "type": "boolean"})
+    out = merge_param_array(original, [{"id": "thinking", "type": "boolean"}])
     assert [i["id"] for i in out] == ["temperature", "thinking"]
     assert out[0]["range"] == {"min": 0, "max": 2}
 
 
 def test_existing_descriptor_is_updated_in_place():
     original = [{"id": "temperature", "type": "number", "label": "Temperature"}]
-    out = _merged_descriptor_array(original, None, {"id": "temperature", "default": 0.4})
+    out = merge_param_array(original, [{"id": "temperature", "default": 0.4}])
     assert len(out) == 1
     assert out[0]["default"] == 0.4
     assert out[0]["label"] == "Temperature", "an override must not drop the rest of the entry"
 
 
-def test_previously_added_descriptors_survive_a_second_add():
-    """The overlay must repeat the whole array; taking only the new id would
-    silently drop descriptors added earlier in the session."""
-    original = [{"id": "temperature"}]
-    overlay = [{"id": "thinking"}]
-    out = _merged_descriptor_array(original, overlay, {"id": "web_search"})
-    assert [i["id"] for i in out] == ["thinking", "temperature", "web_search"]
+def test_overlay_only_needs_the_descriptors_that_were_touched():
+    """The engine matches on id, so restating the model's whole array would put
+    original data into the custom file and bloat it for nothing."""
+    original = [{"id": "a", "label": "A"}, {"id": "b", "label": "B"}, {"id": "c"}]
+    overlay = [{"id": "b", "default": 9}]
+    out = merge_param_array(original, overlay)
+    assert [i["id"] for i in out] == ["a", "b", "c"]
+    assert out[1] == {"id": "b", "label": "B", "default": 9}
+
+
+def test_merging_the_view_never_aliases_the_original():
+    """Regression: the GUI table held the original dicts, so an edit rewrote the
+    loaded dataset and the baseline it compared against was the value just written.
+    """
+    original = [{"id": "temperature", "default": 1}]
+    view = merge_param_array(original, [{"id": "temperature", "default": 0.4}])
+    assert view[0] is not original[0]
+    view[0]["default"] = 99
+    view[0]["range"] = {"min": 0}
+    assert original[0] == {"id": "temperature", "default": 1}
 
 
 def test_descriptor_merge_reports_one_change_line():

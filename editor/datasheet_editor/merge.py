@@ -301,6 +301,28 @@ def _merge_entry(
     return base
 
 
+def merge_param_array(
+    original: Any,
+    overlay: list[Any],
+    mode: ParamArrayMode = ParamArrayMode.MERGE,
+) -> list[Any]:
+    """Public, non-mutating view of the ``model_parameters`` by-id merge.
+
+    The GUI needs to show the *effective* array -- the original overlaid with
+    whatever the user has added or changed -- while editing it, and it must not
+    share a single dict with the loaded dataset. Aliasing here is not a subtle
+    leak: an editor that writes ``item[key] = value`` would rewrite the original
+    entry, and the baseline it then compares against is that same object, so
+    every edit reads as a no-op and gets discarded. This returns fresh dicts
+    throughout.
+
+    Because the overlay only has to carry the descriptors the user touched -- the
+    engine matches on ``id`` and deep-merges the remaining keys -- the overlay
+    stays a handful of small entries instead of a copy of the model's whole array.
+    """
+    return _merge_param_array(original, overlay, mode)
+
+
 def _merge_param_array(
     original: Any,
     overlay: list[Any],
