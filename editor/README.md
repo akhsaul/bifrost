@@ -192,6 +192,21 @@ are never auto-discovered: a working directory here routinely holds several
 datasheet copies (`*_beauty.json`, generated output, an unrelated model's sheet),
 and silently opening the wrong one is worse than asking.
 
+Choosing only one of the two originals raises a dialog saying so, and explaining
+why: the editor lists both side by side and reports where they disagree, and
+`GetCapabilityEntry` reads the pricing copy — so a single file would be a
+misleading half-view, not a convenient shortcut.
+
+- **Add Model…** creates a model that does not exist yet. It asks for an ID
+  (refusing one already present), a provider, and a mode, both offered as
+  editable combos seeded from the values already in the data so the new model
+  shows up under the right filters. You can include a pricing section or not.
+- **Add Parameter Field…** / **Add Pricing Field…** add a single field to the
+  selected model. The name is a combo seeded from the fields in that dataset, and
+  the value is parsed as JSON when valid, so numbers, booleans, arrays and
+  objects are all reachable. Putting a field in the wrong section is refused with
+  the reason — the dialog asks the merge engine's own placement rule, so the
+  editor cannot offer something the merge would reject.
 - **Search** is plain text — no regex, case-insensitive **contains** across model
   ID, provider, base model, and mode. So `onnet` finds `claude-sonnet`. `Ctrl+F`
   focuses it, `Esc` clears.
@@ -224,7 +239,7 @@ and silently opening the wrong one is worse than asking.
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/ -q
 ```
 
-105 tests. The GUI tests are skipped without PySide6. They cover the merge rules
+140 tests. The GUI tests are skipped without PySide6. They cover the merge rules
 against both hand-built cases and slices of the real 20MB file, and pin two Qt
 interop and lifetime traps that make a window render nothing while looking
 healthy:
@@ -249,13 +264,13 @@ itself and reported no change at all.
 editor/
 ├── datasheet_editor/
 │   ├── fields.py        # read-set + cost/capability classification
-├── format.py        # exponent-free numbers + per-1M price readings
+│   ├── format.py        # exponent-free numbers + per-1M price readings
 │   ├── pricing_fields.json   # GENERATED from types.go — do not edit
 │   ├── dataset.py       # load/save, key order, atomic writes
 │   ├── merge.py         # the merge engine (pure, no Qt, no IO)
 │   ├── validate.py      # errors, warnings, conflict detection
 │   ├── cli.py
-│   └── gui/
+│   └── gui/              # models, workers, typed field editor, add dialogs
 ├── tools/gen_pricing_fields.py
 └── tests/
 ```

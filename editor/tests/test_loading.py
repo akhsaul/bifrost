@@ -248,8 +248,16 @@ def test_actions_start_disabled(window):
     assert window.btn_save_custom.isEnabled() is False
 
 
-def test_partial_selection_does_not_load(window):
-    """Choosing only the parameters file must not start a load."""
+def test_partial_selection_does_not_load(window, monkeypatch):
+    """Choosing only the parameters file must not start a load.
+
+    A missing file raises a modal dialog, so stub it out; the dialog's own
+    contents are asserted in test_adding.py.
+    """
+    from PySide6.QtWidgets import QMessageBox
+
+    monkeypatch.setattr(QMessageBox, "information", staticmethod(lambda *a, **k: QMessageBox.Ok))
+
     params = PARAMS if PARAMS.exists() else PARAMS_BEAUTY
     if not params.exists():
         pytest.skip("datasheet files not present")

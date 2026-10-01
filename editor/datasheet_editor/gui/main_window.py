@@ -11,6 +11,7 @@ from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
+    QDialog,
     QFileDialog,
     QFormLayout,
     QGroupBox,
@@ -36,6 +37,7 @@ from ..dataset import write_json_atomic
 from ..fields import is_cost_field
 from ..merge import PARAMS_FIELD, ParamArrayMode, PricingFieldPolicy, merge
 from ..validate import validate_overlay
+from .adddialogs import AddFieldDialog, AddModelDialog
 from .fieldeditor import FieldRow
 from .models import (
     COL_ID,
@@ -153,6 +155,13 @@ class MainWindow(QMainWindow):
         self.btn_load_custom.clicked.connect(self._on_load_custom)
         bar.addWidget(self.btn_load_custom)
 
+        self.btn_add_model = QPushButton("Add Model…")
+        self.btn_add_model.setToolTip(
+            "Add a model that does not exist yet, to your custom overlay"
+        )
+        self.btn_add_model.clicked.connect(self._on_add_model)
+        bar.addWidget(self.btn_add_model)
+
         self.btn_merge = QPushButton("Merge & Preview")
         self.btn_merge.clicked.connect(self._on_merge)
         self.btn_merge.setEnabled(False)
@@ -239,8 +248,15 @@ class MainWindow(QMainWindow):
         params_splitter = QSplitter(Qt.Vertical)
 
         self.params_fields_box = QGroupBox("Parameter fields")
-        self.params_form = QFormLayout(self.params_fields_box)
+        params_box_layout = QVBoxLayout(self.params_fields_box)
+        # Above the form, not below: an entry can have 48 fields, and a button
+        # pinned to the bottom of the scroll area is effectively invisible.
+        self.btn_add_param_field = QPushButton("Add Parameter Field…")
+        self.btn_add_param_field.clicked.connect(lambda: self._on_add_field("parameters"))
+        params_box_layout.addWidget(self.btn_add_param_field, 0, Qt.AlignLeft)
+        self.params_form = QFormLayout()
         self.params_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        params_box_layout.addLayout(self.params_form)
         params_scroll = QScrollArea()
         params_scroll.setWidgetResizable(True)
         params_scroll.setMinimumHeight(240)
@@ -279,8 +295,13 @@ class MainWindow(QMainWindow):
         self.pricing_hint.setStyleSheet("color:#475569;")
         pricing_layout.addWidget(self.pricing_hint)
         self.pricing_fields_box = QGroupBox("Pricing fields")
-        self.pricing_form = QFormLayout(self.pricing_fields_box)
+        pricing_box_layout = QVBoxLayout(self.pricing_fields_box)
+        self.btn_add_pricing_field = QPushButton("Add Pricing Field…")
+        self.btn_add_pricing_field.clicked.connect(lambda: self._on_add_field("pricing"))
+        pricing_box_layout.addWidget(self.btn_add_pricing_field, 0, Qt.AlignLeft)
+        self.pricing_form = QFormLayout()
         self.pricing_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        pricing_box_layout.addLayout(self.pricing_form)
         pricing_scroll = QScrollArea()
         pricing_scroll.setWidgetResizable(True)
         pricing_scroll.setWidget(self.pricing_fields_box)
@@ -402,8 +423,10 @@ class MainWindow(QMainWindow):
         ]
         if missing:
             self._update_path_label()
-            self.status_label.setText("Choose " + " and ".join(missing) + " to load")
             self.btn_merge.setEnabled(False)
+            # A status-bar line is easy to miss, and the result of clicking one
+            # Load button and seeing nothing happen looks broken. Say it plainly.
+            self._warn_incomplete_load(missing)
             return
 
         self._remember_dir()
@@ -416,6 +439,33 @@ class MainWindow(QMainWindow):
         worker.signals.failed.connect(lambda msg: self._on_failed("load", msg))
         worker.signals.cancelled.connect(self._on_load_cancelled)
         self.pool.start(worker)
+
+    def _warn_incomplete_load(self, missing: list[str]) -> None:
+        """Explain that both originals are required before anything can display."""
+        chosen = [
+            name
+            for name, path in (
+                (PARAMETERS_FILENAME, self.parameters_path),
+                (PRICING_FILENAME, self.pricing_path),
+            )
+            if path is not None
+        ]
+        lines = [
+            "Bifrost's datasheet editor needs both files before it can show anything.",
+            "",
+            f"Chosen so far : {', '.join(chosen) if chosen else 'none'}",
+            f"Still needed  : {', '.join(missing)}",
+            "",
+            "This is not just a convenience: model_parameters.json holds the capability "
+            "metadata and parameter forms, while model_pricing.json holds the cost fields "
+            "and is also what Bifrost's GetCapabilityEntry reads. The editor lists both "
+            "side by side and reports where they disagree, so it needs both.",
+            "",
+            f"Press \"Load Parameters…\" and \"Load Pricing…\" to choose the missing "
+            f"{'file' if len(missing) == 1 else 'files'}.",
+        ]
+        QMessageBox.information(self, "Choose both files to load", "\n".join(lines))
+        self.status_label.setText("Waiting for " + " and ".join(missing))
 
     def _remember_dir(self) -> None:
         for path in (self.parameters_path, self.pricing_path):
@@ -554,6 +604,10 @@ class MainWindow(QMainWindow):
         ):
             button.setEnabled(not busy)
         has_data = bool(self.model_list.rowCount())
+        selected = bool(self._selected_model())
+        self.btn_add_model.setEnabled(not busy and has_data)
+        self.btn_add_param_field.setEnabled(not busy and selected)
+        self.btn_add_pricing_field.setEnabled(not busy and selected)
         self.btn_merge.setEnabled(not busy and has_data)
         self.btn_save_output.setEnabled(not busy and self.merge_result is not None)
         self.btn_save_custom.setEnabled(not busy and bool(self.dirty or self.overlay))
@@ -647,6 +701,8 @@ class MainWindow(QMainWindow):
         self._clear_form(self.params_form)
         self._clear_form(self.pricing_form)
         self.param_model.set_items([])
+        for button in (self.btn_add_param_field, self.btn_add_pricing_field):
+            button.setEnabled(bool(model_id) and not self._loading)
         if not model_id:
             return
 
@@ -703,6 +759,93 @@ class MainWindow(QMainWindow):
             self.param_array_box.setEnabled(True)
         else:
             self.param_array_box.setEnabled(False)
+
+    # ------------------------------------------------------------ adding -- #
+
+    def _require_loaded(self) -> bool:
+        if self.model_list.rowCount():
+            return True
+        QMessageBox.information(
+            self,
+            "Nothing loaded yet",
+            "Load both datasheets first — press \"Load Parameters…\" and "
+            "\"Load Pricing…\".",
+        )
+        return False
+
+    def _on_add_model(self) -> None:
+        if not self._require_loaded():
+            return
+        existing = set(self.parameters) | set(self.pricing) | set(self.overlay)
+        dialog = AddModelDialog(
+            providers=self.model_list.providers and [p for p, _ in self.model_list.providers],
+            modes=[m for m, _ in self.model_list.modes],
+            existing_ids=existing,
+            parent=self,
+        )
+        if dialog.exec() != QDialog.Accepted:
+            return
+
+        values = dialog.values()
+        model_id = values["id"]
+        self.overlay[model_id] = values["sections"]
+        self.dirty = True
+        self._refresh_rows()
+        self._select_model(model_id)
+        self._rebuild_field_panes(model_id)
+        self.btn_save_custom.setEnabled(True)
+        self.status_label.setText(
+            f"Added {model_id} to the custom overlay. Save Custom to keep it."
+        )
+
+    def _on_add_field(self, section: str) -> None:
+        if not self._require_loaded():
+            return
+        model_id = self._selected_model()
+        if not model_id:
+            QMessageBox.information(
+                self, "No model selected", "Select a model in the list first."
+            )
+            return
+
+        dataset = self.parameters if section == "parameters" else self.pricing
+        base = dataset.get(model_id) or {}
+        existing = set(base) | set(self.overlay.get(model_id, {}).get(section, {}))
+        known = sorted({name for entry in dataset.values() for name in entry})
+        dialog = AddFieldDialog(
+            section=section,
+            model_id=model_id,
+            known_fields=known,
+            existing=existing,
+            parent=self,
+        )
+        if dialog.exec() != QDialog.Accepted:
+            return
+
+        name, value = dialog.values()
+        self.overlay.setdefault(model_id, {}).setdefault(section, {})[name] = value
+        self.dirty = True
+        self._mark_row(model_id)
+        self._rebuild_field_panes(model_id)
+        self.btn_save_custom.setEnabled(True)
+        self.status_label.setText(
+            f"Added {model_id}.{section}.{name}. Save Custom to keep it."
+        )
+
+    def _refresh_rows(self) -> None:
+        rows = build_rows(self.parameters, self.pricing, self.overlay, self.conflicts)
+        self.model_list.set_rows(rows)
+        self.proxy.sort(COL_ID, Qt.AscendingOrder)
+        self._populate_facet_combos()
+        self._clear_filters()
+
+    def _select_model(self, model_id: str) -> None:
+        for i in range(self.proxy.rowCount()):
+            source = self.proxy.mapToSource(self.proxy.index(i, 0))
+            row = self.model_list.row(source.row())
+            if row and row["id"] == model_id:
+                self.table.selectRow(i)
+                return
 
     def _on_field_edit(self, model_id: str, section: str, name: str, value: Any) -> None:
         entry = self.overlay.setdefault(model_id, {})

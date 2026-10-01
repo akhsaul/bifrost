@@ -359,6 +359,51 @@ def _deep_merge(base: Any, overlay: Any) -> Any:
     return deepcopy(overlay)
 
 
+def check_field_placement(model: str, section: str, name: str, known: set[str]) -> str | None:
+    """Return an error message if ``name`` cannot go in ``section``, else ``None``.
+
+    The single source of truth for which fields belong in which section, shared by
+    the merge-time validators and the GUI's "Add Field" dialog so the editor
+    cannot offer a placement the merge would then reject.
+    """
+    from .fields import is_capability_field, is_cost_field, is_pricing_read, looks_like_cost
+
+    if section == "parameters":
+        if name == PARAMS_FIELD:
+            return None
+        if is_cost_field(name):
+            return (
+                f"{name} is a cost field (read by Bifrost's pricing entry) -- "
+                "put it in the 'pricing' section instead"
+            )
+        if looks_like_cost(name) and not is_capability_field(name) and name not in known:
+            return (
+                f"{name} looks like a cost field and does not appear in the parameters "
+                "dataset -- move it to the 'pricing' section"
+            )
+        # Capability fields are deliberately allowed here: they appear in both
+        # files by design (the pricing copy is what GetCapabilityEntry reads, the
+        # params copy is what the UI builds forms from).
+        return None
+
+    if section == "pricing":
+        if name == PARAMS_FIELD:
+            return (
+                f"{PARAMS_FIELD} belongs in the 'parameters' section -- it is not part "
+                "of the pricing entry"
+            )
+        if is_capability_field(name) or is_pricing_read(name):
+            return None
+        if looks_like_cost(name) or name in known:
+            return None
+        return (
+            f"{name} is neither a pricing nor a capability field -- "
+            "did you mean to put it in the 'parameters' section?"
+        )
+
+    return f"unknown section {section!r} (expected 'parameters' or 'pricing')"
+
+
 def _params_validator(model: str, section: dict[str, Any], known: set[str]):
     """Reject cost fields routed into the parameters section.
 
@@ -367,24 +412,10 @@ def _params_validator(model: str, section: dict[str, Any], known: set[str]):
     """
 
     def validate() -> None:
-        from .fields import is_capability_field, is_cost_field, looks_like_cost
-
         for name in section:
-            if name == PARAMS_FIELD:
-                continue
-            if is_cost_field(name):
-                raise MergeError(
-                    f"{model}.parameters.{name} is a cost field "
-                    f"(read by Bifrost's pricing entry) -- put it in the 'pricing' section instead"
-                )
-            if looks_like_cost(name) and not is_capability_field(name) and name not in known:
-                raise MergeError(
-                    f"{model}.parameters.{name} looks like a cost field and does not appear in the "
-                    "parameters dataset -- move it to the 'pricing' section"
-                )
-            # Capability fields are deliberately allowed here: they appear in
-            # both files by design (the pricing copy is what GetCapabilityEntry
-            # reads, the params copy is what the UI builds forms from).
+            problem = check_field_placement(model, "parameters", name, known)
+            if problem:
+                raise MergeError(problem)
 
     return validate
 
@@ -399,22 +430,10 @@ def _pricing_validator(model: str, section: dict[str, Any], known: set[str]):
     """
 
     def validate() -> None:
-        from .fields import is_capability_field, is_pricing_read, looks_like_cost
-
-        if PARAMS_FIELD in section:
-            raise MergeError(
-                f"{model}.pricing.{PARAMS_FIELD} belongs in the 'parameters' section -- "
-                "model_parameters is not part of the pricing entry"
-            )
         for name in section:
-            if is_capability_field(name) or is_pricing_read(name):
-                continue
-            if looks_like_cost(name) or name in known:
-                continue
-            raise MergeError(
-                f"{model}.pricing.{name} is neither a pricing nor a capability field -- "
-                "did you mean to put it in the 'parameters' section?"
-            )
+            problem = check_field_placement(model, "pricing", name, known)
+            if problem:
+                raise MergeError(problem)
 
     return validate
 
