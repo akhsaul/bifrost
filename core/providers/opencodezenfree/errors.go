@@ -1,4 +1,4 @@
-package opencodefree
+package opencodezenfree
 
 import (
 	"fmt"
@@ -23,8 +23,8 @@ type opencodeFreeErrorInner struct {
 	Message string `json:"message"`
 }
 
-// parseOpencodeFreeError parses OpenCode-specific error responses.
-func parseOpencodeFreeError(resp *fasthttp.Response) *schemas.BifrostError {
+// parseOpencodeZenFreeError parses OpenCode-specific error responses.
+func parseOpencodeZenFreeError(resp *fasthttp.Response) *schemas.BifrostError {
 	var errorBody opencodeFreeErrorBody
 	bifrostErr := providerUtils.HandleProviderAPIError(resp, &errorBody)
 	if bifrostErr == nil {

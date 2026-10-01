@@ -52,7 +52,7 @@ import (
 	"github.com/maximhq/bifrost/core/providers/ollama"
 	"github.com/maximhq/bifrost/core/providers/openai"
 	"github.com/maximhq/bifrost/core/providers/opencode"
-	"github.com/maximhq/bifrost/core/providers/opencodefree"
+	"github.com/maximhq/bifrost/core/providers/opencodezenfree"
 	"github.com/maximhq/bifrost/core/providers/openrouter"
 	"github.com/maximhq/bifrost/core/providers/openrouterfree"
 	"github.com/maximhq/bifrost/core/providers/parasail"
@@ -4662,8 +4662,8 @@ func (bifrost *Bifrost) createBaseProvider(providerKey schemas.ModelProvider, co
 		return opencode.NewOpencodeGoProvider(config, bifrost.logger)
 	case schemas.OpencodeZen:
 		return opencode.NewOpencodeZenProvider(config, bifrost.logger)
-	case schemas.OpencodeFree:
-		return opencodefree.NewOpencodeFreeProvider(config, bifrost.logger)
+	case schemas.OpencodeZenFree:
+		return opencodezenfree.NewOpencodeZenFreeProvider(config, bifrost.logger)
 	case schemas.GithubCopilot:
 		return githubcopilot.NewGithubCopilotProvider(config, bifrost.logger)
 	case schemas.SGL:

@@ -1140,9 +1140,9 @@ func keyEnabled(key schemas.Key) bool {
 // keyless. Used to pick the live-cache key for OnKey* helpers: keyless
 // providers cache under the empty-string sentinel.
 // Standard providers that are inherently keyless (no upstream credential),
-// like opencode-free's anonymous tier, are recognized without config.
+// like opencode-zen-free's anonymous tier, are recognized without config.
 func isKeylessProvider(provider schemas.ModelProvider, cfg *lib.Config) bool {
-	if provider == schemas.OpencodeFree {
+	if provider == schemas.OpencodeZenFree {
 		return true
 	}
 	if cfg == nil {

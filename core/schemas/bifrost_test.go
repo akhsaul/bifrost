@@ -16,11 +16,11 @@ func TestBaiProviderRegistered(t *testing.T) {
 	}
 }
 
-func TestOpencodeFreeProviderRegistered(t *testing.T) {
-	if schemas.OpencodeFree != "opencode-free" {
-		t.Fatalf("OpencodeFree = %q, want %q", schemas.OpencodeFree, "opencode-free")
+func TestOpencodeZenFreeProviderRegistered(t *testing.T) {
+	if schemas.OpencodeZenFree != "opencode-zen-free" {
+		t.Fatalf("OpencodeZenFree = %q, want %q", schemas.OpencodeZenFree, "opencode-zen-free")
 	}
-	if !slices.Contains(schemas.StandardProviders, schemas.OpencodeFree) {
-		t.Fatalf("StandardProviders must contain %q", schemas.OpencodeFree)
+	if !slices.Contains(schemas.StandardProviders, schemas.OpencodeZenFree) {
+		t.Fatalf("StandardProviders must contain %q", schemas.OpencodeZenFree)
 	}
 }

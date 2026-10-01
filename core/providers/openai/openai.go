@@ -1881,7 +1881,7 @@ func HandleOpenAIResponsesRequest(
 	)
 }
 
-// HandleOpenAIResponsesRequestWithOpencodeConverter is the opencode-free entry
+// HandleOpenAIResponsesRequestWithOpencodeConverter is the opencode-zen-free entry
 // point: identical to HandleOpenAIResponsesRequest except the wire body comes
 // from a caller-supplied converter, so opencode-native reasoning values
 // ("auto"/"xhigh") pass through without the shared caps normalization.

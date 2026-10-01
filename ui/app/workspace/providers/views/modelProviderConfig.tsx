@@ -21,7 +21,7 @@ export default function ModelProviderConfig({ provider, onRequestDelete }: Props
 		if (provider.custom_provider_config) {
 			return !(provider.custom_provider_config?.is_key_less ?? false);
 		}
-		if (provider.name === "opencode-free") {
+		if (provider.name === "opencode-zen-free") {
 			return false;
 		}
 		return true;

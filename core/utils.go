@@ -121,7 +121,7 @@ func Ptr[T any](v T) *T {
 
 // providerRequiresKey returns true if the given provider requires an API key for authentication.
 func providerRequiresKey(providerKey schemas.ModelProvider, customConfig *schemas.CustomProviderConfig) bool {
-	if providerKey == schemas.OpencodeFree {
+	if providerKey == schemas.OpencodeZenFree {
 		return false
 	}
 	// Keyless custom providers are not allowed for Bedrock.
@@ -135,7 +135,7 @@ func providerRequiresKey(providerKey schemas.ModelProvider, customConfig *schema
 // Some providers like Vertex and Bedrock have their credentials in additional key configs.
 // Ollama and SGL are keyless (API Key is optional) but use per-key server URLs.
 func CanProviderKeyValueBeEmpty(providerKey schemas.ModelProvider) bool {
-	return providerKey == schemas.Vertex || providerKey == schemas.Bedrock || providerKey == schemas.BedrockMantle || providerKey == schemas.VLLM || providerKey == schemas.Azure || providerKey == schemas.Ollama || providerKey == schemas.SGL || providerKey == schemas.Databricks || providerKey == schemas.OpencodeFree || providerKey == schemas.Cline || providerKey == schemas.GithubCopilot || providerKey == schemas.Antigravity
+	return providerKey == schemas.Vertex || providerKey == schemas.Bedrock || providerKey == schemas.BedrockMantle || providerKey == schemas.VLLM || providerKey == schemas.Azure || providerKey == schemas.Ollama || providerKey == schemas.SGL || providerKey == schemas.Databricks || providerKey == schemas.OpencodeZenFree || providerKey == schemas.Cline || providerKey == schemas.GithubCopilot || providerKey == schemas.Antigravity
 }
 
 // isKeySkippingAllowed gates SkipKeySelection on the provider this attempt resolved to. The flag

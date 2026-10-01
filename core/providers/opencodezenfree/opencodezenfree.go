@@ -1,8 +1,8 @@
-// Package opencodefree implements the isolated Opencode Free AI gateway provider.
+// Package opencodezenfree implements the isolated Opencode Zen Free AI gateway provider.
 // It forwards to https://opencode.ai/zen/v1 with the opencode CLI headers
 // (authorization, x-opencode-client, b3/traceparent tracing, session affinity)
 // and fills Responses API body defaults matching the working opencode capture.
-package opencodefree
+package opencodezenfree
 
 import (
 	"context"
@@ -15,8 +15,8 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-// opencodeFreeProvider implements the Provider interface for the anonymous Opencode Free tier.
-type opencodeFreeProvider struct {
+// opencodeZenFreeProvider implements the Provider interface for the anonymous Opencode Zen Free tier.
+type opencodeZenFreeProvider struct {
 	providerKey         schemas.ModelProvider
 	logger              schemas.Logger
 	client              *fasthttp.Client
@@ -26,8 +26,8 @@ type opencodeFreeProvider struct {
 	sendBackRawResponse bool
 }
 
-// NewOpencodeFreeProvider creates a new Opencode Free provider instance.
-func NewOpencodeFreeProvider(config *schemas.ProviderConfig, logger schemas.Logger) (*opencodeFreeProvider, error) {
+// NewOpencodeZenFreeProvider creates a new Opencode Zen Free provider instance.
+func NewOpencodeZenFreeProvider(config *schemas.ProviderConfig, logger schemas.Logger) (*opencodeZenFreeProvider, error) {
 	config.CheckAndSetDefaults()
 
 	requestTimeout := time.Second * time.Duration(config.NetworkConfig.DefaultRequestTimeoutInSeconds)
@@ -51,8 +51,8 @@ func NewOpencodeFreeProvider(config *schemas.ProviderConfig, logger schemas.Logg
 	}
 	config.NetworkConfig.BaseURL = strings.TrimRight(config.NetworkConfig.BaseURL, "/")
 
-	return &opencodeFreeProvider{
-		providerKey:         schemas.OpencodeFree,
+	return &opencodeZenFreeProvider{
+		providerKey:         schemas.OpencodeZenFree,
 		logger:              logger,
 		client:              client,
 		streamingClient:     streamingClient,
@@ -63,7 +63,7 @@ func NewOpencodeFreeProvider(config *schemas.ProviderConfig, logger schemas.Logg
 }
 
 // GetProviderKey returns the provider identifier.
-func (p *opencodeFreeProvider) GetProviderKey() schemas.ModelProvider {
+func (p *opencodeZenFreeProvider) GetProviderKey() schemas.ModelProvider {
 	return p.providerKey
 }
 
@@ -90,15 +90,15 @@ func dummyFunctionTool(name string) schemas.ResponsesTool {
 	}
 }
 
-// requiredOpencodeFreeToolNames are the placeholder tools the upstream expects.
+// requiredOpencodeZenFreeToolNames are the placeholder tools the upstream expects.
 // Merge is by name: a client tool with the same name counts as provided and is
 // never overwritten.
-var requiredOpencodeFreeToolNames = []string{"edit", "read", "shell"}
+var requiredOpencodeZenFreeToolNames = []string{"edit", "read", "shell"}
 
-// ensureOpencodeFreeTools appends a dummy placeholder for each of
+// ensureOpencodeZenFreeTools appends a dummy placeholder for each of
 // edit/read/shell the client did not send. Client tools always win; only the
 // missing names are filled in.
-func ensureOpencodeFreeTools(params *schemas.ResponsesParameters) {
+func ensureOpencodeZenFreeTools(params *schemas.ResponsesParameters) {
 	if params == nil {
 		return
 	}
@@ -108,7 +108,7 @@ func ensureOpencodeFreeTools(params *schemas.ResponsesParameters) {
 			present[*tool.Name] = true
 		}
 	}
-	for _, name := range requiredOpencodeFreeToolNames {
+	for _, name := range requiredOpencodeZenFreeToolNames {
 		if !present[name] {
 			params.Tools = append(params.Tools, dummyFunctionTool(name))
 		}
@@ -187,10 +187,10 @@ func extractSystemPromptToInstructions(request *schemas.BifrostResponsesRequest)
 	request.Input = kept
 }
 
-// ensureOpencodeFreeDefaults fills Responses API body fields to match the working
+// ensureOpencodeZenFreeDefaults fills Responses API body fields to match the working
 // opencode capture. Client-supplied values always win; defaults apply only to
 // fields the client left unset.
-func ensureOpencodeFreeDefaults(request *schemas.BifrostResponsesRequest, sessionID string) {
+func ensureOpencodeZenFreeDefaults(request *schemas.BifrostResponsesRequest, sessionID string) {
 	if request == nil {
 		return
 	}
@@ -241,11 +241,11 @@ func ensureOpencodeFreeDefaults(request *schemas.BifrostResponsesRequest, sessio
 	if !hasReasoningInclude {
 		request.Params.Include = append(request.Params.Include, opencodeIncludeReasoningEncryptedContent)
 	}
-	ensureOpencodeFreeTools(request.Params)
+	ensureOpencodeZenFreeTools(request.Params)
 }
 
-// ListModels performs a list models request to the Opencode Free API.
-func (p *opencodeFreeProvider) ListModels(ctx *schemas.BifrostContext, keys []schemas.Key, request *schemas.BifrostListModelsRequest) (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
+// ListModels performs a list models request to the Opencode Zen Free API.
+func (p *opencodeZenFreeProvider) ListModels(ctx *schemas.BifrostContext, keys []schemas.Key, request *schemas.BifrostListModelsRequest) (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
 	if len(keys) == 0 {
 		return providerUtils.HandleKeylessListModelsRequest(p.providerKey, func() (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
 			unfiltered := false
@@ -280,13 +280,13 @@ func (p *opencodeFreeProvider) ListModels(ctx *schemas.BifrostContext, keys []sc
 	)
 }
 
-// TextCompletion is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) TextCompletion(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostTextCompletionRequest) (*schemas.BifrostTextCompletionResponse, *schemas.BifrostError) {
+// TextCompletion is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) TextCompletion(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostTextCompletionRequest) (*schemas.BifrostTextCompletionResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.TextCompletionRequest, p.GetProviderKey())
 }
 
-// TextCompletionStream is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) TextCompletionStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostTextCompletionRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+// TextCompletionStream is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) TextCompletionStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostTextCompletionRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.TextCompletionStreamRequest, p.GetProviderKey())
 }
 
@@ -306,8 +306,8 @@ func wrapResponsesToChatStreamPostHookRunner(postHookRunner schemas.PostHookRunn
 }
 
 // ChatCompletion performs a chat completion request by converting to Responses API format
-// and routing to the Opencode Free /v1/responses endpoint.
-func (p *opencodeFreeProvider) ChatCompletion(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostChatRequest) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
+// and routing to the Opencode Zen Free /v1/responses endpoint.
+func (p *opencodeZenFreeProvider) ChatCompletion(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostChatRequest) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
 	if request == nil {
 		return nil, &schemas.BifrostError{
 			IsBifrostError: true,
@@ -343,8 +343,8 @@ func (p *opencodeFreeProvider) ChatCompletion(ctx *schemas.BifrostContext, key s
 }
 
 // ChatCompletionStream performs a streaming chat completion request by converting to Responses API
-// format and routing to the Opencode Free /v1/responses endpoint.
-func (p *opencodeFreeProvider) ChatCompletionStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostChatRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+// format and routing to the Opencode Zen Free /v1/responses endpoint.
+func (p *opencodeZenFreeProvider) ChatCompletionStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostChatRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
 	if request == nil {
 		return nil, &schemas.BifrostError{
 			IsBifrostError: true,
@@ -514,13 +514,13 @@ func preserveOpencodeReasoning(wireReq *openai.OpenAIResponsesRequest, request *
 	return wireReq
 }
 
-// Responses performs a responses request to the Opencode Free API.
-func (p *opencodeFreeProvider) Responses(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostResponsesRequest) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
+// Responses performs a responses request to the Opencode Zen Free API.
+func (p *opencodeZenFreeProvider) Responses(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostResponsesRequest) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
 	// Resolve once: the generated session ID feeds both prompt_cache_key and
 	// the session headers. A second resolution would generate a DIFFERENT
 	// random session for the headers (counter advanced), breaking the invariant.
 	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders)
-	ensureOpencodeFreeDefaults(request, resolved.SessionID)
+	ensureOpencodeZenFreeDefaults(request, resolved.SessionID)
 	extraHeaders := headersFromResolved(ctx, p.networkConfig.ExtraHeaders, resolved, false)
 	return openai.HandleOpenAIResponsesRequestWithOpencodeConverter(
 		ctx,
@@ -533,7 +533,7 @@ func (p *opencodeFreeProvider) Responses(ctx *schemas.BifrostContext, key schema
 		providerUtils.ShouldSendBackRawResponse(ctx, p.sendBackRawResponse),
 		p.providerKey,
 		nil,
-		parseOpencodeFreeError,
+		parseOpencodeZenFreeError,
 		nil,
 		p.logger,
 		func(req *schemas.BifrostResponsesRequest) (providerUtils.RequestBodyWithExtraParams, error) {
@@ -544,12 +544,12 @@ func (p *opencodeFreeProvider) Responses(ctx *schemas.BifrostContext, key schema
 	)
 }
 
-// ResponsesStream performs a streaming responses request to the Opencode Free API.
-func (p *opencodeFreeProvider) ResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostResponsesRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+// ResponsesStream performs a streaming responses request to the Opencode Zen Free API.
+func (p *opencodeZenFreeProvider) ResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostResponsesRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
 	// Same single-resolution invariant as Responses: headers must carry the
 	// exact session ID used for prompt_cache_key.
 	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders)
-	ensureOpencodeFreeDefaults(request, resolved.SessionID)
+	ensureOpencodeZenFreeDefaults(request, resolved.SessionID)
 	extraHeaders := headersFromResolved(ctx, p.networkConfig.ExtraHeaders, resolved, true)
 	postRequestConverter := func(wireReq *openai.OpenAIResponsesRequest) *openai.OpenAIResponsesRequest {
 		wireReq = preserveOpencodeReasoning(wireReq, request)
@@ -569,7 +569,7 @@ func (p *opencodeFreeProvider) ResponsesStream(ctx *schemas.BifrostContext, post
 		p.providerKey,
 		postHookRunner,
 		nil,
-		parseOpencodeFreeError,
+		parseOpencodeZenFreeError,
 		postRequestConverter,
 		nil,
 		nil,
@@ -578,222 +578,222 @@ func (p *opencodeFreeProvider) ResponsesStream(ctx *schemas.BifrostContext, post
 	)
 }
 
-// Embedding is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) Embedding(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostEmbeddingRequest) (*schemas.BifrostEmbeddingResponse, *schemas.BifrostError) {
+// Embedding is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) Embedding(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostEmbeddingRequest) (*schemas.BifrostEmbeddingResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.EmbeddingRequest, p.GetProviderKey())
 }
 
-// Rerank is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) Rerank(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostRerankRequest) (*schemas.BifrostRerankResponse, *schemas.BifrostError) {
+// Rerank is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) Rerank(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostRerankRequest) (*schemas.BifrostRerankResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.RerankRequest, p.GetProviderKey())
 }
 
-// Decision is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) Decision(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostDecisionRequest) (*schemas.BifrostDecisionResponse, *schemas.BifrostError) {
+// Decision is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) Decision(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostDecisionRequest) (*schemas.BifrostDecisionResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.DecisionRequest, p.GetProviderKey())
 }
 
-// OCR is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) OCR(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostOCRRequest) (*schemas.BifrostOCRResponse, *schemas.BifrostError) {
+// OCR is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) OCR(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostOCRRequest) (*schemas.BifrostOCRResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.OCRRequest, p.GetProviderKey())
 }
 
-// Speech is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) Speech(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostSpeechRequest) (*schemas.BifrostSpeechResponse, *schemas.BifrostError) {
+// Speech is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) Speech(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostSpeechRequest) (*schemas.BifrostSpeechResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.SpeechRequest, p.GetProviderKey())
 }
 
-// SpeechStream is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) SpeechStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostSpeechRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+// SpeechStream is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) SpeechStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostSpeechRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.SpeechStreamRequest, p.GetProviderKey())
 }
 
-// Transcription is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) Transcription(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostTranscriptionRequest) (*schemas.BifrostTranscriptionResponse, *schemas.BifrostError) {
+// Transcription is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) Transcription(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostTranscriptionRequest) (*schemas.BifrostTranscriptionResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.TranscriptionRequest, p.GetProviderKey())
 }
 
-// TranscriptionStream is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) TranscriptionStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostTranscriptionRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+// TranscriptionStream is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) TranscriptionStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostTranscriptionRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.TranscriptionStreamRequest, p.GetProviderKey())
 }
 
-// ImageGeneration is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) ImageGeneration(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostImageGenerationRequest) (*schemas.BifrostImageGenerationResponse, *schemas.BifrostError) {
+// ImageGeneration is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) ImageGeneration(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostImageGenerationRequest) (*schemas.BifrostImageGenerationResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.ImageGenerationRequest, p.GetProviderKey())
 }
 
-// ImageGenerationStream is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) ImageGenerationStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostImageGenerationRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+// ImageGenerationStream is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) ImageGenerationStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostImageGenerationRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.ImageGenerationStreamRequest, p.GetProviderKey())
 }
 
-// ImageEdit is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) ImageEdit(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostImageEditRequest) (*schemas.BifrostImageGenerationResponse, *schemas.BifrostError) {
+// ImageEdit is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) ImageEdit(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostImageEditRequest) (*schemas.BifrostImageGenerationResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.ImageEditRequest, p.GetProviderKey())
 }
 
-// ImageEditStream is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) ImageEditStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostImageEditRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+// ImageEditStream is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) ImageEditStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostImageEditRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.ImageEditStreamRequest, p.GetProviderKey())
 }
 
-// ImageVariation is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) ImageVariation(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostImageVariationRequest) (*schemas.BifrostImageGenerationResponse, *schemas.BifrostError) {
+// ImageVariation is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) ImageVariation(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostImageVariationRequest) (*schemas.BifrostImageGenerationResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.ImageVariationRequest, p.GetProviderKey())
 }
 
-// VideoGeneration is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) VideoGeneration(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoGenerationRequest) (*schemas.BifrostVideoGenerationResponse, *schemas.BifrostError) {
+// VideoGeneration is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) VideoGeneration(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoGenerationRequest) (*schemas.BifrostVideoGenerationResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.VideoGenerationRequest, p.GetProviderKey())
 }
 
-// VideoRetrieve is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) VideoRetrieve(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoRetrieveRequest) (*schemas.BifrostVideoGenerationResponse, *schemas.BifrostError) {
+// VideoRetrieve is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) VideoRetrieve(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoRetrieveRequest) (*schemas.BifrostVideoGenerationResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.VideoRetrieveRequest, p.GetProviderKey())
 }
 
-// VideoDownload is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) VideoDownload(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoDownloadRequest) (*schemas.BifrostVideoDownloadResponse, *schemas.BifrostError) {
+// VideoDownload is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) VideoDownload(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoDownloadRequest) (*schemas.BifrostVideoDownloadResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.VideoDownloadRequest, p.GetProviderKey())
 }
 
-// VideoDelete is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) VideoDelete(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoDeleteRequest) (*schemas.BifrostVideoDeleteResponse, *schemas.BifrostError) {
+// VideoDelete is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) VideoDelete(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoDeleteRequest) (*schemas.BifrostVideoDeleteResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.VideoDeleteRequest, p.GetProviderKey())
 }
 
-// VideoList is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) VideoList(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoListRequest) (*schemas.BifrostVideoListResponse, *schemas.BifrostError) {
+// VideoList is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) VideoList(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoListRequest) (*schemas.BifrostVideoListResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.VideoListRequest, p.GetProviderKey())
 }
 
-// VideoEdit is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) VideoEdit(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoEditRequest) (*schemas.BifrostVideoEditResponse, *schemas.BifrostError) {
+// VideoEdit is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) VideoEdit(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoEditRequest) (*schemas.BifrostVideoEditResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.VideoEditRequest, p.GetProviderKey())
 }
 
-// VideoRemix is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) VideoRemix(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoRemixRequest) (*schemas.BifrostVideoGenerationResponse, *schemas.BifrostError) {
+// VideoRemix is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) VideoRemix(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostVideoRemixRequest) (*schemas.BifrostVideoGenerationResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.VideoRemixRequest, p.GetProviderKey())
 }
 
-// BatchCreate is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) BatchCreate(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostBatchCreateRequest) (*schemas.BifrostBatchCreateResponse, *schemas.BifrostError) {
+// BatchCreate is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) BatchCreate(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostBatchCreateRequest) (*schemas.BifrostBatchCreateResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.BatchCreateRequest, p.GetProviderKey())
 }
 
-// BatchList is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) BatchList(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostBatchListRequest) (*schemas.BifrostBatchListResponse, *schemas.BifrostError) {
+// BatchList is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) BatchList(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostBatchListRequest) (*schemas.BifrostBatchListResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.BatchListRequest, p.GetProviderKey())
 }
 
-// BatchRetrieve is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) BatchRetrieve(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostBatchRetrieveRequest) (*schemas.BifrostBatchRetrieveResponse, *schemas.BifrostError) {
+// BatchRetrieve is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) BatchRetrieve(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostBatchRetrieveRequest) (*schemas.BifrostBatchRetrieveResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.BatchRetrieveRequest, p.GetProviderKey())
 }
 
-// BatchCancel is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) BatchCancel(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostBatchCancelRequest) (*schemas.BifrostBatchCancelResponse, *schemas.BifrostError) {
+// BatchCancel is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) BatchCancel(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostBatchCancelRequest) (*schemas.BifrostBatchCancelResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.BatchCancelRequest, p.GetProviderKey())
 }
 
-// BatchDelete is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) BatchDelete(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostBatchDeleteRequest) (*schemas.BifrostBatchDeleteResponse, *schemas.BifrostError) {
+// BatchDelete is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) BatchDelete(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostBatchDeleteRequest) (*schemas.BifrostBatchDeleteResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.BatchDeleteRequest, p.GetProviderKey())
 }
 
-// BatchResults is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) BatchResults(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostBatchResultsRequest) (*schemas.BifrostBatchResultsResponse, *schemas.BifrostError) {
+// BatchResults is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) BatchResults(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostBatchResultsRequest) (*schemas.BifrostBatchResultsResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.BatchResultsRequest, p.GetProviderKey())
 }
 
-// FileUpload is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) FileUpload(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostFileUploadRequest) (*schemas.BifrostFileUploadResponse, *schemas.BifrostError) {
+// FileUpload is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) FileUpload(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostFileUploadRequest) (*schemas.BifrostFileUploadResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.FileUploadRequest, p.GetProviderKey())
 }
 
-// FileList is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) FileList(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostFileListRequest) (*schemas.BifrostFileListResponse, *schemas.BifrostError) {
+// FileList is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) FileList(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostFileListRequest) (*schemas.BifrostFileListResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.FileListRequest, p.GetProviderKey())
 }
 
-// FileRetrieve is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) FileRetrieve(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostFileRetrieveRequest) (*schemas.BifrostFileRetrieveResponse, *schemas.BifrostError) {
+// FileRetrieve is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) FileRetrieve(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostFileRetrieveRequest) (*schemas.BifrostFileRetrieveResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.FileRetrieveRequest, p.GetProviderKey())
 }
 
-// FileDelete is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) FileDelete(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostFileDeleteRequest) (*schemas.BifrostFileDeleteResponse, *schemas.BifrostError) {
+// FileDelete is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) FileDelete(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostFileDeleteRequest) (*schemas.BifrostFileDeleteResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.FileDeleteRequest, p.GetProviderKey())
 }
 
-// FileContent is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) FileContent(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostFileContentRequest) (*schemas.BifrostFileContentResponse, *schemas.BifrostError) {
+// FileContent is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) FileContent(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostFileContentRequest) (*schemas.BifrostFileContentResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.FileContentRequest, p.GetProviderKey())
 }
 
-// CountTokens is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) CountTokens(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostResponsesRequest) (*schemas.BifrostCountTokensResponse, *schemas.BifrostError) {
+// CountTokens is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) CountTokens(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostResponsesRequest) (*schemas.BifrostCountTokensResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.CountTokensRequest, p.GetProviderKey())
 }
 
-// Compaction is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) Compaction(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostCompactionRequest) (*schemas.BifrostCompactionResponse, *schemas.BifrostError) {
+// Compaction is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) Compaction(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostCompactionRequest) (*schemas.BifrostCompactionResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.CompactionRequest, p.GetProviderKey())
 }
 
-// ContainerCreate is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) ContainerCreate(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostContainerCreateRequest) (*schemas.BifrostContainerCreateResponse, *schemas.BifrostError) {
+// ContainerCreate is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) ContainerCreate(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostContainerCreateRequest) (*schemas.BifrostContainerCreateResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.ContainerCreateRequest, p.GetProviderKey())
 }
 
-// ContainerList is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) ContainerList(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostContainerListRequest) (*schemas.BifrostContainerListResponse, *schemas.BifrostError) {
+// ContainerList is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) ContainerList(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostContainerListRequest) (*schemas.BifrostContainerListResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.ContainerListRequest, p.GetProviderKey())
 }
 
-// ContainerRetrieve is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) ContainerRetrieve(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostContainerRetrieveRequest) (*schemas.BifrostContainerRetrieveResponse, *schemas.BifrostError) {
+// ContainerRetrieve is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) ContainerRetrieve(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostContainerRetrieveRequest) (*schemas.BifrostContainerRetrieveResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.ContainerRetrieveRequest, p.GetProviderKey())
 }
 
-// ContainerDelete is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) ContainerDelete(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostContainerDeleteRequest) (*schemas.BifrostContainerDeleteResponse, *schemas.BifrostError) {
+// ContainerDelete is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) ContainerDelete(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostContainerDeleteRequest) (*schemas.BifrostContainerDeleteResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.ContainerDeleteRequest, p.GetProviderKey())
 }
 
-// ContainerFileCreate is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) ContainerFileCreate(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostContainerFileCreateRequest) (*schemas.BifrostContainerFileCreateResponse, *schemas.BifrostError) {
+// ContainerFileCreate is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) ContainerFileCreate(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostContainerFileCreateRequest) (*schemas.BifrostContainerFileCreateResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.ContainerFileCreateRequest, p.GetProviderKey())
 }
 
-// ContainerFileList is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) ContainerFileList(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostContainerFileListRequest) (*schemas.BifrostContainerFileListResponse, *schemas.BifrostError) {
+// ContainerFileList is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) ContainerFileList(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostContainerFileListRequest) (*schemas.BifrostContainerFileListResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.ContainerFileListRequest, p.GetProviderKey())
 }
 
-// ContainerFileRetrieve is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) ContainerFileRetrieve(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostContainerFileRetrieveRequest) (*schemas.BifrostContainerFileRetrieveResponse, *schemas.BifrostError) {
+// ContainerFileRetrieve is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) ContainerFileRetrieve(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostContainerFileRetrieveRequest) (*schemas.BifrostContainerFileRetrieveResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.ContainerFileRetrieveRequest, p.GetProviderKey())
 }
 
-// ContainerFileContent is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) ContainerFileContent(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostContainerFileContentRequest) (*schemas.BifrostContainerFileContentResponse, *schemas.BifrostError) {
+// ContainerFileContent is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) ContainerFileContent(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostContainerFileContentRequest) (*schemas.BifrostContainerFileContentResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.ContainerFileContentRequest, p.GetProviderKey())
 }
 
-// ContainerFileDelete is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) ContainerFileDelete(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostContainerFileDeleteRequest) (*schemas.BifrostContainerFileDeleteResponse, *schemas.BifrostError) {
+// ContainerFileDelete is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) ContainerFileDelete(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostContainerFileDeleteRequest) (*schemas.BifrostContainerFileDeleteResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.ContainerFileDeleteRequest, p.GetProviderKey())
 }
 
-// Passthrough is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) Passthrough(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostPassthroughRequest) (*schemas.BifrostPassthroughResponse, *schemas.BifrostError) {
+// Passthrough is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) Passthrough(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostPassthroughRequest) (*schemas.BifrostPassthroughResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.PassthroughRequest, p.GetProviderKey())
 }
 
-// PassthroughStream is not supported by OpencodeFree.
-func (p *opencodeFreeProvider) PassthroughStream(_ *schemas.BifrostContext, _ schemas.PostHookRunner, _ func(context.Context), _ schemas.Key, _ *schemas.BifrostPassthroughRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+// PassthroughStream is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) PassthroughStream(_ *schemas.BifrostContext, _ schemas.PostHookRunner, _ func(context.Context), _ schemas.Key, _ *schemas.BifrostPassthroughRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.PassthroughStreamRequest, p.GetProviderKey())
 }

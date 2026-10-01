@@ -466,7 +466,7 @@ export const ProviderIcons = {
 		);
 	},
 
-	"opencode-free": ({ size = "md", className = "" }: IconProps) => {
+	"opencode-zen-free": ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
 
 		return (
@@ -478,7 +478,7 @@ export const ProviderIcons = {
 				xmlns="http://www.w3.org/2000/svg"
 				className={className}
 			>
-				<title>OpenCode Free</title>
+				<title>OpenCode Zen Free</title>
 				<rect x="16" y="20" width="96" height="88" rx="8" stroke="currentColor" strokeWidth="6" fill="none" />
 				<path
 					d="M52 46 L36 64 L52 82 M76 46 L92 64 L76 82"

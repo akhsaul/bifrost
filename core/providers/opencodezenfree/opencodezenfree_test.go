@@ -1,4 +1,4 @@
-package opencodefree
+package opencodezenfree
 
 import (
 	"encoding/json"
@@ -16,27 +16,27 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
-// Compile-time check that opencodeFreeProvider satisfies the full Provider interface.
-var _ schemas.Provider = (*opencodeFreeProvider)(nil)
+// Compile-time check that opencodeZenFreeProvider satisfies the full Provider interface.
+var _ schemas.Provider = (*opencodeZenFreeProvider)(nil)
 
-func TestOpencodeFreeProviderConstructor(t *testing.T) {
+func TestOpencodeZenFreeProviderConstructor(t *testing.T) {
 	cfg := &schemas.ProviderConfig{
 		NetworkConfig: schemas.NetworkConfig{},
 	}
-	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
 	if err != nil {
-		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
 	}
 
-	if provider.GetProviderKey() != schemas.OpencodeFree {
-		t.Errorf("expected provider key %s, got %s", schemas.OpencodeFree, provider.GetProviderKey())
+	if provider.GetProviderKey() != schemas.OpencodeZenFree {
+		t.Errorf("expected provider key %s, got %s", schemas.OpencodeZenFree, provider.GetProviderKey())
 	}
 	if provider.networkConfig.BaseURL != DefaultBaseURL {
 		t.Errorf("expected base URL %s, got %s", DefaultBaseURL, provider.networkConfig.BaseURL)
 	}
 }
 
-func TestOpencodeFreeMandatoryHeadersAndReasoning(t *testing.T) {
+func TestOpencodeZenFreeMandatoryHeadersAndReasoning(t *testing.T) {
 	type capturedRequest struct {
 		method  string
 		path    string
@@ -85,9 +85,9 @@ func TestOpencodeFreeMandatoryHeadersAndReasoning(t *testing.T) {
 			BaseURL: server.URL,
 		},
 	}
-	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
 	if err != nil {
-		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
 	}
 
 	ctx := schemas.NewBifrostContext(nil, time.Time{})
@@ -209,7 +209,7 @@ func TestOpencodeFreeMandatoryHeadersAndReasoning(t *testing.T) {
 	}
 }
 
-func TestOpencodeFreeStreamingHeaders(t *testing.T) {
+func TestOpencodeZenFreeStreamingHeaders(t *testing.T) {
 	var capturedAccept string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedAccept = r.Header.Get("Accept")
@@ -226,9 +226,9 @@ func TestOpencodeFreeStreamingHeaders(t *testing.T) {
 			BaseURL: server.URL,
 		},
 	}
-	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
 	if err != nil {
-		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
 	}
 
 	ctx := schemas.NewBifrostContext(nil, time.Time{})
@@ -261,7 +261,7 @@ func TestOpencodeFreeStreamingHeaders(t *testing.T) {
 	}
 }
 
-func TestOpencodeFreeChatCompletionAndReasoning(t *testing.T) {
+func TestOpencodeZenFreeChatCompletionAndReasoning(t *testing.T) {
 	var (
 		mu         sync.Mutex
 		calledPath string
@@ -288,9 +288,9 @@ func TestOpencodeFreeChatCompletionAndReasoning(t *testing.T) {
 			BaseURL: server.URL,
 		},
 	}
-	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
 	if err != nil {
-		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
 	}
 
 	ctx := schemas.NewBifrostContext(nil, time.Time{})
@@ -349,7 +349,7 @@ func TestOpencodeFreeChatCompletionAndReasoning(t *testing.T) {
 	}
 }
 
-func TestOpencodeFreeChatCompletionStreaming(t *testing.T) {
+func TestOpencodeZenFreeChatCompletionStreaming(t *testing.T) {
 	var (
 		mu         sync.Mutex
 		calledPath string
@@ -375,9 +375,9 @@ func TestOpencodeFreeChatCompletionStreaming(t *testing.T) {
 			BaseURL: server.URL,
 		},
 	}
-	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
 	if err != nil {
-		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
 	}
 
 	ctx := schemas.NewBifrostContext(nil, time.Time{})
@@ -431,7 +431,7 @@ func TestOpencodeFreeChatCompletionStreaming(t *testing.T) {
 	}
 }
 
-func TestOpencodeFreeListModels(t *testing.T) {
+func TestOpencodeZenFreeListModels(t *testing.T) {
 	var (
 		mu         sync.Mutex
 		calledPath string
@@ -459,15 +459,15 @@ func TestOpencodeFreeListModels(t *testing.T) {
 			BaseURL: server.URL,
 		},
 	}
-	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
 	if err != nil {
-		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
 	}
 
 	ctx := schemas.NewBifrostContext(nil, time.Time{})
 	keys := []schemas.Key{
 		{
-			ID:     "opencode-free-default",
+			ID:     "opencode-zen-free-default",
 			Name:   "default",
 			Weight: 1.0,
 			Models: schemas.WhiteList{"*"},
@@ -477,7 +477,7 @@ func TestOpencodeFreeListModels(t *testing.T) {
 	if bErr != nil {
 		t.Fatalf("ListModels failed: %v", bErr.Error)
 	}
-	if resp == nil || len(resp.Data) != 1 || resp.Data[0].ID != "opencode-free/muse-spark-1.3-contributor-free" {
+	if resp == nil || len(resp.Data) != 1 || resp.Data[0].ID != "opencode-zen-free/muse-spark-1.3-contributor-free" {
 		t.Fatalf("unexpected ListModels response: %+v", resp)
 	}
 
@@ -510,7 +510,7 @@ func TestOpencodeFreeListModels(t *testing.T) {
 	}
 }
 
-func TestOpencodeFreeListModelsKeyless(t *testing.T) {
+func TestOpencodeZenFreeListModelsKeyless(t *testing.T) {
 	var (
 		mu         sync.Mutex
 		calledPath string
@@ -531,9 +531,9 @@ func TestOpencodeFreeListModelsKeyless(t *testing.T) {
 			BaseURL: server.URL,
 		},
 	}
-	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
 	if err != nil {
-		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
 	}
 
 	ctx := schemas.NewBifrostContext(nil, time.Time{})
@@ -543,10 +543,10 @@ func TestOpencodeFreeListModelsKeyless(t *testing.T) {
 	if bErr != nil {
 		t.Fatalf("ListModels (keyless) failed: %v", bErr.Error)
 	}
-	if resp == nil || len(resp.Data) != 1 || resp.Data[0].ID != "opencode-free/muse-spark-1.3-contributor-free" {
+	if resp == nil || len(resp.Data) != 1 || resp.Data[0].ID != "opencode-zen-free/muse-spark-1.3-contributor-free" {
 		t.Fatalf("unexpected keyless ListModels response: %+v", resp)
 	}
-	if len(resp.KeyStatuses) != 1 || resp.KeyStatuses[0].KeyID != "" || resp.KeyStatuses[0].Provider != schemas.OpencodeFree {
+	if len(resp.KeyStatuses) != 1 || resp.KeyStatuses[0].KeyID != "" || resp.KeyStatuses[0].Provider != schemas.OpencodeZenFree {
 		t.Fatalf("expected one provider-level KeyStatus with empty KeyID, got %+v", resp.KeyStatuses)
 	}
 
@@ -557,7 +557,7 @@ func TestOpencodeFreeListModelsKeyless(t *testing.T) {
 	}
 }
 
-func TestOpencodeFreeClientValuesWinOverDefaults(t *testing.T) {
+func TestOpencodeZenFreeClientValuesWinOverDefaults(t *testing.T) {
 	var body map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -573,9 +573,9 @@ func TestOpencodeFreeClientValuesWinOverDefaults(t *testing.T) {
 			BaseURL: server.URL,
 		},
 	}
-	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
 	if err != nil {
-		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
 	}
 
 	customName := "my_tool"
@@ -651,7 +651,7 @@ func TestOpencodeFreeClientValuesWinOverDefaults(t *testing.T) {
 	}
 }
 
-func TestOpencodeFreePartialToolsMerge(t *testing.T) {
+func TestOpencodeZenFreePartialToolsMerge(t *testing.T) {
 	var body map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -667,9 +667,9 @@ func TestOpencodeFreePartialToolsMerge(t *testing.T) {
 			BaseURL: server.URL,
 		},
 	}
-	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
 	if err != nil {
-		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
 	}
 
 	// Client sends a REAL "read" tool plus an unrelated custom tool: only the
@@ -737,7 +737,7 @@ func TestOpencodeFreePartialToolsMerge(t *testing.T) {
 	}
 }
 
-func TestOpencodeFreeSystemPromptExtractedToInstructions(t *testing.T) {
+func TestOpencodeZenFreeSystemPromptExtractedToInstructions(t *testing.T) {
 	var body map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -753,9 +753,9 @@ func TestOpencodeFreeSystemPromptExtractedToInstructions(t *testing.T) {
 			BaseURL: server.URL,
 		},
 	}
-	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
 	if err != nil {
-		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
 	}
 
 	ctx := schemas.NewBifrostContext(nil, time.Time{})
@@ -798,7 +798,7 @@ func TestOpencodeFreeSystemPromptExtractedToInstructions(t *testing.T) {
 	}
 }
 
-func TestOpencodeFreeExplicitInstructionsUntouched(t *testing.T) {
+func TestOpencodeZenFreeExplicitInstructionsUntouched(t *testing.T) {
 	var body map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -814,9 +814,9 @@ func TestOpencodeFreeExplicitInstructionsUntouched(t *testing.T) {
 			BaseURL: server.URL,
 		},
 	}
-	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
 	if err != nil {
-		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
 	}
 
 	ctx := schemas.NewBifrostContext(nil, time.Time{})
@@ -854,7 +854,7 @@ func TestOpencodeFreeExplicitInstructionsUntouched(t *testing.T) {
 	}
 }
 
-func TestOpencodeFreeReasoningItemWithoutSummary(t *testing.T) {
+func TestOpencodeZenFreeReasoningItemWithoutSummary(t *testing.T) {
 	var body map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -870,9 +870,9 @@ func TestOpencodeFreeReasoningItemWithoutSummary(t *testing.T) {
 			BaseURL: server.URL,
 		},
 	}
-	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
 	if err != nil {
-		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
 	}
 
 	// Shape of opencode-req-bug.json: a reasoning item carrying only
@@ -936,7 +936,7 @@ func TestOpencodeFreeReasoningItemWithoutSummary(t *testing.T) {
 	}
 }
 
-func TestOpencodeFreeMintedReasoningIDStripped(t *testing.T) {
+func TestOpencodeZenFreeMintedReasoningIDStripped(t *testing.T) {
 	var body map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -952,9 +952,9 @@ func TestOpencodeFreeMintedReasoningIDStripped(t *testing.T) {
 			BaseURL: server.URL,
 		},
 	}
-	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
 	if err != nil {
-		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
 	}
 
 	// Bifrost-minted id (rs_<50hex>, as produced by chat→responses conversion)
@@ -1009,7 +1009,7 @@ func TestOpencodeFreeMintedReasoningIDStripped(t *testing.T) {
 	}
 }
 
-func TestOpencodeFreeGenuineReasoningStateRestored(t *testing.T) {
+func TestOpencodeZenFreeGenuineReasoningStateRestored(t *testing.T) {
 	var body map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1025,9 +1025,9 @@ func TestOpencodeFreeGenuineReasoningStateRestored(t *testing.T) {
 			BaseURL: server.URL,
 		},
 	}
-	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
 	if err != nil {
-		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
 	}
 
 	// Genuine server-issued replay state (compound id + encrypted_content, as
@@ -1079,7 +1079,7 @@ func TestOpencodeFreeGenuineReasoningStateRestored(t *testing.T) {
 	}
 }
 
-func TestOpencodeFreeIncludeReasoningEncryptedDefault(t *testing.T) {
+func TestOpencodeZenFreeIncludeReasoningEncryptedDefault(t *testing.T) {
 	var body map[string]any
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -1095,9 +1095,9 @@ func TestOpencodeFreeIncludeReasoningEncryptedDefault(t *testing.T) {
 			BaseURL: server.URL,
 		},
 	}
-	provider, err := NewOpencodeFreeProvider(cfg, nil)
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
 	if err != nil {
-		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
 	}
 
 	ctx := schemas.NewBifrostContext(nil, time.Time{})
@@ -1138,12 +1138,12 @@ func TestOpencodeFreeIncludeReasoningEncryptedDefault(t *testing.T) {
 	}
 }
 
-func TestOpencodeFreeErrorParsing(t *testing.T) {
+func TestOpencodeZenFreeErrorParsing(t *testing.T) {
 	resp := &fasthttp.Response{}
 	resp.SetStatusCode(fasthttp.StatusBadRequest)
 	resp.SetBodyString(`{"type": "error", "error": {"type": "invalid_request", "message": "unknown free model"}}`)
 
-	bErr := parseOpencodeFreeError(resp)
+	bErr := parseOpencodeZenFreeError(resp)
 	if bErr == nil {
 		t.Fatal("expected non-nil BifrostError")
 	}
@@ -1155,11 +1155,11 @@ func TestOpencodeFreeErrorParsing(t *testing.T) {
 	}
 }
 
-func TestOpencodeFreeUnsupportedOperations(t *testing.T) {
+func TestOpencodeZenFreeUnsupportedOperations(t *testing.T) {
 	cfg := &schemas.ProviderConfig{}
-	p, err := NewOpencodeFreeProvider(cfg, nil)
+	p, err := NewOpencodeZenFreeProvider(cfg, nil)
 	if err != nil {
-		t.Fatalf("NewOpencodeFreeProvider failed: %v", err)
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
 	}
 
 	ctx := schemas.NewBifrostContext(nil, time.Time{})

@@ -1,4 +1,4 @@
-package opencodefree
+package opencodezenfree
 
 import (
 	"crypto/sha1"
@@ -257,7 +257,7 @@ func applyContextHeaderOverrides(ctx *schemas.BifrostContext, headers map[string
 	}
 }
 
-// BuildHeaders constructs the complete set of headers for opencode-free,
+// BuildHeaders constructs the complete set of headers for opencode-zen-free,
 // matching the working capture: authorization, x-opencode-client, user-agent,
 // b3, traceparent, x-opencode-project, x-opencode-session, x-session-affinity,
 // x-session-id. Anything not in that set is user-provided, never hardcoded.
