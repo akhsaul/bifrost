@@ -501,7 +501,7 @@
         "opencode-zen": {
           "$ref": "#/$defs/provider"
         },
-        "opencode-free": {
+        "opencode-zen-free": {
           "$ref": "#/$defs/provider"
         },
         "openrouter": {
@@ -2505,7 +2505,7 @@
           },
           "name": {
             "type": "string",
-            "description": "Name of the plugin (built-in: telemetry, prompts, logging, governance, maxim, semantic_cache, otel, bifrost-adaptive-routing, or custom plugin name)"
+            "description": "Name of the plugin (built-in: telemetry, prompts, logging, governance, extra-detection, maxim, semantic_cache, otel, bifrost-adaptive-routing, or custom plugin name)"
           },
           "config": {
             "type": "object",
@@ -3516,6 +3516,206 @@
                     }
                   },
                   "required": ["project_id", "topic_id"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "name": {
+                  "const": "extra-detection"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "config": {
+                  "type": "object",
+                  "description": "Configuration for the extra-detection plugin (pattern and token detection into headers, before routing)",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "description": "Whether extra detection runs. When false, no headers are stamped.",
+                      "default": true
+                    },
+                    "estimate_tokens": {
+                      "type": "boolean",
+                      "description": "Gate API-based token counting. When true, the request's (provider, model) is matched against token_counting.rules and, on a match, counted against the rule's endpoint; the result is written to the token header. A request that matches no rule, or whose count call fails, gets no estimate header and proceeds to routing unchanged - it is never failed or blocked.",
+                      "default": true
+                    },
+                    "token_header": {
+                      "type": "string",
+                      "description": "Header key carrying the token estimate. Defaults to \"estimated_tokens\".",
+                      "default": "estimated_tokens"
+                    },
+                    "token_counting": {
+                      "type": "object",
+                      "description": "API-based token counting. Only (provider, model) pairs matched by a rule are counted, and the rule decides which model name is sent upstream via count_model. Omit this block to disable counting entirely.",
+                      "properties": {
+                        "timeout_ms": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "default": 2000,
+                          "description": "Bounds a single counting call. The call blocks the request before routing, so keep this short."
+                        },
+                        "padding_ratio": {
+                          "type": "number",
+                          "minimum": 0,
+                          "default": 0,
+                          "description": "Pads the count upstream returns: estimate = count * (1 + padding_ratio). Zero is honest because these endpoints count exactly; raise it to stay conservative about billing when count_model is a proxy model for the request's real one."
+                        },
+                        "api_keys": {
+                          "type": "object",
+                          "description": "One credential per endpoint id. A literal, or an \"env.NAME\"/\"vault.path\" reference resolved to plaintext at load time.",
+                          "properties": {
+                            "openai": {
+                              "type": "string",
+                              "description": "OpenAI API key used for the input_tokens counting call"
+                            },
+                            "gemini": {
+                              "type": "string",
+                              "description": "Google API key used for the countTokens counting call"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "base_urls": {
+                          "type": "object",
+                          "description": "Optional per-endpoint base URL override, for proxies and Azure-compatible gateways. Omit to use the endpoint's default.",
+                          "properties": {
+                            "openai": { "type": "string" },
+                            "gemini": { "type": "string" }
+                          },
+                          "additionalProperties": false
+                        },
+                        "rules": {
+                          "type": "array",
+                          "description": "Counting rules evaluated in array order; the first enabled rule whose provider and model pattern match wins. A rule naming an unknown endpoint is dropped at load with a warning - it costs a token estimate, never a request.",
+                          "items": {
+                            "type": "object",
+                            "required": ["id", "name", "enabled", "provider", "model_pattern", "endpoint", "count_model"],
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "description": "Unique identifier for the counting rule"
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "Name of the counting rule"
+                              },
+                              "description": {
+                                "type": "string",
+                                "description": "Description of what this rule counts"
+                              },
+                              "enabled": {
+                                "type": "boolean",
+                                "description": "Whether this rule is evaluated"
+                              },
+                              "provider": {
+                                "type": "string",
+                                "default": "*",
+                                "description": "Provider this rule applies to, or \"*\" for any. Matched against the request's resolved provider, falling back to the prefix on the model string when the request carries no provider."
+                              },
+                              "model_pattern": {
+                                "type": "string",
+                                "description": "Pattern tested against the provider-prefix-stripped model."
+                              },
+                              "model_pattern_type": {
+                                "type": "string",
+                                "enum": ["glob", "regex", "exact"],
+                                "default": "glob",
+                                "description": "How model_pattern is interpreted. glob: \"*\" matches any run of characters, \"?\" one character. regex: Go RE2. exact: case-insensitive equality."
+                              },
+                              "endpoint": {
+                                "type": "string",
+                                "enum": ["openai", "gemini"],
+                                "description": "Counting API to call. \"openai\" is POST {base}/v1/responses/input_tokens; \"gemini\" is POST {base}/v1beta/models/{count_model}:countTokens."
+                              },
+                              "count_model": {
+                                "type": "string",
+                                "description": "Model name sent to the counting endpoint, verbatim. Set this per model: aggregators rename and suffix models (\"gemini-3.8-flash-free\", \"gpt-5-preview\"), and only you know which upstream model tokenizes acceptably for a given request shape."
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "rules": {
+                      "type": "array",
+                      "description": "Detection rules evaluated in order; later matches overwrite earlier ones for the same header.",
+                      "items": {
+                        "type": "object",
+                        "required": ["id", "name", "enabled", "header", "value", "match"],
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "Unique identifier for the rule"
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "Name of the detection rule"
+                          },
+                          "description": {
+                            "type": "string",
+                            "description": "Description of what the rule detects"
+                          },
+                          "enabled": {
+                            "type": "boolean",
+                            "description": "Whether this rule is evaluated"
+                          },
+                          "header": {
+                            "type": "string",
+                            "description": "Header key written on match (lowercased, e.g. \"complexity_tier\")"
+                          },
+                          "value": {
+                            "type": "string",
+                            "description": "Header value written on match (e.g. \"simple\")",
+                            "maxLength": 64
+                          },
+                          "max_messages_to_scan": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 20,
+                            "default": 1,
+                            "description": "User-message window: 1 = last user message only; N > 1 = last message plus up to N-1 previous user messages. Assistant, tool and system messages are skipped, never counted."
+                          },
+                          "match": {
+                            "type": "object",
+                            "description": "Match predicate. All configured operators must pass.",
+                            "properties": {
+                              "scope": {
+                                "type": "string",
+                                "enum": ["last_user_messages", "full_input"],
+                                "default": "last_user_messages",
+                                "description": "Text scanned: last N user messages, or the full input (system prompts plus every user message)."
+                              },
+                              "all_of": {
+                                "type": "array",
+                                "items": { "type": "string" },
+                                "description": "Every keyword must appear (case-insensitive substring)"
+                              },
+                              "any_of": {
+                                "type": "array",
+                                "items": { "type": "string" },
+                                "description": "At least one keyword must appear (case-insensitive substring)"
+                              },
+                              "starts_with": {
+                                "type": "array",
+                                "items": { "type": "string" },
+                                "description": "Text must start with one of the prefixes (case-insensitive)"
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    }
+                  },
                   "additionalProperties": false
                 }
               }
@@ -9000,7 +9200,7 @@
 			"antigravity",
             "opencode-go",
             "opencode-zen",
-            "opencode-free",
+            "opencode-zen-free",
             "sgl",
             "parasail",
             "perplexity",

@@ -1,0 +1,212 @@
+# Extra Detection
+
+The `extra-detection` plugin adds request detection **before routing runs**. It stamps header key/value pairs that routing CEL rules can target — without touching the complexity router and without triggering its embedding classifier.
+
+## What it does
+
+1. **Token counting** — asks a counting endpoint for the exact input token count and writes it to `headers["estimated_tokens"]`. Counting is **opt-in per model**: only a `(provider, model)` pair matched by one of your counting rules is counted.
+2. **Pattern rules** — each user-configured rule scans a window of recent **user-role messages** and, on match, writes a configured header (e.g. `headers["complexity_tier"] = "simple"`).
+
+Because header-based CEL rules (`headers["complexity_tier"] == "simple"`) never reference the bare `complexity_tier` identifier, the routing engine never runs the complexity-router embedding classifier for them: zero embedding cost, zero latency.
+
+## Token counting
+
+### Counting is never allowed to fail a request
+
+A counting rule can only ever **add** a header. Every other outcome simply withholds it and the request continues to routing and its provider exactly as it would have without this plugin:
+
+| Situation | Result |
+|---|---|
+| Request matches no rule | No `estimated_tokens` header |
+| Rule names an endpoint that doesn't exist | Rule is dropped at load with a warning |
+| No API key configured for the endpoint | No header, warning in the request's plugin logs |
+| Counting call times out | No header, warning in the request's plugin logs |
+| Endpoint returns a non-2xx status | No header, warning in the request's plugin logs |
+| Response is unparseable or has no count | No header, warning in the request's plugin logs |
+
+The per-request outcomes are logged to the request's **Plugin logs** (the "Plugin logs" tab in the LLM log details view). A request that matched no rule is logged at `debug` — raise the log level to see it. The load-time "dropped a rule" warning goes to the server log, since a dropped rule produces no per-request event to attach a message to.
+
+### Endpoints
+
+Two counting APIs are supported. They are hardcoded, not user-extensible — adding a third is a code change.
+
+| id | Request | Auth | Count field |
+|---|---|---|---|
+| `openai` | `POST {base}/v1/responses/input_tokens` | `Authorization: Bearer` | `input_tokens` |
+| `gemini` | `POST {base}/v1beta/models/{count_model}:countTokens` | `x-goog-api-key` | `totalTokens` |
+
+Default base URLs are `https://api.openai.com` and `https://generativelanguage.googleapis.com/v1beta`. Override either per endpoint with `base_urls` when you need a proxy or an Azure-compatible gateway.
+
+<Note>
+	Anthropic's `POST /v1/messages/count_tokens` is **not** implemented yet. It is deliberately deferred: it is the one major whose request body is Messages-shaped rather than Responses-shaped, so it needs its own builder instead of sharing the conversion the other two use. Its count would be exact, so nothing is lost by waiting — point those rules at `openai` or `gemini` meanwhile.
+</Note>
+
+### Rules and the `count_model` mapping
+
+Each rule pairs a match on the request's `(provider, model)` with the endpoint to call and the **model name to send it**. That last field is the whole mapping: it is yours to set, per model, because only you know which upstream model tokenizes acceptably for a given request shape. Aggregators rename and suffix models — `gemini-3.8-flash-free`, `gpt-5-preview`, `gemini_3.8` — so there is no sensible default.
+
+| Field | Meaning |
+|---|---|
+| `provider` | Provider this rule applies to, or `*` for any |
+| `model_pattern` | Pattern tested against the provider-prefix-stripped model |
+| `model_pattern_type` | `glob` (default), `regex`, or `exact` |
+| `endpoint` | `openai` or `gemini` |
+| `count_model` | Model name sent to the counting endpoint, **verbatim** |
+
+Rules are evaluated in array order and **the first enabled match wins**, so list order is priority.
+
+`provider` is matched against the request's resolved provider. When the request carries no provider — common for a request whose model string has the prefix, since routing has not run yet — the prefix is taken off the model string instead, so `"openrouter/gemini-3.8-flash"` still matches a `provider: "openrouter"` rule. Only a prefix naming a known Bifrost provider is split off, so a model namespace that merely contains a slash (`meta-llama/Llama-3.1-8B`) stays matchable as itself.
+
+In `glob` mode, `*` matches any run of characters including none, and `?` matches a single character. It is not path matching, so `*` crosses `/`: `"gemini-*"` matches `gemini-3.8-flash` and `"*"` matches `cline/cline-free/gemini-3.8-flash`.
+
+### Worked example
+
+A request for `cline/cline-free/gemini-3.8-flash` with only this rule configured:
+
+```json
+{
+  "id": 1,
+  "name": "openrouter all",
+  "enabled": true,
+  "provider": "openrouter",
+  "model_pattern": "*",
+  "endpoint": "openai",
+  "count_model": "gpt-5"
+}
+```
+
+The request's provider is `cline`, which matches no rule, so **it is not counted** and no estimate header is written. Add a rule with `provider: "openrouter"` and `model_pattern: "*"` and every `openrouter/...` request is counted through OpenAI instead.
+
+Splitting by model family — OpenAI-family models counted by OpenAI, Gemini-family by Google — is the same mechanism, one rule per family:
+
+```json
+{
+  "token_counting": {
+    "timeout_ms": 2000,
+    "padding_ratio": 0,
+    "api_keys": {
+      "openai": { "value": "env.OPENAI_API_KEY" },
+      "gemini": { "value": "env.GEMINI_API_KEY" }
+    },
+    "rules": [
+      {
+        "id": 1,
+        "name": "gemini family → Gemini",
+        "enabled": true,
+        "provider": "*",
+        "model_pattern": "gemini-*",
+        "model_pattern_type": "glob",
+        "endpoint": "gemini",
+        "count_model": "gemini-3-flash"
+      },
+      {
+        "id": 2,
+        "name": "gpt family → OpenAI",
+        "enabled": true,
+        "provider": "*",
+        "model_pattern": "gpt-*",
+        "model_pattern_type": "glob",
+        "endpoint": "openai",
+        "count_model": "gpt-5"
+      }
+    ]
+  }
+}
+```
+
+`api_keys` values accept a literal, an `env.NAME` reference, or a `vault.path` reference.
+
+### Tuning
+
+- `timeout_ms` (default 2000) bounds one counting call. The call blocks the request before routing, so keep it short.
+- `padding_ratio` (default 0) pads the count: `estimate = count * (1 + padding_ratio)`. Zero is honest, because these endpoints count exactly. Raise it when `count_model` is a proxy for the request's real model and you want to stay conservative about billing.
+
+## Pattern rules
+
+All configured match operators must pass (`all_of` AND `any_of` AND `starts_with`), case-insensitive:
+
+| Operator | Meaning |
+|---|---|
+| `all_of` | Every keyword appears (e.g. `git` + `commit`) |
+| `any_of` | At least one keyword appears |
+| `starts_with` | Text starts with any prefix (e.g. `question`) |
+
+Scan scope and window:
+
+- `scope: "last_user_messages"` (default) — scans the last `max_messages_to_scan` **user-role** messages, most recent first. Assistant replies, tool calls, tool results and system prompts are skipped and never counted.
+- `max_messages_to_scan: 1` (default) — last user message only. `2+` also checks previous user messages; a rule matches if **any one** of the window satisfies the match block.
+- `scope: "full_input"` — scans system prompts plus every user message in the conversation (ignores the window).
+
+Rules evaluate in array order; later matches overwrite earlier ones for the same header (last-write-wins), so list order in the UI is meaningful.
+
+## Full configuration
+
+```json
+{
+  "name": "extra-detection",
+  "enabled": true,
+  "config": {
+    "enabled": true,
+    "estimate_tokens": true,
+    "token_header": "estimated_tokens",
+    "token_counting": {
+      "timeout_ms": 2000,
+      "padding_ratio": 0,
+      "api_keys": {
+        "openai": { "value": "env.OPENAI_API_KEY" }
+      },
+      "rules": [
+        {
+          "id": 1,
+          "name": "openrouter gpt-5 → OpenAI",
+          "enabled": true,
+          "provider": "openrouter",
+          "model_pattern": "gpt-5*",
+          "model_pattern_type": "glob",
+          "endpoint": "openai",
+          "count_model": "gpt-5"
+        }
+      ]
+    },
+    "rules": [
+      {
+        "id": 1,
+        "name": "git commit → simple",
+        "description": "Commit-style requests skip embedding",
+        "enabled": true,
+        "header": "complexity_tier",
+        "value": "simple",
+        "max_messages_to_scan": 1,
+        "match": { "scope": "last_user_messages", "all_of": ["git", "commit"] }
+      },
+      {
+        "id": 2,
+        "name": "question → simple",
+        "enabled": true,
+        "header": "complexity_tier",
+        "value": "simple",
+        "max_messages_to_scan": 1,
+        "match": { "scope": "last_user_messages", "starts_with": ["question"] }
+      }
+    ]
+  }
+}
+```
+
+Enable the plugin with an `extra-detection` entry in `plugins` (config.json or DB). The UI page **Models → Extra Detection** edits the same config.
+
+## Routing rules
+
+Target the stamped headers from routing rules:
+
+```cel
+headers["complexity_tier"] == "simple"
+int(headers["estimated_tokens"]) > 4000
+headers["complexity_tier"] == "simple" && int(headers["estimated_tokens"]) < 1000
+```
+
+## Execution order
+
+The plugin registers as a builtin at order 4 (right after governance, before adaptive routing and routing), so its headers are present when routing CEL rules evaluate.
+
+The counting call is a direct outbound HTTP request to the configured endpoint, not a Bifrost inference request: it does not re-enter the plugin pipeline, so it cannot recurse, and it produces no governance or billing side effects.

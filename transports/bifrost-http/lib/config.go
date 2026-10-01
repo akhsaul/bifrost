@@ -43,6 +43,7 @@ import (
 	"github.com/maximhq/bifrost/framework/vectorstore"
 	"github.com/maximhq/bifrost/plugins/adaptiverouting"
 	"github.com/maximhq/bifrost/plugins/compat"
+	"github.com/maximhq/bifrost/plugins/extradetection"
 	"github.com/maximhq/bifrost/plugins/governance"
 	"github.com/maximhq/bifrost/plugins/guardrails"
 	"github.com/maximhq/bifrost/plugins/logging"
@@ -185,6 +186,7 @@ var builtinPluginNames = []string{
 	prompts.PluginName,
 	logging.PluginName,
 	governance.PluginName,
+	extradetection.PluginName,
 	otel.PluginName,
 	semanticcache.PluginName,
 	compat.PluginName,

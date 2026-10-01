@@ -19,6 +19,7 @@ require (
 	github.com/maximhq/bifrost/framework v1.7.4
 	github.com/maximhq/bifrost/plugins/adaptiverouting v0.0.0-00010101000000-000000000000
 	github.com/maximhq/bifrost/plugins/compat v0.3.3
+	github.com/maximhq/bifrost/plugins/extradetection v0.0.0-00010101000000-000000000000
 	github.com/maximhq/bifrost/plugins/governance v1.8.3
 	github.com/maximhq/bifrost/plugins/guardrails v0.0.0-00010101000000-000000000000
 	github.com/maximhq/bifrost/plugins/logging v1.8.3
@@ -282,6 +283,7 @@ replace (
 	github.com/maximhq/bifrost/plugins/adaptiverouting => ../plugins/adaptiverouting
 	github.com/maximhq/bifrost/plugins/circuitbreaker => ../plugins/circuitbreaker
 	github.com/maximhq/bifrost/plugins/compat => ../plugins/compat
+	github.com/maximhq/bifrost/plugins/extradetection => ../plugins/extradetection
 	github.com/maximhq/bifrost/plugins/governance => ../plugins/governance
 	github.com/maximhq/bifrost/plugins/guardrails => ../plugins/guardrails
 	github.com/maximhq/bifrost/plugins/jsonparser => ../plugins/jsonparser

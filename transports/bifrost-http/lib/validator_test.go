@@ -1443,6 +1443,158 @@ func TestValidateConfigSchema_MaximPlugin_MissingApiKey(t *testing.T) {
 }
 
 // =============================================================================
+// Extra Detection Token Counting Config Tests
+// =============================================================================
+
+func TestValidateConfigSchema_ExtraDetection_TokenCountingValid(t *testing.T) {
+	// The full documented shape: two endpoints, credentials, and a rule per family.
+	validConfig := `{
+		"plugins": [
+			{
+				"enabled": true,
+				"name": "extra-detection",
+				"config": {
+					"enabled": true,
+					"estimate_tokens": true,
+					"token_header": "estimated_tokens",
+					"token_counting": {
+						"timeout_ms": 2000,
+						"padding_ratio": 0.1,
+						"api_keys": {
+							"openai": "env.OPENAI_API_KEY",
+							"gemini": "env.GEMINI_API_KEY"
+						},
+						"base_urls": {
+							"openai": "https://proxy.internal"
+						},
+						"rules": [
+							{
+								"id": 1,
+								"name": "openrouter gpt-5 -> OpenAI",
+								"enabled": true,
+								"provider": "openrouter",
+								"model_pattern": "gpt-5*",
+								"model_pattern_type": "glob",
+								"endpoint": "openai",
+								"count_model": "gpt-5"
+							},
+							{
+								"id": 2,
+								"name": "gemini family -> Gemini",
+								"enabled": true,
+								"provider": "*",
+								"model_pattern": "^gemini-[0-9.]+$",
+								"model_pattern_type": "regex",
+								"endpoint": "gemini",
+								"count_model": "gemini-3-flash"
+							}
+						]
+					}
+				}
+			}
+		]
+	}`
+
+	if err := ValidateConfigSchema([]byte(validConfig), loadLocalSchema(t)); err != nil {
+		t.Errorf("expected valid extra-detection token counting config to pass validation, got error: %v", err)
+	}
+}
+
+func TestValidateConfigSchema_ExtraDetection_UnknownEndpointRejected(t *testing.T) {
+	// The endpoint enum is closed: an unknown id must be caught at config
+	// validation, not silently accepted and dropped later.
+	invalidConfig := `{
+		"plugins": [
+			{
+				"enabled": true,
+				"name": "extra-detection",
+				"config": {
+					"token_counting": {
+						"rules": [
+							{
+								"id": 1,
+								"name": "anthropic",
+								"enabled": true,
+								"provider": "*",
+								"model_pattern": "*",
+								"endpoint": "anthropic",
+								"count_model": "claude-sonnet-4"
+							}
+						]
+					}
+				}
+			}
+		]
+	}`
+
+	if err := ValidateConfigSchema([]byte(invalidConfig), loadLocalSchema(t)); err == nil {
+		t.Error("expected counting rule with an unknown endpoint to fail validation")
+	}
+}
+
+func TestValidateConfigSchema_ExtraDetection_CountingRuleMissingCountModel(t *testing.T) {
+	// count_model is what the operator maps a request's model to upstream, so a
+	// rule without one cannot count anything.
+	invalidConfig := `{
+		"plugins": [
+			{
+				"enabled": true,
+				"name": "extra-detection",
+				"config": {
+					"token_counting": {
+						"rules": [
+							{
+								"id": 1,
+								"name": "no count model",
+								"enabled": true,
+								"provider": "openai",
+								"model_pattern": "*",
+								"endpoint": "openai"
+							}
+						]
+					}
+				}
+			}
+		]
+	}`
+
+	if err := ValidateConfigSchema([]byte(invalidConfig), loadLocalSchema(t)); err == nil {
+		t.Error("expected counting rule missing count_model to fail validation")
+	}
+}
+
+func TestValidateConfigSchema_ExtraDetection_UnknownPatternTypeRejected(t *testing.T) {
+	invalidConfig := `{
+		"plugins": [
+			{
+				"enabled": true,
+				"name": "extra-detection",
+				"config": {
+					"token_counting": {
+						"rules": [
+							{
+								"id": 1,
+								"name": "bad pattern type",
+								"enabled": true,
+								"provider": "openai",
+								"model_pattern": "*",
+								"model_pattern_type": "fuzzy",
+								"endpoint": "openai",
+								"count_model": "gpt-5"
+							}
+						]
+					}
+				}
+			}
+		]
+	}`
+
+	if err := ValidateConfigSchema([]byte(invalidConfig), loadLocalSchema(t)); err == nil {
+		t.Error("expected counting rule with an unknown model_pattern_type to fail validation")
+	}
+}
+
+// =============================================================================
 // Azure Key Config Required Fields Tests
 // Note: Azure provider uses a special key schema that extends base_key
 // The azure_key_config is only valid within the azure provider's keys array

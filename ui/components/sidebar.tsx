@@ -44,6 +44,7 @@ import {
 	Shuffle,
 	Siren,
 	SlidersHorizontal,
+	Tags,
 	Telescope,
 	ToolCase,
 	TrendingUp,
@@ -697,6 +698,13 @@ export default function AppSidebar() {
 						url: "/workspace/complexity-router",
 						icon: GitCompareArrows,
 						description: "Complexity tier routing",
+						hasAccess: hasRoutingRulesAccess,
+					},
+					{
+						title: "Extra Detection",
+						url: "/workspace/extra-detection",
+						icon: Tags,
+						description: "Pattern and token detection into headers",
 						hasAccess: hasRoutingRulesAccess,
 					},
 					{

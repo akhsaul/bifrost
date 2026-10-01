@@ -16,6 +16,7 @@ import { MCPAuthConfigPage } from "../../features/mcp-auth-config/pages/mcp-auth
 import { MCPSettingsPage } from "../../features/mcp-settings/pages/mcp-settings.page";
 import { MCPToolGroupsPage } from "../../features/mcp-tool-groups/pages/mcp-tool-groups.page";
 import { ModelLimitsPage } from "../../features/model-limits/pages/model-limits.page";
+import { ExtraDetectionPage } from "../../features/extra-detection/pages/extra-detection.page";
 
 /**
  * Custom test fixtures type
@@ -37,6 +38,7 @@ type BifrostFixtures = {
 	configSettingsPage: ConfigSettingsPage;
 	governancePage: GovernancePage;
 	modelLimitsPage: ModelLimitsPage;
+	extraDetectionPage: ExtraDetectionPage;
 	mcpSettingsPage: MCPSettingsPage;
 	mcpToolGroupsPage: MCPToolGroupsPage;
 	mcpAuthConfigPage: MCPAuthConfigPage;
@@ -166,6 +168,10 @@ export const test = base.extend<BifrostFixtures>({
 
 	modelLimitsPage: async ({ page }, use) => {
 		await use(new ModelLimitsPage(page));
+	},
+
+	extraDetectionPage: async ({ page }, use) => {
+		await use(new ExtraDetectionPage(page));
 	},
 
 	mcpSettingsPage: async ({ page }, use) => {

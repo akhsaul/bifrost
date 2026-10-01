@@ -9,6 +9,7 @@ import (
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/plugins/adaptiverouting"
 	"github.com/maximhq/bifrost/plugins/compat"
+	"github.com/maximhq/bifrost/plugins/extradetection"
 	"github.com/maximhq/bifrost/plugins/governance"
 	"github.com/maximhq/bifrost/plugins/guardrails"
 	"github.com/maximhq/bifrost/plugins/logging"
@@ -181,6 +182,13 @@ func loadBuiltinPlugin(ctx context.Context, name string, pluginConfig any, bifro
 		}
 		return guardrails.Init(guardrailsConfig, logger)
 
+	case extradetection.PluginName:
+		extraDetectionConfig, err := MarshalPluginConfig[extradetection.Config](pluginConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal extra-detection plugin config: %w", err)
+		}
+		return extradetection.Init(extraDetectionConfig, logger)
+
 	default:
 		return nil, fmt.Errorf("unknown built-in plugin: %s", name)
 	}
@@ -279,6 +287,22 @@ func (s *BifrostHTTPServer) loadBuiltinPlugins(ctx context.Context) error {
 		s.markPluginDisabled(governance.PluginName)
 	}
 	s.Config.SetPluginOrderInfo(governance.PluginName, builtinPlacement, schemas.Ptr(4))
+
+	// 4b. Extra detection. Its PreRequestHook stamps headers["estimated_tokens"]
+	// and any rule-matched headers into the request-headers map that routing CEL
+	// rules read. Sort order within the builtin group is order value, then
+	// stable registration order: order 4 ties with governance (registered
+	// earlier), so extra-detection runs right after governance and before
+	// adaptive routing (order 5) and routing (order 6), without renumbering
+	// them. Opt-in: only registered when an enabled "extra-detection" plugin
+	// entry exists in config.json / DB, mirroring the guardrails pattern.
+	extraDetectionConfig := s.getPluginConfig(extradetection.PluginName)
+	if extraDetectionConfig != nil && extraDetectionConfig.Enabled {
+		s.registerPluginWithStatus(ctx, extradetection.PluginName, nil, extraDetectionConfig.Config, false)
+	} else {
+		s.markPluginDisabled(extradetection.PluginName)
+	}
+	s.Config.SetPluginOrderInfo(extradetection.PluginName, builtinPlacement, schemas.Ptr(4))
 
 	// 5. Routing rules. Runs after governance so rules evaluate against a fully stamped
 	// context, and drives the rest of the routing pipeline itself: it publishes the virtual

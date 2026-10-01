@@ -23,6 +23,12 @@ test.describe('Placeholder and Enterprise Pages', () => {
     await expect(page).toHaveURL(/\/workspace\/guardrails(?:\?.*)?$/)
   })
 
+  test('should load extra-detection page', async ({ page }) => {
+    await page.goto('/workspace/extra-detection')
+    await page.waitForLoadState('networkidle')
+    await expect(page).toHaveURL(/\/workspace\/extra-detection(?:\?.*)?$/)
+  })
+
   test('should load audit-logs page', async ({ page }) => {
     await page.goto('/workspace/audit-logs')
     await page.waitForLoadState('networkidle')
