@@ -260,14 +260,29 @@ class MainWindow(QMainWindow):
         pricing_layout.addWidget(pricing_scroll, 1)
         self.tabs.addTab(pricing_page, "Pricing")
 
-        self.conflict_box = QGroupBox("Cross-file disagreements")
+        # A QGroupBox used directly as a tab page sizes to its hint and ends up
+        # vertically centred, leaving dead space above and below. Wrapping it in
+        # a plain page with a filling layout makes it occupy the whole tab.
+        conflicts_page = QWidget()
+        conflicts_layout = QVBoxLayout(conflicts_page)
+        conflicts_layout.setContentsMargins(6, 6, 6, 6)
+        self.conflict_hint = QLabel(
+            "The same capability facts are maintained in both files. Bifrost's "
+            "GetCapabilityEntry reads the pricing copy, so pricing is what drives "
+            "server behaviour; the parameters copy is what the UI builds forms from. "
+            "Neither is treated as authoritative here."
+        )
+        self.conflict_hint.setWordWrap(True)
+        self.conflict_hint.setStyleSheet("color:#475569;")
+        conflicts_layout.addWidget(self.conflict_hint)
+        self.conflict_box = QGroupBox("Disagreements")
         self.conflict_layout = QVBoxLayout(self.conflict_box)
         self.conflict_text = QPlainTextEdit()
         self.conflict_text.setReadOnly(True)
-        self.conflict_text.setMaximumHeight(120)
-        self.conflict_layout.addWidget(self.conflict_text)
-        self.conflict_box.hide()
-        self._conflicts_tab = self.tabs.addTab(self.conflict_box, "Conflicts")
+        self.conflict_text.setLineWrapMode(QPlainTextEdit.NoWrap)
+        self.conflict_layout.addWidget(self.conflict_text, 1)
+        conflicts_layout.addWidget(self.conflict_box, 1)
+        self._conflicts_tab = self.tabs.addTab(conflicts_page, "Conflicts")
 
         return self.tabs
 
@@ -333,21 +348,22 @@ class MainWindow(QMainWindow):
         self.btn_merge.setEnabled(True)
 
     def _conflict_summary(self) -> str:
-        lines = []
+        from ..format import explain
+
+        total = sum(len(v) for v in self.conflicts.values())
+        lines = [
+            f"{len(self.conflicts):,} models, {total:,} field value(s) disagree.",
+            "",
+        ]
         for model in sorted(self.conflicts):
+            lines.append(model)
             for name in self.conflicts[model]:
                 p = self.parameters.get(model, {}).get(name)
                 q = self.pricing.get(model, {}).get(name)
-                lines.append(f"{model}.{name}\n  parameters: {json.dumps(p)}\n  pricing:    {json.dumps(q)}")
-            if len(lines) >= 400:
-                lines.append("…")
-                break
-        header = (
-            "The same capability facts are maintained in both files. Bifrost's capability "
-            "lookup reads the pricing copy; the params copy is what the UI builds forms from. "
-            "Neither is treated as authoritative.\n\n"
-        )
-        return header + "\n".join(lines)
+                lines.append(f"    {name}")
+                lines.append(f"        parameters : {explain(name, p)}")
+                lines.append(f"        pricing    : {explain(name, q)}")
+        return "\n".join(lines)
 
     def _populate_facet_combos(self) -> None:
         for combo, items, all_label in (

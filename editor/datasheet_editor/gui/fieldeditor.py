@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..fields import KNOWN_MODES, classify, is_pricing_read, value_kind
+from ..format import number, scaled
 from ..merge import PARAMS_FIELD as PARAMS_ARRAY_FIELD
 
 _BADGE_COLORS = {
@@ -94,8 +95,11 @@ class FieldRow(QWidget):
             badge.setToolTip(_badge_tooltip(name, section))
             layout.addWidget(badge)
 
+        self.hint_label: QLabel | None = None
         self.editor = self._build_editor(name, value, kind, section)
         layout.addWidget(self.editor, 1)
+        if self.hint_label is not None:
+            layout.addWidget(self.hint_label)
 
         self.origin_label = QLabel(_origin_text(origin))
         fg, bg = ORIGIN_COLORS.get(origin, ORIGIN_COLORS["original"])
@@ -127,6 +131,22 @@ class FieldRow(QWidget):
         if kind in {"int", "float"}:
             edit = QLineEdit(_format_number(value))
             edit.setMaximumWidth(200)
+            quoted = scaled(value, name)
+            if quoted:
+                # The edit holds the exact value that gets written to the file;
+                # the hint carries the reading a human can actually compare.
+                # `0.000003` is exact but hard to reason about, whereas
+                # "$3.00 per 1M tokens" is what you compare across models.
+                self.hint_label = QLabel(f"~ {quoted}")
+                self.hint_label.setStyleSheet("color:#64748b;font-size:11px;")
+                self.hint_label.setToolTip(
+                    "Scaled for readability. The exact value is what gets saved."
+                )
+                edit.textChanged.connect(
+                    lambda text, lbl=self.hint_label, field=name: lbl.setText(
+                        "~ " + (_rescale(text, field) or "not a number")
+                    )
+                )
             validator = _NumberValidator(kind, self)
             edit.setValidator(validator)
             edit.editingFinished.connect(lambda: self._commit_number(edit.text(), kind))
@@ -244,12 +264,22 @@ def _origin_text(origin: str) -> str:
     return {"added": "added", "overridden": "overridden"}.get(origin, "original")
 
 
+def _rescale(text: str, field: str) -> str | None:
+    """Re-quote a half-typed value so the hint tracks live edits."""
+    try:
+        return scaled(float(text), field)
+    except ValueError:
+        return None
+
+
 def _format_number(value: Any) -> str:
-    if isinstance(value, bool):
-        return str(value)
-    if isinstance(value, float):
-        return repr(value)
-    return str(value)
+    """Exact, exponent-free text for the edit box.
+
+    The editor must round-trip the literal value in the file, so ``3e-06`` is
+    written out as ``0.000003`` rather than prettified into something that would
+    re-serialise differently.
+    """
+    return number(value)
 
 
 def _parse_number(text: str, kind: str) -> int | float | None:

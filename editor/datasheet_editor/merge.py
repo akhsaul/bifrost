@@ -65,12 +65,22 @@ class Change:
     before: Any = None
     after: Any = None
 
+    @property
+    def field_name(self) -> str:
+        """The trailing field of :attr:`path`, used for value formatting."""
+        return self.path.rsplit(".", 1)[-1]
+
     def describe(self) -> str:
+        from .format import explain
+
         if self.kind == "model_added":
             return f"{self.model}: new model ({len(self.after)} fields)"
         if self.kind == "added":
-            return f"{self.model}.{self.path} = {self.after!r} (added)"
-        return f"{self.model}.{self.path}: {self.before!r} -> {self.after!r}"
+            return f"{self.model}.{self.path} = {explain(self.field_name, self.after)} (added)"
+        return (
+            f"{self.model}.{self.path}: "
+            f"{explain(self.field_name, self.before)} -> {explain(self.field_name, self.after)}"
+        )
 
 
 @dataclass

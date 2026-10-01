@@ -323,20 +323,20 @@ class ChangeListModel(QAbstractTableModel):
         if col == 3:
             if change.kind == "model_added":
                 return f"new model ({len(change.after)} fields)"
+            field = change.field_name
             if change.kind == "added":
-                return f"= {_compact(change.after)}"
-            return f"{_compact(change.before)} → {_compact(change.after)}"
+                return f"= {_compact(change.after, field=field)}"
+            return (
+                f"{_compact(change.before, field=field)} → "
+                f"{_compact(change.after, field=field)}"
+            )
         return None
 
 
-def _compact(value: Any, limit: int = 60) -> str:
-    import json
+def _compact(value: Any, limit: int = 60, field: str = "") -> str:
+    from ..format import format_value
 
-    try:
-        text = json.dumps(value, separators=(",", ":"))
-    except (TypeError, ValueError):
-        text = str(value)
-    return text if len(text) <= limit else text[: limit - 1] + "…"
+    return format_value(value, field, limit=limit)
 
 
 def build_rows(

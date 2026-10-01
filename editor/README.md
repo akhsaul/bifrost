@@ -82,6 +82,29 @@ The sections are explicit because the same field name can legitimately belong to
 either file. Putting a cost field under `parameters` is a hard error rather than
 a silently ignored edit.
 
+## Reading prices
+
+Every float cost in these datasheets is stored **per token**, so the raw JSON is
+scientific notation: `3e-06` means three millionths of a cent. 1,009 of the 1,255
+distinct float cost values render that way, so every display path expands them:
+
+```
+cache_read_input_token_cost   0.00000003   ~ $0.3000 per 1M tokens
+input_cost_per_token          0.000003     ~ $3.00 per 1M tokens
+output_cost_per_token         0.000015     ~ $15.00 per 1M tokens
+```
+
+The exact decimal is what gets saved; the `~ $X per 1M tokens` reading is display
+only. Editing, merging, and writing are byte-identical to before — `2.5e-06`
+still goes into the file as `2.5e-06`.
+
+The per-1M reading appears only for fields genuinely priced per token, matched by
+name (`input_cost_per_token`, `cache_read_input_token_cost_above_32k_tokens`,
+`output_cost_per_reasoning_token`, …). Per-image, per-second, per-page, and
+multiplier fields are left unscaled, since multiplying those by a million would
+be nonsense. Integer costs are also left alone: the pricing file uses `0` for
+"free" and `-1` as an "unknown" sentinel.
+
 ## Merge rules
 
 Add/override only — **nothing is ever deleted by omission**.
@@ -183,7 +206,7 @@ With no arguments it picks up the datasheets in the working directory.
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/ -q
 ```
 
-47 tests. The GUI tests are skipped without PySide6. They cover the merge rules
+89 tests. The GUI tests are skipped without PySide6. They cover the merge rules
 against both hand-built cases and slices of the real 20MB file, and pin two Qt
 interop traps that make a window render nothing while looking healthy:
 
@@ -203,6 +226,7 @@ itself and reported no change at all.
 editor/
 ├── datasheet_editor/
 │   ├── fields.py        # read-set + cost/capability classification
+├── format.py        # exponent-free numbers + per-1M price readings
 │   ├── pricing_fields.json   # GENERATED from types.go — do not edit
 │   ├── dataset.py       # load/save, key order, atomic writes
 │   ├── merge.py         # the merge engine (pure, no Qt, no IO)
