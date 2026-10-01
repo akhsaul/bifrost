@@ -183,36 +183,54 @@ class ModelFilterProxy(QSortFilterProxyModel):
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._needle = ""
+        self._provider_needle = ""
         self._providers: set[str] = set()
         self._modes: set[str] = set()
         self.setDynamicSortFilter(True)
 
     def set_search(self, text: str) -> None:
-        self.set_filters(text, self._providers, self._modes)
+        self.set_filters(text, self._provider_needle, self._providers, self._modes)
+
+    def set_provider_search(self, text: str) -> None:
+        """Substring match on provider only, independent of the general search."""
+        self.set_filters(self._needle, text, self._providers, self._modes)
 
     def set_providers(self, providers: set[str]) -> None:
-        self.set_filters(self._needle, providers, self._modes)
+        self.set_filters(self._needle, self._provider_needle, providers, self._modes)
 
     def set_modes(self, modes: set[str]) -> None:
-        self.set_filters(self._needle, self._providers, modes)
+        self.set_filters(self._needle, self._provider_needle, self._providers, modes)
 
-    def set_filters(self, needle: str, providers: set[str], modes: set[str]) -> None:
+    def set_filters(
+        self,
+        needle: str,
+        provider_needle: str,
+        providers: set[str],
+        modes: set[str],
+    ) -> None:
         """Apply every filter condition at once.
 
         Two things matter for responsiveness here:
 
         - **Coalesced.** Each condition set separately triggers its own full
-          re-mapping of 12,595 rows; clearing the three one by one cost ~8.6s.
+          re-mapping of 12,595 rows; clearing them one by one cost ~8.6s.
         - **Skipped when unchanged.** Clearing filters that are already empty (the
           initial load does exactly that) must not re-map anything, which was
           another ~2.6s of blocked UI for no visible change.
         """
         needle = needle.strip().casefold()
+        provider_needle = provider_needle.strip().casefold()
         providers = set(providers)
         modes = set(modes)
-        if needle == self._needle and providers == self._providers and modes == self._modes:
+        if (
+            needle == self._needle
+            and provider_needle == self._provider_needle
+            and providers == self._providers
+            and modes == self._modes
+        ):
             return
         self._needle = needle
+        self._provider_needle = provider_needle
         self._providers = providers
         self._modes = modes
         self._invalidate()
@@ -236,14 +254,18 @@ class ModelFilterProxy(QSortFilterProxyModel):
         return self._needle
 
     @property
+    def provider_needle(self) -> str:
+        return self._provider_needle
+
+    @property
     def active(self) -> bool:
-        return bool(self._needle or self._providers or self._modes)
+        return bool(self._needle or self._provider_needle or self._providers or self._modes)
 
     def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:  # noqa: N802
         # With nothing filtered, accept without touching the row. This is the
         # initial-load path, and every row lookup here is a Python call across the
         # Qt/C++ boundary -- 12,595 of them measurably slow the first paint.
-        if not self._needle and not self._providers and not self._modes:
+        if not (self._needle or self._provider_needle or self._providers or self._modes):
             return True
 
         model = self.sourceModel()
@@ -256,6 +278,8 @@ class ModelFilterProxy(QSortFilterProxyModel):
         if self._providers and row.get("provider") not in self._providers:
             return False
         if self._modes and row.get("mode") not in self._modes:
+            return False
+        if self._provider_needle and self._provider_needle not in row.get("provider", "").casefold():
             return False
         if self._needle and self._needle not in row.get("search_blob", ""):
             return False
@@ -399,9 +423,23 @@ def build_rows(
         pricing_entry = pricing.get(model_id) or {}
         sections = overlay.get(model_id) or {}
 
-        provider = params_entry.get("provider") or pricing_entry.get("provider") or ""
-        mode = params_entry.get("mode") or pricing_entry.get("mode") or ""
-        base_model = params_entry.get("base_model") or pricing_entry.get("base_model") or ""
+        # The overlay is the user's edit, so it wins: a model added through the
+        # Add Model dialog exists only in the overlay, and reading provider from
+        # the originals alone left it blank -- which then kept it out of the
+        # provider dropdown and out of provider-based filtering entirely.
+        overlay_params = sections.get("parameters") or {}
+        overlay_pricing = sections.get("pricing") or {}
+
+        def pick(key: str) -> str:
+            for source in (overlay_params, overlay_pricing, params_entry, pricing_entry):
+                value = source.get(key)
+                if isinstance(value, str) and value:
+                    return value
+            return ""
+
+        provider = pick("provider")
+        mode = pick("mode")
+        base_model = pick("base_model")
 
         if model_id not in parameters and model_id not in pricing:
             status = STATUS_ADDED
@@ -412,9 +450,9 @@ def build_rows(
 
         row = {
             "id": model_id,
-            "provider": provider if isinstance(provider, str) else "",
-            "mode": mode if isinstance(mode, str) else "",
-            "base_model": base_model if isinstance(base_model, str) else "",
+            "provider": provider,
+            "mode": mode,
+            "base_model": base_model,
             "status": status,
             "conflicts": len(conflicts.get(model_id, ())),
             "has_params": bool(params_entry),

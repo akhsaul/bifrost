@@ -210,8 +210,14 @@ misleading half-view, not a convenient shortcut.
 - **Search** is plain text — no regex, case-insensitive **contains** across model
   ID, provider, base model, and mode. So `onnet` finds `claude-sonnet`. `Ctrl+F`
   focuses it, `Esc` clears.
-- **Provider** and **mode** facets show counts and combine with the search (all
-  filters AND together).
+- **Provider** and **mode** facets show counts, and a separate **Provider
+  contains…** field does free-text substring matching (so `bed` finds `bedrock`,
+  and a provider you just typed into the overlay is findable before the dropdown
+  has caught up). Every filter ANDs together, and the status line spells out which
+  are active.
+- A model's provider, mode and base model are read from your overlay first, so a
+  model added through **Add Model…** appears under its provider immediately and
+  can be filtered by it.
 - **Filtering is view-only.** Merging always covers every model, never just the
   filtered subset — the status line says so whenever a filter is active.
 - **Parameters** and **Pricing** tabs. Every pricing field is badged `cost`,
@@ -252,7 +258,7 @@ misleading half-view, not a convenient shortcut.
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/ -q
 ```
 
-150 tests. The GUI tests are skipped without PySide6. They cover the merge rules
+171 tests. The GUI tests are skipped without PySide6. They cover the merge rules
 against both hand-built cases and slices of the real 20MB file, and pin two Qt
 interop and lifetime traps that make a window render nothing while looking
 healthy:

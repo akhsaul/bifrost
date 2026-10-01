@@ -90,6 +90,11 @@ class MainWindow(QMainWindow):
         self.search_timer.setInterval(200)
         self.search_timer.timeout.connect(self._apply_search)
 
+        self.provider_timer = QTimer(self)
+        self.provider_timer.setSingleShot(True)
+        self.provider_timer.setInterval(200)
+        self.provider_timer.timeout.connect(self._apply_provider_search)
+
     # ---------------------------------------------------------------- UI -- #
 
     def _build_ui(self) -> None:
@@ -189,9 +194,28 @@ class MainWindow(QMainWindow):
         bar.addWidget(self.search_edit, 2)
 
         self.provider_combo = QComboBox()
-        self.provider_combo.setMinimumWidth(220)
+        self.provider_combo.setMinimumWidth(200)
+        self.provider_combo.setToolTip(
+            "Pick one provider exactly. Counts refresh when the data changes."
+        )
         self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
         bar.addWidget(self.provider_combo)
+
+        # A free-text provider filter alongside the dropdown. The dropdown only
+        # offers providers it has already seen, so it cannot be used to look up a
+        # provider that has just been typed into the overlay, and it is useless
+        # for partial matches. This does substring matching and updates as you type.
+        self.provider_search = QLineEdit()
+        self.provider_search.setPlaceholderText("Provider contains…")
+        self.provider_search.setClearButtonEnabled(True)
+        self.provider_search.setMinimumWidth(170)
+        self.provider_search.setToolTip(
+            "Substring match on the provider only, e.g. \"bed\" finds bedrock"
+        )
+        self.provider_search.textChanged.connect(
+            lambda _: self.provider_timer.start()
+        )
+        bar.addWidget(self.provider_search)
 
         self.mode_combo = QComboBox()
         self.mode_combo.setMinimumWidth(170)
@@ -629,6 +653,10 @@ class MainWindow(QMainWindow):
         self.proxy.set_search(self.search_edit.text())
         self._update_filter_state()
 
+    def _apply_provider_search(self) -> None:
+        self.proxy.set_provider_search(self.provider_search.text())
+        self._update_filter_state()
+
     def _on_provider_changed(self, index: int) -> None:
         value = self.provider_combo.itemData(index)
         self.proxy.set_providers({value} if value else set())
@@ -640,24 +668,30 @@ class MainWindow(QMainWindow):
         self._update_filter_state()
 
     def _clear_filters(self) -> None:
-        for widget in (self.search_edit, self.provider_combo, self.mode_combo):
+        for widget in (self.search_edit, self.provider_search, self.provider_combo, self.mode_combo):
             widget.blockSignals(True)
         self.search_edit.clear()
+        self.provider_search.clear()
         self.provider_combo.setCurrentIndex(0)
         self.mode_combo.setCurrentIndex(0)
-        for widget in (self.search_edit, self.provider_combo, self.mode_combo):
+        for widget in (self.search_edit, self.provider_search, self.provider_combo, self.mode_combo):
             widget.blockSignals(False)
-        # One coalesced call: setting the three filters separately re-maps all
-        # 12,595 rows three times.
-        self.proxy.set_filters("", set(), set())
+        # One coalesced call: setting the filters separately re-maps all 12,595
+        # rows once per condition.
+        self.proxy.set_filters("", "", set(), set())
         self._update_filter_state()
 
     def _on_escape(self) -> None:
-        if self.search_edit.text():
-            self.search_edit.clear()
-            self.search_timer.stop()
-            self._apply_search()
-        elif self.proxy.active:
+        for edit, timer, apply in (
+            (self.search_edit, self.search_timer, self._apply_search),
+            (self.provider_search, self.provider_timer, self._apply_provider_search),
+        ):
+            if edit.text():
+                edit.clear()
+                timer.stop()
+                apply()
+                return
+        if self.proxy.active:
             self._clear_filters()
 
     def _update_filter_state(self) -> None:
@@ -667,6 +701,8 @@ class MainWindow(QMainWindow):
         parts = [f"showing {shown:,} of {total:,} models"]
         if self.proxy.needle:
             parts.append(f'search "{self.search_edit.text().strip()}"')
+        if self.proxy.provider_needle:
+            parts.append(f'provider~"{self.provider_search.text().strip()}"')
         if self.proxy._providers:
             parts.append("provider=" + ",".join(sorted(self.proxy._providers)))
         if self.proxy._modes:

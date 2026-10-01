@@ -152,13 +152,13 @@ def test_set_filters_with_identical_values_does_no_work(app):
 
     proxy._invalidate = counting_invalidate
 
-    proxy.set_filters("", set(), set())  # same as the starting state
+    proxy.set_filters("", "", set(), set())  # same as the starting state
     assert calls["n"] == 0
 
-    proxy.set_filters("sonnet", set(), set())  # real change
+    proxy.set_filters("sonnet", "", set(), set())  # real change
     assert calls["n"] == 1
 
-    proxy.set_filters("sonnet", set(), set())  # no change again
+    proxy.set_filters("sonnet", "", set(), set())  # no change again
     assert calls["n"] == 1
 
 
@@ -171,9 +171,9 @@ def test_set_search_delegates_to_the_coalesced_call(app):
     calls: list[tuple] = []
     original = proxy.set_filters
 
-    def spy(needle, providers, modes):
-        calls.append((needle, providers, modes))
-        original(needle, providers, modes)
+    def spy(needle, provider_needle, providers, modes):
+        calls.append((needle, provider_needle, providers, modes))
+        original(needle, provider_needle, providers, modes)
 
     proxy.set_filters = spy
     proxy.set_search("gpt")
@@ -182,9 +182,9 @@ def test_set_search_delegates_to_the_coalesced_call(app):
 
     assert len(calls) == 3
     # Each single-filter setter must preserve the other two conditions.
-    assert calls[0] == ("gpt", set(), set())
-    assert calls[1] == ("gpt", {"openai"}, set())
-    assert calls[2] == ("gpt", {"openai"}, {"chat"})
+    assert calls[0] == ("gpt", "", set(), set())
+    assert calls[1] == ("gpt", "", {"openai"}, set())
+    assert calls[2] == ("gpt", "", {"openai"}, {"chat"})
 
 
 def test_unfiltered_accept_is_a_short_circuit(app):
@@ -211,7 +211,7 @@ def test_unfiltered_accept_is_a_short_circuit(app):
     assert proxy.filterAcceptsRow(0, None) is True
     assert calls["n"] == 0, "unfiltered accept must not read the row"
 
-    proxy.set_filters("m1", set(), set())
+    proxy.set_filters("m1", "", set(), set())
     calls["n"] = 0
     assert proxy.filterAcceptsRow(1, None) is True
     assert calls["n"] == 1, "a real filter must consult the row"
@@ -239,11 +239,11 @@ def test_filters_still_work_after_the_optimisations(app):
     source.reset_source(rows)
 
     assert proxy.rowCount() == 3
-    proxy.set_filters("sonnet", set(), set())
+    proxy.set_filters("sonnet", "", set(), set())
     assert proxy.rowCount() == 1
-    proxy.set_filters("", {"openai"}, set())
+    proxy.set_filters("", "", {"openai"}, set())
     assert proxy.rowCount() == 2
-    proxy.set_filters("", set(), {"embedding"})
+    proxy.set_filters("", "", set(), {"embedding"})
     assert proxy.rowCount() == 1
-    proxy.set_filters("", set(), set())
+    proxy.set_filters("", "", set(), set())
     assert proxy.rowCount() == 3
