@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useGetAdaptiveRoutingMetricsQuery } from "@/lib/store/apis";
+import { useGetAllKeysQuery } from "@/lib/store/apis/providersApi";
 import { MetricLevel } from "@/lib/types/adaptiveRouting";
 import { Link } from "@tanstack/react-router";
 import { Activity, Gauge, RefreshCw, Server, Settings, Shuffle, Zap } from "lucide-react";
@@ -14,6 +15,10 @@ interface TargetMetricRow {
 	provider: string;
 	model: string;
 	keyId?: string;
+	// Human-readable key name, resolved from key_id. The metrics API reports the
+	// UUID because that is the target's identity (routing rules persist it), but
+	// key names are unique too and are what an operator recognizes.
+	keyLabel?: string;
 	level: MetricLevel;
 	ewmaLatencyMs: number;
 	ttftMs: number;
@@ -41,6 +46,17 @@ export default function AdaptiveRoutingView() {
 		pollingInterval: 3000,
 	});
 
+	// key_id -> key name. Key names are unique across providers (DB-enforced),
+	// so one flat map is unambiguous and needs no per-provider grouping.
+	const { data: allKeys } = useGetAllKeysQuery();
+	const keyNames = useMemo(() => {
+		const map = new Map<string, string>();
+		for (const key of allKeys ?? []) {
+			if (key.key_id && key.name) map.set(key.key_id, key.name);
+		}
+		return map;
+	}, [allKeys]);
+
 	const targets: TargetMetricRow[] = useMemo(() => {
 		if (!data?.metrics) return [];
 		return data.metrics.map((m) => ({
@@ -48,6 +64,9 @@ export default function AdaptiveRoutingView() {
 			provider: m.provider,
 			model: m.model,
 			keyId: m.key_id,
+			// Fall back to the UUID so a key that was deleted (or is not visible
+			// to this caller) still renders as an identifiable row.
+			keyLabel: m.key_id ? (keyNames.get(m.key_id) ?? m.key_id) : undefined,
 			level: m.level ?? (m.key_id ? "key" : m.model ? "model" : "provider"),
 			ewmaLatencyMs: m.ewma_latency_ms,
 			ttftMs: m.ttft_ms,
@@ -57,7 +76,7 @@ export default function AdaptiveRoutingView() {
 			dynamicWeight: m.dynamic_weight,
 			status: m.status,
 		}));
-	}, [data]);
+	}, [data, keyNames]);
 
 	const levelCounts = useMemo(() => {
 		const counts = { provider: 0, model: 0, key: 0, all: targets.length };
@@ -67,11 +86,15 @@ export default function AdaptiveRoutingView() {
 
 	const filteredTargets = targets.filter((t) => {
 		const matchesLevel = selectedLevel === "all" || t.level === selectedLevel;
+		const q = searchQuery.toLowerCase();
 		const matchesSearch =
-			t.target.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			t.provider.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			t.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			(t.keyId && t.keyId.toLowerCase().includes(searchQuery.toLowerCase()));
+			t.target.toLowerCase().includes(q) ||
+			t.provider.toLowerCase().includes(q) ||
+			t.model.toLowerCase().includes(q) ||
+			(t.keyLabel && t.keyLabel.toLowerCase().includes(q)) ||
+			// The UUID stays searchable so an operator can still paste a key id
+			// from the providers page.
+			(t.keyId && t.keyId.toLowerCase().includes(q));
 		return matchesLevel && matchesSearch;
 	});
 
@@ -164,7 +187,7 @@ export default function AdaptiveRoutingView() {
 					</div>
 					<div className="flex items-center gap-2">
 						<Input
-							placeholder="Search provider, model..."
+							placeholder="Search provider, model, key..."
 							value={searchQuery}
 							onChange={(e) => setSearchQuery(e.target.value)}
 							className="h-8 w-[200px] text-xs"
@@ -221,8 +244,14 @@ export default function AdaptiveRoutingView() {
 													</Badge>
 													<span className="text-foreground font-semibold">{row.target}</span>
 												</div>
-												{row.level === "provider" && <span className="text-muted-foreground text-[10px]">Provider-level EWMA aggregate</span>}
-												{row.level === "key" && row.keyId && <span className="text-muted-foreground font-mono text-[10px]">Key: {row.keyId}</span>}
+												{row.level === "provider" && (
+													<span className="text-muted-foreground text-[10px]">Provider-level EWMA aggregate</span>
+												)}
+												{row.level === "key" && row.keyLabel && (
+													<span className="text-muted-foreground text-[10px]" title={`Key ID: ${row.keyId}`}>
+														Key: {row.keyLabel}
+													</span>
+												)}
 											</div>
 										</TableCell>
 										<TableCell>
