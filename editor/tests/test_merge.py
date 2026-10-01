@@ -31,8 +31,24 @@ from datasheet_editor.validate import (
 )
 
 REPO = Path(__file__).resolve().parents[2]
-PARAMS_PATH = REPO / "editor" / "model_parameters.json"
-PRICING_PATH = REPO / "editor" / "model_pricing.json"
+EDITOR = REPO / "editor"
+
+def _resolve(*names: str) -> Path:
+    """First existing copy of a datasheet, searched in each of its locations.
+
+    The compact originals may sit in the editor directory or under tools/, and
+    the pretty-printed *_beauty.json copies hold identical data. Tests resolve
+    whichever is checked out instead of skipping when one location is empty.
+    """
+    for name in names:
+        for directory in (EDITOR, EDITOR / "tools"):
+            candidate = directory / name
+            if candidate.exists():
+                return candidate
+    return EDITOR / names[0]
+
+PARAMS_PATH = _resolve("model_parameters.json", "model_parameters_beauty.json")
+PRICING_PATH = _resolve("model_pricing.json", "model_pricing_beauty.json")
 
 
 # --------------------------------------------------------------------------- #
@@ -267,7 +283,7 @@ def test_pricing_strict_keeps_read_fields():
 
 requires_files = pytest.mark.skipif(
     not (PARAMS_PATH.exists() and PRICING_PATH.exists()),
-    reason="real datasheet files not present",
+    reason="no copy of the real datasheet files present",
 )
 
 

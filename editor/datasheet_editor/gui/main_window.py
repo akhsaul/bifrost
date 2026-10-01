@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QProgressBar,
+    QProgressDialog,
     QPushButton,
     QScrollArea,
     QSplitter,
@@ -44,7 +45,7 @@ from .models import (
     ParamDescriptorModel,
     build_rows,
 )
-from .workers import LoadWorker, MergeWorker, SaveWorker
+from .workers import LOAD_STEPS, LoadWorker, MergeWorker, SaveWorker
 
 PARAMETERS_FILENAME = "model_parameters.json"
 PRICING_FILENAME = "model_pricing.json"
@@ -69,6 +70,8 @@ class MainWindow(QMainWindow):
         self.merge_result = None
         self.dirty = False
         self._loading = False
+        self._load_worker: LoadWorker | None = None
+        self._progress_dialog: QProgressDialog | None = None
 
         self.model_list = ModelListModel(self)
         self.proxy = ModelFilterProxy(self)
@@ -78,6 +81,7 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._wire()
+        self._update_path_label()
 
         self.pool = QThreadPool.globalInstance()
         self.search_timer = QTimer(self)
@@ -119,12 +123,35 @@ class MainWindow(QMainWindow):
 
     def _build_toolbar(self) -> QHBoxLayout:
         bar = QHBoxLayout()
-        self.path_label = QLabel("parameters: –   pricing: –   custom: –")
+        self.path_label = QLabel()
         bar.addWidget(self.path_label, 1)
 
-        self.btn_reload = QPushButton("Load…")
-        self.btn_reload.clicked.connect(self._on_load_clicked)
-        bar.addWidget(self.btn_reload)
+        # One button per file rather than a single "Load…". Each names the file
+        # it wants, so it is obvious which of the three is still missing and the
+        # merge cannot be started with the wrong one.
+        self.btn_load_params = QPushButton("Load Parameters…")
+        self.btn_load_params.setToolTip(
+            f"Choose {PARAMETERS_FILENAME} — capability metadata and the "
+            "model_parameters form descriptors"
+        )
+        self.btn_load_params.clicked.connect(self._on_load_parameters)
+        bar.addWidget(self.btn_load_params)
+
+        self.btn_load_pricing = QPushButton("Load Pricing…")
+        self.btn_load_pricing.setToolTip(
+            f"Choose {PRICING_FILENAME} — cost fields, also read by Bifrost's "
+            "capability lookup"
+        )
+        self.btn_load_pricing.clicked.connect(self._on_load_pricing)
+        bar.addWidget(self.btn_load_pricing)
+
+        self.btn_load_custom = QPushButton("Load Custom…")
+        self.btn_load_custom.setToolTip(
+            "Choose custom_model_metadata.json — your overlay of edits. "
+            "Optional; skip it to start from a clean slate."
+        )
+        self.btn_load_custom.clicked.connect(self._on_load_custom)
+        bar.addWidget(self.btn_load_custom)
 
         self.btn_merge = QPushButton("Merge & Preview")
         self.btn_merge.clicked.connect(self._on_merge)
@@ -307,20 +334,135 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------ loading -- #
 
     def load_paths(self, params: str | Path, pricing: str | Path, custom: str | Path | None) -> None:
+        """Load all three at once. Only used for explicit CLI arguments."""
         self.parameters_path = Path(params)
         self.pricing_path = Path(pricing)
         self.custom_path = Path(custom) if custom else None
         self._update_path_label()
         self._start_load()
 
-    def _start_load(self) -> None:
-        if not self.parameters_path or not self.pricing_path:
+    # -- one button per file --------------------------------------------- #
+
+    def show_start_hint(self) -> None:
+        """Explain what to load first, instead of opening any file on our own."""
+        self._update_path_label()
+        self.status_label.setText(
+            f"Choose {PARAMETERS_FILENAME} and {PRICING_FILENAME} with the two "
+            "Load buttons above. Custom overlay is optional."
+        )
+
+    def _on_load_parameters(self) -> None:
+        chosen, _ = QFileDialog.getOpenFileName(
+            self, f"Select {PARAMETERS_FILENAME}", self._browse_dir(), "JSON files (*.json)"
+        )
+        if not chosen:
             return
-        self._set_busy(True, "loading datasheets…")
+        self.parameters_path = Path(chosen)
+        self._update_path_label()
+        self._start_load()
+
+    def _on_load_pricing(self) -> None:
+        chosen, _ = QFileDialog.getOpenFileName(
+            self, f"Select {PRICING_FILENAME}", self._browse_dir(), "JSON files (*.json)"
+        )
+        if not chosen:
+            return
+        self.pricing_path = Path(chosen)
+        self._update_path_label()
+        self._start_load()
+
+    def _on_load_custom(self) -> None:
+        chosen, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select custom_model_metadata.json (optional)",
+            self._browse_dir(),
+            "JSON files (*.json)",
+        )
+        if not chosen:
+            return
+        self.custom_path = Path(chosen)
+        self._update_path_label()
+        self._start_load()
+
+    def _browse_dir(self) -> str:
+        for path in (self.parameters_path, self.pricing_path, self.custom_path):
+            if path is not None:
+                return str(path.parent)
+        return str(self.settings.value("last_dir", str(Path.cwd())))
+
+    def _start_load(self) -> None:
+        """Load if both originals are chosen; otherwise say what is missing."""
+        missing = [
+            name
+            for name, path in (
+                (PARAMETERS_FILENAME, self.parameters_path),
+                (PRICING_FILENAME, self.pricing_path),
+            )
+            if path is None
+        ]
+        if missing:
+            self._update_path_label()
+            self.status_label.setText("Choose " + " and ".join(missing) + " to load")
+            self.btn_merge.setEnabled(False)
+            return
+
+        self._remember_dir()
+        self._set_busy(True, "loading…")
+        self._show_progress_dialog()
         worker = LoadWorker(self.parameters_path, self.pricing_path, self.custom_path)
+        self._load_worker = worker
+        worker.signals.progress.connect(self._on_load_progress)
         worker.signals.finished.connect(self._on_loaded)
         worker.signals.failed.connect(lambda msg: self._on_failed("load", msg))
+        worker.signals.cancelled.connect(self._on_load_cancelled)
         self.pool.start(worker)
+
+    def _remember_dir(self) -> None:
+        for path in (self.parameters_path, self.pricing_path):
+            if path is not None:
+                self.settings.setValue("last_dir", str(path.parent))
+                break
+
+    # -- progress dialog -------------------------------------------------- #
+
+    def _show_progress_dialog(self) -> None:
+        dialog = QProgressDialog("Starting…", "Cancel", 0, LOAD_STEPS, self)
+        dialog.setWindowTitle("Loading datasheets")
+        dialog.setWindowModality(Qt.WindowModal)
+        dialog.setMinimumDuration(0)
+        dialog.setAutoClose(False)
+        dialog.setAutoReset(False)
+        dialog.setValue(0)
+        dialog.canceled.connect(self._cancel_load)
+        self._progress_dialog = dialog
+        dialog.show()
+
+    def _on_load_progress(self, label: str, value: int, total: int) -> None:
+        dialog = self._progress_dialog
+        if dialog is None:
+            return
+        dialog.setLabelText(label)
+        dialog.setMaximum(total)
+        dialog.setValue(value)
+
+    def _cancel_load(self) -> None:
+        worker = self._load_worker
+        if worker is not None:
+            worker.cancel()
+        self.status_label.setText("cancelling…")
+
+    def _close_progress_dialog(self) -> None:
+        dialog = self._progress_dialog
+        self._progress_dialog = None
+        if dialog is not None:
+            dialog.close()
+            dialog.deleteLater()
+
+    def _on_load_cancelled(self) -> None:
+        self._close_progress_dialog()
+        self._load_worker = None
+        self._set_busy(False)
+        self.status_label.setText("load cancelled")
 
     def _on_loaded(self, payload: dict[str, Any]) -> None:
         self.parameters = payload["parameters"].data
@@ -333,6 +475,9 @@ class MainWindow(QMainWindow):
         self.proxy.sort(COL_ID, Qt.AscendingOrder)
         self._populate_facet_combos()
         self._clear_filters()
+        self._close_progress_dialog()
+        self._load_worker = None
+        self._update_path_label()
         self._set_busy(False)
         self.status_label.setText(
             f"{len(rows):,} models · {len(self.overlay):,} custom entries · "
@@ -378,21 +523,46 @@ class MainWindow(QMainWindow):
             combo.blockSignals(False)
 
     def _update_path_label(self) -> None:
-        self.path_label.setText(
-            f"parameters: {self.parameters_path.name if self.parameters_path else '–'}   "
-            f"pricing: {self.pricing_path.name if self.pricing_path else '–'}   "
-            f"custom: {self.custom_path.name if self.custom_path else '(not saved yet)'}"
-        )
+        """Show which of the three files is chosen and which is still missing."""
+        parts = []
+        for title, path, required in (
+            ("Parameters", self.parameters_path, True),
+            ("Pricing", self.pricing_path, True),
+            ("Custom", self.custom_path, False),
+        ):
+            if path is not None:
+                parts.append(f"<b>{title}</b>: {path.name}")
+            elif required:
+                parts.append(f"<b>{title}</b>: <span style='color:#b91c1c'>not chosen</span>")
+            else:
+                parts.append(f"<b>{title}</b>: <span style='color:#64748b'>optional, not chosen</span>")
+        self.path_label.setText("   ".join(parts))
 
     def _set_busy(self, busy: bool, message: str = "") -> None:
+        """Toggle button availability.
+
+        Actions are gated on data actually being present, not merely on paths
+        having been chosen -- a cancelled load leaves both paths set but nothing
+        loaded, and must not leave Merge clickable.
+        """
         self._loading = busy
         self.progress.setVisible(busy)
-        for button in (self.btn_reload, self.btn_merge, self.btn_save_output, self.btn_save_custom):
-            button.setEnabled(not busy and button is not self.btn_reload)
+        for button in (
+            self.btn_load_params,
+            self.btn_load_pricing,
+            self.btn_load_custom,
+        ):
+            button.setEnabled(not busy)
+        has_data = bool(self.model_list.rowCount())
+        self.btn_merge.setEnabled(not busy and has_data)
+        self.btn_save_output.setEnabled(not busy and self.merge_result is not None)
+        self.btn_save_custom.setEnabled(not busy and bool(self.dirty or self.overlay))
         if busy:
             self.status_label.setText(message)
 
     def _on_failed(self, what: str, message: str) -> None:
+        self._close_progress_dialog()
+        self._load_worker = None
         self._set_busy(False)
         QMessageBox.critical(self, f"{what.capitalize()} failed", message)
         self.status_label.setText(f"{what} failed")
@@ -631,23 +801,6 @@ class MainWindow(QMainWindow):
         self.param_model.set_items(entry.get(PARAMS_FIELD) or [])
 
     # ------------------------------------------------------------- actions -- #
-
-    def _on_load_clicked(self) -> None:
-        params, _ = QFileDialog.getOpenFileName(self, "Select model_parameters.json", "",
-                                                 "JSON files (*.json)")
-        if not params:
-            return
-        pricing, _ = QFileDialog.getOpenFileName(self, "Select model_pricing.json", "", "JSON files (*.json)")
-        if not pricing:
-            return
-        custom = None
-        if self.custom_path and self.custom_path.exists():
-            custom = str(self.custom_path)
-        else:
-            chosen, _ = QFileDialog.getOpenFileName(self, "Select custom overlay (optional)", "",
-                                                    "JSON files (*.json)")
-            custom = chosen or None
-        self.load_paths(params, pricing, custom)
 
     def _on_merge(self) -> None:
         if self._loading:

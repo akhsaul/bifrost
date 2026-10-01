@@ -3,10 +3,17 @@
 Loading a 20MB datasheet, merging 12,595 entries, and writing the result all
 take long enough to freeze the UI, so each runs on a ``QThreadPool`` thread and
 reports back through signals.
+
+Loading reports discrete progress steps rather than an indeterminate spinner:
+the work is four separable phases, and naming them ("Reading
+model_parameters.json", "Comparing both datasets") tells the user what is
+happening and whether the app is stuck.
 """
 
 from __future__ import annotations
 
+import json
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -19,53 +26,159 @@ from ..validate import find_cross_file_conflicts
 PARAMETERS_FILENAME = "model_parameters.json"
 PRICING_FILENAME = "model_pricing.json"
 
+#: Total number of phases reported by LoadWorker.
+LOAD_STEPS = 4
+
+
+#: Strong references to running workers.
+#:
+#: ``QThreadPool.start()`` does not keep the *Python* wrapper alive, so a worker
+#: whose last Python reference is dropped gets collected mid-run. Its
+#: ``QObject``-based signals go with it, and the worker thread then emits on a
+#: deleted object ("Signal source has been deleted") -- reproducible by closing
+#: the window while a 20MB file is still loading.
+_LIVE_WORKERS: set["QRunnable"] = set()
+
+
+def _keep_alive(worker: "QRunnable") -> None:
+    _LIVE_WORKERS.add(worker)
+
+
+def _release(worker: "QRunnable") -> None:
+    _LIVE_WORKERS.discard(worker)
+
+
+def _emit(signal: Signal, *args: Any) -> None:
+    """Emit, tolerating a receiver (window) that was destroyed mid-flight.
+
+    Closing the window during a load is legitimate; the worker must not raise on
+    its way out just because nobody is listening any more.
+    """
+    try:
+        signal.emit(*args)
+    except RuntimeError:
+        pass
+
 
 class _Signals(QObject):
     finished = Signal(object)
     failed = Signal(str)
 
 
+class LoadSignals(QObject):
+    """Progress and completion signals for :class:`LoadWorker`."""
+
+    #: label, current step, total steps
+    progress = Signal(str, int, int)
+    finished = Signal(object)
+    failed = Signal(str)
+    cancelled = Signal()
+
+
 class LoadWorker(QRunnable):
-    """Load both datasets, the overlay, and cross-file conflicts off-thread."""
+    """Load both datasets, the overlay, and cross-file conflicts off-thread.
+
+    Cancellation is cooperative and checked between phases: a phase already inside
+    ``json.load`` cannot be interrupted, but stopping before the expensive
+    conflict scan is still worth it.
+    """
 
     def __init__(
         self,
-        parameters_path: str | Path,
-        pricing_path: str | Path,
+        parameters_path: str | Path | None,
+        pricing_path: str | Path | None,
         custom_path: str | Path | None,
+        *,
+        cancel_event: threading.Event | None = None,
     ) -> None:
         super().__init__()
-        self.signals = _Signals()
-        self._parameters_path = Path(parameters_path)
-        self._pricing_path = Path(pricing_path)
+        self.signals = LoadSignals()
+        self._parameters_path = Path(parameters_path) if parameters_path else None
+        self._pricing_path = Path(pricing_path) if pricing_path else None
         self._custom_path = Path(custom_path) if custom_path else None
+        self._cancel = cancel_event or threading.Event()
+        _keep_alive(self)
+
+    def cancel(self) -> None:
+        """Ask the worker to stop at the next phase boundary."""
+        self._cancel.set()
+
+    def _cancelled(self) -> bool:
+        return self._cancel.is_set()
+
+    def _abort(self) -> None:
+        _emit(self.signals.cancelled)
 
     @Slot()
     def run(self) -> None:
         try:
-            params = load_dataset(self._parameters_path, DatasetKind.PARAMETERS)
-            pricing = load_dataset(self._pricing_path, DatasetKind.PRICING)
-            overlay = {}
-            if self._custom_path and self._custom_path.exists():
-                import json
+            total = LOAD_STEPS
 
+            _emit(
+                self.signals.progress,
+                f"Reading {_display(self._parameters_path, PARAMETERS_FILENAME)}",
+                0,
+                total,
+            )
+            if self._parameters_path is None:
+                raise FileNotFoundError("no parameters file selected")
+            params = load_dataset(self._parameters_path, DatasetKind.PARAMETERS)
+            if self._cancelled():
+                self._abort()
+                return
+
+            _emit(
+                self.signals.progress,
+                f"Reading {_display(self._pricing_path, PRICING_FILENAME)}",
+                1,
+                total,
+            )
+            if self._pricing_path is None:
+                raise FileNotFoundError("no pricing file selected")
+            pricing = load_dataset(self._pricing_path, DatasetKind.PRICING)
+            if self._cancelled():
+                self._abort()
+                return
+
+            _emit(self.signals.progress, "Reading custom overlay", 2, total)
+            overlay: dict[str, dict[str, Any]] = {}
+            if self._custom_path and self._custom_path.exists():
                 with self._custom_path.open(encoding="utf-8") as fh:
-                    overlay = json.load(fh)
+                    loaded = json.load(fh)
+                if isinstance(loaded, dict):
+                    overlay = loaded
+            if self._cancelled():
+                self._abort()
+                return
+
+            _emit(self.signals.progress, "Comparing both datasets", 3, total)
             conflicts = find_cross_file_conflicts(params.data, pricing.data)
             grouped: dict[str, list[str]] = {}
             for conflict in conflicts:
                 grouped.setdefault(conflict["model"], []).append(conflict["field"])
-            self.signals.finished.emit(
+            if self._cancelled():
+                self._abort()
+                return
+
+            _emit(self.signals.progress, "Done", total, total)
+            _emit(
+                self.signals.finished,
                 {
                     "parameters": params,
                     "pricing": pricing,
                     "overlay": overlay,
                     "conflicts": grouped,
                     "conflict_count": len(conflicts),
-                }
+                },
             )
         except Exception as exc:  # surfaced in the UI, not swallowed
-            self.signals.failed.emit(str(exc))
+            _emit(self.signals.failed, str(exc))
+        finally:
+            _release(self)
+
+
+def _display(path: Path | None, fallback: str) -> str:
+    return path.name if path else fallback
 
 
 class MergeWorker(QRunnable):
@@ -87,6 +200,7 @@ class MergeWorker(QRunnable):
         self._overlay = overlay
         self._param_array_mode = param_array_mode
         self._pricing_fields = pricing_fields
+        _keep_alive(self)
 
     @Slot()
     def run(self) -> None:
@@ -98,22 +212,31 @@ class MergeWorker(QRunnable):
                 param_array_mode=self._param_array_mode,
                 pricing_fields=self._pricing_fields,
             )
-            self.signals.finished.emit(result)
+            _emit(self.signals.finished, result)
         except Exception as exc:
-            self.signals.failed.emit(str(exc))
+            _emit(self.signals.failed, str(exc))
+        finally:
+            _release(self)
 
 
 class SaveWorker(QRunnable):
     """Write both merged output files off-thread, then re-read to verify."""
 
-    def __init__(self, result: Any, output_dir: str | Path, *, indent: int | None = None,
-                 sort_keys: bool = False) -> None:
+    def __init__(
+        self,
+        result: Any,
+        output_dir: str | Path,
+        *,
+        indent: int | None = None,
+        sort_keys: bool = False,
+    ) -> None:
         super().__init__()
         self.signals = _Signals()
         self._result = result
         self._output_dir = Path(output_dir)
         self._indent = indent
         self._sort_keys = sort_keys
+        _keep_alive(self)
 
     @Slot()
     def run(self) -> None:
@@ -136,8 +259,11 @@ class SaveWorker(QRunnable):
                     continue
                 if len(actual) != len(expected):
                     problems.append(f"{label}: wrote {len(actual)} models, expected {len(expected)}")
-            self.signals.finished.emit(
-                {"parameters": str(params_out), "pricing": str(pricing_out), "problems": problems}
+            _emit(
+                self.signals.finished,
+                {"parameters": str(params_out), "pricing": str(pricing_out), "problems": problems},
             )
         except Exception as exc:
-            self.signals.failed.emit(str(exc))
+            _emit(self.signals.failed, str(exc))
+        finally:
+            _release(self)

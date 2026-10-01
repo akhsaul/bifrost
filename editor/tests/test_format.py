@@ -137,11 +137,24 @@ def test_format_value_uses_readable_form_for_floats():
     assert format_value(3e-06, "input_cost_per_token") == "0.000003 (~$3.00 per 1M tokens)"
 
 
-PRICING_PATH = Path(__file__).resolve().parents[1] / "model_pricing.json"
+_EDITOR = Path(__file__).resolve().parents[1]
+
+
+def _resolve(*names: str) -> Path:
+    """First existing copy, searched in each location. See test_merge.py."""
+    for name in names:
+        for directory in (_EDITOR, _EDITOR / "tools"):
+            candidate = directory / name
+            if candidate.exists():
+                return candidate
+    return _EDITOR / names[0]
+
+
+PRICING_PATH = _resolve("model_pricing.json", "model_pricing_beauty.json")
 
 requires_files = pytest.mark.skipif(
     not PRICING_PATH.exists(),
-    reason="real pricing file not present",
+    reason="no copy of the real pricing file present",
 )
 
 

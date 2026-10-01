@@ -15,7 +15,14 @@ def run_gui(
     original_pricing: str | Path | None = None,
     custom: str | Path | None = None,
 ) -> int:
-    """Launch the editor. Returns a process exit code."""
+    """Launch the editor. Returns a process exit code.
+
+    Files are never auto-discovered. Matching on a filename is not safe here: the
+    working directory routinely holds several datasheet copies (``*_beauty.json``,
+    generated output, an unrelated model's sheet), and silently opening the wrong
+    one would be worse than asking. Only paths passed explicitly on the command
+    line are loaded; otherwise the user picks each file with its own button.
+    """
     app = QApplication.instance() or QApplication([])
     window = MainWindow()
     window.show()
@@ -23,19 +30,6 @@ def run_gui(
     if original_parameters and original_pricing:
         window.load_paths(original_parameters, original_pricing, custom)
     else:
-        _auto_discover(window)
+        window.show_start_hint()
 
     return int(app.exec())
-
-
-def _auto_discover(window: MainWindow) -> None:
-    """Prefer the datasheets sitting next to the working directory."""
-    cwd = Path.cwd()
-    params = next((p for p in (cwd / "model_parameters.json",) if p.exists()), None)
-    pricing = next((p for p in (cwd / "model_pricing.json",) if p.exists()), None)
-    custom = next(
-        (p for p in (cwd / "custom_model_metadata.json",) if p.exists()),
-        None,
-    )
-    if params and pricing:
-        window.load_paths(params, pricing, custom)

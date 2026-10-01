@@ -178,7 +178,19 @@ picking a winner.
   --custom              custom_model_metadata.json
 ```
 
-With no arguments it picks up the datasheets in the working directory.
+With no arguments nothing is opened. Three buttons load the three files, each
+labelled with what it wants:
+
+| Button | File | Needed |
+|---|---|---|
+| **Load Parameters…** | `model_parameters.json` | required |
+| **Load Pricing…** | `model_pricing.json` | required |
+| **Load Custom…** | `custom_model_metadata.json` | optional |
+
+The toolbar states which are chosen and which are still missing, in red. Files
+are never auto-discovered: a working directory here routinely holds several
+datasheet copies (`*_beauty.json`, generated output, an unrelated model's sheet),
+and silently opening the wrong one is worse than asking.
 
 - **Search** is plain text — no regex, case-insensitive **contains** across model
   ID, provider, base model, and mode. So `onnet` finds `claude-sonnet`. `Ctrl+F`
@@ -196,7 +208,13 @@ With no arguments it picks up the datasheets in the working directory.
   Unparseable input shows an inline error and is not committed.
 - `null` is editable as a real value.
 - Loading, merging, and saving run on background threads, so the 20MB file never
-  freezes the window.
+  freezes the window. Loading shows a progress dialog naming the phase it is on
+  ("Reading model_parameters.json", "Comparing both datasets") with a working
+  **Cancel** — the phases are separable, so cancelling skips the conflict scan
+  rather than pretending to abort a `json.load` already in flight.
+- **Merge**, **Save Output**, and **Save Custom** stay disabled until there is
+  actually data, not merely until paths have been chosen. A cancelled load
+  leaves both paths set and nothing loaded, and must not leave Merge clickable.
 - Merging writes nowhere until you choose an output directory, and the written
   files are re-read and verified before the status bar reports success.
 
@@ -206,14 +224,19 @@ With no arguments it picks up the datasheets in the working directory.
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/ -q
 ```
 
-89 tests. The GUI tests are skipped without PySide6. They cover the merge rules
+105 tests. The GUI tests are skipped without PySide6. They cover the merge rules
 against both hand-built cases and slices of the real 20MB file, and pin two Qt
-interop traps that make a window render nothing while looking healthy:
+interop and lifetime traps that make a window render nothing while looking
+healthy:
 
 - Qt passes an **invalid** `QModelIndex()` (not `None`) into Python overrides, so
   `if parent is not None` silently makes every table report zero rows.
 - A `QSortFilterProxyModel` over a Python model stays empty unless the root
   row/column counts answer correctly.
+- `QThreadPool.start()` keeps only the C++ worker, so a worker whose last Python
+  reference is dropped is collected mid-run and its `QObject` signals are
+  destroyed with it. Closing the window during a load then raised "Signal source
+  has been deleted" on the worker thread.
 
 There is also a regression test for a subtler merge bug: the by-id
 `model_parameters` merge used to mutate the original descriptors in place, so the
