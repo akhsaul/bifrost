@@ -410,6 +410,13 @@ func makeKey(model, provider, mode string) string {
 	return model + "|" + provider + "|" + mode
 }
 
+// FreeProviderSuffix marks a provider that serves only its base provider's
+// free-tier models ("opencode-zen-free", "openrouter-free"). The suffix is what
+// keeps the free tier from colliding with the real provider it mirrors; the
+// datasheet itself files those models under the base provider, so resolution
+// folds the suffix away (see normalizeProvider).
+const FreeProviderSuffix = "-free"
+
 // normalizeProvider folds equivalent provider identifiers onto the canonical
 // provider name used by the pricing catalog.
 func normalizeProvider(p string) string {
@@ -426,9 +433,59 @@ func normalizeProvider(p string) string {
 		return string(schemas.Runway)
 	case strings.Contains(p, "fireworks_ai"):
 		return string(schemas.Fireworks)
+	// A free-tier provider is the same provider as far as the catalog is
+	// concerned: the datasheet has no rows of its own, it files every free
+	// model under the base provider ("opencode-zen/muse-spark-…-free",
+	// "openrouter/z-ai/glm-5.2:free"). Fold last so the vendor-specific cases
+	// above still win, and strictly one-directional so a real provider never
+	// inherits the free tier's catalog.
+	case strings.HasSuffix(p, FreeProviderSuffix) && len(p) > len(FreeProviderSuffix):
+		return strings.TrimSuffix(p, FreeProviderSuffix)
 	default:
 		return p
 	}
+}
+
+// foldFreeTierProvider resolves a runtime provider onto the base provider the
+// datasheet files its free-tier models under ("openrouter-free" → "openrouter",
+// "opencode-zen-free" → "opencode-zen"). A provider with no "-free" suffix is
+// returned unchanged: unlike normalizeProvider this deliberately does NOT fold
+// bedrock_*, together_ai, and friends, because callers that need that fold are
+// comparing against a stored row provider (already normalized), not another
+// runtime provider.
+func foldFreeTierProvider(p schemas.ModelProvider) string {
+	base, ok := strings.CutSuffix(string(p), FreeProviderSuffix)
+	if !ok || base == "" {
+		return string(p)
+	}
+	return normalizeProvider(base)
+}
+
+// isFreeTierModel reports whether a catalog model name identifies a free-tier
+// model. The two live providers disagree on spelling — opencode suffixes the
+// model ("muse-spark-1.3-contributor-free") while openrouter appends a variant
+// tag ("z-ai/glm-5.2:free") — so both are accepted. It gates which of a base
+// provider's models a "-free" provider may claim (see freeTierProviders).
+func isFreeTierModel(model string) bool {
+	return strings.HasSuffix(model, FreeProviderSuffix) || strings.Contains(model, ":free")
+}
+
+// freeTierProviders maps each base provider to the "-free" providers that serve
+// only its free-tier models, derived from the standard provider list so a newly
+// added free provider needs no change here. A free provider with no base in the
+// catalog contributes nothing and is skipped by the caller.
+func freeTierProviders() map[schemas.ModelProvider][]schemas.ModelProvider {
+	out := make(map[schemas.ModelProvider][]schemas.ModelProvider)
+	for _, p := range schemas.StandardProviders {
+		name := string(p)
+		base, ok := strings.CutSuffix(name, FreeProviderSuffix)
+		if !ok || base == "" {
+			continue
+		}
+		baseProvider := schemas.ModelProvider(base)
+		out[baseProvider] = append(out[baseProvider], p)
+	}
+	return out
 }
 
 // normalizeRequestType collapses streaming and non-streaming variants of a

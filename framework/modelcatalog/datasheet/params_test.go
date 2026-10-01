@@ -204,3 +204,58 @@ func TestLoadModelCapabilities_MatchesBedrockMantleRows(t *testing.T) {
 		t.Errorf("bedrock lookup resolved to %+v, want the plain bedrock row", bedrockCaps)
 	}
 }
+
+// A "-free" provider resolves against its base provider's parameter rows, so
+// openrouter-free can serve openrouter's ":free" models with their real
+// endpoint and parameter support instead of falling back to name detection.
+func TestLoadModelCapabilities_MatchesFreeProviderBaseRows(t *testing.T) {
+	const model = "z-ai/glm-5.2:free"
+	rows := map[string]string{
+		"openrouter/" + model: `{"provider":"openrouter","mode":"chat","supported_endpoints":["/v1/chat/completions","/v1/responses"]}`,
+	}
+	s := NewTestStore(nil)
+	s.configStore = paramsOnlyConfigStore{rows: rows}
+	s.SetSupportedParamsForTest(map[string][]string{"openrouter/" + model: {"temperature"}})
+
+	caps, err := s.LoadModelCapabilities(context.Background(), schemas.OpenRouterFree, model)
+	if err != nil {
+		t.Fatalf("LoadModelCapabilities(openrouter-free): %v", err)
+	}
+	if caps == nil {
+		t.Fatal("no capabilities for an openrouter-free model the sheet has a row for")
+	}
+	if !slices.Equal(caps.SupportedEndpoints, []string{"/v1/chat/completions", "/v1/responses"}) {
+		t.Fatalf("SupportedEndpoints = %v, want the openrouter row's", caps.SupportedEndpoints)
+	}
+
+	// The base provider still resolves the same row, unchanged.
+	baseCaps, err := s.LoadModelCapabilities(context.Background(), schemas.OpenRouter, model)
+	if err != nil {
+		t.Fatalf("LoadModelCapabilities(openrouter): %v", err)
+	}
+	if baseCaps == nil || len(baseCaps.SupportedEndpoints) != 2 {
+		t.Errorf("openrouter lookup resolved to %+v, want the same row", baseCaps)
+	}
+}
+
+// Folding a "-free" provider must not fold the other normalizeProvider aliases
+// in the same breath: doing so would let a bedrock_mantle request answer with a
+// plain bedrock row, which is exactly what TestLoadModelCapabilities_MatchesBedrockMantleRows guards.
+func TestLoadModelCapabilities_DoesNotFoldNonFreeAliases(t *testing.T) {
+	const model = "openai.gpt-oss-safeguard-20b"
+	rows := map[string]string{
+		model:                     `{"provider":"bedrock","mode":"chat"}`,
+		"bedrock_mantle/" + model: `{"provider":"bedrock_mantle","mode":"chat","supported_endpoints":["/v1/chat/completions"]}`,
+	}
+	s := NewTestStore(nil)
+	s.configStore = paramsOnlyConfigStore{rows: rows}
+	s.SetSupportedParamsForTest(map[string][]string{"bedrock_mantle/" + model: {"temperature"}})
+
+	caps, err := s.LoadModelCapabilities(context.Background(), schemas.BedrockMantle, model)
+	if err != nil {
+		t.Fatalf("LoadModelCapabilities: %v", err)
+	}
+	if caps == nil || !slices.Equal(caps.SupportedEndpoints, []string{"/v1/chat/completions"}) {
+		t.Fatalf("bedrock_mantle lookup resolved to %+v, want its own row's endpoints", caps)
+	}
+}

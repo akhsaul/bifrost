@@ -227,6 +227,64 @@ func TestGetModelsForProvider_PartialListModelsProviderUnionsDatasheet(t *testin
 	}
 }
 
+// TestGetModelsForProvider_FreeProviderGetsOnlyFreeModels verifies the catalog a
+// "-free" provider advertises. It inherits its base provider's rows through the
+// catalog fold, but must claim only the free ones — listing the paid catalog
+// would make the split between free and paid traffic meaningless. Models are
+// named as the datasheet files them (provider-qualified), since that is what the
+// pricing rows are keyed by.
+func TestGetModelsForProvider_FreeProviderGetsOnlyFreeModels(t *testing.T) {
+	pricingPath := filepath.Join(t.TempDir(), "pricing.json")
+	pricingJSON := []byte(`{
+		"openrouter/z-ai/glm-5.2:free": {"provider":"openrouter","mode":"chat","base_model":"z-ai/glm-5.2:free"},
+		"openrouter/z-ai/glm-5.2": {"provider":"openrouter","mode":"chat","base_model":"z-ai/glm-5.2"},
+		"openrouter/meta/llama-3.3-70b-instruct": {"provider":"openrouter","mode":"chat","base_model":"meta/llama-3.3-70b-instruct"},
+		"opencode-zen/muse-spark-1.3-contributor-free": {"provider":"opencode-zen","mode":"chat","base_model":"muse-spark-1.3-contributor-free"},
+		"opencode-zen/muse-spark-1.3-contributor": {"provider":"opencode-zen","mode":"chat","base_model":"muse-spark-1.3-contributor"}
+	}`)
+	if err := os.WriteFile(pricingPath, pricingJSON, 0o600); err != nil {
+		t.Fatalf("write pricing testdata: %v", err)
+	}
+	ds := datasheet.New(nil, nil, datasheet.Config{URL: "file://" + pricingPath})
+	if err := ds.LoadFromURLIntoMemory(t.Context()); err != nil {
+		t.Fatalf("load pricing testdata: %v", err)
+	}
+	mc := NewTestCatalogWithDatasheet(ds)
+	// The datasheet branch is gated on an aggregated allow-list, so each provider
+	// needs key state; a wildcard key is the unrestricted case.
+	keys := []schemas.Key{{ID: "k1", Enabled: ptrBool(true), Models: schemas.WhiteList{"*"}}}
+	mc.keyconf.SetProvider(schemas.OpenRouter, keys)
+	mc.keyconf.SetProvider(schemas.OpenRouterFree, keys)
+	mc.keyconf.SetProvider(schemas.OpencodeZen, keys)
+	mc.keyconf.SetProvider(schemas.OpencodeZenFree, keys)
+
+	// Both free spellings must be recognized: openrouter appends a ":free"
+	// variant tag, opencode suffixes the model name.
+	// Catalog model names carry no owning-provider prefix (extractModelName strips
+	// it), but a nested vendor path is preserved.
+	gotOpenRouterFree := mc.GetModelsForProvider(schemas.OpenRouterFree)
+	slices.Sort(gotOpenRouterFree)
+	wantOpenRouterFree := []string{"z-ai/glm-5.2:free"}
+	if !slices.Equal(gotOpenRouterFree, wantOpenRouterFree) {
+		t.Errorf("GetModelsForProvider(OpenRouterFree) = %v, want %v (free models only)", gotOpenRouterFree, wantOpenRouterFree)
+	}
+
+	gotZenFree := mc.GetModelsForProvider(schemas.OpencodeZenFree)
+	slices.Sort(gotZenFree)
+	wantZenFree := []string{"muse-spark-1.3-contributor-free"}
+	if !slices.Equal(gotZenFree, wantZenFree) {
+		t.Errorf("GetModelsForProvider(OpencodeZenFree) = %v, want %v (free models only)", gotZenFree, wantZenFree)
+	}
+
+	// The base providers keep their full catalogs.
+	if got := len(mc.GetModelsForProvider(schemas.OpenRouter)); got != 3 {
+		t.Errorf("GetModelsForProvider(OpenRouter) returned %d models, want all 3", got)
+	}
+	if got := len(mc.GetModelsForProvider(schemas.OpencodeZen)); got != 2 {
+		t.Errorf("GetModelsForProvider(OpencodeZen) returned %d models, want both", got)
+	}
+}
+
 // ptrBool returns a pointer to b, for building schemas.Key fixtures.
 func ptrBool(b bool) *bool { return &b }
 

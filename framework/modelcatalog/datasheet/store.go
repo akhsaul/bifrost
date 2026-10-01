@@ -492,6 +492,53 @@ func (s *Store) rebuildDatasheetViewUnsafe() {
 		}
 	}
 
+	// Free-tier providers have no rows of their own — the datasheet files their
+	// models under the base provider, and normalizeProvider folds the suffix away
+	// above — so derive their catalogs from the base buckets once those are built.
+	// Only free-tier models carry over: "openrouter-free" must never advertise
+	// openrouter's paid catalog, which is the one thing that distinguishes it from
+	// the provider it mirrors.
+	for base, freeProviders := range freeTierProviders() {
+		baseModels, ok := providerModels[base]
+		if !ok {
+			continue
+		}
+		var freeModels map[string]struct{}
+		for model := range baseModels {
+			if isFreeTierModel(model) {
+				if freeModels == nil {
+					freeModels = make(map[string]struct{})
+				}
+				freeModels[model] = struct{}{}
+			}
+		}
+		// Nothing free to serve: leave the free provider absent from the view
+		// rather than listing it with an empty catalog.
+		if len(freeModels) == 0 {
+			continue
+		}
+		baseDeprecated := deprecatedModels[base]
+		for _, freeProvider := range freeProviders {
+			// Copied per free provider rather than aliased: a base with two free
+			// tiers (or a future in-place filter added below) must not have one
+			// provider's bucket mutate another's.
+			own := make(map[string]struct{}, len(freeModels))
+			for model := range freeModels {
+				own[model] = struct{}{}
+			}
+			providerModels[freeProvider] = own
+			freeDeprecated := make(map[string]struct{})
+			for model := range baseDeprecated {
+				if isFreeTierModel(model) {
+					freeDeprecated[model] = struct{}{}
+				}
+			}
+			if len(freeDeprecated) > 0 {
+				deprecatedModels[freeProvider] = freeDeprecated
+			}
+		}
+	}
+
 	s.datasheetByProvider = make(map[schemas.ModelProvider][]string, len(providerModels))
 	for provider, modelSet := range providerModels {
 		models := make([]string, 0, len(modelSet))

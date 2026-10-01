@@ -297,8 +297,13 @@ func (s *Store) LoadModelCapabilities(ctx context.Context, provider schemas.Mode
 		}
 		rowProvider := gjson.Get(row.Data, "provider").String()
 		// Exact match first: normalizeProvider folds every row that contains
-		// "bedrock" (like "bedrock_mantle") onto "bedrock".
-		if rowProvider == "" || (rowProvider != string(provider) && normalizeProvider(rowProvider) != string(provider)) {
+		// "bedrock" (like "bedrock_mantle") onto "bedrock". Only the "-free"
+		// suffix additionally folds on the runtime side, so "openrouter-free"
+		// matches the "openrouter" rows holding its capabilities — the other
+		// folds must NOT be applied there, or a bedrock_mantle lookup would
+		// answer with a plain bedrock row.
+		if rowProvider == "" ||
+			(rowProvider != string(provider) && normalizeProvider(rowProvider) != foldFreeTierProvider(provider)) {
 			continue
 		}
 		var caps schemas.ModelCapabilities
