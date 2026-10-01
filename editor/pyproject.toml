@@ -1,0 +1,27 @@
+[project]
+name = "bifrost-datasheet-editor"
+version = "0.1.0"
+description = "Edit, overlay, and merge Bifrost's model_parameters.json and model_pricing.json datasheets"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+gui = ["PySide6>=6.6"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+datasheet = "datasheet_editor.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["datasheet_editor", "datasheet_editor.gui"]
+
+[tool.setuptools.package-data]
+datasheet_editor = ["pricing_fields.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["error::DeprecationWarning"]
