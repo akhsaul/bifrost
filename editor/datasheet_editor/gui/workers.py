@@ -22,10 +22,8 @@ from PySide6.QtCore import QObject, QRunnable, Signal, Slot
 from ..dataset import DatasetKind, load_dataset, write_json_atomic
 from ..fieldinfo import build_catalog
 from ..merge import ParamArrayMode, PricingFieldPolicy, merge
+from ..output import OUTPUT_FILENAMES, PARAMETERS_FILENAME, PRICING_FILENAME
 from ..validate import find_cross_file_conflicts
-
-PARAMETERS_FILENAME = "model_parameters.json"
-PRICING_FILENAME = "model_pricing.json"
 
 #: Phases performed off-thread by LoadWorker (reported as steps 0..3).
 LOAD_STEPS = 4
@@ -234,20 +232,32 @@ class MergeWorker(QRunnable):
 
 
 class SaveWorker(QRunnable):
-    """Write both merged output files off-thread, then re-read to verify."""
+    """Write both merged output files off-thread, then re-read to verify.
+
+    Takes the resolved paths rather than a directory, because the directory alone
+    no longer determines the filenames: on a collision the user may have chosen
+    numbered ones. Re-deriving the name here would silently write somewhere other
+    than where the dialog said.
+    """
 
     def __init__(
         self,
         result: Any,
-        output_dir: str | Path,
+        output_dir: str | Path | None = None,
         *,
+        paths: dict[str, Path] | None = None,
         indent: int | None = None,
         sort_keys: bool = False,
     ) -> None:
         super().__init__()
         self.signals = _Signals()
         self._result = result
-        self._output_dir = Path(output_dir)
+        if paths is None:
+            if output_dir is None:
+                raise ValueError("SaveWorker needs output_dir or paths")
+            base = Path(output_dir)
+            paths = {name: base / name for name in OUTPUT_FILENAMES}
+        self._paths = dict(paths)
         self._indent = indent
         self._sort_keys = sort_keys
         _keep_alive(self)
@@ -255,8 +265,8 @@ class SaveWorker(QRunnable):
     @Slot()
     def run(self) -> None:
         try:
-            params_out = self._output_dir / PARAMETERS_FILENAME
-            pricing_out = self._output_dir / PRICING_FILENAME
+            params_out = self._paths[PARAMETERS_FILENAME]
+            pricing_out = self._paths[PRICING_FILENAME]
             write_json_atomic(self._result.parameters, params_out, indent=self._indent,
                               sort_keys=self._sort_keys)
             write_json_atomic(self._result.pricing, pricing_out, indent=self._indent,

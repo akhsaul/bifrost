@@ -46,7 +46,7 @@ from ..merge import (
     merge_param_array,
 )
 from ..validate import validate_overlay
-from .adddialogs import AddFieldDialog, AddModelDialog
+from .adddialogs import AddFieldDialog, AddModelDialog, ask_output_policy
 from .fieldeditor import FieldRow
 from .models import (
     ChangeListModel,
@@ -57,8 +57,10 @@ from .models import (
 )
 from .workers import BUILD_STEP, TOTAL_STEPS, LoadWorker, MergeWorker, SaveWorker
 
-PARAMETERS_FILENAME = "model_parameters.json"
-PRICING_FILENAME = "model_pricing.json"
+# Re-exported from datasheet_editor.output so the filenames, the collision rules
+# and the save path cannot drift apart: three copies of these two strings is two
+# chances to write somewhere other than where the user was told.
+from ..output import PARAMETERS_FILENAME, PRICING_FILENAME  # noqa: F401
 
 
 class MainWindow(QMainWindow):
@@ -1075,11 +1077,59 @@ class MainWindow(QMainWindow):
         if not directory:
             return
         self.output_dir = Path(directory)
+
+        # An input is not a valid output target, even with Overwrite chosen: the
+        # merge read that file moments ago, so replacing it is not repeatable and
+        # the originals are the only copy. The CLI refuses the same case via
+        # --force, and the two front-ends must not disagree about it. Checked
+        # before the dialog so the user is not asked a question whose every answer
+        # is refused.
+        clash = self._output_targets_an_input()
+        if clash is not None:
+            QMessageBox.warning(
+                self,
+                "That is the file you loaded",
+                f"{clash.name} in this folder is the {clash.stem.replace('_', ' ')} file "
+                "this session was loaded from. Writing the merged result there would "
+                "replace the original, and the merge has already read it — the run "
+                "could not be repeated.\n\nChoose a different output folder, or use "
+                "Add Number to write beside it.",
+            )
+            self.status_label.setText(f"refused to overwrite the input {clash.name}")
+            return
+
+        # Asked before the write starts, not after: a collision has to be settled
+        # on the main thread, and the dialog can be cancelled, so it cannot live
+        # inside the worker.
+        policy, paths = ask_output_policy(self.output_dir, self)
+        if policy is None:
+            self.status_label.setText("save cancelled — output files left as they were")
+            return
+
         self._set_busy(True, "writing merged files…")
-        worker = SaveWorker(self.merge_result, self.output_dir)
+        worker = SaveWorker(self.merge_result, paths=paths)
         worker.signals.finished.connect(self._on_saved)
         worker.signals.failed.connect(lambda msg: self._on_failed("save", msg))
         self.pool.start(worker)
+
+    def _output_targets_an_input(self) -> Path | None:
+        """An output path that is also one of the files this session loaded."""
+        wanted = {
+            PARAMETERS_FILENAME: (self.parameters_path, self.custom_path),
+            PRICING_FILENAME: (self.pricing_path, self.custom_path),
+        }
+        for name, sources in wanted.items():
+            target = self.output_dir / name
+            if not target.exists():
+                continue
+            try:
+                resolved = target.resolve()
+            except OSError:
+                continue
+            for source in sources:
+                if source and source.exists() and source.resolve() == resolved:
+                    return target
+        return None
 
     def _on_saved(self, payload: dict[str, Any]) -> None:
         self._set_busy(False)

@@ -37,9 +37,41 @@ The merge engine and CLI need nothing beyond the standard library.
   --output              out/
 ```
 
-Writes `out/model_parameters.json` and `out/model_pricing.json`. The originals
-are never written to; pointing `--output` at an input is refused unless you pass
-`--force`.
+Writes `out/model_parameters.json` and `out/model_pricing.json`.
+
+### Output names that are already taken
+
+If the output folder already holds a file of the same name, the merge **stops
+and asks** rather than picking for you. Neither answer is a safe default:
+overwriting destroys the previous result, and quietly writing a numbered file
+leaves two files that both look canonical.
+
+```bash
+error: the output folder already contains model_parameters.json.
+  --overwrite     replace the existing file
+  --add-number    keep them and write model_parameters_1.json, model_pricing_1.json instead
+  (both files move together: parameters and pricing are read as a pair)
+```
+
+Exit code is `3`, distinct from `1` (validation) and `2` (usage), so a wrapper
+can tell "retry with a flag" from "you called me wrong". The check runs *before*
+the merge, so a refusal costs nothing instead of loading 20MB first.
+
+In the GUI, **Save Output…** shows the same question as a dialog with
+**Overwrite** and **Add Number** buttons, listing the size and modification time
+of what would be lost. Cancel is the default button, so a stray Return cannot
+destroy a file. Escape and Cancel both write nothing.
+
+Two details:
+
+- **The two files move as a pair.** They are read together, so a mismatched pair
+  — `model_parameters_2.json` beside a stale `model_pricing.json` — is a silent
+  data bug. If either name is taken, both are numbered, with the first suffix
+  free for both.
+- **`--overwrite` is not `--force`.** `--overwrite` replaces a previous *output*;
+  `--force` is still required to write over an *input*, because the merge just
+  read that file and the run could not be repeated. The GUI refuses the input
+  case outright, with no flag to bypass it.
 
 | Command | Purpose |
 |---|---|
@@ -53,7 +85,8 @@ Useful flags: `--dry-run` (report without writing), `--report <path>` (full
 change list as JSON), `--indent N` (pretty output), `--sort-keys`,
 `--param-array-mode merge|replace`, `--pricing-fields preserve|strict`.
 
-Exit codes: `0` ok, `1` validation failure, `2` usage/IO error.
+Exit codes: `0` ok, `1` validation failure, `2` usage/IO error, `3` an output
+name is already taken in `--output` (retry with `--overwrite` or `--add-number`).
 
 ## The custom overlay
 
@@ -327,6 +360,11 @@ misleading half-view, not a convenient shortcut.
   leaves both paths set and nothing loaded, and must not leave Merge clickable.
 - Merging writes nowhere until you choose an output directory, and the written
   files are re-read and verified before the status bar reports success.
+- **Save Output…** asks before replacing or numbering — see
+  [Output names that are already taken](#output-names-that-are-already-taken).
+  The dialog shows what would be lost, and **Cancel** is the default button. It
+  also refuses, outright, to write over the file this session was loaded from,
+  which the CLI needs `--force` for and the GUI offers no way to bypass.
 
 ## Tests
 
@@ -334,7 +372,7 @@ misleading half-view, not a convenient shortcut.
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/ -q
 ```
 
-296 tests. The GUI tests are skipped without PySide6. They cover the merge rules
+351 tests. The GUI tests are skipped without PySide6. They cover the merge rules
 against both hand-built cases and slices of the real 20MB file, and pin two Qt
 interop and lifetime traps that make a window render nothing while looking
 healthy:

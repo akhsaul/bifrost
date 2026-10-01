@@ -46,7 +46,9 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPlainTextEdit,
+    QPushButton,
     QScrollArea,
     QSizePolicy,
     QVBoxLayout,
@@ -56,10 +58,137 @@ from PySide6.QtWidgets import (
 from ..fields import KNOWN_MODES
 from ..fieldinfo import DescriptorInfo, FieldInfo, ParameterCatalog
 from ..merge import PARAMS_FIELD, check_field_placement
+from ..output import ADD_NUMBER, OVERWRITE, OutputConflict
 
 #: Which kind of thing the field dialog is writing.
 TARGET_FIELD = "field"
 TARGET_DESCRIPTOR = "descriptor"
+
+
+class OutputConflictDialog(QDialog):
+    """Ask what to do about output files that are already there.
+
+    Two buttons, because those are the two real answers: replace the existing
+    files, or keep them and write numbered ones beside them. Escape and Cancel
+    both mean "do not write", which is the safe reading of a dialog that appears
+    only when something is about to be destroyed.
+
+    The dialog states the size of what would be overwritten. "model_pricing.json
+    exists" is easy to click through; "you are replacing the 28 MB file you loaded
+    an hour ago" is not.
+    """
+
+    def __init__(self, conflict: OutputConflict, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Output files already exist")
+        self.setModal(True)
+        self._policy: str | None = None
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+
+        plural = len(conflict.conflicts) > 1
+        headline = QLabel(
+            f"{'These files' if plural else 'This file'} already "
+            f"{'exist' if plural else 'exists'} in the output folder:"
+        )
+        headline.setWordWrap(True)
+        layout.addWidget(headline)
+
+        listing = QGroupBox()
+        listing_layout = QVBoxLayout(listing)
+        for path in conflict.conflicts:
+            row = QLabel(f"  {path.name}  —  {_describe_file(path)}")
+            row.setStyleSheet("font-family: monospace;")
+            listing_layout.addWidget(row)
+        numbered = conflict.numbered
+        if numbered:
+            keep = QLabel("  keeping them writes:  " + ",  ".join(
+                sorted(p.name for p in numbered.values())
+            ))
+            keep.setStyleSheet("color:#475569; font-family: monospace;")
+            listing_layout.addWidget(keep)
+        layout.addWidget(listing)
+
+        note = QLabel(
+            "Both files are named together: parameters and pricing are read as a "
+            "pair, so the numbered names apply to both."
+        )
+        note.setWordWrap(True)
+        note.setStyleSheet("color:#475569;")
+        layout.addWidget(note)
+
+        buttons = QDialogButtonBox()
+        self.btn_overwrite = QPushButton("&Overwrite")
+        self.btn_overwrite.setToolTip("Replace the existing file(s) with the merged result")
+        self.btn_add_number = QPushButton("Add &Number")
+        self.btn_add_number.setToolTip("Keep the existing file(s) and write numbered ones beside them")
+        cancel = buttons.addButton(QDialogButtonBox.Cancel)
+        # AcceptRole, not ActionRole: both close the dialog, and the policy is
+        # carried in _policy rather than inferred from which button was pressed.
+        buttons.addButton(self.btn_overwrite, QDialogButtonBox.AcceptRole)
+        buttons.addButton(self.btn_add_number, QDialogButtonBox.AcceptRole)
+        cancel.clicked.connect(self.reject)
+        # Cancel is the default so that a stray Return, or a dialog that appears
+        # while the user is typing elsewhere, cannot destroy a file.
+        cancel.setDefault(True)
+        layout.addWidget(buttons)
+
+    def policy(self) -> str | None:
+        """``OVERWRITE``, ``ADD_NUMBER``, or None if the user backed out."""
+        return self._policy
+
+    def accept_overwrite(self) -> None:  # noqa: N802
+        self._policy = OVERWRITE
+        self.accept()
+
+    def accept_add_number(self) -> None:  # noqa: N802
+        self._policy = ADD_NUMBER
+        self.accept()
+
+
+def _describe_file(path: Any) -> str:
+    """Size and mtime, so the risk is legible rather than nominal."""
+    try:
+        stat = path.stat()
+    except OSError:
+        return "size unknown"
+    size = f"{stat.st_size / (1024 * 1024):.1f} MB" if stat.st_size >= 1024 * 1024 else f"{stat.st_size:,} B"
+    from datetime import datetime
+
+    return f"{size}, modified {datetime.fromtimestamp(stat.st_mtime):%Y-%m-%d %H:%M}"
+
+
+def ask_output_policy(
+    output_dir: Any,
+    parent: QWidget | None = None,
+) -> tuple[str | None, dict[str, Any]]:
+    """Resolve the output paths, asking about collisions.
+
+    Returns ``(policy, paths)``. ``policy`` is None when the user cancelled, in
+    which case *paths* is empty and nothing should be written.
+
+    The first :func:`plan_output` call deliberately uses no policy: that is what
+    raises, and the raise is how the normal path stays a single cheap filesystem
+    check rather than a dialog that has to be constructed and torn down on every
+    save.
+    """
+    from ..output import plan_output
+
+    try:
+        # No policy: a raise here is the signal that the user has to be asked.
+        # Keeping the common case a single stat() means saving never constructs a
+        # dialog it will immediately discard.
+        return OVERWRITE, plan_output(output_dir)
+    except OutputConflict as conflict:
+        dialog = OutputConflictDialog(conflict, parent)
+        dialog.btn_overwrite.clicked.connect(dialog.accept_overwrite)
+        dialog.btn_add_number.clicked.connect(dialog.accept_add_number)
+        if dialog.exec() != QDialog.Accepted:
+            return None, {}
+        policy = dialog.policy()
+        assert policy is not None  # accept() only runs through the two handlers
+        return policy, plan_output(output_dir, **{policy: True})
 
 
 class AddModelDialog(QDialog):

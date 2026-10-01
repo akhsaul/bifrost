@@ -25,6 +25,14 @@ from .merge import (
     PricingFieldPolicy,
     merge,
 )
+from .output import (
+    OUTPUT_FILENAMES,
+    PARAMETERS_FILENAME,
+    PRICING_FILENAME,
+    find_conflicts,
+    format_written,
+    plan_output,
+)
 from .validate import (
     ValidationReport,
     find_cross_file_conflicts,
@@ -35,6 +43,10 @@ from .validate import (
 EXIT_OK = 0
 EXIT_VALIDATION = 1
 EXIT_USAGE = 2
+#: A name is already taken in the output folder. Distinct from EXIT_USAGE because
+#: the merge itself was fine -- the run is safe to repeat with a flag, which is
+#: what a script wrapping this needs to tell apart from a bad invocation.
+EXIT_CONFLICT = 3
 
 PARAMETERS_FILENAME = "model_parameters.json"
 PRICING_FILENAME = "model_pricing.json"
@@ -57,7 +69,13 @@ def _load_overlay(path: Path) -> dict[str, dict[str, Any]]:
 
 
 def _guard_output(output: Path, sources: list[Path], force: bool) -> None:
-    """Refuse to write an output file on top of one of its own inputs."""
+    """Refuse to write an output file on top of one of its own inputs.
+
+    Distinct from the name-collision check in :mod:`datasheet_editor.output`: this
+    one protects an *input*, and ``--overwrite`` does not stand in for ``--force``
+    there. Overwriting is fine for a previous *output*; it is not fine for the
+    file the merge just read, because the run cannot be repeated afterwards.
+    """
     out = output.resolve()
     for src in sources:
         if src.exists() and src.resolve() == out:
@@ -66,6 +84,55 @@ def _guard_output(output: Path, sources: list[Path], force: bool) -> None:
                     f"refusing to overwrite the input {src} with merged output; "
                     "choose a different --output or pass --force"
                 )
+
+
+def _resolve_output_paths(
+    args: argparse.Namespace,
+    output_dir: Path,
+    params_path: Path,
+    pricing_path: Path,
+    custom_path: Path,
+) -> dict[str, Path] | None:
+    """Where the merged pair will be written, or None if the run must stop.
+
+    Returns None after printing the reason, so the caller just returns
+    :data:`EXIT_CONFLICT`. Raising ``SystemExit`` here would exit correctly from a
+    terminal but make ``main()`` unusable as a callable -- a wrapper importing it
+    would be killed rather than handed an exit code.
+
+    Resolved before the merge runs, not after, so a collision is reported in
+    milliseconds instead of after loading 20MB and diffing 12,595 models. A
+    command that would refuse should not do the work first.
+    """
+    # Checked before the plan because with --add-number it picks the filenames,
+    # and those are the paths --force has to be checked against.
+    conflicts = find_conflicts(output_dir)
+    if conflicts and not (args.overwrite or args.add_number):
+        numbered = plan_output(output_dir, add_number=True)
+        print(
+            f"error: the output folder already contains {', '.join(p.name for p in conflicts)}.",
+            file=sys.stderr,
+        )
+        print(
+            "  --overwrite     replace the existing "
+            f"{'file' if len(conflicts) == 1 else 'files'}",
+            file=sys.stderr,
+        )
+        print(
+            "  --add-number    keep them and write "
+            f"{', '.join(numbered[n].name for n in OUTPUT_FILENAMES)} instead",
+            file=sys.stderr,
+        )
+        print(
+            "  (both files move together: parameters and pricing are read as a pair)",
+            file=sys.stderr,
+        )
+        return None
+
+    paths = plan_output(output_dir, overwrite=args.overwrite, add_number=args.add_number)
+    _guard_output(paths[PARAMETERS_FILENAME], [params_path, custom_path], args.force)
+    _guard_output(paths[PRICING_FILENAME], [pricing_path, custom_path], args.force)
+    return paths
 
 
 def _print_change_report(result: MergeResult, *, verbose: bool, limit: int = 200) -> None:
@@ -125,6 +192,11 @@ def cmd_merge(args: argparse.Namespace) -> int:
     pricing_path = Path(args.original_pricing)
     custom_path = Path(args.custom)
     output_dir = Path(args.output)
+    paths = _resolve_output_paths(args, output_dir, params_path, pricing_path, custom_path)
+    if paths is None:
+        return EXIT_CONFLICT
+    params_out = paths[PARAMETERS_FILENAME]
+    pricing_out = paths[PRICING_FILENAME]
 
     overlay = _load_overlay(custom_path)
     params = load_dataset(params_path, DatasetKind.PARAMETERS)
@@ -176,19 +248,21 @@ def cmd_merge(args: argparse.Namespace) -> int:
         _write_report(Path(args.report), result)
         print(f"\nreport written to {args.report}")
 
-    params_out = output_dir / PARAMETERS_FILENAME
-    pricing_out = output_dir / PRICING_FILENAME
-    _guard_output(params_out, [params_path, custom_path], args.force)
-    _guard_output(pricing_out, [pricing_path, custom_path], args.force)
-
     if args.dry_run:
         print(f"\ndry run: would write {params_out} and {pricing_out}")
         return EXIT_OK
 
     write_json_atomic(result.parameters, params_out, indent=args.indent, sort_keys=args.sort_keys)
     write_json_atomic(result.pricing, pricing_out, indent=args.indent, sort_keys=args.sort_keys)
-    print(f"\nwrote {params_out}")
-    print(f"wrote {pricing_out}")
+    print(f"\n{format_written(paths)}")
+    if params_out.name != PARAMETERS_FILENAME:
+        # The pair moved, so the originals in this folder are now stale. Saying so
+        # matters: a consumer pointed at model_pricing.json here would keep reading
+        # the previous run's data and see no error.
+        print(
+            f"note: {PARAMETERS_FILENAME} and {PRICING_FILENAME} in this folder were left "
+            "as they were; the new output is under the numbered names above."
+        )
 
     failures = _verify_output(params_out, pricing_out, result)
     for message in failures:
@@ -316,7 +390,30 @@ def build_parser() -> argparse.ArgumentParser:
     p_merge.add_argument("--sort-keys", action="store_true", help="sort object keys on write")
     p_merge.add_argument("--dry-run", action="store_true", help="report without writing")
     p_merge.add_argument("--report", help="write the full change list as JSON")
-    p_merge.add_argument("--force", action="store_true", help="allow overwriting an input file")
+    p_merge.add_argument(
+        "--force", action="store_true",
+        help="allow writing the output over one of the input files (separate from --overwrite)",
+    )
+
+    collision = p_merge.add_argument_group(
+        "output name collisions",
+        "When the output folder already holds a file of the same name, the merge stops "
+        "rather than picking for you. These two flags are the choices. They are mutually "
+        "exclusive, and neither is the default.",
+    )
+    # A mutually exclusive group, so passing both is rejected by argparse with a
+    # usage line rather than raising out of the resolve step. The engine keeps its
+    # own check for callers that bypass argparse.
+    exclusive = collision.add_mutually_exclusive_group()
+    exclusive.add_argument(
+        "--overwrite", action="store_true",
+        help="replace the existing output file(s)",
+    )
+    exclusive.add_argument(
+        "--add-number", action="store_true", dest="add_number",
+        help="keep the existing file(s) and write numbered ones "
+             "(model_parameters_1.json and model_pricing_1.json)",
+    )
     p_merge.add_argument("--quiet", action="store_true", help="suppress the change report")
     p_merge.add_argument("--verbose", action="store_true", help="print every change")
     p_merge.set_defaults(func=cmd_merge)
