@@ -326,6 +326,17 @@ misleading half-view, not a convenient shortcut.
   cell that could be flipped on its own would be editable but wrong; change it
   through **Add Parameter Field…** instead. Each read-only column's header says why
   on hover, and a row's own tooltip carries the playground's `helpText`.
+- **Delete Descriptor** removes a descriptor *you added* — one that is in your
+  overlay but not in the original. The original file is never touched, and the row
+  leaves the merged output until you add it back. A descriptor from the original is
+  deliberately not deletable: the overlay has no delete channel (`merge._deep_merge`
+  is explicit that absence never removes anything), so "removing" one would either
+  do nothing at merge time or force a tombstone into the custom file's format. The
+  button is disabled for those and says why, because a permanently greyed-out
+  control with no reason reads as a bug. Deleting asks first, and prunes the empty
+  containers it leaves, so the custom file never accumulates
+  `{"model": {"parameters": {"model_parameters": []}}}`. Right-clicking a row offers
+  the same action.
 - Editing a descriptor records a minimal overlay entry (`{"id": …, "default": …}`)
   and typing the original value back drops it again, so the custom file never
   accumulates hollow records or a copy of the model's whole array.
@@ -372,7 +383,7 @@ misleading half-view, not a convenient shortcut.
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest tests/ -q
 ```
 
-351 tests. The GUI tests are skipped without PySide6. They cover the merge rules
+370 tests. The GUI tests are skipped without PySide6. They cover the merge rules
 against both hand-built cases and slices of the real 20MB file, and pin two Qt
 interop and lifetime traps that make a window render nothing while looking
 healthy:

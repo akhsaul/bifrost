@@ -359,7 +359,26 @@ class MainWindow(QMainWindow):
         self.param_table.setColumnWidth(2, 110)
         self.param_table.setColumnWidth(3, 110)
         self.param_table.setAlternatingRowColors(True)
+        # A Delete key in the table would be quicker, but the row under the cursor
+        # is not the row the user last edited after a rebuild, and a descriptor
+        # carries a label and a default that took real typing. An explicit button
+        # on the selected row is the one that cannot surprise anyone.
+        self.param_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.param_table.customContextMenuRequested.connect(self._on_param_context_menu)
         array_layout.addWidget(self.param_table)
+
+        descriptor_actions = QHBoxLayout()
+        descriptor_actions.setContentsMargins(0, 6, 0, 0)
+        self.btn_delete_param = QPushButton("Delete Descriptor")
+        self.btn_delete_param.clicked.connect(self._on_delete_param)
+        self.btn_delete_param.setEnabled(False)
+        descriptor_actions.addWidget(self.btn_delete_param, 0, Qt.AlignLeft)
+        self.descriptors_delete_hint = QLabel()
+        self.descriptors_delete_hint.setWordWrap(True)
+        self.descriptors_delete_hint.setStyleSheet("color:#64748b;")
+        descriptor_actions.addWidget(self.descriptors_delete_hint, 1)
+        array_layout.addLayout(descriptor_actions)
+
         self.descriptors_empty = QLabel(
             "This model publishes no model_parameters descriptors."
         )
@@ -783,6 +802,8 @@ class MainWindow(QMainWindow):
         self.param_array_box.setEnabled(False)
         self.param_table.setVisible(False)
         self.descriptors_empty.setVisible(False)
+        self._param_focus_id = None
+        self._update_delete_param_enabled()
         for button in (self.btn_add_param_field, self.btn_add_pricing_field):
             button.setEnabled(bool(model_id) and not self._loading)
         if not model_id:
@@ -844,6 +865,9 @@ class MainWindow(QMainWindow):
         # Disabling the tab, rather than leaving an empty one, keeps the tab row
         # from carrying a dead entry for the many models with no descriptors.
         self.tabs.setTabEnabled(self._descriptors_tab, has_array)
+        # The focus id can name a descriptor that is gone or now read-only, so the
+        # Delete button is re-evaluated rather than carried over.
+        self._update_delete_param_enabled()
 
     # ------------------------------------------------------------ adding -- #
 
@@ -995,6 +1019,15 @@ class MainWindow(QMainWindow):
         catalog = self.param_catalog
         return catalog.descriptor(param_id) if (catalog and param_id) else None
 
+    def _select_descriptor(self, param_id: str | None) -> None:
+        """Make *param_id* the descriptor the Delete button and a rebuild target.
+
+        The single place focus changes, so a selection made by click, by
+        keyboard, or by a test all leave the same state behind.
+        """
+        self._param_focus_id = param_id
+        self._update_delete_param_enabled()
+
     def _on_param_clicked(self, index: Any) -> None:
         """Remember the clicked descriptor so a rebuild can put the selection back.
 
@@ -1005,7 +1038,83 @@ class MainWindow(QMainWindow):
         """
         item = self.param_model.item_at(index.row())
         param_id = item.get(PARAMS_ID_FIELD) if isinstance(item, dict) else None
-        self._param_focus_id = param_id if isinstance(param_id, str) else None
+        self._select_descriptor(param_id if isinstance(param_id, str) else None)
+
+    def _update_delete_param_enabled(self) -> None:
+        """Arm the Delete button only for a descriptor the user actually added.
+
+        The distinction is the whole point: a descriptor from the original
+        dataset is not the user's to remove here. There is no delete channel in
+        the overlay, so "delete" on one of those would silently do nothing at
+        merge time, or force a tombstone into the custom file's format.
+        """
+        model_id = self._selected_model()
+        param_id = self._param_focus_id
+        if not model_id or not param_id:
+            self.btn_delete_param.setEnabled(False)
+            self.btn_delete_param.setToolTip("Select a descriptor first.")
+            self.descriptors_delete_hint.setText("")
+            return
+
+        original_ids = _descriptor_ids(self.parameters.get(model_id) or {})
+        overlay_ids = _descriptor_ids({"model_parameters": _param_overlay(self, model_id)})
+        if param_id in original_ids:
+            self.btn_delete_param.setEnabled(False)
+            self.btn_delete_param.setToolTip(
+                f"'{param_id}' comes from the original model_parameters.json, not from "
+                "your custom overlay. Editing its label or default records an override; "
+                "the descriptor itself stays, because the overlay has no way to remove it."
+            )
+            self.descriptors_delete_hint.setText(
+                f"'{param_id}' is from the original file — it can be overridden, not removed."
+            )
+            return
+
+        self.btn_delete_param.setEnabled(True)
+        self.btn_delete_param.setToolTip(
+            f"Remove '{param_id}' from your custom overlay. The original file is untouched."
+        )
+        self.descriptors_delete_hint.setText(
+            f"'{param_id}' is yours — it can be edited or removed."
+        )
+
+    def _on_delete_param(self) -> None:
+        model_id = self._selected_model()
+        param_id = self._param_focus_id
+        if not model_id or not param_id:
+            return
+        if not _is_deletable(self, model_id, param_id):
+            # Reached by keyboard or a stale click; the button was already
+            # disabled, so this is belt-and-braces rather than a real path.
+            return
+        answer = QMessageBox.question(
+            self,
+            "Remove this descriptor?",
+            f"Remove '{param_id}' from the custom overlay?\n\n"
+            "The original model_parameters.json is not touched. The descriptor "
+            "disappears from the merged output until you add it again.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            return
+        _delete_param(self, model_id, param_id)
+        self.status_label.setText(
+            f"Removed {param_id} from the custom overlay. Save Custom to keep it."
+        )
+        self._update_delete_param_enabled()
+
+    def _on_param_context_menu(self, pos: Any) -> None:
+        """Right-click a descriptor: select it, then offer the same two actions."""
+        index = self.param_table.indexAt(pos)
+        if not index.isValid():
+            return
+        item = self.param_model.item_at(index.row())
+        param_id = item.get(PARAMS_ID_FIELD) if isinstance(item, dict) else None
+        if not isinstance(param_id, str):
+            return
+        self._select_descriptor(param_id)
+        self.btn_delete_param.showMenu(self.param_table.viewport().mapToGlobal(pos))
 
     def _on_param_cell_edited(self, param_id: str, key: str, value: Any) -> None:
         """A descriptor cell was edited in the table; record it as an override."""
@@ -1236,6 +1345,54 @@ def _set_param_field(window: "MainWindow", model_id: str, param_id: str, key: st
         entry = {PARAMS_ID_FIELD: param_id}
         array.append(entry)
     entry[key] = value
+    window.dirty = True
+    window.btn_save_custom.setEnabled(True)
+    window._mark_row(model_id)
+    _refresh_param_table(window, model_id)
+
+
+def _is_deletable(window: "MainWindow", model_id: str, param_id: str) -> bool:
+    """Whether *param_id* is a descriptor the user added and may remove again.
+
+    True only when the overlay has an entry for it and the original does not. An
+    original descriptor is the source data's, not the custom file's: overriding
+    it is an override, and removing it is not something the overlay can express.
+    """
+    if param_id in _descriptor_ids(window.parameters.get(model_id) or {}):
+        return False
+    return param_id in _descriptor_ids({"model_parameters": _param_overlay(window, model_id)})
+
+
+def _delete_param(window: "MainWindow", model_id: str, param_id: str) -> None:
+    """Drop an overlay-only descriptor, pruning the empty containers it leaves.
+
+    The pruning is not cosmetic: an empty ``model_parameters: []`` or an empty
+    ``parameters: {}`` would be written to the custom file and show up in the
+    diff as a change against a model that has nothing to change.
+    """
+    section = window.overlay.get(model_id, {}).get("parameters")
+    if not isinstance(section, dict):
+        return
+    array = section.get(PARAMS_FIELD)
+    if not isinstance(array, list):
+        return
+    remaining = [
+        item for item in array
+        if not (isinstance(item, dict) and item.get(PARAMS_ID_FIELD) == param_id)
+    ]
+    if len(remaining) == len(array):
+        return
+
+    entry = window.overlay[model_id]
+    if remaining:
+        section[PARAMS_FIELD] = remaining
+    else:
+        section.pop(PARAMS_FIELD, None)
+    if not section:
+        entry.pop("parameters", None)
+    if not entry:
+        window.overlay.pop(model_id, None)
+
     window.dirty = True
     window.btn_save_custom.setEnabled(True)
     window._mark_row(model_id)
