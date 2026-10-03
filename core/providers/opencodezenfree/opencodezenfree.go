@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/maximhq/bifrost/core/providers/anthropic"
 	"github.com/maximhq/bifrost/core/providers/openai"
 	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
 	schemas "github.com/maximhq/bifrost/core/schemas"
@@ -305,8 +306,13 @@ func wrapResponsesToChatStreamPostHookRunner(postHookRunner schemas.PostHookRunn
 	}
 }
 
-// ChatCompletion performs a chat completion request by converting to Responses API format
-// and routing to the Opencode Zen Free /v1/responses endpoint.
+// ChatCompletion performs a chat completion request, routing each model to
+// its required upstream endpoint: Gemini-kind models to the Google
+// Generative Language path, qwen-kind models to /v1/messages (Anthropic
+// wire format), space-bunny-kind models to /v1/chat/completions, and
+// everything else to /v1/responses. Unary requests are served via stream
+// fan-in (the free tier requires stream:true); on unsupported-format
+// failures the chain chat -> responses -> messages is walked.
 func (p *opencodeZenFreeProvider) ChatCompletion(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostChatRequest) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
 	if request == nil {
 		return nil, &schemas.BifrostError{
@@ -316,6 +322,69 @@ func (p *opencodeZenFreeProvider) ChatCompletion(ctx *schemas.BifrostContext, ke
 			},
 		}
 	}
+	// Resolve once: the generated session ID feeds both prompt_cache_key and
+	// the session headers. A second resolution would generate a DIFFERENT
+	// random session for the headers (counter advanced), breaking the invariant.
+	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders)
+	ensureOpencodeZenFreeChatDefaults(request)
+	extraHeaders := headersFromResolved(ctx, p.networkConfig.ExtraHeaders, resolved, false)
+
+	primary := classifyOpencodeZenFreeModel(ctx, request.Model)
+	if primary == opencodeZenFreeEndpointGemini {
+		return p.doGeminiChatUnary(ctx, request, geminiHeaders(extraHeaders))
+	}
+	var lastErr *schemas.BifrostError
+	for _, endpoint := range opencodeZenFreeFallbackChain(primary) {
+		var (
+			chatResp *schemas.BifrostChatResponse
+			bErr     *schemas.BifrostError
+		)
+		switch endpoint {
+		case opencodeZenFreeEndpointChat:
+			chatResp, bErr = p.doChatUnary(ctx, request, extraHeaders)
+		case opencodeZenFreeEndpointMessages:
+			chatResp, bErr = p.doMessagesChatUnary(ctx, request, extraHeaders)
+		default:
+			responsesResp, rErr := p.doResponsesUnaryViaChat(ctx, request, resolved.SessionID, extraHeaders)
+			bErr = rErr
+			if rErr == nil && responsesResp != nil {
+				chatResp = responsesResp.ToBifrostChatResponse()
+				if chatResp == nil {
+					bErr = &schemas.BifrostError{
+						IsBifrostError: true,
+						Error: &schemas.ErrorField{
+							Message: "failed to convert responses response to chat response",
+						},
+					}
+				}
+			}
+		}
+		if bErr == nil {
+			if chatResp != nil {
+				chatResp.BackfillParams(request)
+			}
+			return chatResp, nil
+		}
+		if !isUnsupportedFormatError(bErr) {
+			return nil, bErr
+		}
+		lastErr = bErr
+	}
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, &schemas.BifrostError{
+		IsBifrostError: true,
+		Error: &schemas.ErrorField{
+			Message: "chat completion request failed on all endpoints",
+		},
+	}
+}
+
+// doResponsesUnaryViaChat serves the responses endpoint for a chat-shaped
+// request: convert to Responses shape, apply Responses defaults, and run the
+// unary responses attempt.
+func (p *opencodeZenFreeProvider) doResponsesUnaryViaChat(ctx *schemas.BifrostContext, request *schemas.BifrostChatRequest, sessionID string, extraHeaders map[string]string) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
 	responsesReq := request.ToResponsesRequest()
 	if responsesReq == nil {
 		return nil, &schemas.BifrostError{
@@ -325,25 +394,14 @@ func (p *opencodeZenFreeProvider) ChatCompletion(ctx *schemas.BifrostContext, ke
 			},
 		}
 	}
-	responsesResp, bifrostErr := p.Responses(ctx, key, responsesReq)
-	if bifrostErr != nil {
-		return nil, bifrostErr
-	}
-	chatResp := responsesResp.ToBifrostChatResponse()
-	if chatResp == nil {
-		return nil, &schemas.BifrostError{
-			IsBifrostError: true,
-			Error: &schemas.ErrorField{
-				Message: "failed to convert responses response to chat response",
-			},
-		}
-	}
-	chatResp.BackfillParams(request)
-	return chatResp, nil
+	ensureOpencodeZenFreeDefaults(responsesReq, sessionID)
+	return p.doResponsesUnary(ctx, responsesReq, extraHeaders)
 }
 
-// ChatCompletionStream performs a streaming chat completion request by converting to Responses API
-// format and routing to the Opencode Zen Free /v1/responses endpoint.
+// ChatCompletionStream performs a streaming chat completion request,
+// routing each model to its required upstream endpoint. Streaming paths
+// pass through untouched (no stream forcing, no accumulation); endpoint
+// fallback applies only to pre-first-chunk errors.
 func (p *opencodeZenFreeProvider) ChatCompletionStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostChatRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
 	if request == nil {
 		return nil, &schemas.BifrostError{
@@ -353,22 +411,112 @@ func (p *opencodeZenFreeProvider) ChatCompletionStream(ctx *schemas.BifrostConte
 			},
 		}
 	}
-	responsesReq := request.ToResponsesRequest()
-	if responsesReq == nil {
-		return nil, &schemas.BifrostError{
-			IsBifrostError: true,
-			Error: &schemas.ErrorField{
-				Message: "failed to convert chat request to responses request",
-			},
+	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders)
+	ensureOpencodeZenFreeChatDefaults(request)
+	extraHeaders := headersFromResolved(ctx, p.networkConfig.ExtraHeaders, resolved, true)
+
+	primary := classifyOpencodeZenFreeModel(ctx, request.Model)
+	if primary == opencodeZenFreeEndpointGemini {
+		return p.geminiChatStream(ctx, postHookRunner, postHookSpanFinalizer, request, geminiHeaders(extraHeaders))
+	}
+	chatPostHookRunner := wrapResponsesToChatStreamPostHookRunner(postHookRunner)
+	var lastErr *schemas.BifrostError
+	for _, endpoint := range opencodeZenFreeFallbackChain(primary) {
+		switch endpoint {
+		case opencodeZenFreeEndpointChat:
+			stream, bErr := openai.HandleOpenAIChatCompletionStreaming(
+				ctx,
+				p.streamingClient,
+				p.opencodeChatURL(ctx),
+				request,
+				nil,
+				extraHeaders,
+				p.networkConfig.StreamIdleTimeoutInSeconds,
+				providerUtils.ShouldSendBackRawRequest(ctx, p.sendBackRawRequest),
+				providerUtils.ShouldSendBackRawResponse(ctx, p.sendBackRawResponse),
+				p.providerKey,
+				postHookRunner,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				p.logger,
+				postHookSpanFinalizer,
+			)
+			if bErr == nil {
+				return stream, nil
+			}
+			if !isUnsupportedFormatError(bErr) {
+				return nil, bErr
+			}
+			lastErr = bErr
+		case opencodeZenFreeEndpointMessages:
+			jsonBody, bErr := anthropic.BuildAnthropicChatRequestBody(ctx, request, anthropic.AnthropicRequestBuildConfig{
+				Provider:                  schemas.OpencodeZenFree,
+				IsStreaming:               true,
+				ShouldSendBackRawRequest:  providerUtils.ShouldSendBackRawRequest(ctx, p.sendBackRawRequest),
+				ShouldSendBackRawResponse: providerUtils.ShouldSendBackRawResponse(ctx, p.sendBackRawResponse),
+			})
+			if bErr != nil {
+				return nil, bErr
+			}
+			stream, bErr := anthropic.HandleAnthropicChatCompletionStreaming(
+				ctx,
+				p.streamingClient,
+				p.opencodeMessagesURL(ctx),
+				jsonBody,
+				anthropicHeaders(nil),
+				extraHeaders,
+				p.networkConfig.StreamIdleTimeoutInSeconds,
+				p.networkConfig.BetaHeaderOverrides,
+				providerUtils.ShouldSendBackRawRequest(ctx, p.sendBackRawRequest),
+				providerUtils.ShouldSendBackRawResponse(ctx, p.sendBackRawResponse),
+				p.providerKey,
+				postHookRunner,
+				nil,
+				nil,
+				p.logger,
+				postHookSpanFinalizer,
+			)
+			if bErr == nil {
+				return stream, nil
+			}
+			if !isUnsupportedFormatError(bErr) {
+				return nil, bErr
+			}
+			lastErr = bErr
+		default:
+			responsesReq := request.ToResponsesRequest()
+			if responsesReq == nil {
+				return nil, &schemas.BifrostError{
+					IsBifrostError: true,
+					Error: &schemas.ErrorField{
+						Message: "failed to convert chat request to responses request",
+					},
+				}
+			}
+			ensureOpencodeZenFreeDefaults(responsesReq, resolved.SessionID)
+			stream, bErr := p.openResponsesStream(ctx, chatPostHookRunner, postHookSpanFinalizer, responsesReq, extraHeaders)
+			if bErr == nil {
+				return stream, nil
+			}
+			if !isUnsupportedFormatError(bErr) {
+				return nil, bErr
+			}
+			lastErr = bErr
 		}
 	}
-	return p.ResponsesStream(
-		ctx,
-		wrapResponsesToChatStreamPostHookRunner(postHookRunner),
-		postHookSpanFinalizer,
-		key,
-		responsesReq,
-	)
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, &schemas.BifrostError{
+		IsBifrostError: true,
+		Error: &schemas.ErrorField{
+			Message: "chat completion stream request failed on all endpoints",
+		},
+	}
 }
 
 // preserveOpencodeReasoning restores client-supplied effort/summary verbatim on
@@ -514,7 +662,10 @@ func preserveOpencodeReasoning(wireReq *openai.OpenAIResponsesRequest, request *
 	return wireReq
 }
 
-// Responses performs a responses request to the Opencode Zen Free API.
+// Responses performs a responses request, routing each model to its
+// required upstream endpoint with the same classification as the chat path.
+// Non-responses endpoints are served by converting to the target shape;
+// unary requests use stream fan-in where the wire supports it.
 func (p *opencodeZenFreeProvider) Responses(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostResponsesRequest) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
 	// Resolve once: the generated session ID feeds both prompt_cache_key and
 	// the session headers. A second resolution would generate a DIFFERENT
@@ -522,35 +673,62 @@ func (p *opencodeZenFreeProvider) Responses(ctx *schemas.BifrostContext, key sch
 	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders)
 	ensureOpencodeZenFreeDefaults(request, resolved.SessionID)
 	extraHeaders := headersFromResolved(ctx, p.networkConfig.ExtraHeaders, resolved, false)
-	return openai.HandleOpenAIResponsesRequestWithOpencodeConverter(
-		ctx,
-		p.client,
-		p.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, "/v1/responses"),
-		request,
-		nil,
-		extraHeaders,
-		providerUtils.ShouldSendBackRawRequest(ctx, p.sendBackRawRequest),
-		providerUtils.ShouldSendBackRawResponse(ctx, p.sendBackRawResponse),
-		p.providerKey,
-		nil,
-		parseOpencodeZenFreeError,
-		nil,
-		p.logger,
-		func(req *schemas.BifrostResponsesRequest) (providerUtils.RequestBodyWithExtraParams, error) {
-			wireReq := preserveOpencodeReasoning(openai.ToOpenAIResponsesRequest(ctx, req), req)
-			wireReq = ensureOpencodeReasoningItemSummaries(wireReq)
-			return normalizeOpencodeReasoningItems(wireReq, req), nil
+
+	primary := classifyOpencodeZenFreeModel(ctx, request.Model)
+	if primary == opencodeZenFreeEndpointGemini {
+		return p.doGeminiResponsesUnary(ctx, request, geminiHeaders(extraHeaders))
+	}
+	var lastErr *schemas.BifrostError
+	for _, endpoint := range opencodeZenFreeFallbackChain(primary) {
+		var (
+			responsesResp *schemas.BifrostResponsesResponse
+			bErr          *schemas.BifrostError
+		)
+		switch endpoint {
+		case opencodeZenFreeEndpointChat:
+			chatReq := request.ToChatRequest()
+			ensureOpencodeZenFreeChatDefaults(chatReq)
+			var chatResp *schemas.BifrostChatResponse
+			chatResp, bErr = p.doChatUnary(ctx, chatReq, extraHeaders)
+			if bErr == nil {
+				if chatResp == nil {
+					bErr = &schemas.BifrostError{
+						IsBifrostError: true,
+						Error: &schemas.ErrorField{
+							Message: "failed to convert chat response to responses response",
+						},
+					}
+				} else {
+					responsesResp = chatResp.ToBifrostResponsesResponse()
+				}
+			}
+		case opencodeZenFreeEndpointMessages:
+			responsesResp, bErr = p.doMessagesResponsesUnary(ctx, request, extraHeaders)
+		default:
+			responsesResp, bErr = p.doResponsesUnary(ctx, request, extraHeaders)
+		}
+		if bErr == nil {
+			return responsesResp, nil
+		}
+		if !isUnsupportedFormatError(bErr) {
+			return nil, bErr
+		}
+		lastErr = bErr
+	}
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, &schemas.BifrostError{
+		IsBifrostError: true,
+		Error: &schemas.ErrorField{
+			Message: "responses request failed on all endpoints",
 		},
-	)
+	}
 }
 
-// ResponsesStream performs a streaming responses request to the Opencode Zen Free API.
-func (p *opencodeZenFreeProvider) ResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostResponsesRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
-	// Same single-resolution invariant as Responses: headers must carry the
-	// exact session ID used for prompt_cache_key.
-	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders)
-	ensureOpencodeZenFreeDefaults(request, resolved.SessionID)
-	extraHeaders := headersFromResolved(ctx, p.networkConfig.ExtraHeaders, resolved, true)
+// openResponsesStream opens one streaming /v1/responses attempt with the
+// opencode converter. Streaming paths pass through untouched.
+func (p *opencodeZenFreeProvider) openResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), request *schemas.BifrostResponsesRequest, extraHeaders map[string]string) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
 	postRequestConverter := func(wireReq *openai.OpenAIResponsesRequest) *openai.OpenAIResponsesRequest {
 		wireReq = preserveOpencodeReasoning(wireReq, request)
 		wireReq = ensureOpencodeReasoningItemSummaries(wireReq)
@@ -559,7 +737,7 @@ func (p *opencodeZenFreeProvider) ResponsesStream(ctx *schemas.BifrostContext, p
 	return openai.HandleOpenAIResponsesStreaming(
 		ctx,
 		p.streamingClient,
-		p.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, "/v1/responses"),
+		p.opencodeResponsesURL(ctx),
 		request,
 		nil,
 		extraHeaders,
@@ -576,6 +754,111 @@ func (p *opencodeZenFreeProvider) ResponsesStream(ctx *schemas.BifrostContext, p
 		p.logger,
 		postHookSpanFinalizer,
 	)
+}
+
+// ResponsesStream performs a streaming responses request, routing each model
+// to its required upstream endpoint. Streaming paths pass through untouched;
+// endpoint fallback applies only to pre-first-chunk errors.
+func (p *opencodeZenFreeProvider) ResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostResponsesRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+	// Same single-resolution invariant as Responses: headers must carry the
+	// exact session ID used for prompt_cache_key.
+	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders)
+	ensureOpencodeZenFreeDefaults(request, resolved.SessionID)
+	extraHeaders := headersFromResolved(ctx, p.networkConfig.ExtraHeaders, resolved, true)
+
+	primary := classifyOpencodeZenFreeModel(ctx, request.Model)
+	if primary == opencodeZenFreeEndpointGemini {
+		return p.geminiResponsesStream(ctx, postHookRunner, postHookSpanFinalizer, request, geminiHeaders(extraHeaders))
+	}
+	var lastErr *schemas.BifrostError
+	for _, endpoint := range opencodeZenFreeFallbackChain(primary) {
+		switch endpoint {
+		case opencodeZenFreeEndpointChat:
+			chatReq := request.ToChatRequest()
+			ensureOpencodeZenFreeChatDefaults(chatReq)
+			stream, bErr := openai.HandleOpenAIChatCompletionStreaming(
+				ctx,
+				p.streamingClient,
+				p.opencodeChatURL(ctx),
+				chatReq,
+				nil,
+				extraHeaders,
+				p.networkConfig.StreamIdleTimeoutInSeconds,
+				providerUtils.ShouldSendBackRawRequest(ctx, p.sendBackRawRequest),
+				providerUtils.ShouldSendBackRawResponse(ctx, p.sendBackRawResponse),
+				p.providerKey,
+				postHookRunner,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				nil,
+				p.logger,
+				postHookSpanFinalizer,
+			)
+			if bErr == nil {
+				return stream, nil
+			}
+			if !isUnsupportedFormatError(bErr) {
+				return nil, bErr
+			}
+			lastErr = bErr
+		case opencodeZenFreeEndpointMessages:
+			jsonBody, bErr := anthropic.BuildAnthropicResponsesRequestBody(ctx, request, anthropic.AnthropicRequestBuildConfig{
+				Provider:                  schemas.OpencodeZenFree,
+				IsStreaming:               true,
+				ShouldSendBackRawRequest:  providerUtils.ShouldSendBackRawRequest(ctx, p.sendBackRawRequest),
+				ShouldSendBackRawResponse: providerUtils.ShouldSendBackRawResponse(ctx, p.sendBackRawResponse),
+			})
+			if bErr != nil {
+				return nil, bErr
+			}
+			stream, bErr := anthropic.HandleAnthropicResponsesStream(
+				ctx,
+				p.streamingClient,
+				p.opencodeMessagesURL(ctx),
+				jsonBody,
+				anthropicHeaders(nil),
+				extraHeaders,
+				p.networkConfig.StreamIdleTimeoutInSeconds,
+				p.networkConfig.BetaHeaderOverrides,
+				providerUtils.ShouldSendBackRawRequest(ctx, p.sendBackRawRequest),
+				providerUtils.ShouldSendBackRawResponse(ctx, p.sendBackRawResponse),
+				p.providerKey,
+				postHookRunner,
+				nil,
+				nil,
+				p.logger,
+				postHookSpanFinalizer,
+			)
+			if bErr == nil {
+				return stream, nil
+			}
+			if !isUnsupportedFormatError(bErr) {
+				return nil, bErr
+			}
+			lastErr = bErr
+		default:
+			stream, bErr := p.openResponsesStream(ctx, postHookRunner, postHookSpanFinalizer, request, extraHeaders)
+			if bErr == nil {
+				return stream, nil
+			}
+			if !isUnsupportedFormatError(bErr) {
+				return nil, bErr
+			}
+			lastErr = bErr
+		}
+	}
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, &schemas.BifrostError{
+		IsBifrostError: true,
+		Error: &schemas.ErrorField{
+			Message: "responses stream request failed on all endpoints",
+		},
+	}
 }
 
 // Embedding is not supported by OpencodeZenFree.

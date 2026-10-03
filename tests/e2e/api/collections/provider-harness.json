@@ -170627,6 +170627,156 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "117. Opencode Zen Free per-model routing (opencode-zen-free)",
+      "description": "opencode-zen-free routes each model to its required upstream endpoint: muse-spark-1.3-contributor-free to /v1/responses (OpenAI format), space-bunny-free to /v1/chat/completions (OpenAI format), qwen3.5-plus to /v1/messages (Anthropic format), Gemini-kind models to /v1/models/<model> (Google Generative Language format). Unary requests force stream:true upstream and accumulate the SSE stream. Regression: space-bunny-free sent to /v1/responses failed with \"Model space-bunny-free is not supported for format openai\". Each case pins the model on its correct endpoint and asserts the format error is absent.",
+      "item": [
+        {
+          "name": "POST /v1/chat/completions - opencode-zen-free space-bunny-free routes to chat endpoint - #opencode-zen-free-routing",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('space-bunny chat succeeds', function () {",
+                  "  pm.expect(pm.response.code, 'failed: ' + pm.response.text()).to.be.below(400);",
+                  "});",
+                  "pm.test('no unsupported-format error', function () {",
+                  "  pm.expect(pm.response.text(), 'format error leaked').to.not.include('not supported for format');",
+                  "});",
+                  "pm.test('chat completion has content', function () {",
+                  "  var body = pm.response.json();",
+                  "  var content = body.choices && body.choices[0] && body.choices[0].message && body.choices[0].message.content;",
+                  "  pm.expect(content, 'missing content: ' + pm.response.text()).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"opencode-zen-free/space-bunny-free\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": \"Reply with exactly: bunny-ok\" }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/chat/completions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "chat",
+                "completions"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/responses - opencode-zen-free muse-spark-1.3-contributor-free routes to responses endpoint - #opencode-zen-free-routing",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('muse-spark responses succeeds', function () {",
+                  "  pm.expect(pm.response.code, 'failed: ' + pm.response.text()).to.be.below(400);",
+                  "});",
+                  "pm.test('no unsupported-format error', function () {",
+                  "  pm.expect(pm.response.text(), 'format error leaked').to.not.include('not supported for format');",
+                  "});",
+                  "pm.test('responses output present', function () {",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.output, 'missing output: ' + pm.response.text()).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"opencode-zen-free/muse-spark-1.3-contributor-free\",\n  \"input\": [\n    { \"type\": \"message\", \"role\": \"user\", \"content\": \"Reply with exactly: spark-ok\" }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/responses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "responses"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /v1/chat/completions (stream) - opencode-zen-free space-bunny-free streams untouched - #opencode-zen-free-routing",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('space-bunny stream succeeds', function () {",
+                  "  pm.expect(pm.response.code, 'failed: ' + pm.response.text()).to.be.below(400);",
+                  "});",
+                  "pm.test('SSE framing', function () {",
+                  "  var ct = pm.response.headers.get('content-type') || '';",
+                  "  pm.expect(ct, 'expected SSE, got ' + ct).to.include('text/event-stream');",
+                  "  var text = pm.response.text() || '';",
+                  "  pm.expect(text.indexOf('data: ') !== -1, 'expected SSE data chunks').to.be.true;",
+                  "  pm.expect(text, 'format error leaked').to.not.include('not supported for format');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"opencode-zen-free/space-bunny-free\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": \"Reply with exactly: bunny-stream-ok\" }\n  ],\n  \"stream\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/chat/completions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v1",
+                "chat",
+                "completions"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ]
 }

@@ -761,3 +761,24 @@ func (c ModelCaps) SupportsResponsesEndpoint(fallback bool) bool {
 	}
 	return false
 }
+
+// SupportsEndpoint reports whether the datasheet's supported_endpoints list
+// includes the given URL path fragment (e.g. "/v1/chat/completions",
+// "/v1/messages"). Unknown fragments never match: an endpoint the row does
+// not list is not silently served. When the row says nothing
+// (no record or empty list), it answers with fallback — the caller's own
+// detection — so catalog-less deployments keep working.
+func (c ModelCaps) SupportsEndpoint(endpoint string, fallback bool) bool {
+	if endpoint == "" {
+		return fallback
+	}
+	if c.record == nil || len(c.record.SupportedEndpoints) == 0 {
+		return fallback
+	}
+	for _, supported := range c.record.SupportedEndpoints {
+		if strings.Contains(supported, endpoint) {
+			return true
+		}
+	}
+	return false
+}

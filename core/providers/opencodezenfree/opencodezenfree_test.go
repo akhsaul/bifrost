@@ -75,8 +75,8 @@ func TestOpencodeZenFreeMandatoryHeadersAndReasoning(t *testing.T) {
 		})
 		mu.Unlock()
 
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, "data: {\"type\":\"response.completed\",\"sequence_number\":1,\"response\":{\"id\":\"resp_123\",\"object\":\"response\",\"model\":\"muse-spark-1.3-contributor-free\",\"output\":[]}}\n\n")
 	}))
 	defer server.Close()
 
@@ -278,8 +278,9 @@ func TestOpencodeZenFreeChatCompletionAndReasoning(t *testing.T) {
 		body = payload
 		mu.Unlock()
 
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","status":"completed","model":"muse-spark-1.3-contributor-free","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"hello"}]}]}`)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, "data: {\"type\":\"response.output_text.delta\",\"sequence_number\":1,\"delta\":\"hello\"}\n\n")
+		_, _ = fmt.Fprint(w, "data: {\"type\":\"response.completed\",\"sequence_number\":2,\"response\":{\"id\":\"resp_123\",\"object\":\"response\",\"status\":\"completed\",\"model\":\"muse-spark-1.3-contributor-free\",\"output\":[{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"hello\"}]}]}}\n\n")
 	}))
 	defer server.Close()
 
@@ -563,8 +564,8 @@ func TestOpencodeZenFreeClientValuesWinOverDefaults(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bodyBytes, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(bodyBytes, &body)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, "data: {\"type\":\"response.completed\",\"sequence_number\":1,\"response\":{\"id\":\"resp_123\",\"object\":\"response\",\"model\":\"muse-spark-1.3-contributor-free\",\"output\":[]}}\n\n")
 	}))
 	defer server.Close()
 
@@ -657,8 +658,8 @@ func TestOpencodeZenFreePartialToolsMerge(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bodyBytes, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(bodyBytes, &body)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, "data: {\"type\":\"response.completed\",\"sequence_number\":1,\"response\":{\"id\":\"resp_123\",\"object\":\"response\",\"model\":\"muse-spark-1.3-contributor-free\",\"output\":[]}}\n\n")
 	}))
 	defer server.Close()
 
@@ -743,8 +744,8 @@ func TestOpencodeZenFreeSystemPromptExtractedToInstructions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bodyBytes, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(bodyBytes, &body)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, "data: {\"type\":\"response.completed\",\"sequence_number\":1,\"response\":{\"id\":\"resp_123\",\"object\":\"response\",\"model\":\"muse-spark-1.3-contributor-free\",\"output\":[]}}\n\n")
 	}))
 	defer server.Close()
 
@@ -804,8 +805,8 @@ func TestOpencodeZenFreeExplicitInstructionsUntouched(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bodyBytes, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(bodyBytes, &body)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, "data: {\"type\":\"response.completed\",\"sequence_number\":1,\"response\":{\"id\":\"resp_123\",\"object\":\"response\",\"model\":\"muse-spark-1.3-contributor-free\",\"output\":[]}}\n\n")
 	}))
 	defer server.Close()
 
@@ -860,8 +861,8 @@ func TestOpencodeZenFreeReasoningItemWithoutSummary(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bodyBytes, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(bodyBytes, &body)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, "data: {\"type\":\"response.completed\",\"sequence_number\":1,\"response\":{\"id\":\"resp_123\",\"object\":\"response\",\"model\":\"muse-spark-1.3-contributor-free\",\"output\":[]}}\n\n")
 	}))
 	defer server.Close()
 
@@ -942,8 +943,8 @@ func TestOpencodeZenFreeMintedReasoningIDStripped(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bodyBytes, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(bodyBytes, &body)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, "data: {\"type\":\"response.completed\",\"sequence_number\":1,\"response\":{\"id\":\"resp_123\",\"object\":\"response\",\"model\":\"muse-spark-1.3-contributor-free\",\"output\":[]}}\n\n")
 	}))
 	defer server.Close()
 
@@ -1015,8 +1016,8 @@ func TestOpencodeZenFreeGenuineReasoningStateRestored(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bodyBytes, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(bodyBytes, &body)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, "data: {\"type\":\"response.completed\",\"sequence_number\":1,\"response\":{\"id\":\"resp_123\",\"object\":\"response\",\"model\":\"muse-spark-1.3-contributor-free\",\"output\":[]}}\n\n")
 	}))
 	defer server.Close()
 
@@ -1085,8 +1086,8 @@ func TestOpencodeZenFreeIncludeReasoningEncryptedDefault(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bodyBytes, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(bodyBytes, &body)
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprint(w, `{"id":"resp_123","object":"response","model":"muse-spark-1.3-contributor-free","output":[]}`)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, "data: {\"type\":\"response.completed\",\"sequence_number\":1,\"response\":{\"id\":\"resp_123\",\"object\":\"response\",\"model\":\"muse-spark-1.3-contributor-free\",\"output\":[]}}\n\n")
 	}))
 	defer server.Close()
 
@@ -1177,5 +1178,417 @@ func TestOpencodeZenFreeUnsupportedOperations(t *testing.T) {
 	}
 	if _, bErr := p.CountTokens(ctx, schemas.Key{}, nil); bErr == nil {
 		t.Error("expected error for unsupported CountTokens")
+	}
+}
+
+func TestOpencodeZenFreeSupportsEndpoint(t *testing.T) {
+	yes := true
+	setResolver := func(endpoints []string) {
+		t.Helper()
+		schemas.SetCapabilityResolver(func(_ schemas.ModelProvider, _ string) *schemas.ModelCapabilities {
+			return &schemas.ModelCapabilities{SupportedEndpoints: endpoints}
+		})
+		t.Cleanup(func() { schemas.SetCapabilityResolver(nil) })
+		_ = yes
+	}
+
+	setResolver([]string{"/v1/chat/completions"})
+	if !schemas.ResolveModelCaps(schemas.OpencodeZenFree, "space-bunny-free").SupportsEndpoint("/v1/chat/completions", false) {
+		t.Error("expected chat endpoint match")
+	}
+	if schemas.ResolveModelCaps(schemas.OpencodeZenFree, "space-bunny-free").SupportsEndpoint("/v1/responses", true) {
+		t.Error("expected responses endpoint mismatch")
+	}
+	// Empty fragment never matches.
+	setResolver([]string{"/v1/chat/completions"})
+	if schemas.ResolveModelCaps(schemas.OpencodeZenFree, "m").SupportsEndpoint("", true) != true {
+		t.Error("expected empty fragment to answer fallback")
+	}
+	if schemas.ResolveModelCaps(schemas.OpencodeZenFree, "m").SupportsEndpoint("", false) != false {
+		t.Error("expected empty fragment to answer fallback=false")
+	}
+	// No record answers fallback.
+	schemas.SetCapabilityResolver(func(_ schemas.ModelProvider, _ string) *schemas.ModelCapabilities { return nil })
+	t.Cleanup(func() { schemas.SetCapabilityResolver(nil) })
+	if !schemas.ResolveModelCaps(schemas.OpencodeZenFree, "m").SupportsEndpoint("/v1/chat/completions", true) {
+		t.Error("expected nil record to answer fallback=true")
+	}
+	if schemas.ResolveModelCaps(schemas.OpencodeZenFree, "m").SupportsEndpoint("/v1/chat/completions", false) {
+		t.Error("expected nil record to answer fallback=false")
+	}
+}
+
+func TestOpencodeZenFreeClassify(t *testing.T) {
+	schemas.SetCapabilityResolver(func(_ schemas.ModelProvider, m string) *schemas.ModelCapabilities {
+		switch m {
+		case "space-bunny-free", "opencode-zen/space-bunny-free":
+			return &schemas.ModelCapabilities{SupportedEndpoints: []string{"/v1/chat/completions"}}
+		case "qwen3.5-plus":
+			return &schemas.ModelCapabilities{SupportedEndpoints: []string{"/v1/messages"}}
+		case "muse-spark-1.3-contributor-free":
+			return &schemas.ModelCapabilities{SupportedEndpoints: []string{"/v1/responses"}}
+		}
+		return nil
+	})
+	t.Cleanup(func() { schemas.SetCapabilityResolver(nil) })
+	ctx := schemas.NewBifrostContext(nil, time.Time{})
+
+	cases := []struct {
+		model string
+		want  opencodeZenFreeEndpoint
+	}{
+		{"muse-spark-1.3-contributor-free", opencodeZenFreeEndpointResponses},
+		{"space-bunny-free", opencodeZenFreeEndpointChat},
+		{"qwen3.5-plus", opencodeZenFreeEndpointMessages},
+		{"gemini-3-flash", opencodeZenFreeEndpointGemini},
+		{"GEMINI-2.5-pro", opencodeZenFreeEndpointGemini},
+		{"opencode-zen/space-bunny-free", opencodeZenFreeEndpointChat},
+		{"unknown-model-xyz", opencodeZenFreeEndpointResponses},
+	}
+	for _, tc := range cases {
+		if got := classifyOpencodeZenFreeModel(ctx, tc.model); got != tc.want {
+			t.Errorf("classify(%q) = %v, want %v", tc.model, got, tc.want)
+		}
+	}
+
+	// Gemini is terminal: never in the fallback chain.
+	chain := opencodeZenFreeFallbackChain(opencodeZenFreeEndpointChat)
+	if len(chain) != 3 || chain[0] != opencodeZenFreeEndpointChat {
+		t.Errorf("fallback chain from chat = %v, want [chat responses messages]", chain)
+	}
+	for _, e := range chain {
+		if e == opencodeZenFreeEndpointGemini {
+			t.Error("gemini must never appear in the fallback chain")
+		}
+	}
+}
+
+func TestOpencodeZenFreeUnsupportedFormatError(t *testing.T) {
+	formatErr := &schemas.BifrostError{Error: &schemas.ErrorField{Message: "Model space-bunny-free is not supported for format openai"}}
+	if !isUnsupportedFormatError(formatErr) {
+		t.Error("expected format error to match")
+	}
+	for _, msg := range []string{
+		"OpenCode's free tier can only be used from within OpenCode",
+		"Missing API key.",
+		"Internal server error",
+		"",
+	} {
+		if isUnsupportedFormatError(&schemas.BifrostError{Error: &schemas.ErrorField{Message: msg}}) {
+			t.Errorf("message %q must not match as format error", msg)
+		}
+	}
+	if isUnsupportedFormatError(nil) {
+		t.Error("nil error must not match")
+	}
+}
+
+func TestOpencodeZenFreeChatDefaults(t *testing.T) {
+	// Default system prompt + dummy tools + store=false.
+	req := &schemas.BifrostChatRequest{
+		Model: "space-bunny-free",
+		Input: []schemas.ChatMessage{
+			{Role: schemas.ChatMessageRoleUser, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("hi")}},
+		},
+	}
+	ensureOpencodeZenFreeChatDefaults(req)
+	if len(req.Input) != 2 || req.Input[0].Role != schemas.ChatMessageRoleSystem {
+		t.Fatalf("expected leading system message, got %+v", req.Input)
+	}
+	if req.Input[0].Content == nil || req.Input[0].Content.ContentStr == nil || *req.Input[0].Content.ContentStr != DefaultInstructions {
+		t.Errorf("expected default instructions, got %+v", req.Input[0].Content)
+	}
+	if req.Params == nil || req.Params.Store == nil || *req.Params.Store != false {
+		t.Errorf("expected store=false, got %+v", req.Params)
+	}
+	if len(req.Params.Tools) != 3 {
+		t.Fatalf("expected 3 dummy tools, got %+v", req.Params.Tools)
+	}
+
+	// Client system prompt and tools win.
+	custom := &schemas.BifrostChatRequest{
+		Model: "space-bunny-free",
+		Input: []schemas.ChatMessage{
+			{Role: schemas.ChatMessageRoleSystem, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("custom")}},
+			{Role: schemas.ChatMessageRoleUser, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("hi")}},
+		},
+		Params: &schemas.ChatParameters{
+			Tools: []schemas.ChatTool{{
+				Type:     schemas.ChatToolTypeFunction,
+				Function: &schemas.ChatToolFunction{Name: "edit"},
+			}},
+		},
+	}
+	ensureOpencodeZenFreeChatDefaults(custom)
+	if len(custom.Input) != 2 || *custom.Input[0].Content.ContentStr != "custom" {
+		t.Errorf("client system prompt must win, got %+v", custom.Input)
+	}
+	names := map[string]bool{}
+	for _, tool := range custom.Params.Tools {
+		if tool.Function != nil {
+			names[tool.Function.Name] = true
+		}
+	}
+	if len(custom.Params.Tools) != 3 || !names["edit"] || !names["read"] || !names["shell"] {
+		t.Errorf("expected edit kept + read/shell filled, got %+v", custom.Params.Tools)
+	}
+}
+
+func TestOpencodeZenFreeSpaceBunnyHitsChatCompletions(t *testing.T) {
+	var (
+		mu         sync.Mutex
+		calledPath string
+		body       map[string]any
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		bodyBytes, _ := io.ReadAll(r.Body)
+		var payload map[string]any
+		_ = json.Unmarshal(bodyBytes, &payload)
+		mu.Lock()
+		calledPath = r.URL.Path
+		body = payload
+		mu.Unlock()
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, "data: {\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"space-bunny-free\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"hi\"},\"finish_reason\":null}]}\n\n")
+		_, _ = fmt.Fprint(w, "data: {\"id\":\"chatcmpl-1\",\"object\":\"chat.completion.chunk\",\"created\":1,\"model\":\"space-bunny-free\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":1,\"total_tokens\":4}}\n\n")
+		_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+	}))
+	defer server.Close()
+
+	schemas.SetCapabilityResolver(func(_ schemas.ModelProvider, m string) *schemas.ModelCapabilities {
+		if m == "space-bunny-free" {
+			return &schemas.ModelCapabilities{SupportedEndpoints: []string{"/v1/chat/completions"}}
+		}
+		return nil
+	})
+	t.Cleanup(func() { schemas.SetCapabilityResolver(nil) })
+
+	cfg := &schemas.ProviderConfig{NetworkConfig: schemas.NetworkConfig{BaseURL: server.URL}}
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
+	if err != nil {
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
+	}
+
+	ctx := schemas.NewBifrostContext(nil, time.Time{})
+	resp, bErr := provider.ChatCompletion(ctx, schemas.Key{}, &schemas.BifrostChatRequest{
+		Model: "space-bunny-free",
+		Input: []schemas.ChatMessage{
+			{Role: schemas.ChatMessageRoleUser, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("hi")}},
+		},
+	})
+	if bErr != nil {
+		t.Fatalf("ChatCompletion failed: %v", bErr.Error)
+	}
+	if resp == nil || len(resp.Choices) == 0 {
+		t.Fatalf("unexpected response: %+v", resp)
+	}
+	msg := resp.Choices[0].ChatNonStreamResponseChoice
+	if msg == nil || msg.Message == nil || msg.Message.Content == nil || msg.Message.Content.ContentStr == nil || *msg.Message.Content.ContentStr != "hi" {
+		t.Fatalf("expected accumulated content 'hi', got %+v", resp)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if calledPath != "/v1/chat/completions" {
+		t.Errorf("expected path /v1/chat/completions, got %s", calledPath)
+	}
+	if _, ok := body["messages"]; !ok {
+		t.Errorf("expected OpenAI chat 'messages' on the wire, got %v", body)
+	}
+	if _, ok := body["stream"]; !ok {
+		t.Errorf("expected stream:true on the wire, got %v", body)
+	}
+	// Chat defaults travel on the chat path too.
+	foundSystem := false
+	if msgs, ok := body["messages"].([]any); ok {
+		for _, m := range msgs {
+			if mm, ok := m.(map[string]any); ok && mm["role"] == "system" {
+				foundSystem = true
+			}
+		}
+	}
+	if !foundSystem {
+		t.Errorf("expected default system message on the wire, got %v", body["messages"])
+	}
+}
+
+func TestOpencodeZenFreeFallbackChatToResponses(t *testing.T) {
+	var (
+		mu    sync.Mutex
+		paths []string
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		paths = append(paths, r.URL.Path)
+		mu.Unlock()
+		if r.URL.Path == "/v1/chat/completions" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = fmt.Fprint(w, `{"type":"error","error":{"type":"ModelError","message":"Model mystery-model is not supported for format openai"}}`)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, "data: {\"type\":\"response.completed\",\"sequence_number\":1,\"response\":{\"id\":\"resp_fb\",\"object\":\"response\",\"status\":\"completed\",\"model\":\"mystery-model\",\"output\":[]}}\n\n")
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+	}))
+	defer server.Close()
+
+	// Datasheet says chat; the gateway rejects it as the wrong format, so the
+	// provider must fall through to responses.
+	schemas.SetCapabilityResolver(func(_ schemas.ModelProvider, m string) *schemas.ModelCapabilities {
+		if m == "mystery-model" {
+			return &schemas.ModelCapabilities{SupportedEndpoints: []string{"/v1/chat/completions"}}
+		}
+		return nil
+	})
+	t.Cleanup(func() { schemas.SetCapabilityResolver(nil) })
+
+	cfg := &schemas.ProviderConfig{NetworkConfig: schemas.NetworkConfig{BaseURL: server.URL}}
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
+	if err != nil {
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
+	}
+	ctx := schemas.NewBifrostContext(nil, time.Time{})
+	resp, bErr := provider.Responses(ctx, schemas.Key{}, &schemas.BifrostResponsesRequest{
+		Model: "mystery-model",
+		Input: []schemas.ResponsesMessage{
+			{Role: schemas.Ptr(schemas.ResponsesInputMessageRoleUser), Content: &schemas.ResponsesMessageContent{ContentStr: schemas.Ptr("hi")}},
+		},
+	})
+	if bErr != nil {
+		t.Fatalf("Responses failed: %v", bErr.Error)
+	}
+	if resp == nil || resp.ID == nil || *resp.ID != "resp_fb" {
+		t.Fatalf("expected fallback responses body, got %+v", resp)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(paths) != 2 || paths[0] != "/v1/chat/completions" || paths[1] != "/v1/responses" {
+		t.Errorf("expected [chat responses] attempt order, got %v", paths)
+	}
+}
+
+func TestOpencodeZenFreeNonFormatErrorDoesNotFallback(t *testing.T) {
+	var (
+		mu    sync.Mutex
+		calls int
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = fmt.Fprint(w, `{"type":"error","error":{"type":"FreeTierError","message":"Error from provider (Console): OpenCode's free tier can only be used from within OpenCode"}}`)
+	}))
+	defer server.Close()
+
+	schemas.SetCapabilityResolver(func(_ schemas.ModelProvider, m string) *schemas.ModelCapabilities {
+		if m == "mystery-model" {
+			return &schemas.ModelCapabilities{SupportedEndpoints: []string{"/v1/chat/completions"}}
+		}
+		return nil
+	})
+	t.Cleanup(func() { schemas.SetCapabilityResolver(nil) })
+
+	cfg := &schemas.ProviderConfig{NetworkConfig: schemas.NetworkConfig{BaseURL: server.URL}}
+	provider, err := NewOpencodeZenFreeProvider(cfg, nil)
+	if err != nil {
+		t.Fatalf("NewOpencodeZenFreeProvider failed: %v", err)
+	}
+	ctx := schemas.NewBifrostContext(nil, time.Time{})
+	if _, bErr := provider.ChatCompletion(ctx, schemas.Key{}, &schemas.BifrostChatRequest{
+		Model: "mystery-model",
+		Input: []schemas.ChatMessage{
+			{Role: schemas.ChatMessageRoleUser, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("hi")}},
+		},
+	}); bErr == nil {
+		t.Fatal("expected the FreeTier error to surface")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if calls != 1 {
+		t.Errorf("expected exactly 1 attempt (no fallback on non-format errors), got %d", calls)
+	}
+}
+
+func TestOpencodeZenFreeAccumulateChatStream(t *testing.T) {
+	ch := make(chan *schemas.BifrostStreamChunk, 4)
+	content1, content2 := "hello ", "world"
+	ch <- &schemas.BifrostStreamChunk{BifrostChatResponse: &schemas.BifrostChatResponse{
+		ID: "chatcmpl-1", Model: "m", Created: 7,
+		Choices: []schemas.BifrostResponseChoice{{Index: 0, ChatStreamResponseChoice: &schemas.ChatStreamResponseChoice{
+			Delta: &schemas.ChatStreamResponseChoiceDelta{Role: schemas.Ptr("assistant"), Content: &content1},
+		}}},
+	}}
+	args1, args2 := `{"a":`, `1}`
+	ch <- &schemas.BifrostStreamChunk{BifrostChatResponse: &schemas.BifrostChatResponse{
+		ID: "chatcmpl-1", Model: "m",
+		Choices: []schemas.BifrostResponseChoice{{Index: 0, ChatStreamResponseChoice: &schemas.ChatStreamResponseChoice{
+			Delta: &schemas.ChatStreamResponseChoiceDelta{
+				Content:   &content2,
+				ToolCalls: []schemas.ChatAssistantMessageToolCall{{Index: 0, Function: schemas.ChatAssistantMessageToolCallFunction{Arguments: args1}}},
+			},
+		}}},
+	}}
+	stop := "stop"
+	ch <- &schemas.BifrostStreamChunk{BifrostChatResponse: &schemas.BifrostChatResponse{
+		ID: "chatcmpl-1", Model: "m",
+		Choices: []schemas.BifrostResponseChoice{{Index: 0, FinishReason: &stop, ChatStreamResponseChoice: &schemas.ChatStreamResponseChoice{
+			Delta: &schemas.ChatStreamResponseChoiceDelta{
+				ToolCalls: []schemas.ChatAssistantMessageToolCall{{Index: 0, Function: schemas.ChatAssistantMessageToolCallFunction{Arguments: args2}}},
+			},
+		}}},
+		Usage: &schemas.BifrostLLMUsage{PromptTokens: 3, CompletionTokens: 2, TotalTokens: 5},
+	}}
+	close(ch)
+	resp, bErr := accumulateChatStream(ch, "m")
+	if bErr != nil {
+		t.Fatalf("accumulate failed: %v", bErr.Error)
+	}
+	got := resp.Choices[0].ChatNonStreamResponseChoice.Message.Content.ContentStr
+	if got == nil || *got != "hello world" {
+		t.Errorf("expected merged content, got %v", got)
+	}
+	calls := resp.Choices[0].ChatNonStreamResponseChoice.Message.ChatAssistantMessage.ToolCalls
+	if len(calls) != 1 || calls[0].Function.Arguments != `{"a":1}` {
+		t.Errorf("expected merged tool args, got %+v", calls)
+	}
+	if resp.Choices[0].FinishReason == nil || *resp.Choices[0].FinishReason != "stop" {
+		t.Errorf("expected finish stop, got %+v", resp.Choices[0].FinishReason)
+	}
+	if resp.Usage == nil || resp.Usage.TotalTokens != 5 {
+		t.Errorf("expected usage passthrough, got %+v", resp.Usage)
+	}
+}
+
+func TestOpencodeZenFreeUnaryForcesStream(t *testing.T) {
+	plain := &schemas.BifrostChatRequest{Model: "m", Input: []schemas.ChatMessage{
+		{Role: schemas.ChatMessageRoleUser, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("hi")}},
+	}}
+	if plain.Params != nil {
+		t.Fatal("precondition: no params")
+	}
+	forced, release := forceStreamTrueChat(plain)
+	defer release()
+	if plain.Params != nil {
+		t.Error("forcing must not mutate the caller's request")
+	}
+	if forced.Params == nil || !forcedStreamTrue(forced.Params.ExtraParams) {
+		t.Error("expected forced marker on the copy")
+	}
+
+	plainResp := &schemas.BifrostResponsesRequest{Model: "m"}
+	forcedResp, releaseResp := forceStreamTrueResponses(plainResp)
+	defer releaseResp()
+	if plainResp.Params != nil {
+		t.Error("forcing must not mutate the caller's responses request")
+	}
+	if forcedResp.Params == nil || !forcedStreamTrue(forcedResp.Params.ExtraParams) {
+		t.Error("expected forced marker on the responses copy")
 	}
 }
