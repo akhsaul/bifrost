@@ -114,9 +114,12 @@ export default function AgentSetupView() {
 	// ── Wizard state ─────────────────────────────────────────────────
 	const [agent, setAgent] = useState<AgentId>("opencode");
 	const [virtualKeyId, setVirtualKeyId] = useState<string | null>(null);
-	// Multi-select state: many providers, many models/rules, at most one VK.
+	// Multi-select state: providers gatekeep models (pick providers first,
+	// then their models). Routing rules are an independent track — they fire
+	// via their CEL trigger and are unaffected by the provider picker.
 	const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
-	const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
+	const [selectedDirectIds, setSelectedDirectIds] = useState<string[]>([]);
+	const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([]);
 	// Agent-native per-entry metadata (opencode v2 keys only), datasheet-prefilled, user-editable.
 	const [metadata, setMetadata] = useState<Record<string, AgentModelMetadata>>({});
 	// Reasoning-effort options per direct model, from the datasheet (null = none found).
@@ -249,56 +252,66 @@ export default function AgentSetupView() {
 		return withTrigger.filter(({ rule }) => isRuleReachableForVk(selectedVk, rule.targets));
 	}, [rulesData, selectedVk]);
 
-	// Unified Models picker: direct `provider/model` rows plus every
-	// triggerable rule as `trigger → targets`.
+	// Models picker: direct `provider/model` rows ONLY, strictly inside the
+	// picked providers. Nothing is offered until at least one provider is
+	// picked — browsing 1500+ models across all providers is the wrong flow.
 	const modelOptions = useMemo<MultiSelectOption[]>(() => {
-		const inScopeProviders = selectedProviders.length > 0 ? new Set(selectedProviders) : null;
-		const direct = (modelsData?.models ?? [])
-			.filter((m) => !inScopeProviders || inScopeProviders.has(m.provider))
+		if (selectedProviders.length === 0) return [];
+		const inScopeProviders = new Set(selectedProviders);
+		return (modelsData?.models ?? [])
+			.filter((m) => inScopeProviders.has(m.provider))
 			.filter((m) => isModelAllowedForVk(selectedVk, m.provider, m.name))
 			.map((m) => ({
 				value: `direct:${m.provider}/${m.name}`,
 				label: `${m.provider}/${m.name}`,
 				description: undefined as string | undefined,
 			}));
-		const rules = triggerableRules.map(({ rule, trigger }) => ({
-			value: `rule:${rule.id}`,
-			label: trigger,
-			description: `Rule → ${rule.targets.map((t) => [t.provider, t.model].filter(Boolean).join("/")).join(", ")}`,
-		}));
-		return [...direct, ...rules];
-	}, [modelsData, selectedProviders, selectedVk, triggerableRules]);
+	}, [modelsData, selectedProviders, selectedVk]);
 
-	// Drop selections that fall out of scope (VK change narrows the world).
+	// Rules picker: every triggerable rule, independent of providers.
+	const ruleOptions = useMemo<MultiSelectOption[]>(
+		() =>
+			triggerableRules.map(({ rule, trigger }) => ({
+				value: `rule:${rule.id}`,
+				label: trigger,
+				description: `Rule → ${rule.targets.map((t) => [t.provider, t.model].filter(Boolean).join("/")).join(", ")}`,
+			})),
+		[triggerableRules],
+	);
+
+	// Drop selections that fall out of scope (provider unpick or VK change narrows the world).
 	useEffect(() => {
 		const valid = new Set(modelOptions.map((o) => o.value));
-		setSelectedModelIds((prev) => prev.filter((id) => valid.has(id)));
+		setSelectedDirectIds((prev) => prev.filter((id) => valid.has(id)));
 	}, [modelOptions]);
+	useEffect(() => {
+		const valid = new Set(ruleOptions.map((o) => o.value));
+		setSelectedRuleIds((prev) => prev.filter((id) => valid.has(id)));
+	}, [ruleOptions]);
 
-	// Resolve the selection into entries with datasheet snapshots.
+	// Resolve the selections into entries with datasheet snapshots.
 	const selectionItems = useMemo<ModelSelectionItem[]>(() => {
 		const items: ModelSelectionItem[] = [];
-		for (const id of selectedModelIds) {
-			if (id.startsWith("rule:")) {
-				const ruleId = id.slice("rule:".length);
-				const found = triggerableRules.find(({ rule }) => rule.id === ruleId);
-				if (!found) continue;
-				items.push({
-					id: found.trigger,
-					kind: "rule",
-					ruleId: found.rule.id,
-					ruleTargets: found.rule.targets.map((t) => [t.provider, t.model].filter(Boolean).join("/")).join(", "),
-				});
-				continue;
-			}
+		for (const id of selectedDirectIds) {
 			const qualified = id.startsWith("direct:") ? id.slice("direct:".length) : id;
 			const slash = qualified.indexOf("/");
 			const provider = slash >= 0 ? qualified.slice(0, slash) : "";
 			const model = slash >= 0 ? qualified.slice(slash + 1) : qualified;
 			items.push({ id: qualified, kind: "direct", provider, model, datasheet: datasheetByModel.get(qualified) });
 		}
+		for (const id of selectedRuleIds) {
+			const ruleId = id.slice("rule:".length);
+			const found = triggerableRules.find(({ rule }) => rule.id === ruleId);
+			if (!found) continue;
+			items.push({
+				id: found.trigger,
+				kind: "rule",
+				ruleId: found.rule.id,
+				ruleTargets: found.rule.targets.map((t) => [t.provider, t.model].filter(Boolean).join("/")).join(", "),
+			});
+		}
 		return items;
-	}, [selectedModelIds, triggerableRules, datasheetByModel]);
+	}, [selectedDirectIds, selectedRuleIds, triggerableRules, datasheetByModel]);
 
 	const selectionKeys = useMemo(() => selectionItems.map((i) => selectionKey(i)), [selectionItems]);
 
@@ -612,9 +625,9 @@ export default function AgentSetupView() {
 				)}
 			</section>
 
-			{/* ── Step 2: providers + models ──────────────────────────── */}
+			{/* ── Step 2: providers → models, plus independent rules ─── */}
 			<section className="flex flex-col gap-3">
-				<div className="text-sm font-medium">Providers & models (multi-select)</div>
+				<div className="text-sm font-medium">Providers → models (pick providers first, then their models)</div>
 				<div className="flex flex-col gap-1.5">
 					<Label>Providers</Label>
 					<MultiSelect
@@ -622,7 +635,7 @@ export default function AgentSetupView() {
 						defaultValue={selectedProviders}
 						resetOnDefaultValueChange
 						onValueChange={(values) => setSelectedProviders(values)}
-						placeholder={selectedVk ? "Select allowed providers" : "Select providers (all listed)"}
+						placeholder={selectedVk ? "Select allowed providers" : "Select providers"}
 						emptyIndicator={selectedVk ? "No allowed providers for this key." : "No providers found."}
 						maxCount={3}
 						data-testid="agent-setup-provider-select"
@@ -632,27 +645,47 @@ export default function AgentSetupView() {
 					)}
 				</div>
 				<div className="flex flex-col gap-1.5">
-					<Label>Models & routing-rule triggers</Label>
+					<Label>Models</Label>
 					<MultiSelect
 						options={modelOptions}
-						defaultValue={selectedModelIds}
+						defaultValue={selectedDirectIds}
 						resetOnDefaultValueChange
-						onValueChange={(values) => setSelectedModelIds(values)}
-						placeholder={
-							isFetchingModels
-								? "Loading models…"
-								: selectedProviders.length > 0
-									? "Select models and rule triggers"
-									: "Select models and rule triggers (all providers)"
-						}
-						emptyIndicator="No models or rule triggers match."
+						onValueChange={(values) => setSelectedDirectIds(values)}
+						placeholder={isFetchingModels ? "Loading models…" : selectedProviders.length > 0 ? "Select models" : "Pick providers first"}
+						emptyIndicator={selectedProviders.length > 0 ? "No allowed models for these providers." : "Pick at least one provider above."}
 						maxCount={3}
 						data-testid="agent-setup-model-select"
+						disabled={selectedProviders.length === 0}
 					/>
 					<p className="text-muted-foreground text-xs">
-						{isFetchingModels ? "Loading…" : `${modelOptions.length} options`} · direct entries are qualified{" "}
-						<code className="font-mono">provider/model</code>; rule entries fire via their trigger and note their targets.
-						{selectedProviders.length === 0 && " Narrow by provider to browse faster."}
+						{isFetchingModels
+							? "Loading…"
+							: selectedProviders.length > 0
+								? `${modelOptions.length} models in the picked providers`
+								: "Models unlock once providers are picked"}{" "}
+						· direct entries are qualified <code className="font-mono">provider/model</code>.
+					</p>
+				</div>
+			</section>
+
+			{/* ── Step 2b: routing rules (independent of providers) ────── */}
+			<section className="flex flex-col gap-3">
+				<div className="text-sm font-medium">Routing rules (optional, independent of providers)</div>
+				<div className="flex flex-col gap-1.5">
+					<Label>Rule triggers</Label>
+					<MultiSelect
+						options={ruleOptions}
+						defaultValue={selectedRuleIds}
+						resetOnDefaultValueChange
+						onValueChange={(values) => setSelectedRuleIds(values)}
+						placeholder={ruleOptions.length > 0 ? "Select rule triggers" : "No triggerable rules"}
+						emptyIndicator="No triggerable rules match."
+						maxCount={3}
+						data-testid="agent-setup-rule-select"
+					/>
+					<p className="text-muted-foreground text-xs">
+						{ruleOptions.length} triggerable rules · each fires via its <code className="font-mono">model == &quot;trigger&quot;</code> CEL
+						and notes its targets. Not affected by the provider picker.
 					</p>
 				</div>
 			</section>
