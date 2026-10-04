@@ -172,4 +172,24 @@ describe("buildAgentConfig", () => {
 		expect(out.config).toContain('"ANTHROPIC_DEFAULT_SONNET_MODEL": "opencode-zen/glm-5.3"');
 		expect(out.config).toContain('"model": "opencode-zen/glm-5.3"');
 	});
+
+	it("emits claude Opus/Fable overrides only when set", () => {
+		const bare = buildAgentConfig("claude-code", baseInput({ envVar: "ANTHROPIC_AUTH_TOKEN", defaultModelId: "test-route" }));
+		expect(bare.config).not.toContain("ANTHROPIC_DEFAULT_OPUS_MODEL");
+		expect(bare.config).not.toContain("ANTHROPIC_DEFAULT_FABLE_MODEL");
+
+		const withOptional = buildAgentConfig(
+			"claude-code",
+			baseInput({
+				envVar: "ANTHROPIC_AUTH_TOKEN",
+				defaultModelId: "test-route",
+				claudeHaikuModelId: "test-route",
+				claudeSonnetModelId: "test-route",
+				claudeOpusModelId: "opencode-zen/glm-5.3",
+				claudeFableModelId: "opencode-zen/glm-5.3",
+			}),
+		);
+		expect(withOptional.config).toContain('"ANTHROPIC_DEFAULT_OPUS_MODEL": "opencode-zen/glm-5.3"');
+		expect(withOptional.config).toContain('"ANTHROPIC_DEFAULT_FABLE_MODEL": "opencode-zen/glm-5.3"');
+	});
 });

@@ -125,9 +125,12 @@ export default function AgentSetupView() {
 	const [defaultModelId, setDefaultModelId] = useState<string | null>(null);
 	// Claude tier overrides: what the haiku alias (fast/cheap tasks) and the
 	// sonnet alias (standard session model) resolve to. Null = follow the
-	// first selection (single-model case → both the same model).
+	// first selection (single-model case → both the same model). Opus and
+	// Fable tiers are optional extras — empty means the key is omitted.
 	const [claudeHaikuId, setClaudeHaikuId] = useState<string | null>(null);
 	const [claudeSonnetId, setClaudeSonnetId] = useState<string | null>(null);
+	const [claudeOpusId, setClaudeOpusId] = useState<string | null>(null);
+	const [claudeFableId, setClaudeFableId] = useState<string | null>(null);
 	// Codex globals: datasheet-prefilled from the default model until the user edits.
 	const [codexCtx, setCodexCtx] = useState("");
 	const [codexCtxTouched, setCodexCtxTouched] = useState(false);
@@ -387,6 +390,7 @@ export default function AgentSetupView() {
 	}, [selectionItems, defaultModelId, agent]);
 
 	// Claude tier resolution: explicit pick wins, else follow the single default radio, else first selection.
+	// Optional tiers (opus/fable) stay empty unless the user picks one — empty means the key is omitted.
 	const selectionIds = useMemo(() => selectionItems.map((i) => i.id), [selectionItems]);
 	const effectiveClaudeHaikuId = claudeHaikuId && selectionIds.includes(claudeHaikuId) ? claudeHaikuId : effectiveDefaultId;
 	const effectiveClaudeSonnetId = claudeSonnetId && selectionIds.includes(claudeSonnetId) ? claudeSonnetId : effectiveDefaultId;
@@ -394,7 +398,9 @@ export default function AgentSetupView() {
 	useEffect(() => {
 		if (!selectionIds.some((id) => id === claudeHaikuId)) setClaudeHaikuId(null);
 		if (!selectionIds.some((id) => id === claudeSonnetId)) setClaudeSonnetId(null);
-	}, [selectionIds, claudeHaikuId, claudeSonnetId]);
+		if (!selectionIds.some((id) => id === claudeOpusId)) setClaudeOpusId(null);
+		if (!selectionIds.some((id) => id === claudeFableId)) setClaudeFableId(null);
+	}, [selectionIds, claudeHaikuId, claudeSonnetId, claudeOpusId, claudeFableId]);
 
 	// Codex globals follow the default model's datasheet until the user edits them.
 	const defaultDatasheet = useMemo(() => {
@@ -459,6 +465,8 @@ export default function AgentSetupView() {
 						? {
 								claudeHaikuModelId: effectiveClaudeHaikuId,
 								claudeSonnetModelId: effectiveClaudeSonnetId,
+								...(claudeOpusId && selectionIds.includes(claudeOpusId) ? { claudeOpusModelId: claudeOpusId } : {}),
+								...(claudeFableId && selectionIds.includes(claudeFableId) ? { claudeFableModelId: claudeFableId } : {}),
 							}
 						: {}),
 					...(agent === "codex"
@@ -797,7 +805,9 @@ export default function AgentSetupView() {
 					) : (
 						<div className="grid gap-3 sm:grid-cols-2">
 							<div className="flex flex-col gap-1.5">
-								<Label>Haiku-tier model (fast tasks)</Label>
+								<Label>
+									Haiku-tier model <span className="text-muted-foreground">(required)</span>
+								</Label>
 								<Select value={effectiveClaudeHaikuId} onValueChange={setClaudeHaikuId}>
 									<SelectTrigger className="font-mono" data-testid="agent-setup-claude-haiku">
 										<SelectValue />
@@ -815,7 +825,9 @@ export default function AgentSetupView() {
 								</p>
 							</div>
 							<div className="flex flex-col gap-1.5">
-								<Label>Sonnet-tier model (standard sessions)</Label>
+								<Label>
+									Sonnet-tier model <span className="text-muted-foreground">(required)</span>
+								</Label>
 								<Select value={effectiveClaudeSonnetId} onValueChange={setClaudeSonnetId}>
 									<SelectTrigger className="font-mono" data-testid="agent-setup-claude-sonnet">
 										<SelectValue />
@@ -831,6 +843,54 @@ export default function AgentSetupView() {
 								<p className="text-muted-foreground text-[11px]">
 									What the <code className="font-mono">sonnet</code> alias and session default resolve to → ANTHROPIC_DEFAULT_SONNET_MODEL +
 									top-level <code className="font-mono">model</code>
+								</p>
+							</div>
+							<div className="flex flex-col gap-1.5">
+								<Label>
+									Opus-tier model <span className="text-muted-foreground">(optional)</span>
+								</Label>
+								<Select
+									value={claudeOpusId && selectionIds.includes(claudeOpusId) ? claudeOpusId : "__none__"}
+									onValueChange={(v) => setClaudeOpusId(v === "__none__" ? null : v)}
+								>
+									<SelectTrigger className="font-mono" data-testid="agent-setup-claude-opus">
+										<SelectValue placeholder="Not set (key omitted)" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="__none__">Not set (key omitted)</SelectItem>
+										{selectionItems.map((item) => (
+											<SelectItem key={item.id} value={item.id} className="font-mono">
+												{item.id}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								<p className="text-muted-foreground text-[11px]">
+									What the <code className="font-mono">opus</code> alias (heaviest tasks) resolves to → ANTHROPIC_DEFAULT_OPUS_MODEL
+								</p>
+							</div>
+							<div className="flex flex-col gap-1.5">
+								<Label>
+									Fable-tier model <span className="text-muted-foreground">(optional)</span>
+								</Label>
+								<Select
+									value={claudeFableId && selectionIds.includes(claudeFableId) ? claudeFableId : "__none__"}
+									onValueChange={(v) => setClaudeFableId(v === "__none__" ? null : v)}
+								>
+									<SelectTrigger className="font-mono" data-testid="agent-setup-claude-fable">
+										<SelectValue placeholder="Not set (key omitted)" />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value="__none__">Not set (key omitted)</SelectItem>
+										{selectionItems.map((item) => (
+											<SelectItem key={item.id} value={item.id} className="font-mono">
+												{item.id}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								<p className="text-muted-foreground text-[11px]">
+									What the <code className="font-mono">fable</code> alias resolves to → ANTHROPIC_DEFAULT_FABLE_MODEL
 								</p>
 							</div>
 						</div>

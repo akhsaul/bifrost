@@ -33,9 +33,11 @@ export interface AgentConfigInput {
 	envVar: string;
 	/** Codex/claude only: which selected model is the default. Falls back to the first selection. */
 	defaultModelId?: string;
-	/** Claude only: Haiku-tier and Sonnet-tier model overrides. Each falls back to defaultModelId, then the first selection. */
+	/** Claude only: tier model overrides. Haiku + Sonnet are required and fall back to defaultModelId, then the first selection. Opus + Fable are optional — emitted only when the user picks one. */
 	claudeHaikuModelId?: string;
 	claudeSonnetModelId?: string;
+	claudeOpusModelId?: string;
+	claudeFableModelId?: string;
 	/** Codex only: `model_context_window` / `model_max_output_tokens` globals (default model's datasheet, editable). */
 	codexContextWindow?: string;
 	codexMaxOutputTokens?: string;
@@ -183,11 +185,13 @@ function buildCodex(input: AgentConfigInput): AgentConfigOutput {
 
 // ── Claude Code ──────────────────────────────────────────────────────────
 // settings.json fragment: `env` carries the base URL, the Haiku-tier and
-// Sonnet-tier model overrides (what the fast haiku alias and the standard
-// sonnet alias resolve to — see https://code.claude.com/docs/en/model-config),
+// Sonnet-tier model overrides (required — what the fast haiku alias and the
+// standard sonnet alias resolve to)
+// plus optional Opus-tier and Fable-tier overrides (emitted only when set),
 // plus the auth-token key with a placeholder when a VK is picked — never
 // the real secret. Top-level `model` is the session-start default and is
 // always kept alongside. Without a VK no auth key is emitted.
+// See https://code.claude.com/docs/en/model-config.
 
 function buildClaudeCode(input: AgentConfigInput): AgentConfigOutput {
 	const hasAuth = !!input.virtualKeyName;
@@ -197,6 +201,8 @@ function buildClaudeCode(input: AgentConfigInput): AgentConfigOutput {
 	const defaultId = input.defaultModelId ?? firstId;
 	const haikuId = input.claudeHaikuModelId ?? defaultId;
 	const sonnetId = input.claudeSonnetModelId ?? defaultId;
+	const opusId = input.claudeOpusModelId?.trim() ? input.claudeOpusModelId : "";
+	const fableId = input.claudeFableModelId?.trim() ? input.claudeFableModelId : "";
 
 	const settingsFragment = `${hasAuth && input.virtualKeyName ? `// Virtual key: ${input.virtualKeyName} — replace "${VK_VALUE_PLACEHOLDER}" with its value, or set ${authKey} in your shell.\n` : ""}${JSON.stringify(
 		{
@@ -204,6 +210,8 @@ function buildClaudeCode(input: AgentConfigInput): AgentConfigOutput {
 				ANTHROPIC_BASE_URL: baseUrl,
 				...(haikuId ? { ANTHROPIC_DEFAULT_HAIKU_MODEL: haikuId } : {}),
 				...(sonnetId ? { ANTHROPIC_DEFAULT_SONNET_MODEL: sonnetId } : {}),
+				...(opusId ? { ANTHROPIC_DEFAULT_OPUS_MODEL: opusId } : {}),
+				...(fableId ? { ANTHROPIC_DEFAULT_FABLE_MODEL: fableId } : {}),
 				...(hasAuth ? { [authKey]: VK_VALUE_PLACEHOLDER } : {}),
 			},
 			...(defaultId ? { model: defaultId } : {}),
