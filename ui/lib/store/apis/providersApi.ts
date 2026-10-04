@@ -149,6 +149,8 @@ export interface GetModelsRequest {
 	vks?: string[];
 	limit?: number;
 	unfiltered?: boolean;
+	/** Virtual-key value (sk-bf-…) sent as x-bf-vk so the listing is scoped to what the key may reach. */
+	virtualKeyValue?: string;
 }
 
 export interface GetBaseModelsRequest {
@@ -525,9 +527,13 @@ export const providersApi = baseApi.injectEndpoints({
 			providesTags: ["DBKeys"],
 		}),
 
-		// Get models with optional filtering
+		// Get models with optional filtering.
+		// virtualKeyValue is the VK secret: it is sent as the x-bf-vk header so
+		// the server scopes the listing to what that key may reach. Only call
+		// sites that already hold the secret (a revealed key the user chose)
+		// pass it; every other caller leaves it unset.
 		getModels: builder.query<ListModelsResponse, GetModelsRequest>({
-			query: ({ query, provider, keys, vks, limit, unfiltered }) => {
+			query: ({ query, provider, keys, vks, limit, unfiltered, virtualKeyValue }) => {
 				const params = new URLSearchParams();
 				if (query) params.append("query", query);
 				if (provider) params.append("provider", provider);
@@ -535,7 +541,10 @@ export const providersApi = baseApi.injectEndpoints({
 				if (vks && vks.length > 0) params.append("vks", vks.join(","));
 				if (limit !== undefined) params.append("limit", limit.toString());
 				if (unfiltered !== undefined) params.append("unfiltered", unfiltered.toString());
-				return `/models?${params.toString()}`;
+				return {
+					url: `/models?${params.toString()}`,
+					...(virtualKeyValue ? { headers: { "x-bf-vk": virtualKeyValue } } : {}),
+				};
 			},
 			providesTags: ["Models"],
 		}),
@@ -580,9 +589,11 @@ export const providersApi = baseApi.injectEndpoints({
 				limit?: number;
 				offset?: number;
 				unfiltered?: boolean;
+				/** VK secret sent as x-bf-vk; scopes rows to what the key may reach. */
+				virtualKeyValue?: string;
 			}
 		>({
-			query: ({ query, provider, limit, offset, unfiltered }) => {
+			query: ({ query, provider, limit, offset, unfiltered, virtualKeyValue }) => {
 				const params = new URLSearchParams();
 				if (query) params.append("query", query);
 				if (provider) params.append("provider", provider);
@@ -590,7 +601,10 @@ export const providersApi = baseApi.injectEndpoints({
 				if (offset !== undefined && offset > 0) params.append("offset", String(offset));
 				if (unfiltered !== undefined) params.append("unfiltered", String(unfiltered));
 				const qs = params.toString();
-				return `/models/details${qs ? `?${qs}` : ""}`;
+				return {
+					url: `/models/details${qs ? `?${qs}` : ""}`,
+					...(virtualKeyValue ? { headers: { "x-bf-vk": virtualKeyValue } } : {}),
+				};
 			},
 			providesTags: ["Models"],
 		}),

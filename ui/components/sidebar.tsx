@@ -40,6 +40,7 @@ import {
 	SearchCheck,
 	Settings,
 	Settings2Icon,
+	SquareTerminal,
 	ShieldCheck,
 	Shuffle,
 	Siren,
@@ -692,6 +693,13 @@ export default function AppSidebar() {
 						icon: Network,
 						description: "Intelligent routing rules",
 						hasAccess: hasRoutingRulesAccess,
+					},
+					{
+						title: "Agent Setup",
+						url: "/workspace/agent-setup",
+						icon: SquareTerminal,
+						description: "Generate agent model configs for opencode, Claude Code and Codex",
+						hasAccess: hasModelProvidersAccess,
 					},
 					{
 						title: "Complexity Router",
