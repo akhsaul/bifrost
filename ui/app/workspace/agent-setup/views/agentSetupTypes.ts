@@ -24,18 +24,23 @@
  *    what current opencode loads, so builders emit v2.
  *  - codex config reference: `[model_providers.<id>]` + top-level globals
  *    `model_context_window`, `model_max_output_tokens`, `model_reasoning_effort`.
- *  - claude code gateway docs: settings.json `env` fragment carries only
- *    secret-free keys (base URL + model); the VK secret lives only in a
- *    POSIX shell-export hint.
+ *  - claude code gateway docs: settings.json `env` fragment carries
+ *    `ANTHROPIC_BASE_URL` + `ANTHROPIC_DEFAULT_HAIKU_MODEL` /
+ *    `ANTHROPIC_DEFAULT_SONNET_MODEL` (both the chosen default model) plus
+ *    the auth-token key with the `<paste-your-virtual-key-value>`
+ *    placeholder when a VK is picked — the VK secret never lands in the
+ *    file itself (top-level `model` is kept alongside).
  *
  * Auth model (from the agent's point of view a virtual key IS the api key):
  *  - No virtual key picked → the config carries no credential at all (no
  *    apiKey / env_key / auth token, no shell exports for secrets).
  *  - Virtual key picked (at most one) → provider/model/rule lists are
  *    narrowed to what that key may reach, and the output references the
- *    credential by env var only. The secret itself is never written into
- *    the config — only the key name as a comment plus a placeholder the
- *    user pastes into their own environment.
+ *    credential without ever writing the real secret: opencode uses
+ *    env-var indirection (`env` + `{env:}`), codex uses `env_key`, and
+ *    claude code inlines the env-var key with the
+ *    `<paste-your-virtual-key-value>` placeholder (plus the VK name as a
+ *    comment). A POSIX shell-export hint is always included alongside.
  */
 
 export type AgentId = "opencode" | "claude-code" | "codex";

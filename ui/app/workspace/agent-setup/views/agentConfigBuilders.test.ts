@@ -139,19 +139,22 @@ describe("buildAgentConfig", () => {
 		expect(withoutVk.shellExports).toBe("");
 	});
 
-	it("builds a secret-free claude fragment (base URL + model only) with the VK secret only in shell exports", () => {
+	it("builds a claude fragment with Haiku/Sonnet defaults, kept model key, and a placeholder auth token only with a VK", () => {
 		const withVk = buildAgentConfig(
 			"claude-code",
 			baseInput({ virtualKeyName: "k", envVar: "ANTHROPIC_AUTH_TOKEN", defaultModelId: "test-route" }),
 		);
 		expect(withVk.config).toContain('"ANTHROPIC_BASE_URL": "http://127.0.0.1:8080/anthropic"');
+		expect(withVk.config).toContain('"ANTHROPIC_DEFAULT_HAIKU_MODEL": "test-route"');
+		expect(withVk.config).toContain('"ANTHROPIC_DEFAULT_SONNET_MODEL": "test-route"');
 		expect(withVk.config).toContain('"model": "test-route"');
-		expect(withVk.config).not.toContain("ANTHROPIC_AUTH_TOKEN");
-		expect(withVk.config).not.toContain("<paste-your-virtual-key-value>");
+		expect(withVk.config).toContain('"ANTHROPIC_AUTH_TOKEN": "<paste-your-virtual-key-value>"');
+		expect(withVk.config).not.toContain("sk-bf-");
 		expect(withVk.shellExports).toContain('export ANTHROPIC_AUTH_TOKEN="<paste-your-virtual-key-value>"');
 
 		const withoutVk = buildAgentConfig("claude-code", baseInput({ envVar: "ANTHROPIC_AUTH_TOKEN" }));
 		expect(withoutVk.config).toContain('"ANTHROPIC_BASE_URL"');
+		expect(withoutVk.config).not.toContain("ANTHROPIC_AUTH_TOKEN");
 		expect(withoutVk.shellExports).toBe("");
 	});
 });

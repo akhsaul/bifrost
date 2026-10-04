@@ -179,20 +179,25 @@ function buildCodex(input: AgentConfigInput): AgentConfigOutput {
 }
 
 // ── Claude Code ──────────────────────────────────────────────────────────
-// settings.json first: the fragment carries only secret-free keys (base URL
-// + model). The VK secret lives only in the POSIX shell-export hint, never
-// in the JSON. Without a VK the fragment is just base URL + model.
+// settings.json fragment: `env` carries the base URL, the Haiku/Sonnet
+// default models (both point at the user-chosen default; with a single
+// selection they are the same model), plus the auth-token key with a
+// placeholder when a VK is picked — never the real secret. Top-level
+// `model` is always kept alongside. Without a VK no auth key is emitted.
 
 function buildClaudeCode(input: AgentConfigInput): AgentConfigOutput {
 	const hasAuth = !!input.virtualKeyName;
-	const envVar = input.envVar || DEFAULT_CLAUDE_ENV_VAR;
+	const authKey = input.envVar || DEFAULT_CLAUDE_ENV_VAR;
 	const baseUrl = `${input.baseUrl}/anthropic`;
 	const defaultId = input.defaultModelId ?? input.models[0]?.id ?? "";
 
-	const settingsFragment = `${hasAuth && input.virtualKeyName ? `// Virtual key: ${input.virtualKeyName}\n` : ""}${JSON.stringify(
+	const settingsFragment = `${hasAuth && input.virtualKeyName ? `// Virtual key: ${input.virtualKeyName} — replace "${VK_VALUE_PLACEHOLDER}" with its value, or set ${authKey} in your shell.\n` : ""}${JSON.stringify(
 		{
 			env: {
 				ANTHROPIC_BASE_URL: baseUrl,
+				...(defaultId ? { ANTHROPIC_DEFAULT_HAIKU_MODEL: defaultId } : {}),
+				...(defaultId ? { ANTHROPIC_DEFAULT_SONNET_MODEL: defaultId } : {}),
+				...(hasAuth ? { [authKey]: VK_VALUE_PLACEHOLDER } : {}),
 			},
 			...(defaultId ? { model: defaultId } : {}),
 		},
@@ -200,12 +205,12 @@ function buildClaudeCode(input: AgentConfigInput): AgentConfigOutput {
 		2,
 	)}`;
 
-	const shellExports = hasAuth ? posixShellExports(envVar, `Virtual key ${input.virtualKeyName}: set once in your shell`) : "";
+	const shellExports = hasAuth ? posixShellExports(authKey, `Virtual key ${input.virtualKeyName}: set once in your shell`) : "";
 
 	return {
 		config: settingsFragment,
 		shellExports,
-		sections: [...(hasAuth ? [{ label: "Shell exports (secret lives here, not in the file)", content: shellExports }] : [])],
+		sections: [...(hasAuth ? [{ label: "Shell exports (alternative to pasting into the file)", content: shellExports }] : [])],
 	};
 }
 
