@@ -133,6 +133,8 @@ export default function AgentSetupView() {
 	const [envVar, setEnvVar] = useState(DEFAULT_BIFROST_ENV_VAR);
 
 	const variantsTouched = useRef<Set<string>>(new Set());
+	// Per-entry fields the user edited by hand — datasheet refreshes must not clobber them (ref: mutated alongside setMetadata, no extra render).
+	const metaTouched = useRef<Map<string, Set<keyof AgentModelMetadata>>>(new Map());
 
 	// ── Virtual key picker (searchable, secret never rendered raw) ───
 	const [vkSearch, setVkSearch] = useState("");
@@ -175,8 +177,12 @@ export default function AgentSetupView() {
 		for (const m of detailsData?.models ?? []) {
 			const key = `${m.provider}/${m.name}`;
 			const arch = m.architecture;
+			// Operator precedence trap (fixed): `a ?? b !== undefined` parses as
+			// `a ?? (b !== undefined)`, so a missing max_input_tokens with a
+			// present context_length produced `true` instead of the number.
+			const context = m.max_input_tokens ?? m.context_length;
 			map.set(key, {
-				...((m.max_input_tokens ?? m.context_length !== undefined) ? { context: m.max_input_tokens ?? m.context_length } : {}),
+				...(context !== undefined ? { context } : {}),
 				...(m.max_output_tokens !== undefined ? { output: m.max_output_tokens } : {}),
 				...(arch?.input_modalities ? { inputModalities: arch.input_modalities } : {}),
 				...(arch?.output_modalities ? { outputModalities: arch.output_modalities } : {}),
@@ -291,7 +297,9 @@ export default function AgentSetupView() {
 		[effortsByModel],
 	);
 
-	// Initialize metadata for new selections; refresh unchecked variants when datasheet efforts land.
+	// Initialize metadata for new selections; datasheet-backed fields
+	// (limits, modalities) refresh until the user edits them — the server
+	// row can land after the prefill ran, so only user-touched entries win.
 	useEffect(() => {
 		setMetadata((prev) => {
 			const next = { ...prev };
@@ -299,25 +307,32 @@ export default function AgentSetupView() {
 			const selected = new Set(selectionKeys);
 			for (let i = 0; i < selectionItems.length; i++) {
 				const key = selectionKeys[i];
+				const fresh = makePrefill(selectionItems[i]);
 				const existing = next[key];
 				if (!existing) {
-					next[key] = makePrefill(selectionItems[i]);
+					next[key] = fresh;
 					changed = true;
-				} else if (!variantsTouched.current.has(key)) {
-					const efforts =
-						selectionItems[i].kind === "direct"
-							? (effortsByModel[selectionItems[i].id] ?? DEFAULT_REASONING_EFFORTS)
-							: DEFAULT_REASONING_EFFORTS;
-					if (JSON.stringify(existing.variantEfforts) !== JSON.stringify(efforts)) {
-						next[key] = { ...existing, variantEfforts: efforts };
-						changed = true;
-					}
+					continue;
+				}
+				const touched = metaTouched.current.get(key);
+				const merged: AgentModelMetadata = {
+					limitContext: touched?.has("limitContext") ? existing.limitContext : fresh.limitContext,
+					limitOutput: touched?.has("limitOutput") ? existing.limitOutput : fresh.limitOutput,
+					tools: touched?.has("tools") ? existing.tools : fresh.tools,
+					inputModalities: touched?.has("inputModalities") ? existing.inputModalities : fresh.inputModalities,
+					outputModalities: touched?.has("outputModalities") ? existing.outputModalities : fresh.outputModalities,
+					variantEfforts: variantsTouched.current.has(key) ? existing.variantEfforts : fresh.variantEfforts,
+				};
+				if (JSON.stringify(existing) !== JSON.stringify(merged)) {
+					next[key] = merged;
+					changed = true;
 				}
 			}
 			for (const k of Object.keys(next)) {
 				if (!selected.has(k)) {
 					delete next[k];
 					variantsTouched.current.delete(k);
+					metaTouched.current.delete(k);
 					changed = true;
 				}
 			}
@@ -326,11 +341,18 @@ export default function AgentSetupView() {
 	}, [selectionItems, selectionKeys, effortsByModel, makePrefill]);
 
 	const handleEfforts = useCallback((model: string, efforts: string[] | null) => {
-		setEffortsByModel((prev) => (prev[model] === efforts ? prev : { ...prev, [model]: efforts }));
+		setEffortsByModel((prev) => {
+			const cur = prev[model] ?? null;
+			if (JSON.stringify(cur) === JSON.stringify(efforts)) return prev;
+			return { ...prev, [model]: efforts };
+		});
 	}, []);
 
 	const updateMetadata = useCallback((key: string, patch: Partial<AgentModelMetadata>) => {
 		setMetadata((prev) => ({ ...prev, [key]: { ...(prev[key] ?? EMPTY_AGENT_METADATA), ...patch } }));
+		const set = metaTouched.current.get(key) ?? new Set<keyof AgentModelMetadata>();
+		for (const field of Object.keys(patch) as (keyof AgentModelMetadata)[]) set.add(field);
+		metaTouched.current.set(key, set);
 	}, []);
 
 	// Effective default model for single-default agents (user choice wins, else first selection).
