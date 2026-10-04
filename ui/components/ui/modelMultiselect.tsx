@@ -162,7 +162,8 @@ export function ModelMultiselect(props: ModelMultiselectProps) {
 
 	// The single visible chip is the only case where the row can still be too
 	// narrow for the name itself; then — and only then — the label is truncated.
-	const truncateSoleChip = isCollapsed && visibleCount === 1 && hiddenCount === 0 && chipWidths.length === 1 && chipWidths[0] > availableWidth - CHIP_ROW_RESERVE;
+	const truncateSoleChip =
+		isCollapsed && visibleCount === 1 && hiddenCount === 0 && chipWidths.length === 1 && chipWidths[0] > availableWidth - CHIP_ROW_RESERVE;
 
 	// Determine if we should use base models (no provider selected + "base_models" mode)
 	const shouldUseBaseModels = loadModelsOnEmptyProvider === "base_models" && !provider;
@@ -336,13 +337,13 @@ export function ModelMultiselect(props: ModelMultiselectProps) {
 				<div
 					ref={measureRef}
 					aria-hidden="true"
-					className="pointer-events-none absolute -top-[9999px] left-0 flex items-center gap-1 opacity-0 whitespace-nowrap"
+					className="pointer-events-none absolute -top-[9999px] left-0 flex items-center gap-1 whitespace-nowrap opacity-0"
 				>
 					{selectedOptions.map((opt) => (
 						<div
 							key={opt.value}
 							data-measure-chip
-							className="bg-accent flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs shrink-0 whitespace-nowrap"
+							className="bg-accent flex shrink-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs whitespace-nowrap"
 						>
 							<span>{opt.label}</span>
 							<X className="h-3.5 w-3.5 shrink-0" />

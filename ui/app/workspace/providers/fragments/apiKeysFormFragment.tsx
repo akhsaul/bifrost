@@ -19,6 +19,7 @@ import {
 	type ClineDeviceChallenge,
 } from "@/lib/store/apis/providersApi";
 import { hasAntigravityOAuthRefresh, hasClineApiToken, hasClineOAuthRefresh, hasCopilotApiToken, isRedacted } from "@/lib/utils/validation";
+import { getErrorMessage } from "@/lib/store/apis/baseApi";
 import { CheckCircle2, Info, Loader2, RefreshCw, Copy, Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Control, UseFormReturn } from "react-hook-form";
@@ -192,11 +193,18 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 
 	// Auth type state for Antigravity: 'oauth' or 'manual'
 	const [antigravityAuthType, setAntigravityAuthType] = useState<"oauth" | "manual">("oauth");
+	// Pinned loopback redirect: the shared Google OAuth client only accepts
+	// http://localhost:8085, so auth-url generation and code exchange must use
+	// the same URI regardless of which port Bifrost itself serves on.
+	const ANTIGRAVITY_REDIRECT_URI = "http://localhost:8085";
 	const [manualCode, setManualCode] = useState("");
 	const [manualRedirectUri, setManualRedirectUri] = useState<string>("http://localhost:8085");
 	const [hasCopiedLink, setHasCopiedLink] = useState(false);
 	const [isCopyingUrl, setIsCopyingUrl] = useState(false);
 	const [authError, setAuthError] = useState<string | null>(null);
+	// True once the operator clicks Authenticate: reveals the waiting box
+	// (disabled popup placeholder + copy link + paste box), Cline-style.
+	const [antigravityAuthStarted, setAntigravityAuthStarted] = useState(false);
 	const [getAuthUrl, { isLoading: isFetchingUrl }] = useLazyGetAntigravityAuthUrlQuery();
 	const [exchangeCode, { isLoading: isExchanging }] = useExchangeAntigravityAuthCodeMutation();
 
@@ -237,31 +245,22 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 
 	const handleGoogleLogin = async () => {
 		setAuthError(null);
+		setAntigravityAuthStarted(true);
+		setIsCopyingUrl(true);
 		try {
-			const redirectUri = `${window.location.origin}/oauth-callback`;
-			const res = await getAuthUrl({ redirect_uri: redirectUri }).unwrap();
+			const res = await getAuthUrl({ redirect_uri: ANTIGRAVITY_REDIRECT_URI }).unwrap();
 			if (!res.auth_url) throw new Error("No authorization URL returned");
 
-			const width = 600;
-			const height = 700;
-			const left = window.screenX + (window.outerWidth - width) / 2;
-			const top = window.screenY + (window.outerHeight - height) / 2;
-			const popup = window.open(
-				res.auth_url,
-				"antigravity_oauth",
-				`width=${width},height=${height},left=${left},top=${top},status=no,resizable=yes`,
-			);
-
-			const handleMessage = async (event: MessageEvent) => {
-				if (event.data?.type === "antigravity_oauth_code" && event.data?.code) {
-					window.removeEventListener("message", handleMessage);
-					popup?.close();
-					await completeExchange(event.data.code, redirectUri);
-				}
-			};
-			window.addEventListener("message", handleMessage);
-		} catch (err: any) {
-			setAuthError(err?.data?.error || err?.message || "Failed to start Google OAuth flow");
+			await navigator.clipboard.writeText(res.auth_url);
+			setManualRedirectUri(ANTIGRAVITY_REDIRECT_URI);
+			setHasCopiedLink(true);
+			setTimeout(() => setHasCopiedLink(false), 2500);
+			toast.success("Google OAuth URL copied to clipboard! Open it in your local browser, then paste the redirect URL below.");
+		} catch (err: unknown) {
+			setAuthError(getErrorMessage(err));
+			toast.error("Failed to generate Google OAuth URL");
+		} finally {
+			setIsCopyingUrl(false);
 		}
 	};
 
@@ -269,17 +268,16 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 		setAuthError(null);
 		setIsCopyingUrl(true);
 		try {
-			const redirectUri = "http://localhost:8085";
-			const res = await getAuthUrl({ redirect_uri: redirectUri }).unwrap();
+			const res = await getAuthUrl({ redirect_uri: ANTIGRAVITY_REDIRECT_URI }).unwrap();
 			if (!res.auth_url) throw new Error("No authorization URL returned");
 
 			await navigator.clipboard.writeText(res.auth_url);
-			setManualRedirectUri("http://localhost:8085");
+			setManualRedirectUri(ANTIGRAVITY_REDIRECT_URI);
 			setHasCopiedLink(true);
 			setTimeout(() => setHasCopiedLink(false), 2500);
 			toast.success("Google OAuth URL copied to clipboard! Open it in your local browser, then paste the redirect URL below.");
-		} catch (err: any) {
-			setAuthError(err?.data?.error || err?.message || "Failed to generate Google OAuth URL");
+		} catch (err: unknown) {
+			setAuthError(getErrorMessage(err));
 			toast.error("Failed to copy Google OAuth URL");
 		} finally {
 			setIsCopyingUrl(false);
@@ -289,7 +287,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 	const completeExchange = async (code: string, redirectUri?: string) => {
 		setAuthError(null);
 		try {
-			const uri = redirectUri || `${window.location.origin}/oauth-callback`;
+			const uri = redirectUri || ANTIGRAVITY_REDIRECT_URI;
 			const res = await exchangeCode({
 				code: code.trim(),
 				redirect_uri: uri,
@@ -307,8 +305,9 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			}
 			toast.success(res.email ? `Connected as ${res.email}!` : "Antigravity Google OAuth connected successfully!");
 			setManualCode("");
-		} catch (err: any) {
-			setAuthError(err?.data?.error || err?.message || "Failed to exchange authorization code");
+			setAntigravityAuthStarted(false);
+		} catch (err: unknown) {
+			setAuthError(getErrorMessage(err));
 		}
 	};
 
@@ -2105,10 +2104,13 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 											variant="outline"
 											size="sm"
 											className="text-xs"
-											onClick={handleGoogleLogin}
+											onClick={() => {
+												setAntigravityAuthStarted(false);
+												void handleGoogleLogin();
+											}}
 											disabled={isFetchingUrl || isExchanging || isCopyingUrl}
 										>
-											{isFetchingUrl || isExchanging ? (
+											{isFetchingUrl || isExchanging || isCopyingUrl ? (
 												<Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
 											) : (
 												<RefreshCw className="mr-2 h-3.5 w-3.5" />
@@ -2137,86 +2139,110 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 													</Button>
 												</TooltipTrigger>
 												<TooltipContent className="max-w-xs">
-													<p>Copy Google OAuth URL (redirecting to localhost:8085) to open in your local browser.</p>
+													<p>Copy a fresh Google OAuth URL (redirecting to localhost:8085) to open in your local browser.</p>
 												</TooltipContent>
 											</Tooltip>
 										</TooltipProvider>
 									</div>
 								</div>
-							) : (
+							) : !antigravityAuthStarted ? (
 								<div className="space-y-3">
 									<p className="text-muted-foreground text-sm">
 										Sign in with your Google account. Bifrost will automatically retrieve the OAuth tokens and discover your Cloud Code
 										project.
 									</p>
-									<div className="flex flex-col gap-2 sm:flex-row">
-										<Button
-											type="button"
-											variant="default"
-											data-testid="antigravity-oauth-login-btn"
-											className="flex flex-1 items-center justify-center gap-2"
-											onClick={handleGoogleLogin}
-											disabled={isFetchingUrl || isExchanging || isCopyingUrl}
-										>
-											{isFetchingUrl || isExchanging ? (
-												<Loader2 className="h-4 w-4 animate-spin" />
-											) : (
-												<svg className="h-4 w-4" viewBox="0 0 24 24">
-													<path
-														fill="#EA4335"
-														d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"
-													/>
-													<path
-														fill="#4285F4"
-														d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"
-													/>
-													<path
-														fill="#FBBC05"
-														d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9z"
-													/>
-													<path
-														fill="#34A853"
-														d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z"
-													/>
-												</svg>
-											)}
-											Sign in with Google (OAuth)
+									<Button
+										type="button"
+										variant="default"
+										data-testid="antigravity-oauth-login-btn"
+										className="flex w-full items-center justify-center gap-2"
+										onClick={() => void handleGoogleLogin()}
+										disabled={isFetchingUrl || isExchanging || isCopyingUrl}
+									>
+										{isFetchingUrl || isCopyingUrl ? (
+											<Loader2 className="h-4 w-4 animate-spin" />
+										) : (
+											<svg className="h-4 w-4" viewBox="0 0 24 24">
+												<path
+													fill="#EA4335"
+													d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"
+												/>
+												<path
+													fill="#4285F4"
+													d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"
+												/>
+												<path
+													fill="#FBBC05"
+													d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15s.7 5.3 1.9 7.7l3.7-2.9z"
+												/>
+												<path
+													fill="#34A853"
+													d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z"
+												/>
+											</svg>
+										)}
+										Authenticate
+									</Button>
+								</div>
+							) : (
+								<div className="space-y-3">
+									<div className="flex items-center justify-between gap-2">
+										<div>
+											<div className="text-sm font-semibold">Connect with Google (OAuth)</div>
+											<p className="text-muted-foreground text-xs">
+												Approve in your browser, then paste the redirect URL below. No manual key needed.
+											</p>
+										</div>
+										<Button type="button" variant="outline" size="sm" data-testid="antigravity-oauth-waiting-btn" disabled>
+											<Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+											Waiting for authentication…
 										</Button>
-										<TooltipProvider>
-											<Tooltip>
-												<TooltipTrigger asChild>
-													<Button
-														type="button"
-														variant="outline"
-														data-testid="antigravity-oauth-copy-link-btn"
-														className="flex items-center justify-center gap-2"
-														onClick={handleCopyGoogleLoginUrl}
-														disabled={isFetchingUrl || isExchanging || isCopyingUrl}
-													>
-														{isCopyingUrl ? (
-															<Loader2 className="h-4 w-4 animate-spin" />
-														) : hasCopiedLink ? (
-															<Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-														) : (
-															<Copy className="h-4 w-4" />
-														)}
-														<span>{hasCopiedLink ? "Copied Link!" : "Copy Login Link"}</span>
-													</Button>
-												</TooltipTrigger>
-												<TooltipContent className="max-w-xs">
-													<p>
-														Recommended for VPS, Docker, or Hugging Face Space. Copy the link, open it in your local browser, then paste the
-														resulting redirect URL below.
-													</p>
-												</TooltipContent>
-											</Tooltip>
-										</TooltipProvider>
 									</div>
-
-									<div className="mt-4 space-y-2 border-t pt-4">
-										<FormLabel className="text-muted-foreground text-xs">
-											Alternative / Remote: Paste Authorization Code or Redirect URL
-										</FormLabel>
+									<div className="space-y-2 rounded-md border p-3">
+										<div className="flex flex-wrap gap-2">
+											<TooltipProvider>
+												<Tooltip>
+													<TooltipTrigger asChild>
+														<span className="inline-flex">
+															<Button
+																type="button"
+																variant="outline"
+																size="sm"
+																className="text-xs"
+																data-testid="antigravity-oauth-open-popup-btn"
+																disabled
+															>
+																Open popup (not supported)
+															</Button>
+														</span>
+													</TooltipTrigger>
+													<TooltipContent className="max-w-xs">
+														<p>
+															Popup sign-in is not supported: the shared Google OAuth client only accepts the loopback redirect{" "}
+															<span className="font-mono">http://localhost:8085</span>, which the popup cannot capture. Use Copy link below.
+														</p>
+													</TooltipContent>
+												</Tooltip>
+											</TooltipProvider>
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												className="text-xs"
+												data-testid="antigravity-oauth-copy-link-btn"
+												onClick={() => void handleCopyGoogleLoginUrl()}
+												disabled={isFetchingUrl || isExchanging || isCopyingUrl}
+											>
+												{isCopyingUrl ? (
+													<Loader2 className="h-4 w-4 animate-spin" />
+												) : hasCopiedLink ? (
+													<Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+												) : (
+													<Copy className="h-4 w-4" />
+												)}
+												{hasCopiedLink ? "Copied!" : "Copy link"}
+											</Button>
+										</div>
 										<div className="flex gap-2">
 											<Input
 												placeholder="4/0A... or http://localhost:8085/?code=..."
@@ -2247,7 +2273,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 												type="button"
 												variant="secondary"
 												size="sm"
-												onClick={() => completeExchange(manualCode, manualRedirectUri || "http://localhost:8085")}
+												onClick={() => completeExchange(manualCode, manualRedirectUri || ANTIGRAVITY_REDIRECT_URI)}
 												disabled={!manualCode.trim() || isExchanging}
 											>
 												{isExchanging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Exchange"}

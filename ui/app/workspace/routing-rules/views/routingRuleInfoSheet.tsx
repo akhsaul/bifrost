@@ -208,7 +208,7 @@ function TargetCard({
 						<div className="flex items-center gap-2">
 							<span className="text-sm font-medium">{providerLabel}</span>
 							{isGroupAdaptive && target.priority && (
-								<Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0">
+								<Badge variant="outline" className="px-1.5 py-0 font-mono text-[10px]">
 									Priority {target.priority}
 								</Badge>
 							)}

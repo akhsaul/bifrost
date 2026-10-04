@@ -351,10 +351,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 				}
 			}
 			// group_adaptive: weight is per provider card, so sum distinct card weights
-			const effectiveTotal =
-				currentStrategy === "group_adaptive"
-					? targets.reduce((sum, t) => sum + (t.weight || 0), 0)
-					: totalWeight;
+			const effectiveTotal = currentStrategy === "group_adaptive" ? targets.reduce((sum, t) => sum + (t.weight || 0), 0) : totalWeight;
 			if (Math.abs(effectiveTotal - 1) > 0.001) {
 				toast.error(`Target weights must sum to 1, current total: ${effectiveTotal.toFixed(4)}`);
 				return;
@@ -422,9 +419,9 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 		const submitPromise =
 			isEditing && editingRule
 				? updateRoutingRule({
-					id: editingRule.id,
-					data: payload,
-				}).unwrap()
+						id: editingRule.id,
+						data: payload,
+					}).unwrap()
 				: createRoutingRule(payload).unwrap();
 
 		submitPromise
@@ -641,10 +638,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 									</p>
 								</div>
 								<div className="flex items-center gap-2">
-									<Select
-										value={watch("strategy") || "weighted"}
-										onValueChange={(val: RoutingStrategy) => setValue("strategy", val)}
-									>
+									<Select value={watch("strategy") || "weighted"} onValueChange={(val: RoutingStrategy) => setValue("strategy", val)}>
 										<SelectTrigger className="h-8 w-[140px] text-xs">
 											<SelectValue placeholder="Strategy" />
 										</SelectTrigger>
@@ -696,7 +690,8 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 							) : watch("strategy") === "group_adaptive" ? (
 								<div className="space-y-1">
 									<p className="text-muted-foreground text-xs">
-										Group Adaptive selects the optimal provider via provider-level EWMA, then rotates models within the chosen provider by priority (1 → 2 → 1).
+										Group Adaptive selects the optimal provider via provider-level EWMA, then rotates models within the chosen provider by
+										priority (1 → 2 → 1).
 									</p>
 									<div
 										className={`flex items-center justify-end gap-2 text-xs font-medium ${Math.abs(totalWeight - 1) > 0.001 ? "text-destructive" : "text-muted-foreground"}`}
@@ -1081,17 +1076,17 @@ function TargetRow({
 
 			{/* Group Adaptive: Model Priority Rotation List */}
 			{isGroupAdaptive && target.models && target.models.length > 1 && (
-				<div className="space-y-1.5 rounded-md border bg-muted/40 p-2.5 text-xs">
-					<div className="flex items-center justify-between text-muted-foreground font-medium">
+				<div className="bg-muted/40 space-y-1.5 rounded-md border p-2.5 text-xs">
+					<div className="text-muted-foreground flex items-center justify-between font-medium">
 						<span>Model Priority Rotation (1 → 2 → 1)</span>
 						<span className="text-[10px]">Lower number = higher precedence</span>
 					</div>
 					<div className="space-y-1">
 						{target.models.map((item, mIdx) => (
-							<div key={item.model} className="flex items-center justify-between gap-2 rounded border bg-background px-2.5 py-1.5">
+							<div key={item.model} className="bg-background flex items-center justify-between gap-2 rounded border px-2.5 py-1.5">
 								<span className="font-mono text-xs font-semibold">{item.model}</span>
 								<div className="flex items-center gap-1.5">
-									<Label className="text-[10px] text-muted-foreground">Priority:</Label>
+									<Label className="text-muted-foreground text-[10px]">Priority:</Label>
 									<Input
 										type="number"
 										min={1}
