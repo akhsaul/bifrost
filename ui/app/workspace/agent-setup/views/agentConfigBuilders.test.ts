@@ -2,13 +2,24 @@ import { describe, expect, it } from "vitest";
 import { buildAgentConfig } from "./agentConfigBuilders";
 import { extractModelTrigger } from "./agentSetupTypes";
 
-const BASE = {
-	baseUrl: "http://127.0.0.1:8080",
-	model: "test-route",
-	providerName: "bifrost",
-	extraParams: {},
-	envVar: "BIFROST_API_KEY",
-};
+function multiInput(extra = {}) {
+	return {
+		baseUrl: "http://127.0.0.1:8080",
+		models: [
+			{ id: "opencode-zen/glm-5.3", kind: "direct" as const, provider: "opencode-zen", model: "glm-5.3", limit: { context: 200000 } },
+			{
+				id: "test-route",
+				kind: "rule" as const,
+				ruleId: "r1",
+				ruleTargets: "opencode-zen/space-bunny-free",
+				manualMetadata: { contextWindow: "1000000", maxInputTokens: "", maxOutputTokens: "128000", reasoningEffort: "" },
+			},
+		],
+		extraParams: {},
+		envVar: "BIFROST_API_KEY",
+		...extra,
+	};
+}
 
 describe("extractModelTrigger", () => {
 	it("extracts the literal from a simple model equality CEL", () => {
@@ -26,51 +37,55 @@ describe("extractModelTrigger", () => {
 });
 
 describe("buildAgentConfig", () => {
-	it("builds an opencode provider block with {env:} substitution and no literal secret", () => {
-		const out = buildAgentConfig("opencode", { ...BASE, virtualKeyName: "evaluate-test-route" }, "linux");
-		expect(out.config).toContain("{env:BIFROST_API_KEY}");
-		expect(out.config).toContain('"baseURL": "http://127.0.0.1:8080/v1"');
-		expect(out.config).toContain("test-route");
-		expect(out.config).toContain("evaluate-test-route");
-		expect(out.config).not.toContain("sk-bf-");
-		expect(out.shellExports).toContain('export BIFROST_API_KEY="<paste-your-virtual-key-value>"');
+	it("builds an opencode provider block with every selected model and {env:} auth only with a VK", () => {
+		const withVk = buildAgentConfig("opencode", multiInput({ virtualKeyName: "evaluate-test-route" }), "linux");
+		expect(withVk.config).toContain("{env:BIFROST_API_KEY}");
+		expect(withVk.config).toContain('"baseURL": "http://127.0.0.1:8080/v1"');
+		expect(withVk.config).toContain("opencode-zen/glm-5.3");
+		expect(withVk.config).toContain("test-route");
+		expect(withVk.config).toContain("evaluate-test-route");
+		expect(withVk.config).toContain('"context": 200000');
+		expect(withVk.config).toContain('"output": 128000');
+		expect(withVk.config).not.toContain("sk-bf-");
+		expect(withVk.shellExports).toContain('export BIFROST_API_KEY="<paste-your-virtual-key-value>"');
+
+		const withoutVk = buildAgentConfig("opencode", multiInput(), "linux");
+		expect(withoutVk.config).toContain("opencode-zen/glm-5.3");
+		expect(withoutVk.config).not.toContain("apiKey");
+		expect(withoutVk.config).not.toContain('"env"');
+		expect(withoutVk.config).not.toContain("<paste-your-virtual-key-value>");
+		expect(withoutVk.shellExports).toBe("");
+		expect(withoutVk.sections).toEqual([]);
 	});
 
-	it("builds a codex TOML block with env_key and responses wire api", () => {
-		const out = buildAgentConfig("codex", BASE, "macos");
-		expect(out.config).toContain('model = "test-route"');
-		expect(out.config).toContain('env_key = "BIFROST_API_KEY"');
-		expect(out.config).toContain('wire_api = "responses"');
-		expect(out.config).toContain('base_url = "http://127.0.0.1:8080/v1"');
-		expect(out.config).not.toContain("sk-bf-");
+	it("builds a codex TOML block with env_key only with a VK", () => {
+		const withVk = buildAgentConfig("codex", multiInput({ virtualKeyName: "k" }), "macos");
+		expect(withVk.config).toContain('model = "opencode-zen/glm-5.3"');
+		expect(withVk.config).toContain("# Models: opencode-zen/glm-5.3, test-route (rule → opencode-zen/space-bunny-free)");
+		expect(withVk.config).toContain('env_key = "BIFROST_API_KEY"');
+		expect(withVk.config).toContain('wire_api = "responses"');
+		expect(withVk.config).not.toContain("sk-bf-");
+
+		const withoutVk = buildAgentConfig("codex", multiInput(), "macos");
+		expect(withoutVk.config).not.toContain("env_key");
+		expect(withoutVk.config).not.toContain("<paste-your-virtual-key-value>");
+		expect(withoutVk.shellExports).toBe("");
 	});
 
-	it("builds claude code shell exports against /anthropic with literal placeholder fragment", () => {
-		const out = buildAgentConfig("claude-code", { ...BASE, envVar: "ANTHROPIC_AUTH_TOKEN" }, "linux");
-		expect(out.shellExports).toContain('export ANTHROPIC_BASE_URL="http://127.0.0.1:8080/anthropic"');
-		expect(out.shellExports).toContain('export ANTHROPIC_AUTH_TOKEN="<paste-your-virtual-key-value>"');
-		expect(out.config).toContain('"model": "test-route"');
-	});
+	it("builds claude code output with credential fields only with a VK", () => {
+		const withVk = buildAgentConfig("claude-code", multiInput({ virtualKeyName: "k", envVar: "ANTHROPIC_AUTH_TOKEN" }), "linux");
+		expect(withVk.shellExports).toContain('export ANTHROPIC_BASE_URL="http://127.0.0.1:8080/anthropic"');
+		expect(withVk.shellExports).toContain('export ANTHROPIC_AUTH_TOKEN="<paste-your-virtual-key-value>"');
+		expect(withVk.config).toContain('"model": "opencode-zen/glm-5.3"');
 
-	it("omits empty manual metadata and applies provided limits to opencode", () => {
-		const empty = buildAgentConfig(
-			"opencode",
-			{ ...BASE, manualMetadata: { contextWindow: "", maxInputTokens: "", maxOutputTokens: "", reasoningEffort: "" } },
-			"linux",
-		);
-		expect(empty.config).not.toContain('"limit"');
-
-		const withLimits = buildAgentConfig(
-			"opencode",
-			{ ...BASE, manualMetadata: { contextWindow: "1000000", maxInputTokens: "", maxOutputTokens: "128000", reasoningEffort: "max" } },
-			"linux",
-		);
-		expect(withLimits.config).toContain('"context": 1000000');
-		expect(withLimits.config).toContain('"output": 128000');
+		const withoutVk = buildAgentConfig("claude-code", multiInput({ envVar: "ANTHROPIC_AUTH_TOKEN" }), "linux");
+		expect(withoutVk.config).not.toContain("ANTHROPIC_AUTH_TOKEN");
+		expect(withoutVk.config).not.toContain("<paste-your-virtual-key-value>");
+		expect(withoutVk.shellExports).toBe('export ANTHROPIC_BASE_URL="http://127.0.0.1:8080/anthropic"');
 	});
 
 	it("emits windows-style shell exports on windows", () => {
-		const out = buildAgentConfig("codex", BASE, "windows");
+		const out = buildAgentConfig("codex", multiInput({ virtualKeyName: "k" }), "windows");
 		expect(out.shellExports).toContain('$env:BIFROST_API_KEY = "<paste-your-virtual-key-value>"');
 	});
 });

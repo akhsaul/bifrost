@@ -3,12 +3,11 @@ import { Button } from "@/components/ui/button";
 import { CodeEditor } from "@/components/ui/codeEditor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MultiSelect, type MultiSelectOption } from "@/components/ui/multiSelect";
 import { SearchSelect } from "@/components/ui/searchSelect";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ModelParameters from "@/components/ui/custom/modelParameters";
 import { NoPermissionView } from "@/components/noPermissionView";
-import { maskSecret } from "@/app/workspace/mcp-registry/views/mcpUsageGuide/utils";
 import { useDebouncedValue } from "@/hooks/useDebounce";
 import { useCopyToClipboard } from "@/hooks/useCopyToClipboard";
 import {
@@ -19,10 +18,11 @@ import {
 	useGetVirtualKeysQuery,
 } from "@/lib/store";
 import { useGetRoutingRulesQuery } from "@/lib/store/apis/routingRulesApi";
+import type { VirtualKey } from "@/lib/types/governance";
 import { cn } from "@/lib/utils";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
 import { Check, Copy, Download, KeyRound, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { buildAgentConfig, type AgentConfigInput } from "./agentConfigBuilders";
 import {
@@ -35,7 +35,7 @@ import {
 	type AgentId,
 	type AgentPlatform,
 	type ManualModelMetadata,
-	type ModelSource,
+	type ModelSelectionItem,
 } from "./agentSetupTypes";
 
 function defaultEnvVar(agent: AgentId): string {
@@ -48,21 +48,59 @@ function defaultBaseUrl(): string {
 	return "";
 }
 
+// ── Virtual-key allowlist helpers ──────────────────────────────────────
+// From the agent's point of view a virtual key IS the api key: when one is
+// picked, every picker below only offers what that key may reach. The VK
+// list endpoint already returns provider_configs (incl. the secret value),
+// so no extra reveal step is needed — the secret is used as the x-bf-vk
+// header for exact server-side scoping and never rendered.
+
+/** Providers the key may call. Empty set = key allows nothing. */
+function allowedProvidersForVk(vk: VirtualKey | undefined): Set<string> | null {
+	if (!vk) return null;
+	if (vk.allow_all_providers) return null;
+	return new Set((vk.provider_configs ?? []).map((c) => c.provider));
+}
+
+/** Whether the key may call `model` on `provider`. */
+function isModelAllowedForVk(vk: VirtualKey | undefined, provider: string, model: string): boolean {
+	if (!vk || vk.allow_all_providers) return true;
+	const cfg = (vk.provider_configs ?? []).find((c) => c.provider === provider);
+	if (!cfg) return false;
+	if (cfg.blacklisted_models?.includes(model)) return false;
+	const allowed = cfg.allowed_models ?? [];
+	return allowed.includes("*") || allowed.includes(model);
+}
+
+/** Whether any target of the rule is reachable with the key. */
+function isRuleReachableForVk(vk: VirtualKey | undefined, targets: { provider?: string; model?: string }[]): boolean {
+	if (!vk || vk.allow_all_providers) return true;
+	return targets.some((t) => {
+		if (!t.provider) return true;
+		const cfg = (vk.provider_configs ?? []).find((c) => c.provider === t.provider);
+		if (!cfg) return false;
+		if (!t.model) return true;
+		if (cfg.blacklisted_models?.includes(t.model)) return false;
+		const allowed = cfg.allowed_models ?? [];
+		return allowed.includes("*") || allowed.includes(t.model);
+	});
+}
+
 export default function AgentSetupView() {
 	const hasAccess = useRbac(RbacResource.ModelProvider, RbacOperation.View);
 
 	// ── Wizard state ─────────────────────────────────────────────────
 	const [agent, setAgent] = useState<AgentId>("opencode");
 	const [platform, setPlatform] = useState<AgentPlatform>("linux");
-	const [source, setSource] = useState<ModelSource>("direct");
 	const [virtualKeyId, setVirtualKeyId] = useState<string | null>(null);
-	const [provider, setProvider] = useState("");
-	const [model, setModel] = useState("");
-	const [ruleId, setRuleId] = useState("");
+	// Multi-select state: many providers, many models/rules, at most one VK.
+	const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
+	const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
+	// Per-rule manual metadata (rules have no datasheet; targets may differ).
+	const [ruleMetadata, setRuleMetadata] = useState<Record<string, ManualModelMetadata>>({});
 	const [baseUrlOverride, setBaseUrlOverride] = useState("");
 	const [envVar, setEnvVar] = useState(DEFAULT_BIFROST_ENV_VAR);
-	const [datasheetParams, setDatasheetParams] = useState<Record<string, any>>({});
-	const [manualMetadata, setManualMetadata] = useState<ManualModelMetadata>(EMPTY_MANUAL_METADATA);
+	const [datasheetParams, setDatasheetParams] = useState<Record<string, Record<string, any>>>({});
 	const [extraParams, setExtraParams] = useState<{ key: string; value: string }[]>([]);
 
 	// ── Virtual key picker (searchable, secret never rendered raw) ───
@@ -81,16 +119,15 @@ export default function AgentSetupView() {
 		[activeVks],
 	);
 
-	// ── Model source data ────────────────────────────────────────────
-	// When a virtual key is revealed, its secret rides the x-bf-vk header so
-	// the server scopes both listings to what that key may reach. The secret
-	// stays in the RTK Query cache only for these two keyed queries.
-	const [vkRevealed, setVkRevealed] = useState(false);
+	// ── Source data ──────────────────────────────────────────────────
+	// A picked VK scopes both listings server-side via its secret on x-bf-vk
+	// (the list endpoint already returns provider_configs incl. the value, so
+	// no separate reveal step is needed). No VK → unfiltered full catalog.
+	const vkSecret = selectedVk?.value || undefined;
 	const { data: providers } = useGetProvidersQuery(undefined, { skip: !hasAccess });
 	const { data: modelsData, isFetching: isFetchingModels } = useGetModelsQuery(
 		{
-			...(vkRevealed && virtualKeyId && selectedVk ? { virtualKeyValue: selectedVk.value } : { unfiltered: true }),
-			...(provider ? { provider } : {}),
+			...(vkSecret ? { virtualKeyValue: vkSecret } : { unfiltered: true }),
 			limit: 2000,
 		},
 		{ skip: !hasAccess || (!!virtualKeyId && !selectedVk) },
@@ -98,73 +135,115 @@ export default function AgentSetupView() {
 	const { data: rulesData } = useGetRoutingRulesQuery({ limit: 200 }, { skip: !hasAccess });
 	const { data: detailsData } = useGetModelDetailsQuery(
 		{
-			...(vkRevealed && virtualKeyId && selectedVk ? { virtualKeyValue: selectedVk.value } : { unfiltered: true }),
-			...(provider ? { provider } : {}),
+			...(vkSecret ? { virtualKeyValue: vkSecret } : { unfiltered: true }),
 			limit: 2000,
 		},
 		{ skip: !hasAccess || (!!virtualKeyId && !selectedVk) },
 	);
 
-	const providerNames = useMemo(() => (providers ?? []).map((p) => p.name).sort(), [providers]);
+	// Provider allowlist for the picked VK (null = all providers allowed).
+	const vkAllowedProviders = useMemo(() => allowedProvidersForVk(selectedVk), [selectedVk]);
 
-	// Direct-model rows, narrowed by provider. When a VK is revealed the
-	// server already scoped the listing via x-bf-vk; the client-side pass
-	// below only applies when the secret is still hidden (unscoped rows).
-	const directModels = useMemo(() => {
-		const rows = modelsData?.models ?? [];
-		const byProvider = provider ? rows.filter((m) => m.provider === provider) : rows;
-		if (vkRevealed || !selectedVk || selectedVk.allow_all_providers) return byProvider;
-		const allowed = new Map<string, Set<string>>();
-		for (const cfg of selectedVk.provider_configs ?? []) {
-			allowed.set(cfg.provider, new Set(cfg.allowed_models ?? []));
-		}
-		if (allowed.size === 0) return byProvider;
-		return byProvider.filter((m) => {
-			const set = allowed.get(m.provider);
-			if (!set) return false;
-			if (!(set.has("*") || set.has(m.name))) return false;
-			const cfg = (selectedVk.provider_configs ?? []).find((c) => c.provider === m.provider);
-			if (cfg?.blacklisted_models?.includes(m.name)) return false;
-			return true;
-		});
-	}, [modelsData, provider, selectedVk, vkRevealed]);
+	const providerOptions = useMemo<MultiSelectOption[]>(() => {
+		const all = (providers ?? []).map((p) => p.name).sort();
+		const allowed = vkAllowedProviders ? all.filter((name) => vkAllowedProviders.has(name)) : all;
+		return allowed.map((name) => ({ value: name, label: name }));
+	}, [providers, vkAllowedProviders]);
+
+	// Drop providers that fall out of scope when the VK changes.
+	useEffect(() => {
+		if (!vkAllowedProviders) return;
+		setSelectedProviders((prev) => prev.filter((p) => vkAllowedProviders.has(p)));
+	}, [vkAllowedProviders]);
 
 	// Rules whose CEL is a simple `model == "<trigger>"` — the only shape an
-	// agent can fire through its model field. Shown by trigger alias; a VK
-	// that pins providers hides rules routing outside those providers.
+	// agent can fire through its model field. With a VK, only rules with at
+	// least one reachable target are offered (the rules list itself is not
+	// VK-scoped server-side, so this is approximated via the allowlist).
+	// Without a VK every triggerable rule is listed.
 	const triggerableRules = useMemo(() => {
 		const rules = (rulesData?.rules ?? []).filter((r) => r.enabled);
 		const withTrigger = rules
 			.map((r) => ({ rule: r, trigger: extractModelTrigger(r.cel_expression) }))
 			.filter((e): e is { rule: (typeof rules)[number]; trigger: string } => e.trigger !== null);
-		// Revealed VK: the rules list itself is not VK-scoped server-side, so
-		// still narrow by provider allowlist; unrevealed VKs use the same
-		// client-side allowlist pass.
-		if (!selectedVk || selectedVk.allow_all_providers) return withTrigger;
-		const allowedProviders = new Set((selectedVk.provider_configs ?? []).map((c) => c.provider));
-		if (allowedProviders.size === 0) return withTrigger;
-		return withTrigger.filter(({ rule }) => rule.targets.some((t) => !t.provider || allowedProviders.has(t.provider)));
+		if (!selectedVk) return withTrigger;
+		return withTrigger.filter(({ rule }) => isRuleReachableForVk(selectedVk, rule.targets));
 	}, [rulesData, selectedVk]);
 
-	const selectedRule = useMemo(() => triggerableRules.find(({ rule }) => rule.id === ruleId)?.rule, [triggerableRules, ruleId]);
-	const selectedTrigger = useMemo(() => (selectedRule ? (extractModelTrigger(selectedRule.cel_expression) ?? "") : ""), [selectedRule]);
+	// Unified Models picker: direct `provider/model` rows (VK-filtered when a
+	// key is picked — by the server via x-bf-vk, which is exact) plus every
+	// triggerable rule as `trigger → targets`.
+	const modelOptions = useMemo<MultiSelectOption[]>(() => {
+		const inScopeProviders = selectedProviders.length > 0 ? new Set(selectedProviders) : null;
+		const direct = (modelsData?.models ?? [])
+			.filter((m) => !inScopeProviders || inScopeProviders.has(m.provider))
+			// Belt-and-braces: the server already scoped VK listings, but the
+			// client-side allowlist pass keeps the picker honest while the
+			// scoped query is in flight.
+			.filter((m) => isModelAllowedForVk(selectedVk, m.provider, m.name))
+			.map((m) => ({
+				value: `direct:${m.provider}/${m.name}`,
+				label: `${m.provider}/${m.name}`,
+				description: undefined as string | undefined,
+			}));
+		const rules = triggerableRules.map(({ rule, trigger }) => ({
+			value: `rule:${rule.id}`,
+			label: trigger,
+			description: `Rule → ${rule.targets.map((t) => [t.provider, t.model].filter(Boolean).join("/")).join(", ")}`,
+		}));
+		return [...direct, ...rules];
+	}, [modelsData, selectedProviders, selectedVk, triggerableRules]);
 
-	// Datasheet limits for the direct-model path (feeds opencode `limit`).
-	const datasheetLimits = useMemo(() => {
-		if (source !== "direct" || !model) return undefined;
-		const row = (detailsData?.models ?? []).find((m) => m.name === model && (!provider || m.provider === provider));
-		if (!row) return undefined;
-		const context = row.max_input_tokens ?? row.context_length;
-		const output = row.max_output_tokens;
-		if (context === undefined && output === undefined) return undefined;
-		return { ...(context !== undefined ? { context } : {}), ...(output !== undefined ? { output } : {}) };
-	}, [detailsData, model, provider, source]);
+	// Drop selections that fall out of scope (VK change narrows the world).
+	useEffect(() => {
+		const valid = new Set(modelOptions.map((o) => o.value));
+		setSelectedModelIds((prev) => prev.filter((id) => valid.has(id)));
+	}, [modelOptions]);
+
+	// Datasheet limits per direct model (feeds opencode `limit`).
+	const limitsByModel = useMemo(() => {
+		const map = new Map<string, { context?: number; output?: number }>();
+		for (const m of detailsData?.models ?? []) {
+			const context = m.max_input_tokens ?? m.context_length;
+			const output = m.max_output_tokens;
+			if (context === undefined && output === undefined) continue;
+			map.set(`${m.provider}/${m.name}`, {
+				...(context !== undefined ? { context } : {}),
+				...(output !== undefined ? { output } : {}),
+			});
+		}
+		return map;
+	}, [detailsData]);
+
+	// Resolve the selection into builder entries. Rules carry their own
+	// manual metadata; empty values are omitted from the output.
+	const selectionItems = useMemo<ModelSelectionItem[]>(() => {
+		const items: ModelSelectionItem[] = [];
+		for (const id of selectedModelIds) {
+			if (id.startsWith("rule:")) {
+				const ruleId = id.slice("rule:".length);
+				const found = triggerableRules.find(({ rule }) => rule.id === ruleId);
+				if (!found) continue;
+				items.push({
+					id: found.trigger,
+					kind: "rule",
+					ruleId: found.rule.id,
+					ruleTargets: found.rule.targets.map((t) => [t.provider, t.model].filter(Boolean).join("/")).join(", "),
+					manualMetadata: ruleMetadata[found.rule.id],
+				});
+				continue;
+			}
+			const qualified = id.startsWith("direct:") ? id.slice("direct:".length) : id;
+			const slash = qualified.indexOf("/");
+			const provider = slash >= 0 ? qualified.slice(0, slash) : "";
+			const model = slash >= 0 ? qualified.slice(slash + 1) : qualified;
+			items.push({ id: qualified, kind: "direct", provider, model, limit: limitsByModel.get(qualified) });
+		}
+		return items;
+	}, [selectedModelIds, triggerableRules, limitsByModel, ruleMetadata]);
 
 	const activeAgent = AGENTS.find((a) => a.id === agent) ?? AGENTS[0];
 	const baseUrl = (baseUrlOverride.trim() || defaultBaseUrl()).replace(/\/+$/, "");
-
-	const modelForConfig = source === "direct" ? model : selectedTrigger;
-	const providerForConfig = source === "direct" ? provider || "bifrost" : "bifrost";
 
 	const extraParamsRecord = useMemo(() => {
 		const record: Record<string, string> = {};
@@ -175,16 +254,13 @@ export default function AgentSetupView() {
 	}, [extraParams]);
 
 	const builderInput: AgentConfigInput | null =
-		baseUrl && modelForConfig
+		baseUrl && selectionItems.length > 0
 			? {
 					baseUrl,
-					model: modelForConfig,
-					providerName: providerForConfig,
-					...(source === "direct" && datasheetLimits ? { limit: datasheetLimits } : {}),
-					...(source === "rule" ? { manualMetadata } : {}),
-					extraParams: { ...datasheetParamsString(datasheetParams), ...extraParamsRecord },
-					envVar: envVar.trim() || defaultEnvVar(agent),
+					models: selectionItems,
 					...(selectedVk ? { virtualKeyName: selectedVk.name } : {}),
+					extraParams: { ...flattenFirstParams(datasheetParams, selectedModelIds), ...extraParamsRecord },
+					envVar: envVar.trim() || defaultEnvVar(agent),
 				}
 			: null;
 
@@ -229,6 +305,10 @@ export default function AgentSetupView() {
 
 	if (!hasAccess) return <NoPermissionView entity="agent setup" />;
 
+	// First direct selection drives the datasheet-first parameters panel.
+	const firstDirect = selectionItems.find((i) => i.kind === "direct");
+	const selectedRuleItems = selectionItems.filter((i) => i.kind === "rule");
+
 	return (
 		<div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4">
 			<PageTitle>Generate copy-ready model configs for opencode, Claude Code and Codex pointing at Bifrost</PageTitle>
@@ -237,7 +317,7 @@ export default function AgentSetupView() {
 			<section className="flex flex-col gap-2">
 				<div className="flex items-center gap-2 text-sm font-medium">
 					<KeyRound className="size-4" />
-					<span>Virtual key (optional)</span>
+					<span>Virtual key — the api key from the agent’s point of view (optional, pick at most one)</span>
 				</div>
 				<div className="flex flex-col gap-2 sm:flex-row sm:items-center">
 					<SearchSelect
@@ -250,7 +330,6 @@ export default function AgentSetupView() {
 						isLoading={isFetchingVks && vkOptions.length === 0}
 						onValueSelect={(option) => {
 							setVirtualKeyId(option.value);
-							setVkRevealed(false);
 							setVkOpen(false);
 						}}
 						label={
@@ -261,7 +340,7 @@ export default function AgentSetupView() {
 								data-testid="agent-setup-vk-select"
 							>
 								<KeyRound className="text-muted-foreground size-4" />
-								<span className="truncate">{selectedVk?.name ?? "No virtual key (server default)"}</span>
+								<span className="truncate">{selectedVk?.name ?? "No virtual key (no api key in output)"}</span>
 							</Button>
 						}
 						entryView={(option) => (
@@ -280,44 +359,18 @@ export default function AgentSetupView() {
 						contentClassName="w-[var(--radix-popover-trigger-width)]"
 					/>
 					{virtualKeyId && (
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							onClick={() => {
-								setVirtualKeyId(null);
-								setVkRevealed(false);
-							}}
-							data-testid="agent-setup-vk-clear"
-						>
+						<Button type="button" variant="ghost" size="sm" onClick={() => setVirtualKeyId(null)} data-testid="agent-setup-vk-clear">
 							Clear
 						</Button>
 					)}
-					{selectedVk && (
-						<Button
-							type="button"
-							variant={vkRevealed ? "secondary" : "outline"}
-							size="sm"
-							onClick={() => setVkRevealed((v) => !v)}
-							data-testid="agent-setup-vk-reveal"
-							title={
-								vkRevealed
-									? "Server-scoped listing is active"
-									: "Reveal once so model lists are scoped server-side to what this key may reach"
-							}
-						>
-							{vkRevealed ? "Scoped ✓" : "Scope lists to this key"}
-						</Button>
-					)}
 				</div>
-				{vkHint && <p className="text-muted-foreground text-xs">{vkHint} — lists below are narrowed to what this key can use.</p>}
-				{selectedVk && !vkRevealed && (
-					<p className="text-muted-foreground text-xs">
-						Preview narrowed from the key’s allowlist. Click “Scope lists to this key” for the exact server-side listing.
-					</p>
+				{vkHint && (
+					<p className="text-muted-foreground text-xs">{vkHint} — providers, models and rules below only show what this key can use.</p>
 				)}
 				<p className="text-muted-foreground text-xs">
-					The key secret is never written into the config — set it once via the shell exports below.
+					{selectedVk
+						? "The key secret is never written into the config — set it once via the shell exports below."
+						: "No virtual key picked: the generated config carries no credential at all. Pick one to add env-var auth."}
 				</p>
 			</section>
 
@@ -355,147 +408,107 @@ export default function AgentSetupView() {
 				<p className="text-muted-foreground font-mono text-xs">Merge into: {activeAgent.configPath[platform]}</p>
 			</section>
 
-			{/* ── Step 2: model source ────────────────────────────────── */}
+			{/* ── Step 2: providers + models ──────────────────────────── */}
 			<section className="flex flex-col gap-3">
-				<div className="text-sm font-medium">Model</div>
-				<Tabs value={source} onValueChange={(value) => setSource(value as ModelSource)}>
-					<TabsList className="rounded-sm" data-testid="agent-setup-source-tabs">
-						<TabsTrigger value="direct" data-testid="agent-setup-source-direct">
-							Direct model
-						</TabsTrigger>
-						<TabsTrigger value="rule" data-testid="agent-setup-source-rule">
-							Routing rule
-						</TabsTrigger>
-					</TabsList>
-				</Tabs>
-
-				{source === "direct" ? (
-					<div className="grid gap-3 sm:grid-cols-2">
-						<div className="flex flex-col gap-1.5">
-							<Label>Provider</Label>
-							<Select
-								value={provider}
-								onValueChange={(v) => {
-									setProvider(v);
-									setModel("");
-									setDatasheetParams({});
-								}}
-							>
-								<SelectTrigger data-testid="agent-setup-provider-select">
-									<SelectValue placeholder="Select provider" />
-								</SelectTrigger>
-								<SelectContent>
-									{providerNames.map((name) => (
-										<SelectItem key={name} value={name}>
-											{name}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>
-						<div className="flex flex-col gap-1.5">
-							<Label>Model</Label>
-							<Select
-								value={model}
-								disabled={!provider}
-								onValueChange={(v) => {
-									setModel(v);
-									setDatasheetParams({});
-								}}
-							>
-								<SelectTrigger data-testid="agent-setup-model-select">
-									<SelectValue placeholder={provider ? "Select model" : "Select a provider first"} />
-								</SelectTrigger>
-								<SelectContent>
-									{directModels.map((m) => (
-										<SelectItem key={`${m.provider}/${m.name}`} value={m.name}>
-											{m.name}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-							{provider &&
-								(directModels.length > 0 ? (
-									<p className="text-muted-foreground text-xs">
-										{directModels.length} model{directModels.length === 1 ? "" : "s"} available
-										{isFetchingModels ? " (refreshing…)" : ""}
-									</p>
-								) : (
-									<p className="text-muted-foreground text-xs">
-										{isFetchingModels ? "Loading models…" : "No models returned for this provider."}
-									</p>
-								))}
-						</div>
-					</div>
-				) : (
-					<div className="flex flex-col gap-1.5">
-						<Label>Routing rule (agent sends the trigger as its model)</Label>
-						<Select
-							value={ruleId}
-							onValueChange={(v) => {
-								setRuleId(v);
-								setManualMetadata(EMPTY_MANUAL_METADATA);
-							}}
-						>
-							<SelectTrigger data-testid="agent-setup-rule-select">
-								<SelectValue placeholder="Select routing rule" />
-							</SelectTrigger>
-							<SelectContent>
-								{triggerableRules.map(({ rule, trigger }) => (
-									<SelectItem key={rule.id} value={rule.id}>
-										{trigger} → {rule.targets.map((t) => [t.provider, t.model].filter(Boolean).join("/")).join(", ")}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-						{selectedRule && (
-							<p className="text-muted-foreground text-xs">
-								Rule “{selectedRule.name}” · scope {selectedRule.scope} · CEL{" "}
-								<code className="font-mono">{selectedRule.cel_expression}</code>
-							</p>
-						)}
-						<p className="text-muted-foreground text-xs">
-							Only rules with a simple <code className="font-mono">model == "…"</code> trigger are listed — header- or regex-based rules
-							can’t be fired from an agent’s model field.
-						</p>
-					</div>
-				)}
+				<div className="text-sm font-medium">Providers & models (multi-select)</div>
+				<div className="flex flex-col gap-1.5">
+					<Label>Providers</Label>
+					<MultiSelect
+						options={providerOptions}
+						defaultValue={selectedProviders}
+						resetOnDefaultValueChange
+						onValueChange={(values) => setSelectedProviders(values)}
+						placeholder={selectedVk ? "Select allowed providers" : "Select providers (all listed)"}
+						emptyIndicator={selectedVk ? "No allowed providers for this key." : "No providers found."}
+						maxCount={3}
+						data-testid="agent-setup-provider-select"
+					/>
+					{selectedVk && providerOptions.length === 0 && (
+						<p className="text-muted-foreground text-xs">This key allows no providers — nothing below can be generated for it.</p>
+					)}
+				</div>
+				<div className="flex flex-col gap-1.5">
+					<Label>Models & routing-rule triggers</Label>
+					<MultiSelect
+						options={modelOptions}
+						defaultValue={selectedModelIds}
+						resetOnDefaultValueChange
+						onValueChange={(values) => setSelectedModelIds(values)}
+						placeholder={
+							isFetchingModels
+								? "Loading models…"
+								: selectedProviders.length > 0
+									? "Select models and rule triggers"
+									: "Select models and rule triggers (all providers)"
+						}
+						emptyIndicator="No models or rule triggers match."
+						maxCount={3}
+						data-testid="agent-setup-model-select"
+					/>
+					<p className="text-muted-foreground text-xs">
+						{isFetchingModels ? "Loading…" : `${modelOptions.length} options`} · direct entries are qualified{" "}
+						<code className="font-mono">provider/model</code>; rule entries fire via their trigger and note their targets.
+						{selectedProviders.length === 0 && " Narrow by provider to browse faster."}
+					</p>
+				</div>
 			</section>
 
 			{/* ── Step 3: parameters ──────────────────────────────────── */}
 			<section className="flex flex-col gap-3">
 				<div className="text-sm font-medium">Parameters</div>
-				{source === "direct" && model ? (
-					<ModelParameters model={model} config={datasheetParams} onChange={setDatasheetParams} />
-				) : source === "rule" && selectedRule ? (
-					<div className="flex flex-col gap-3 rounded-sm border p-3">
-						<p className="text-muted-foreground text-xs">
-							A rule can route to targets with different context windows, so set metadata manually to match your target (
-							{selectedRule.targets.map((t) => [t.provider, t.model].filter(Boolean).join("/")).join(", ")}).
-						</p>
-						<div className="grid gap-3 sm:grid-cols-2">
-							{(
-								[
-									["contextWindow", "Context window (tokens)"],
-									["maxInputTokens", "Max input tokens"],
-									["maxOutputTokens", "Max output tokens"],
-									["reasoningEffort", "Reasoning effort (low/medium/high/…)"],
-								] as [keyof ManualModelMetadata, string][]
-							).map(([field, label]) => (
-								<div key={field} className="flex flex-col gap-1.5">
-									<Label>{label}</Label>
-									<Input
-										value={manualMetadata[field]}
-										onChange={(e) => setManualMetadata((prev) => ({ ...prev, [field]: e.target.value }))}
-										placeholder="Leave empty to omit"
-										data-testid={`agent-setup-manual-${field}`}
-									/>
-								</div>
-							))}
-						</div>
+				{firstDirect ? (
+					<div className="flex flex-col gap-1.5">
+						<Label className="text-muted-foreground text-xs">
+							Datasheet parameters for <code className="font-mono">{firstDirect.id}</code> (first direct selection)
+						</Label>
+						<ModelParameters
+							model={firstDirect.model ?? firstDirect.id}
+							config={datasheetParams[firstDirect.id] ?? {}}
+							onChange={(next) => setDatasheetParams((prev) => ({ ...prev, [firstDirect.id]: next }))}
+						/>
 					</div>
 				) : (
-					<p className="text-muted-foreground text-xs">Pick a model or routing rule above to set parameters.</p>
+					<p className="text-muted-foreground text-xs">Select a direct model above for datasheet-first parameters.</p>
+				)}
+
+				{selectedRuleItems.length > 0 && (
+					<div className="flex flex-col gap-3 rounded-sm border p-3">
+						<p className="text-muted-foreground text-xs">
+							A rule can route to targets with different context windows, so set metadata per rule manually (empty values are omitted).
+						</p>
+						{selectedRuleItems.map((item) => (
+							<div key={item.ruleId} className="flex flex-col gap-2 rounded-sm border p-2.5">
+								<div className="font-mono text-xs">
+									{item.id} <span className="text-muted-foreground">→ {item.ruleTargets}</span>
+								</div>
+								<div className="grid gap-3 sm:grid-cols-2">
+									{(
+										[
+											["contextWindow", "Context window (tokens)"],
+											["maxInputTokens", "Max input tokens"],
+											["maxOutputTokens", "Max output tokens"],
+											["reasoningEffort", "Reasoning effort (low/medium/high/…)"],
+										] as [keyof ManualModelMetadata, string][]
+									).map(([field, label]) => (
+										<div key={field} className="flex flex-col gap-1.5">
+											<Label>{label}</Label>
+											<Input
+												value={ruleMetadata[item.ruleId ?? ""]?.[field] ?? ""}
+												onChange={(e) =>
+													setRuleMetadata((prev) => ({
+														...prev,
+														[item.ruleId ?? ""]: { ...(prev[item.ruleId ?? ""] ?? EMPTY_MANUAL_METADATA), [field]: e.target.value },
+													}))
+												}
+												placeholder="Leave empty to omit"
+												data-testid={`agent-setup-manual-${item.id}-${field}`}
+											/>
+										</div>
+									))}
+								</div>
+							</div>
+						))}
+					</div>
 				)}
 
 				<div className="flex flex-col gap-2">
@@ -555,12 +568,13 @@ export default function AgentSetupView() {
 					/>
 				</div>
 				<div className="flex flex-col gap-1.5">
-					<Label>Credential env var</Label>
+					<Label>Credential env var {selectedVk ? "" : "(only used with a virtual key)"}</Label>
 					<Input
 						value={envVar}
 						onChange={(e) => setEnvVar(e.target.value)}
 						placeholder={defaultEnvVar(agent)}
 						className="font-mono"
+						disabled={!selectedVk}
 						data-testid="agent-setup-env-var"
 					/>
 				</div>
@@ -581,16 +595,18 @@ export default function AgentSetupView() {
 							{copied ? <Check className="mr-1.5 h-4 w-4 text-green-500" /> : <Copy className="mr-1.5 h-4 w-4" />}
 							{copied ? "Copied" : "Copy config"}
 						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={() => output && void copy(output.shellExports)}
-							disabled={!canGenerate}
-							data-testid="agent-setup-copy-shell"
-						>
-							<Copy className="mr-1.5 h-4 w-4" />
-							Copy shell exports
-						</Button>
+						{selectedVk && (
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => output && output.shellExports && void copy(output.shellExports)}
+								disabled={!canGenerate}
+								data-testid="agent-setup-copy-shell"
+							>
+								<Copy className="mr-1.5 h-4 w-4" />
+								Copy shell exports
+							</Button>
+						)}
 						<Button size="sm" onClick={handleDownload} disabled={!canGenerate} data-testid="agent-setup-download">
 							<Download className="mr-1.5 h-4 w-4" />
 							Download {activeAgent.downloadFileName}
@@ -603,17 +619,20 @@ export default function AgentSetupView() {
 						<div className="bg-card text-card-foreground rounded-lg border shadow-sm">
 							<div className="bg-muted/40 flex items-center justify-between border-b px-4 py-2.5">
 								<div className="text-muted-foreground flex items-center gap-2 font-mono text-xs">
-									{activeAgent.label} · {modelForConfig}
+									{activeAgent.label} · {selectionItems.length} model{selectionItems.length === 1 ? "" : "s"}
+									{selectedVk ? ` · ${selectedVk.name}` : " · no api key"}
 								</div>
-								<Button
-									variant="ghost"
-									size="sm"
-									onClick={() => void copy(output.shellExports)}
-									data-testid="agent-setup-copy-shell-inline"
-								>
-									<Copy className="mr-1.5 h-3.5 w-3.5" />
-									Shell exports
-								</Button>
+								{selectedVk && (
+									<Button
+										variant="ghost"
+										size="sm"
+										onClick={() => output.shellExports && void copy(output.shellExports)}
+										data-testid="agent-setup-copy-shell-inline"
+									>
+										<Copy className="mr-1.5 h-3.5 w-3.5" />
+										Shell exports
+									</Button>
+								)}
 							</div>
 							<CodeEditor
 								className="w-full font-mono text-sm"
@@ -666,7 +685,7 @@ export default function AgentSetupView() {
 					</>
 				) : (
 					<div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-						Select a model or routing rule above to generate the {activeAgent.label} config.
+						Select one or more models or routing-rule triggers above to generate the {activeAgent.label} config.
 					</div>
 				)}
 			</section>
@@ -674,12 +693,17 @@ export default function AgentSetupView() {
 	);
 }
 
-/** Flatten datasheet field values into string extras (objects become JSON). */
-function datasheetParamsString(params: Record<string, any>): Record<string, string> {
+/** Merge per-model datasheet params for the current selection (first model wins per key). */
+function flattenFirstParams(byModel: Record<string, Record<string, any>>, selectedIds: string[]): Record<string, string> {
 	const record: Record<string, string> = {};
-	for (const [key, value] of Object.entries(params)) {
-		if (value === undefined) continue;
-		record[key] = typeof value === "string" ? value : JSON.stringify(value);
+	const qualified = (id: string) => (id.startsWith("direct:") ? id.slice("direct:".length) : id);
+	for (const id of selectedIds) {
+		const params = byModel[qualified(id)];
+		if (!params) continue;
+		for (const [key, value] of Object.entries(params)) {
+			if (value === undefined || key in record) continue;
+			record[key] = typeof value === "string" ? value : JSON.stringify(value);
+		}
 	}
 	return record;
 }

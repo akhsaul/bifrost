@@ -2,18 +2,28 @@
  * Agent Setup — shared types and constants.
  *
  * Generates agent-side model configs (opencode / claude code / codex) that
- * point at Bifrost. The agent always sends a single `model` string:
- *  - Direct model: the provider model name (e.g. `opencode-zen/glm-5.3`).
- *  - Routing rule: the rule's CEL model trigger (e.g. `test-route`), which a
- *    rule matches via `model == "<trigger>"` and rewrites to its target.
- *    Triggers on other CEL variables (headers, etc.) cannot be driven by an
- *    agent's model field, so rules whose CEL is not a simple
- *    `model == "<literal>"` are hidden from the picker.
+ * point at Bifrost. The agent config can carry many models at once:
+ *  - Direct models: qualified `provider/model` names (e.g.
+ *    `opencode-zen/glm-5.3`), exactly as `/v1/models` lists them.
+ *  - Routing rules: each selected rule contributes the CEL model trigger
+ *    from its simple `model == "<trigger>"` expression (e.g. `test-route`),
+ *    which the rule matches and rewrites to its target. Triggers on other
+ *    CEL variables (headers, etc.) cannot be driven by an agent's model
+ *    field, so rules whose CEL is not a simple `model == "<literal>"` are
+ *    hidden from the picker.
+ *
+ * Auth model (from the agent's point of view a virtual key IS the api key):
+ *  - No virtual key picked → the config carries no credential at all (no
+ *    apiKey / env_key / auth token, no shell exports for secrets).
+ *  - Virtual key picked (at most one) → provider/model/rule lists are
+ *    narrowed to what that key may reach, and the output references the
+ *    credential by env var only. The secret itself is never written into
+ *    the config — only the key name as a comment plus a placeholder the
+ *    user pastes into their own environment.
  */
 
 export type AgentId = "opencode" | "claude-code" | "codex";
 export type AgentPlatform = "macos" | "windows" | "linux";
-export type ModelSource = "direct" | "rule";
 
 export interface AgentDefinition {
 	id: AgentId;
@@ -88,6 +98,26 @@ export const EMPTY_MANUAL_METADATA: ManualModelMetadata = {
 	maxOutputTokens: "",
 	reasoningEffort: "",
 };
+
+/** One selectable entry in the Models step: a direct model or a rule trigger. */
+export interface ModelSelectionItem {
+	/** Agent-sendable model string: `provider/model` or rule trigger. */
+	id: string;
+	/** Direct provider/model vs routing-rule trigger. */
+	kind: "direct" | "rule";
+	/** Direct only: provider part of the qualified name. */
+	provider?: string;
+	/** Direct only: bare model name. */
+	model?: string;
+	/** Rule only: the routing rule id. */
+	ruleId?: string;
+	/** Rule only: targets summary, e.g. `opencode-zen/space-bunny-free`. */
+	ruleTargets?: string;
+	/** Direct-model limits from the datasheet (feeds opencode `limit`). */
+	limit?: { context?: number; output?: number };
+	/** Rule-entry manual metadata (empty values omitted from output). */
+	manualMetadata?: ManualModelMetadata;
+}
 
 /**
  * Extract the agent-sendable model trigger from a rule's CEL expression.

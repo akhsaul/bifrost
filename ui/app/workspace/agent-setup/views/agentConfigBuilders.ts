@@ -5,31 +5,30 @@ import {
 	VK_VALUE_PLACEHOLDER,
 	type AgentId,
 	type ManualModelMetadata,
+	type ModelSelectionItem,
 } from "./agentSetupTypes";
 
 export interface AgentConfigInput {
 	/** Bifrost origin, e.g. http://127.0.0.1:8080 (no trailing slash). */
 	baseUrl: string;
-	/** Agent-side model string: direct model name or rule CEL trigger. */
-	model: string;
-	/** Resolved display/provider name for the opencode provider block. */
-	providerName: string;
-	/** Direct-model source only: datasheet limits used for opencode `limit`. */
-	limit?: { context?: number; output?: number };
-	/** Routing-rule source only: user-supplied metadata (empty values omitted). */
-	manualMetadata?: ManualModelMetadata;
+	/** Every model entry that lands in the generated config. Empty → no output. */
+	models: ModelSelectionItem[];
+	/**
+	 * Virtual key in play, if any. No VK → the config carries no credential
+	 * at all. A VK → the credential is referenced by env var only; the
+	 * secret itself never lands in the output.
+	 */
+	virtualKeyName?: string;
 	/** Extra user-defined parameters merged into the request payload. */
 	extraParams: Record<string, string>;
-	/** Env var name carrying the credential (editable). */
+	/** Env var name carrying the credential (editable, ignored without a VK). */
 	envVar: string;
-	/** Virtual key display name, rendered as a comment (never the secret). */
-	virtualKeyName?: string;
 }
 
 export interface AgentConfigOutput {
 	/** Main config snippet shown in the preview + used for Download. */
 	config: string;
-	/** Shell export block (BIFROST_API_KEY / ANTHROPIC_*). */
+	/** Shell export block, or "" when no virtual key is picked. */
 	shellExports: string;
 	/** Copyable per-section blocks: [label, content]. */
 	sections: { label: string; content: string }[];
@@ -66,120 +65,115 @@ function buildShellExports(envVar: string, platform: "macos" | "windows" | "linu
 }
 
 // ── OpenCode ─────────────────────────────────────────────────────────────
-// Custom provider via @opencode-ai/ai/providers/openai-compatible:
-// "env" declares the credential variable, settings.apiKey uses the {env:}
-// substitution so no literal secret lands in the file.
+// One Bifrost provider entry; every selected model (direct or rule trigger)
+// becomes a key under `models`. Auth only exists with a VK: env-var
+// indirection via "env" + {env:} so no literal secret lands in the file.
 
 function buildOpencode(input: AgentConfigInput, platform: "macos" | "windows" | "linux"): AgentConfigOutput {
+	const hasAuth = !!input.virtualKeyName;
 	const envVar = input.envVar || DEFAULT_BIFROST_ENV_VAR;
-	const datasourceLimit = input.limit ?? resolveManualLimit(input.manualMetadata);
-	const limit = datasourceLimit
-		? {
-				...(datasourceLimit.context ? { context: datasourceLimit.context } : {}),
-				...(datasourceLimit.output ? { output: datasourceLimit.output } : {}),
-			}
-		: undefined;
+
+	const models: Record<string, { name: string; limit?: { context?: number; output?: number } }> = {};
+	for (const item of input.models) {
+		const limit = item.limit ?? resolveManualLimit(item.manualMetadata);
+		models[item.id] = {
+			name: item.id,
+			...(limit && Object.keys(limit).length > 0 ? { limit } : {}),
+		};
+	}
 
 	const providerBlock = {
 		name: "Bifrost",
-		env: [envVar],
+		...(hasAuth
+			? { env: [envVar], settings: { baseURL: `${input.baseUrl}/v1`, apiKey: `{env:${envVar}}` } }
+			: { settings: { baseURL: `${input.baseUrl}/v1` } }),
+		models,
 		package: "@opencode-ai/ai/providers/openai-compatible",
-		settings: {
-			baseURL: `${input.baseUrl}/v1`,
-			apiKey: `{env:${envVar}}`,
-		},
-		models: {
-			[input.model]: {
-				name: input.model,
-				...(limit && Object.keys(limit).length > 0 ? { limit } : {}),
-			},
-		},
 	};
 
-	const vkComment = input.virtualKeyName ? `// Virtual key: ${input.virtualKeyName} — set ${envVar} in your shell.\n` : "";
+	const vkComment = hasAuth ? `// Virtual key: ${input.virtualKeyName} — set ${envVar} in your shell.\n` : "";
 	const extraComment = extraParamsBlock(input.extraParams);
 	const header = `${vkComment}${extraComment ? `// Extra params (merge into your request):\n${extraComment}\n` : ""}`;
-	const config = `${header}${JSON.stringify({ providers: { [input.providerName]: providerBlock } }, null, 2)}`;
-	const shellExports = buildShellExports(envVar, platform, `Set once, then launch opencode from the same shell`);
+	const config = `${header}${JSON.stringify({ providers: { bifrost: providerBlock } }, null, 2)}`;
+	const shellExports = hasAuth ? buildShellExports(envVar, platform, `Set once, then launch opencode from the same shell`) : "";
 
 	return {
 		config,
 		shellExports,
-		sections: [
-			{ label: "Provider block", content: config },
-			{ label: "Shell exports", content: shellExports },
-		],
+		sections: [...(hasAuth ? [{ label: "Shell exports", content: shellExports }] : [])],
 	};
 }
 
 // ── Codex ────────────────────────────────────────────────────────────────
-// Custom provider via [model_providers.<id>]: env_key names the variable
-// Codex reads the key from (never a literal in the file), wire_api
-// responses is required for custom providers.
+// One [model_providers.bifrost] block; `model` is the default the agent
+// starts with (first selection). With a VK the credential arrives via
+// env_key; without one no credential fields are emitted at all.
 
 function buildCodex(input: AgentConfigInput, platform: "macos" | "windows" | "linux"): AgentConfigOutput {
+	const hasAuth = !!input.virtualKeyName;
 	const envVar = input.envVar || DEFAULT_BIFROST_ENV_VAR;
-	const vkComment = input.virtualKeyName ? `# Virtual key: ${input.virtualKeyName} — set ${envVar} in your shell.\n` : "";
+	const vkComment = hasAuth ? `# Virtual key: ${input.virtualKeyName} — set ${envVar} in your shell.\n` : "";
 	const extraComment = extraParamsBlock(input.extraParams);
+	const selectedLabels = input.models.map((m) => (m.kind === "rule" ? `${m.id} (rule → ${m.ruleTargets})` : m.id));
 
 	const lines = [
-		`${vkComment}${extraComment ? `# Extra params (merge into your request):\n${extraComment}\n` : ""}model = ${quoteTomlString(input.model)}`,
-		`model_provider = ${quoteTomlString(input.providerName)}`,
+		`${vkComment}${extraComment ? `# Extra params (merge into your request):\n${extraComment}\n` : ""}# Models: ${selectedLabels.join(", ")}`,
+		`model = ${quoteTomlString(input.models[0]?.id ?? "")}`,
+		`model_provider = "bifrost"`,
 		"",
-		`[model_providers.${input.providerName}]`,
+		`[model_providers.bifrost]`,
 		`name = "Bifrost"`,
 		`base_url = ${quoteTomlString(`${input.baseUrl}/v1`)}`,
-		`env_key = ${quoteTomlString(envVar)}`,
+		...(hasAuth ? [`env_key = ${quoteTomlString(envVar)}`] : []),
 		`wire_api = "responses"`,
 	];
 
 	const config = lines.join("\n");
-	const shellExports = buildShellExports(envVar, platform, `Set once, then launch codex from the same shell`);
+	const shellExports = hasAuth ? buildShellExports(envVar, platform, `Set once, then launch codex from the same shell`) : "";
 
 	return {
 		config,
 		shellExports,
-		sections: [
-			{ label: "Provider block", content: config },
-			{ label: "Shell exports", content: shellExports },
-		],
+		sections: [...(hasAuth ? [{ label: "Shell exports", content: shellExports }] : [])],
 	};
 }
 
 // ── Claude Code ──────────────────────────────────────────────────────────
-// settings.json env blocks take literal values only, so the recommended path
-// is shell exports (secret never touches disk). The settings.json fragment
-// carries the placeholder for users who prefer a file.
+// With a VK the recommended path is shell exports (secret never touches
+// disk); the settings.json fragment carries the placeholder for users who
+// prefer a file. Without a VK only the base URL (and default model) are
+// emitted — no credential fields, no placeholder, no secret exports.
 
 function buildClaudeCode(input: AgentConfigInput, platform: "macos" | "windows" | "linux"): AgentConfigOutput {
+	const hasAuth = !!input.virtualKeyName;
 	const envVar = input.envVar || DEFAULT_CLAUDE_ENV_VAR;
 	const baseUrl = `${input.baseUrl}/anthropic`;
 
-	const exportsBlock =
-		platform === "windows"
-			? [`$env:ANTHROPIC_BASE_URL = "${baseUrl}"`, `$env:${envVar} = "${VK_VALUE_PLACEHOLDER}"`].join("\n")
-			: [`export ANTHROPIC_BASE_URL="${baseUrl}"`, `export ${envVar}="${VK_VALUE_PLACEHOLDER}"`].join("\n");
+	const baseExport = platform === "windows" ? `$env:ANTHROPIC_BASE_URL = "${baseUrl}"` : `export ANTHROPIC_BASE_URL="${baseUrl}"`;
+	const secretExport = platform === "windows" ? `$env:${envVar} = "${VK_VALUE_PLACEHOLDER}"` : `export ${envVar}="${VK_VALUE_PLACEHOLDER}"`;
+	const exportsBlock = hasAuth ? [baseExport, secretExport].join("\n") : baseExport;
 
-	const vkComment = input.virtualKeyName ? `// Virtual key: ${input.virtualKeyName}\n` : "";
-	const settingsFragment = `${vkComment}${JSON.stringify(
+	const vkComment = hasAuth && input.virtualKeyName ? `// Virtual key: ${input.virtualKeyName}\n` : "";
+	const allModelsComment = input.models.length > 1 ? `// All selected models: ${input.models.map((m) => m.id).join(", ")}\n` : "";
+	const settingsFragment = `${vkComment}${allModelsComment}${JSON.stringify(
 		{
 			env: {
 				ANTHROPIC_BASE_URL: baseUrl,
-				[envVar]: VK_VALUE_PLACEHOLDER,
+				...(hasAuth ? { [envVar]: VK_VALUE_PLACEHOLDER } : {}),
 			},
-			model: input.model,
+			...(input.models[0] ? { model: input.models[0].id } : {}),
 		},
 		null,
 		2,
 	)}`;
 
-	const shellExports = `# Recommended: secret stays out of the file.\n${exportsBlock}`;
+	const shellExports = hasAuth ? `# Recommended: secret stays out of the file.\n${exportsBlock}` : exportsBlock;
 
 	return {
 		config: settingsFragment,
 		shellExports,
 		sections: [
-			{ label: "Shell exports (recommended)", content: shellExports },
+			{ label: hasAuth ? "Shell exports (recommended)" : "Shell exports (base URL only — no credential)", content: shellExports },
 			{ label: "settings.json fragment", content: settingsFragment },
 		],
 	};
