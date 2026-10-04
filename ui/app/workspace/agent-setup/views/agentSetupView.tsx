@@ -130,7 +130,18 @@ export default function AgentSetupView() {
 	const [codexMaxOutTouched, setCodexMaxOutTouched] = useState(false);
 	const [codexReasoningEffort, setCodexReasoningEffort] = useState<string>("medium");
 	const [baseUrlOverride, setBaseUrlOverride] = useState("");
-	const [envVar, setEnvVar] = useState(DEFAULT_BIFROST_ENV_VAR);
+	// Credential env var, remembered per agent: opencode/codex default to
+	// BIFROST_API_KEY, claude-code to ANTHROPIC_AUTH_TOKEN (the only auth
+	// key Claude reads). A single shared state leaked the opencode default
+	// into the claude fragment, emitting "BIFROST_API_KEY" which Claude
+	// ignores.
+	const [envVarByAgent, setEnvVarByAgent] = useState<Record<AgentId, string>>({
+		opencode: DEFAULT_BIFROST_ENV_VAR,
+		codex: DEFAULT_BIFROST_ENV_VAR,
+		"claude-code": DEFAULT_CLAUDE_ENV_VAR,
+	});
+	const envVar = envVarByAgent[agent];
+	const setEnvVar = (value: string) => setEnvVarByAgent((prev) => ({ ...prev, [agent]: value }));
 
 	const variantsTouched = useRef<Set<string>>(new Set());
 	// Per-entry fields the user edited by hand — datasheet refreshes must not clobber them (ref: mutated alongside setMetadata, no extra render).
