@@ -156,6 +156,56 @@ func systemPromptText(msg schemas.ResponsesMessage) string {
 	return strings.Join(parts, "\n")
 }
 
+// isTitleGenerationResponsesRequest reports whether the responses request
+// carries a session-title generation system prompt. Checks the top-level
+// instructions (post-hoist) and any system-role input items not yet hoisted
+// (when instructions were explicitly set, extractSystemPromptToInstructions
+// leaves input items in place).
+func isTitleGenerationResponsesRequest(request *schemas.BifrostResponsesRequest) bool {
+	if request == nil {
+		return false
+	}
+	if request.Params != nil && request.Params.Instructions != nil {
+		if isTitleGenerationPrompt(*request.Params.Instructions) {
+			return true
+		}
+	}
+	for _, msg := range request.Input {
+		if msg.Role == nil || (*msg.Role != schemas.ResponsesInputMessageRoleSystem && *msg.Role != schemas.ResponsesInputMessageRoleDeveloper) {
+			continue
+		}
+		if isTitleGenerationPrompt(responsesMessageText(msg)) {
+			return true
+		}
+	}
+	return false
+}
+
+// responsesMessageText extracts the readable text of a Responses input
+// message, handling both plain string content and text content blocks.
+func responsesMessageText(msg schemas.ResponsesMessage) string {
+	if msg.Content == nil {
+		return ""
+	}
+	if msg.Content.ContentStr != nil {
+		return *msg.Content.ContentStr
+	}
+	var parts []string
+	for _, block := range msg.Content.ContentBlocks {
+		if block.Text == nil {
+			continue
+		}
+		switch block.Type {
+		case schemas.ResponsesInputMessageContentBlockTypeText,
+			schemas.ResponsesOutputMessageContentTypeText:
+			if text := strings.TrimSpace(*block.Text); text != "" {
+				parts = append(parts, text)
+			}
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
 // extractSystemPromptToInstructions moves system-prompt messages from input
 // into the top-level instructions field the upstream expects. It runs only
 // when the client left instructions unset, so explicit instructions are never
@@ -242,7 +292,11 @@ func ensureOpencodeZenFreeDefaults(request *schemas.BifrostResponsesRequest, ses
 	if !hasReasoningInclude {
 		request.Params.Include = append(request.Params.Include, opencodeIncludeReasoningEncryptedContent)
 	}
-	ensureOpencodeZenFreeTools(request.Params)
+	// Session-title generation prompts are plain single prompts with no
+	// tools; attaching the dummy edit/read/shell placeholders breaks them.
+	if !isTitleGenerationResponsesRequest(request) {
+		ensureOpencodeZenFreeTools(request.Params)
+	}
 }
 
 // ListModels performs a list models request to the Opencode Zen Free API.

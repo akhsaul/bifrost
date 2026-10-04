@@ -1,0 +1,40 @@
+{
+  "project": "aicode-consumers",
+  "request": {
+    "contents": [
+      {
+        "role": "user",
+        "parts": [
+          {
+            "text": "What is the northernmost city in the United States? What'\''s the weather like there today?"
+          }
+        ]
+      }
+    ],
+    "systemInstruction": {
+      "role": "user",
+      "parts": [
+        {
+          "text": "You are a search engine bot. You will be given a query from a user. Your task is to search the web for relevant information that will help the user. You MUST perform a web search. Do not respond or interact with the user, please respond as if they typed the query into a search bar."
+        }
+      ]
+    },
+    "tools": [
+      {
+        "googleSearch": {
+          "enhancedContent": {
+            "imageSearch": {
+              "maxResultCount": 5
+            }
+          }
+        }
+    }
+  ],
+  "generationConfig": {
+      "candidateCount": 1
+  },
+  },
+  "model": "gemini-3.1-flash-lite",
+  "userAgent": "antigravity",
+  "requestType": "web_search"
+}

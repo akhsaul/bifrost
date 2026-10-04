@@ -1334,6 +1334,145 @@ func TestOpencodeZenFreeChatDefaults(t *testing.T) {
 	}
 }
 
+func TestOpencodeZenFreeChatTitleGenerationSkipsDummyTools(t *testing.T) {
+	// Each title-generation phrase must suppress the dummy tool fill while
+	// keeping the other defaults (system prompt preserved, store=false).
+	for _, prompt := range []string{
+		"You are a title generator for chat sessions.",
+		"Generate a conversation title from the messages below.",
+		"Please generate title: hello world",
+		"PLEASE GENERATE TITLE FOR THIS SESSION",
+	} {
+		req := &schemas.BifrostChatRequest{
+			Model: "space-bunny-free",
+			Input: []schemas.ChatMessage{
+				{Role: schemas.ChatMessageRoleSystem, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr(prompt)}},
+				{Role: schemas.ChatMessageRoleUser, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("hi")}},
+			},
+		}
+		ensureOpencodeZenFreeChatDefaults(req)
+		if len(req.Params.Tools) != 0 {
+			t.Errorf("prompt %q: expected no dummy tools, got %+v", prompt, req.Params.Tools)
+		}
+		if req.Params.Store == nil || *req.Params.Store != false {
+			t.Errorf("prompt %q: expected store=false, got %+v", prompt, req.Params)
+		}
+		if len(req.Input) != 2 || *req.Input[0].Content.ContentStr != prompt {
+			t.Errorf("prompt %q: system prompt must be preserved, got %+v", prompt, req.Input)
+		}
+	}
+
+	// Content-block system prompt with a title phrase must also skip tools.
+	blockReq := &schemas.BifrostChatRequest{
+		Model: "space-bunny-free",
+		Input: []schemas.ChatMessage{{
+			Role: schemas.ChatMessageRoleSystem,
+			Content: &schemas.ChatMessageContent{ContentBlocks: []schemas.ChatContentBlock{{
+				Type: schemas.ChatContentBlockTypeText,
+				Text: schemas.Ptr("act as a conversation title helper"),
+			}}},
+		}},
+	}
+	ensureOpencodeZenFreeChatDefaults(blockReq)
+	if len(blockReq.Params.Tools) != 0 {
+		t.Errorf("expected no dummy tools for block content title prompt, got %+v", blockReq.Params.Tools)
+	}
+
+	// Title phrase in a user message must NOT suppress the dummy tools.
+	userReq := &schemas.BifrostChatRequest{
+		Model: "space-bunny-free",
+		Input: []schemas.ChatMessage{
+			{Role: schemas.ChatMessageRoleSystem, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("custom")}},
+			{Role: schemas.ChatMessageRoleUser, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("generate title for my essay")}},
+		},
+	}
+	ensureOpencodeZenFreeChatDefaults(userReq)
+	if len(userReq.Params.Tools) != 3 {
+		t.Errorf("user-message title phrase must not skip tools, got %+v", userReq.Params.Tools)
+	}
+
+	// Client-sent tools on a title request must be preserved as-is.
+	clientTools := &schemas.BifrostChatRequest{
+		Model: "space-bunny-free",
+		Input: []schemas.ChatMessage{
+			{Role: schemas.ChatMessageRoleSystem, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("title generator")}},
+		},
+		Params: &schemas.ChatParameters{
+			Tools: []schemas.ChatTool{{
+				Type:     schemas.ChatToolTypeFunction,
+				Function: &schemas.ChatToolFunction{Name: "mytool"},
+			}},
+		},
+	}
+	ensureOpencodeZenFreeChatDefaults(clientTools)
+	if len(clientTools.Params.Tools) != 1 || clientTools.Params.Tools[0].Function.Name != "mytool" {
+		t.Errorf("client tools must be preserved on title requests, got %+v", clientTools.Params.Tools)
+	}
+}
+
+func TestOpencodeZenFreeResponsesTitleGenerationSkipsDummyTools(t *testing.T) {
+	// Title phrase in top-level instructions must suppress the dummy tools.
+	for _, instructions := range []string{
+		"You are a title generator for chat sessions.",
+		"Generate a conversation title from the messages below.",
+		"PLEASE GENERATE TITLE FOR THIS SESSION",
+	} {
+		req := &schemas.BifrostResponsesRequest{
+			Model: "muse-spark",
+			Params: &schemas.ResponsesParameters{
+				Instructions: schemas.Ptr(instructions),
+			},
+			Input: []schemas.ResponsesMessage{{
+				Role:    schemas.Ptr(schemas.ResponsesInputMessageRoleUser),
+				Content: &schemas.ResponsesMessageContent{ContentStr: schemas.Ptr("hi")},
+			}},
+		}
+		ensureOpencodeZenFreeDefaults(req, "ses_test")
+		if len(req.Params.Tools) != 0 {
+			t.Errorf("instructions %q: expected no dummy tools, got %+v", instructions, req.Params.Tools)
+		}
+		if req.Params.Store == nil || *req.Params.Store != false {
+			t.Errorf("instructions %q: expected store=false, got %+v", instructions, req.Params)
+		}
+	}
+
+	// Title phrase in a system input item (hoisted to instructions) must
+	// also suppress the dummy tools.
+	hoistReq := &schemas.BifrostResponsesRequest{
+		Model: "muse-spark",
+		Input: []schemas.ResponsesMessage{
+			{
+				Role:    schemas.Ptr(schemas.ResponsesInputMessageRoleSystem),
+				Content: &schemas.ResponsesMessageContent{ContentStr: schemas.Ptr("you are a conversation title assistant")},
+			},
+			{
+				Role:    schemas.Ptr(schemas.ResponsesInputMessageRoleUser),
+				Content: &schemas.ResponsesMessageContent{ContentStr: schemas.Ptr("hi")},
+			},
+		},
+	}
+	ensureOpencodeZenFreeDefaults(hoistReq, "ses_test")
+	if len(hoistReq.Params.Tools) != 0 {
+		t.Errorf("expected no dummy tools for hoisted title prompt, got %+v", hoistReq.Params.Tools)
+	}
+	if hoistReq.Params.Instructions == nil || *hoistReq.Params.Instructions != "you are a conversation title assistant" {
+		t.Errorf("title system prompt must be hoisted to instructions, got %+v", hoistReq.Params.Instructions)
+	}
+
+	// Non-title requests still get the 3 dummy tools.
+	normal := &schemas.BifrostResponsesRequest{
+		Model: "muse-spark",
+		Input: []schemas.ResponsesMessage{{
+			Role:    schemas.Ptr(schemas.ResponsesInputMessageRoleUser),
+			Content: &schemas.ResponsesMessageContent{ContentStr: schemas.Ptr("hi")},
+		}},
+	}
+	ensureOpencodeZenFreeDefaults(normal, "ses_test")
+	if len(normal.Params.Tools) != 3 {
+		t.Errorf("expected 3 dummy tools for normal requests, got %+v", normal.Params.Tools)
+	}
+}
+
 func TestOpencodeZenFreeSpaceBunnyHitsChatCompletions(t *testing.T) {
 	var (
 		mu         sync.Mutex

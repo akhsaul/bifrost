@@ -1,0 +1,73 @@
+{
+  "model": "muse-spark-1.3-contributor-free",
+  "input": [
+    {
+      "type": "message",
+      "role": "user",
+      "content": [
+        {
+          "type": "input_text",
+          "text": "count this and result only number: 8741788 * 46783468"
+        }
+      ]
+    }
+  ],
+  "instructions": "You are helpfull assistant",
+  "tools": [
+    {
+      "type": "function",
+      "name": "edit",
+      "description": "deprecated function, don't use it!",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "deprecated": {
+            "type": "string",
+            "description": "deprecated parameters"
+          }
+        },
+        "required": ["deprecated"],
+        "additionalProperties": false
+      },
+      "strict": false
+    },
+    {
+      "type": "function",
+      "name": "read",
+      "description": "deprecated function, don't use it!",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "deprecated": {
+            "type": "string",
+            "description": "deprecated parameters"
+          }
+        },
+        "required": ["deprecated"],
+        "additionalProperties": false
+      },
+      "strict": false
+    },
+    {
+      "type": "function",
+      "name": "shell",
+      "description": "deprecated function, don't use it!",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "deprecated": {
+            "type": "string",
+            "description": "deprecated parameters"
+          }
+        },
+        "required": ["deprecated"],
+        "additionalProperties": false
+      },
+      "strict": false
+    }
+  ],
+  "store": false,
+  "prompt_cache_key": "ses_f19635ddcffeCXi7OSxpJXPxpd",
+  "reasoning": { "effort": "low", "summary": "auto" },
+  "stream": true
+}

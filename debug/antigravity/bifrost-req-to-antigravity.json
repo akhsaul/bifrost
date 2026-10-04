@@ -1,0 +1,26 @@
+{
+  "project": "aicode-consumers",
+  "model": "gemini-3.1-flash-lite",
+  "userAgent": "antigravity",
+  "requestId": "agent/295519f4-6e51-5c5e-a584-d97c8cf8fadd/1790605361200/8aa562bd-ad85-59c1-9983-c682f1a46c3c/1",
+  "requestType": "agent",
+  "request": {
+    "sessionId": "-6881620032325993598",
+    "contents": [
+      {
+        "parts": [
+          {
+            "text": "apa itu atria dawn ? jika sebuah produk maka sebutkan tanggal release"
+          }
+        ],
+        "role": "user"
+      }
+    ],
+    "generationConfig": {
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingBudget": -1
+      }
+    }
+  }
+}
