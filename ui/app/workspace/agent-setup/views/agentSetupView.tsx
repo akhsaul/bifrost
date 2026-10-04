@@ -836,96 +836,47 @@ export default function AgentSetupView() {
 							))}
 						</div>
 					) : (
-						<div className="grid gap-3 sm:grid-cols-2">
-							<div className="flex flex-col gap-1.5">
-								<Label>
-									Haiku-tier model <span className="text-muted-foreground">(required)</span>
-								</Label>
-								<Select value={effectiveClaudeHaikuId} onValueChange={setClaudeHaikuId}>
-									<SelectTrigger className="font-mono" data-testid="agent-setup-claude-haiku">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										{selectionItems.map((item) => (
-											<SelectItem key={item.id} value={item.id} className="font-mono">
-												{item.id}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-								<p className="text-muted-foreground text-[11px]">
-									What the <code className="font-mono">haiku</code> alias resolves to → ANTHROPIC_DEFAULT_HAIKU_MODEL
-								</p>
-							</div>
-							<div className="flex flex-col gap-1.5">
-								<Label>
-									Sonnet-tier model <span className="text-muted-foreground">(required)</span>
-								</Label>
-								<Select value={effectiveClaudeSonnetId} onValueChange={setClaudeSonnetId}>
-									<SelectTrigger className="font-mono" data-testid="agent-setup-claude-sonnet">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										{selectionItems.map((item) => (
-											<SelectItem key={item.id} value={item.id} className="font-mono">
-												{item.id}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-								<p className="text-muted-foreground text-[11px]">
-									What the <code className="font-mono">sonnet</code> alias and session default resolve to → ANTHROPIC_DEFAULT_SONNET_MODEL +
-									top-level <code className="font-mono">model</code>
-								</p>
-							</div>
-							<div className="flex flex-col gap-1.5">
-								<Label>
-									Opus-tier model <span className="text-muted-foreground">(optional)</span>
-								</Label>
-								<Select
-									value={claudeOpusId && selectionIds.includes(claudeOpusId) ? claudeOpusId : "__none__"}
-									onValueChange={(v) => setClaudeOpusId(v === "__none__" ? null : v)}
-								>
-									<SelectTrigger className="font-mono" data-testid="agent-setup-claude-opus">
-										<SelectValue placeholder="Not set (key omitted)" />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="__none__">Not set (key omitted)</SelectItem>
-										{selectionItems.map((item) => (
-											<SelectItem key={item.id} value={item.id} className="font-mono">
-												{item.id}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-								<p className="text-muted-foreground text-[11px]">
-									What the <code className="font-mono">opus</code> alias (heaviest tasks) resolves to → ANTHROPIC_DEFAULT_OPUS_MODEL
-								</p>
-							</div>
-							<div className="flex flex-col gap-1.5">
-								<Label>
-									Fable-tier model <span className="text-muted-foreground">(optional)</span>
-								</Label>
-								<Select
-									value={claudeFableId && selectionIds.includes(claudeFableId) ? claudeFableId : "__none__"}
-									onValueChange={(v) => setClaudeFableId(v === "__none__" ? null : v)}
-								>
-									<SelectTrigger className="font-mono" data-testid="agent-setup-claude-fable">
-										<SelectValue placeholder="Not set (key omitted)" />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="__none__">Not set (key omitted)</SelectItem>
-										{selectionItems.map((item) => (
-											<SelectItem key={item.id} value={item.id} className="font-mono">
-												{item.id}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
-								<p className="text-muted-foreground text-[11px]">
-									What the <code className="font-mono">fable</code> alias resolves to → ANTHROPIC_DEFAULT_FABLE_MODEL
-								</p>
-							</div>
+						<div className="grid auto-rows-fr gap-3 sm:grid-cols-2">
+							<ClaudeTierSelect
+								label="Haiku-tier model"
+								required
+								value={effectiveClaudeHaikuId}
+								onChange={setClaudeHaikuId}
+								items={selectionItems}
+								testId="agent-setup-claude-haiku"
+								hint="Fast-task alias resolution"
+								envKey="ANTHROPIC_DEFAULT_HAIKU_MODEL"
+							/>
+							<ClaudeTierSelect
+								label="Sonnet-tier model"
+								required
+								value={effectiveClaudeSonnetId}
+								onChange={setClaudeSonnetId}
+								items={selectionItems}
+								testId="agent-setup-claude-sonnet"
+								hint="Standard sessions + session default"
+								envKey="ANTHROPIC_DEFAULT_SONNET_MODEL"
+							/>
+							<ClaudeTierSelect
+								label="Opus-tier model"
+								optional
+								value={claudeOpusId && selectionIds.includes(claudeOpusId) ? claudeOpusId : "__none__"}
+								onChange={(v) => setClaudeOpusId(v === "__none__" ? null : v)}
+								items={selectionItems}
+								testId="agent-setup-claude-opus"
+								hint="Heaviest-task alias resolution"
+								envKey="ANTHROPIC_DEFAULT_OPUS_MODEL"
+							/>
+							<ClaudeTierSelect
+								label="Fable-tier model"
+								optional
+								value={claudeFableId && selectionIds.includes(claudeFableId) ? claudeFableId : "__none__"}
+								onChange={(v) => setClaudeFableId(v === "__none__" ? null : v)}
+								items={selectionItems}
+								testId="agent-setup-claude-fable"
+								hint="Fable alias resolution"
+								envKey="ANTHROPIC_DEFAULT_FABLE_MODEL"
+							/>
 						</div>
 					)}
 					{agent === "codex" && (
@@ -1160,6 +1111,63 @@ function ModalityInput({
 			className="font-mono"
 			data-testid={testId}
 		/>
+	);
+}
+
+/**
+ * Claude tier model select with a readable minimum width. Radix Select's
+ * trigger is `w-fit`, so short values collapse it and long
+ * `provider/model` names get cut — the user had to pick the longest model
+ * first just to stretch the layout. `w-full min-w-64` plus an ellipsis on
+ * the value keeps all four tier selects uniformly readable; the dropdown
+ * itself sizes to the longest option instead of the trigger.
+ */
+function ClaudeTierSelect({
+	label,
+	value,
+	onChange,
+	items,
+	testId,
+	hint,
+	envKey,
+	required,
+	optional,
+}: {
+	label: string;
+	value: string;
+	onChange: (value: string) => void;
+	items: ModelSelectionItem[];
+	testId: string;
+	hint: string;
+	envKey: string;
+	required?: boolean;
+	optional?: boolean;
+}) {
+	return (
+		<div className="flex min-w-0 flex-col gap-1.5">
+			<Label>
+				{label} {required && <span className="text-muted-foreground">(required)</span>}
+				{optional && <span className="text-muted-foreground">(optional)</span>}
+			</Label>
+			<Select value={value} onValueChange={onChange}>
+				<SelectTrigger className="w-full min-w-64 font-mono [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate" data-testid={testId}>
+					<SelectValue placeholder="Not set (key omitted)" />
+				</SelectTrigger>
+				<SelectContent className="max-w-[min(90vw,42rem)]">
+					{optional && <SelectItem value="__none__">Not set (key omitted)</SelectItem>}
+					{items.map((item) => (
+						<SelectItem key={item.id} value={item.id} className="font-mono">
+							<span className="block max-w-[min(80vw,36rem)] truncate" title={item.id}>
+								{item.id}
+							</span>
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
+			<p className="text-muted-foreground text-[11px]">
+				{hint} → <code className="font-mono">{envKey}</code>
+			</p>
+		</div>
 	);
 }
 
