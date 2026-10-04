@@ -146,7 +146,9 @@ export default function AgentSetupView() {
 	);
 	const activeVks = useMemo(() => vksData?.virtual_keys?.filter((vk) => vk.is_active) ?? [], [vksData]);
 	const { data: vkDetail } = useGetVirtualKeyQuery(virtualKeyId ?? "", { skip: !virtualKeyId });
-	const selectedVk = vkDetail?.virtual_key;
+	// RTK Query keeps the last fetched detail cached when the query is skipped — gate on
+	// virtualKeyId so Clear actually clears (otherwise the old VK keeps scoping the lists).
+	const selectedVk = virtualKeyId ? vkDetail?.virtual_key : undefined;
 	const vkOptions = useMemo(
 		() => activeVks.map((vk) => ({ value: vk.id, label: vk.name || vk.id, description: vk.description })),
 		[activeVks],
