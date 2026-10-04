@@ -12,6 +12,22 @@
  *    field, so rules whose CEL is not a simple `model == "<literal>"` are
  *    hidden from the picker.
  *
+ * Metadata rule: only keys the target agent's own schema supports are ever
+ * emitted, and every value is datasheet-prefilled but user-editable ("empty
+ * filled by datasheet" — datasheet value lands in the input, empty input
+ * when the datasheet has nothing). Per-agent sources of truth:
+ *  - opencode v2 docs (https://opencode.ai/v2/docs/models): per-model
+ *    `capabilities { tools, input, output }`, `limit { context, output }`,
+ *    `cost` per-1M tokens, `variants [{ id, settings: { reasoningEffort } }]`.
+ *    NOTE: https://opencode.ai/config.json still describes the v1 schema
+ *    (`provider` singular, `tool_call`, `modalities`); the v2 docs shape is
+ *    what current opencode loads, so builders emit v2.
+ *  - codex config reference: `[model_providers.<id>]` + top-level globals
+ *    `model_context_window`, `model_max_output_tokens`, `model_reasoning_effort`.
+ *  - claude code gateway docs: settings.json `env` fragment carries only
+ *    secret-free keys (base URL + model); the VK secret lives only in a
+ *    POSIX shell-export hint.
+ *
  * Auth model (from the agent's point of view a virtual key IS the api key):
  *  - No virtual key picked → the config carries no credential at all (no
  *    apiKey / env_key / auth token, no shell exports for secrets).
@@ -23,13 +39,16 @@
  */
 
 export type AgentId = "opencode" | "claude-code" | "codex";
-export type AgentPlatform = "macos" | "windows" | "linux";
 
+/**
+ * Static config-path hint shown per agent (no platform selector — the paths
+ * differ trivially and shell syntax is always POSIX `export ...`).
+ */
 export interface AgentDefinition {
 	id: AgentId;
 	label: string;
 	logoSrc: string;
-	configPath: Record<AgentPlatform, string>;
+	configPathNote: string;
 	/** Filename used for the Download button. */
 	downloadFileName: string;
 	/** Monaco language for the preview block. */
@@ -41,11 +60,7 @@ export const AGENTS: AgentDefinition[] = [
 		id: "opencode",
 		label: "OpenCode",
 		logoSrc: "/images/harness/opencode.svg",
-		configPath: {
-			macos: "~/.config/opencode/opencode.json",
-			linux: "~/.config/opencode/opencode.json",
-			windows: "%APPDATA%/opencode/opencode.json",
-		},
+		configPathNote: "macOS/Linux: ~/.config/opencode/opencode.json · Windows: %APPDATA%/opencode/opencode.json",
 		downloadFileName: "opencode-bifrost.json",
 		previewLang: "json",
 	},
@@ -53,11 +68,7 @@ export const AGENTS: AgentDefinition[] = [
 		id: "claude-code",
 		label: "Claude Code",
 		logoSrc: "/images/harness/claudecode.svg",
-		configPath: {
-			macos: "~/.claude/settings.json",
-			linux: "~/.claude/settings.json",
-			windows: "%USERPROFILE%/.claude/settings.json",
-		},
+		configPathNote: "macOS/Linux: ~/.claude/settings.json · Windows: %USERPROFILE%/.claude/settings.json",
 		downloadFileName: "claude-settings-bifrost.json",
 		previewLang: "json",
 	},
@@ -65,17 +76,11 @@ export const AGENTS: AgentDefinition[] = [
 		id: "codex",
 		label: "Codex",
 		logoSrc: "/images/harness/codex.svg",
-		configPath: {
-			macos: "~/.codex/config.toml",
-			linux: "~/.codex/config.toml",
-			windows: "%USERPROFILE%/.codex/config.toml",
-		},
+		configPathNote: "macOS/Linux: ~/.codex/config.toml · Windows: %USERPROFILE%/.codex/config.toml",
 		downloadFileName: "bifrost-config.toml",
 		previewLang: "toml",
 	},
 ];
-
-export const AGENT_PLATFORMS: AgentPlatform[] = ["macos", "windows", "linux"];
 
 /** Env var name carrying the Bifrost credential for opencode/codex snippets. */
 export const DEFAULT_BIFROST_ENV_VAR = "BIFROST_API_KEY";
@@ -85,18 +90,35 @@ export const DEFAULT_CLAUDE_ENV_VAR = "ANTHROPIC_AUTH_TOKEN";
 /** Stand-in for the virtual-key secret the user pastes into their own environment. */
 export const VK_VALUE_PLACEHOLDER = "<paste-your-virtual-key-value>";
 
-export interface ManualModelMetadata {
-	contextWindow: string;
-	maxInputTokens: string;
-	maxOutputTokens: string;
-	reasoningEffort: string;
+/** Fallback reasoning efforts when the datasheet has no reasoning-effort parameter. */
+export const DEFAULT_REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max", "auto"];
+
+/** Codex reasoning-effort select options (config reference). */
+export const CODEX_REASONING_EFFORTS = ["minimal", "low", "medium", "high", "xhigh"] as const;
+
+/** Agent-native per-model metadata: every field maps to a key the agent schema supports. */
+export interface AgentModelMetadata {
+	/** opencode `limit.context` ← datasheet max_input_tokens else context_length; rule entries start empty. */
+	limitContext: string;
+	/** opencode `limit.output` ← datasheet max_output_tokens; rule entries start empty. */
+	limitOutput: string;
+	/** opencode `capabilities.tools`; always true, user can disable. */
+	tools: boolean;
+	/** opencode `capabilities.input`; datasheet-prefilled, editable. */
+	inputModalities: string[];
+	/** opencode `capabilities.output`; datasheet-prefilled, editable. */
+	outputModalities: string[];
+	/** opencode `variants` reasoning efforts; datasheet options else DEFAULT_REASONING_EFFORTS, checklist. */
+	variantEfforts: string[];
 }
 
-export const EMPTY_MANUAL_METADATA: ManualModelMetadata = {
-	contextWindow: "",
-	maxInputTokens: "",
-	maxOutputTokens: "",
-	reasoningEffort: "",
+export const EMPTY_AGENT_METADATA: AgentModelMetadata = {
+	limitContext: "",
+	limitOutput: "",
+	tools: true,
+	inputModalities: [],
+	outputModalities: [],
+	variantEfforts: [],
 };
 
 /** One selectable entry in the Models step: a direct model or a rule trigger. */
@@ -113,10 +135,19 @@ export interface ModelSelectionItem {
 	ruleId?: string;
 	/** Rule only: targets summary, e.g. `opencode-zen/space-bunny-free`. */
 	ruleTargets?: string;
-	/** Direct-model limits from the datasheet (feeds opencode `limit`). */
-	limit?: { context?: number; output?: number };
-	/** Rule-entry manual metadata (empty values omitted from output). */
-	manualMetadata?: ManualModelMetadata;
+	/** Direct-model datasheet snapshot feeding the agent-native metadata form (v2 keys). */
+	datasheet?: {
+		/** max_input_tokens else context_length. */
+		context?: number;
+		/** max_output_tokens. */
+		output?: number;
+		inputModalities?: string[];
+		outputModalities?: string[];
+		/** Per-token costs; opencode wants per-1M so the builder multiplies by 1e6. */
+		costPerToken?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
+		/** Reasoning-effort option values from model_parameters (id matching /reasoning.*effort/i). */
+		reasoningEfforts?: string[];
+	};
 }
 
 /**
@@ -129,4 +160,15 @@ export function extractModelTrigger(celExpression: string | undefined): string |
 	if (!celExpression) return null;
 	const match = celExpression.trim().match(/^model\s*==\s*["']([^"']+)["']$/);
 	return match ? match[1] : null;
+}
+
+/**
+ * Find reasoning-effort option values in a datasheet parameter list: the
+ * parameter whose id matches /reasoning.*effort/i, with an options array.
+ * Returns null when the datasheet has no such parameter.
+ */
+export function extractReasoningEfforts(params: { id: string; options?: { value: string }[] }[] | undefined): string[] | null {
+	const found = (params ?? []).find((p) => /reasoning.*effort/i.test(p.id) && Array.isArray(p.options));
+	if (!found?.options?.length) return null;
+	return found.options.map((o) => o.value).filter(Boolean);
 }
