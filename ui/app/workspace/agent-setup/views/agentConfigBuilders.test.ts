@@ -158,12 +158,12 @@ describe("buildAgentConfig", () => {
 		expect(withoutVk.shellExports).toBe("");
 	});
 
-	it("lets claude Haiku and Sonnet tiers point at different models", () => {
+	it("lets claude Haiku and Sonnet tiers point at different models, with model tracking Sonnet", () => {
 		const out = buildAgentConfig(
 			"claude-code",
 			baseInput({
 				envVar: "ANTHROPIC_AUTH_TOKEN",
-				defaultModelId: "opencode-zen/glm-5.3",
+				defaultModelId: "test-route",
 				claudeHaikuModelId: "test-route",
 				claudeSonnetModelId: "opencode-zen/glm-5.3",
 			}),

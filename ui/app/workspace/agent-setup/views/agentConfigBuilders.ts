@@ -31,7 +31,8 @@ export interface AgentConfigInput {
 	virtualKeyName?: string;
 	/** Env var name carrying the credential (editable, ignored without a VK). */
 	envVar: string;
-	/** Codex/claude only: which selected model is the default. Falls back to the first selection. */
+	/** Codex only: which selected model is the default (user-chosen radio). Falls back to the first selection.
+	 * Claude reuses it only as the initial value each tier select falls back to — top-level `model` tracks the Sonnet pick. */
 	defaultModelId?: string;
 	/** Claude only: tier model overrides. Haiku + Sonnet are required and fall back to defaultModelId, then the first selection. Opus + Fable are optional — emitted only when the user picks one. */
 	claudeHaikuModelId?: string;
@@ -189,8 +190,8 @@ function buildCodex(input: AgentConfigInput): AgentConfigOutput {
 // standard sonnet alias resolve to)
 // plus optional Opus-tier and Fable-tier overrides (emitted only when set),
 // plus the auth-token key with a placeholder when a VK is picked — never
-// the real secret. Top-level `model` is the session-start default and is
-// always kept alongside. Without a VK no auth key is emitted.
+// the real secret. Top-level `model` is the session-start default and
+// always tracks the Sonnet pick. Without a VK no auth key is emitted.
 // See https://code.claude.com/docs/en/model-config.
 
 function buildClaudeCode(input: AgentConfigInput): AgentConfigOutput {
@@ -198,9 +199,11 @@ function buildClaudeCode(input: AgentConfigInput): AgentConfigOutput {
 	const authKey = input.envVar || DEFAULT_CLAUDE_ENV_VAR;
 	const baseUrl = `${input.baseUrl}/anthropic`;
 	const firstId = input.models[0]?.id ?? "";
-	const defaultId = input.defaultModelId ?? firstId;
-	const haikuId = input.claudeHaikuModelId ?? defaultId;
-	const sonnetId = input.claudeSonnetModelId ?? defaultId;
+	const requestedDefault = input.defaultModelId ?? firstId;
+	const haikuId = input.claudeHaikuModelId ?? requestedDefault;
+	// Top-level `model` is the session-start default and tracks the Sonnet pick.
+	const sonnetId = input.claudeSonnetModelId ?? requestedDefault;
+	const modelId = sonnetId;
 	const opusId = input.claudeOpusModelId?.trim() ? input.claudeOpusModelId : "";
 	const fableId = input.claudeFableModelId?.trim() ? input.claudeFableModelId : "";
 
@@ -214,7 +217,7 @@ function buildClaudeCode(input: AgentConfigInput): AgentConfigOutput {
 				...(fableId ? { ANTHROPIC_DEFAULT_FABLE_MODEL: fableId } : {}),
 				...(hasAuth ? { [authKey]: VK_VALUE_PLACEHOLDER } : {}),
 			},
-			...(defaultId ? { model: defaultId } : {}),
+			...(modelId ? { model: modelId } : {}),
 		},
 		null,
 		2,
