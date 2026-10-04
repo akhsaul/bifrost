@@ -121,8 +121,13 @@ export default function AgentSetupView() {
 	const [metadata, setMetadata] = useState<Record<string, AgentModelMetadata>>({});
 	// Reasoning-effort options per direct model, from the datasheet (null = none found).
 	const [effortsByModel, setEffortsByModel] = useState<Record<string, string[] | null>>({});
-	// User-chosen default model for single-default agents (codex, claude-code).
+	// User-chosen default model for single-default agents (codex).
 	const [defaultModelId, setDefaultModelId] = useState<string | null>(null);
+	// Claude tier overrides: what the haiku alias (fast/cheap tasks) and the
+	// sonnet alias (standard session model) resolve to. Null = follow the
+	// first selection (single-model case → both the same model).
+	const [claudeHaikuId, setClaudeHaikuId] = useState<string | null>(null);
+	const [claudeSonnetId, setClaudeSonnetId] = useState<string | null>(null);
 	// Codex globals: datasheet-prefilled from the default model until the user edits.
 	const [codexCtx, setCodexCtx] = useState("");
 	const [codexCtxTouched, setCodexCtxTouched] = useState(false);
@@ -377,7 +382,19 @@ export default function AgentSetupView() {
 
 	useEffect(() => {
 		if (!selectionItems.some((i) => i.id === defaultModelId)) setDefaultModelId(null);
-	}, [selectionItems, defaultModelId]);
+		if (agent === "claude-code") return;
+		// Codex has a single default radio; claude tier selects manage their own fallbacks below.
+	}, [selectionItems, defaultModelId, agent]);
+
+	// Claude tier resolution: explicit pick wins, else follow the single default radio, else first selection.
+	const selectionIds = useMemo(() => selectionItems.map((i) => i.id), [selectionItems]);
+	const effectiveClaudeHaikuId = claudeHaikuId && selectionIds.includes(claudeHaikuId) ? claudeHaikuId : effectiveDefaultId;
+	const effectiveClaudeSonnetId = claudeSonnetId && selectionIds.includes(claudeSonnetId) ? claudeSonnetId : effectiveDefaultId;
+
+	useEffect(() => {
+		if (!selectionIds.some((id) => id === claudeHaikuId)) setClaudeHaikuId(null);
+		if (!selectionIds.some((id) => id === claudeSonnetId)) setClaudeSonnetId(null);
+	}, [selectionIds, claudeHaikuId, claudeSonnetId]);
 
 	// Codex globals follow the default model's datasheet until the user edits them.
 	const defaultDatasheet = useMemo(() => {
@@ -438,6 +455,12 @@ export default function AgentSetupView() {
 					...(selectedVk ? { virtualKeyName: selectedVk.name } : {}),
 					envVar: resolvedEnvVar,
 					...(agent === "codex" || agent === "claude-code" ? { defaultModelId: effectiveDefaultId } : {}),
+					...(agent === "claude-code"
+						? {
+								claudeHaikuModelId: effectiveClaudeHaikuId,
+								claudeSonnetModelId: effectiveClaudeSonnetId,
+							}
+						: {}),
 					...(agent === "codex"
 						? {
 								codexContextWindow: effectiveCodexCtx,
@@ -754,22 +777,64 @@ export default function AgentSetupView() {
 			{(agent === "codex" || agent === "claude-code") && selectionItems.length > 0 && (
 				<section className="flex flex-col gap-3">
 					<div className="text-sm font-medium">Default model</div>
-					<div className="flex flex-col gap-1.5" data-testid="agent-setup-default-model">
-						{selectionItems.map((item) => (
-							<label key={item.id} className="flex cursor-pointer items-center gap-2 font-mono text-xs">
-								<input
-									type="radio"
-									name="agent-setup-default-model"
-									checked={effectiveDefaultId === item.id}
-									onChange={() => setDefaultModelId(item.id)}
-									className="accent-primary size-4"
-									data-testid={`agent-setup-default-model-${item.id}`}
-								/>
-								{item.id}
-								{item.kind === "rule" && <span className="text-muted-foreground">→ {item.ruleTargets}</span>}
-							</label>
-						))}
-					</div>
+					{agent === "codex" ? (
+						<div className="flex flex-col gap-1.5" data-testid="agent-setup-default-model">
+							{selectionItems.map((item) => (
+								<label key={item.id} className="flex cursor-pointer items-center gap-2 font-mono text-xs">
+									<input
+										type="radio"
+										name="agent-setup-default-model"
+										checked={effectiveDefaultId === item.id}
+										onChange={() => setDefaultModelId(item.id)}
+										className="accent-primary size-4"
+										data-testid={`agent-setup-default-model-${item.id}`}
+									/>
+									{item.id}
+									{item.kind === "rule" && <span className="text-muted-foreground">→ {item.ruleTargets}</span>}
+								</label>
+							))}
+						</div>
+					) : (
+						<div className="grid gap-3 sm:grid-cols-2">
+							<div className="flex flex-col gap-1.5">
+								<Label>Haiku-tier model (fast tasks)</Label>
+								<Select value={effectiveClaudeHaikuId} onValueChange={setClaudeHaikuId}>
+									<SelectTrigger className="font-mono" data-testid="agent-setup-claude-haiku">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{selectionItems.map((item) => (
+											<SelectItem key={item.id} value={item.id} className="font-mono">
+												{item.id}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								<p className="text-muted-foreground text-[11px]">
+									What the <code className="font-mono">haiku</code> alias resolves to → ANTHROPIC_DEFAULT_HAIKU_MODEL
+								</p>
+							</div>
+							<div className="flex flex-col gap-1.5">
+								<Label>Sonnet-tier model (standard sessions)</Label>
+								<Select value={effectiveClaudeSonnetId} onValueChange={setClaudeSonnetId}>
+									<SelectTrigger className="font-mono" data-testid="agent-setup-claude-sonnet">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										{selectionItems.map((item) => (
+											<SelectItem key={item.id} value={item.id} className="font-mono">
+												{item.id}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								<p className="text-muted-foreground text-[11px]">
+									What the <code className="font-mono">sonnet</code> alias and session default resolve to → ANTHROPIC_DEFAULT_SONNET_MODEL +
+									top-level <code className="font-mono">model</code>
+								</p>
+							</div>
+						</div>
+					)}
 					{agent === "codex" && (
 						<div className="grid gap-3 sm:grid-cols-3">
 							<div className="flex flex-col gap-1.5">

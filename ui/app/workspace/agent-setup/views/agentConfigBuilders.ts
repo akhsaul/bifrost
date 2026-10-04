@@ -33,6 +33,9 @@ export interface AgentConfigInput {
 	envVar: string;
 	/** Codex/claude only: which selected model is the default. Falls back to the first selection. */
 	defaultModelId?: string;
+	/** Claude only: Haiku-tier and Sonnet-tier model overrides. Each falls back to defaultModelId, then the first selection. */
+	claudeHaikuModelId?: string;
+	claudeSonnetModelId?: string;
 	/** Codex only: `model_context_window` / `model_max_output_tokens` globals (default model's datasheet, editable). */
 	codexContextWindow?: string;
 	codexMaxOutputTokens?: string;
@@ -179,24 +182,28 @@ function buildCodex(input: AgentConfigInput): AgentConfigOutput {
 }
 
 // ── Claude Code ──────────────────────────────────────────────────────────
-// settings.json fragment: `env` carries the base URL, the Haiku/Sonnet
-// default models (both point at the user-chosen default; with a single
-// selection they are the same model), plus the auth-token key with a
-// placeholder when a VK is picked — never the real secret. Top-level
-// `model` is always kept alongside. Without a VK no auth key is emitted.
+// settings.json fragment: `env` carries the base URL, the Haiku-tier and
+// Sonnet-tier model overrides (what the fast haiku alias and the standard
+// sonnet alias resolve to — see https://code.claude.com/docs/en/model-config),
+// plus the auth-token key with a placeholder when a VK is picked — never
+// the real secret. Top-level `model` is the session-start default and is
+// always kept alongside. Without a VK no auth key is emitted.
 
 function buildClaudeCode(input: AgentConfigInput): AgentConfigOutput {
 	const hasAuth = !!input.virtualKeyName;
 	const authKey = input.envVar || DEFAULT_CLAUDE_ENV_VAR;
 	const baseUrl = `${input.baseUrl}/anthropic`;
-	const defaultId = input.defaultModelId ?? input.models[0]?.id ?? "";
+	const firstId = input.models[0]?.id ?? "";
+	const defaultId = input.defaultModelId ?? firstId;
+	const haikuId = input.claudeHaikuModelId ?? defaultId;
+	const sonnetId = input.claudeSonnetModelId ?? defaultId;
 
 	const settingsFragment = `${hasAuth && input.virtualKeyName ? `// Virtual key: ${input.virtualKeyName} — replace "${VK_VALUE_PLACEHOLDER}" with its value, or set ${authKey} in your shell.\n` : ""}${JSON.stringify(
 		{
 			env: {
 				ANTHROPIC_BASE_URL: baseUrl,
-				...(defaultId ? { ANTHROPIC_DEFAULT_HAIKU_MODEL: defaultId } : {}),
-				...(defaultId ? { ANTHROPIC_DEFAULT_SONNET_MODEL: defaultId } : {}),
+				...(haikuId ? { ANTHROPIC_DEFAULT_HAIKU_MODEL: haikuId } : {}),
+				...(sonnetId ? { ANTHROPIC_DEFAULT_SONNET_MODEL: sonnetId } : {}),
 				...(hasAuth ? { [authKey]: VK_VALUE_PLACEHOLDER } : {}),
 			},
 			...(defaultId ? { model: defaultId } : {}),

@@ -157,4 +157,19 @@ describe("buildAgentConfig", () => {
 		expect(withoutVk.config).not.toContain("ANTHROPIC_AUTH_TOKEN");
 		expect(withoutVk.shellExports).toBe("");
 	});
+
+	it("lets claude Haiku and Sonnet tiers point at different models", () => {
+		const out = buildAgentConfig(
+			"claude-code",
+			baseInput({
+				envVar: "ANTHROPIC_AUTH_TOKEN",
+				defaultModelId: "opencode-zen/glm-5.3",
+				claudeHaikuModelId: "test-route",
+				claudeSonnetModelId: "opencode-zen/glm-5.3",
+			}),
+		);
+		expect(out.config).toContain('"ANTHROPIC_DEFAULT_HAIKU_MODEL": "test-route"');
+		expect(out.config).toContain('"ANTHROPIC_DEFAULT_SONNET_MODEL": "opencode-zen/glm-5.3"');
+		expect(out.config).toContain('"model": "opencode-zen/glm-5.3"');
+	});
 });
