@@ -661,23 +661,21 @@ export default function AgentSetupView() {
 									</div>
 									<div className="flex flex-col gap-1.5">
 										<Label>capabilities.input (comma-separated)</Label>
-										<Input
-											value={meta.inputModalities.join(", ")}
-											onChange={(e) => updateMetadata(key, { inputModalities: splitModalities(e.target.value) })}
+										<ModalityInput
+											committed={meta.inputModalities.join(", ")}
+											onCommit={(raw) => updateMetadata(key, { inputModalities: splitModalities(raw) })}
+											testId={`agent-setup-meta-${item.id}-input`}
 											placeholder="text, image"
-											className="font-mono"
-											data-testid={`agent-setup-meta-${item.id}-input`}
 										/>
 										<p className="text-muted-foreground text-[11px]">Known values: {OPENCODE_MODALITIES.join(", ")}</p>
 									</div>
 									<div className="flex flex-col gap-1.5">
 										<Label>capabilities.output (comma-separated)</Label>
-										<Input
-											value={meta.outputModalities.join(", ")}
-											onChange={(e) => updateMetadata(key, { outputModalities: splitModalities(e.target.value) })}
+										<ModalityInput
+											committed={meta.outputModalities.join(", ")}
+											onCommit={(raw) => updateMetadata(key, { outputModalities: splitModalities(raw) })}
+											testId={`agent-setup-meta-${item.id}-output`}
 											placeholder="text"
-											className="font-mono"
-											data-testid={`agent-setup-meta-${item.id}-output`}
 										/>
 									</div>
 								</div>
@@ -946,6 +944,51 @@ export default function AgentSetupView() {
 				)}
 			</section>
 		</div>
+	);
+}
+
+/**
+ * Free-text input for comma-separated modalities. The parent stores the
+ * parsed array, so binding the raw keystrokes to it would normalize away
+ * intermediate states (a just-typed comma or space vanishes on the next
+ * render). Instead the draft lives here while focused and is committed
+ * (parsed) on blur; external prefill updates flow through while unfocused.
+ */
+function ModalityInput({
+	committed,
+	onCommit,
+	testId,
+	placeholder,
+}: {
+	committed: string;
+	onCommit: (raw: string) => void;
+	testId: string;
+	placeholder: string;
+}) {
+	const [draft, setDraft] = useState(committed);
+	const [focused, setFocused] = useState(false);
+	useEffect(() => {
+		if (!focused) setDraft(committed);
+	}, [committed, focused]);
+	return (
+		<Input
+			value={focused ? draft : committed}
+			onFocus={() => {
+				setDraft(committed);
+				setFocused(true);
+			}}
+			onChange={(e) => setDraft(e.target.value)}
+			onBlur={() => {
+				setFocused(false);
+				onCommit(draft);
+			}}
+			onKeyDown={(e) => {
+				if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+			}}
+			placeholder={placeholder}
+			className="font-mono"
+			data-testid={testId}
+		/>
 	);
 }
 
