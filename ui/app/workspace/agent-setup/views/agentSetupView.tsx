@@ -87,10 +87,11 @@ export default function AgentSetupView() {
 	// stays in the RTK Query cache only for these two keyed queries.
 	const [vkRevealed, setVkRevealed] = useState(false);
 	const { data: providers } = useGetProvidersQuery(undefined, { skip: !hasAccess });
-	const { data: modelsData } = useGetModelsQuery(
+	const { data: modelsData, isFetching: isFetchingModels } = useGetModelsQuery(
 		{
 			...(vkRevealed && virtualKeyId && selectedVk ? { virtualKeyValue: selectedVk.value } : { unfiltered: true }),
-			limit: 500,
+			...(provider ? { provider } : {}),
+			limit: 2000,
 		},
 		{ skip: !hasAccess || (!!virtualKeyId && !selectedVk) },
 	);
@@ -98,6 +99,7 @@ export default function AgentSetupView() {
 	const { data: detailsData } = useGetModelDetailsQuery(
 		{
 			...(vkRevealed && virtualKeyId && selectedVk ? { virtualKeyValue: selectedVk.value } : { unfiltered: true }),
+			...(provider ? { provider } : {}),
 			limit: 2000,
 		},
 		{ skip: !hasAccess || (!!virtualKeyId && !selectedVk) },
@@ -395,6 +397,7 @@ export default function AgentSetupView() {
 							<Label>Model</Label>
 							<Select
 								value={model}
+								disabled={!provider}
 								onValueChange={(v) => {
 									setModel(v);
 									setDatasheetParams({});
@@ -411,6 +414,17 @@ export default function AgentSetupView() {
 									))}
 								</SelectContent>
 							</Select>
+							{provider &&
+								(directModels.length > 0 ? (
+									<p className="text-muted-foreground text-xs">
+										{directModels.length} model{directModels.length === 1 ? "" : "s"} available
+										{isFetchingModels ? " (refreshing…)" : ""}
+									</p>
+								) : (
+									<p className="text-muted-foreground text-xs">
+										{isFetchingModels ? "Loading models…" : "No models returned for this provider."}
+									</p>
+								))}
 						</div>
 					</div>
 				) : (
