@@ -793,6 +793,19 @@ func (p *ProviderConfig) Redacted() *ProviderConfig {
 				RefreshToken: *key.ClineKeyConfig.RefreshToken.Redacted(),
 			}
 		}
+		if key.ModalKeyConfig != nil {
+			// Username/region are proxy credentials and redacted; model forms are
+			// plain identifiers and surfaced as-is.
+			modalCfg := &schemas.ModalKeyConfig{
+				Model:         key.ModalKeyConfig.Model,
+				EndpointModel: key.ModalKeyConfig.EndpointModel,
+				Username:      *key.ModalKeyConfig.Username.Redacted(),
+			}
+			if key.ModalKeyConfig.Region != nil {
+				modalCfg.Region = key.ModalKeyConfig.Region.Redacted()
+			}
+			redactedConfig.Keys[i].ModalKeyConfig = modalCfg
+		}
 	}
 	return &redactedConfig
 }
@@ -1011,6 +1024,22 @@ func GenerateKeyHash(key schemas.Key) (string, error) {
 	// Hash GithubCopilotKeyConfig
 	if key.GithubCopilotKeyConfig != nil {
 		data, err := sonic.Marshal(key.GithubCopilotKeyConfig)
+		if err != nil {
+			return "", err
+		}
+		hash.Write(data)
+	}
+	// Hash ClineKeyConfig
+	if key.ClineKeyConfig != nil {
+		data, err := sonic.Marshal(key.ClineKeyConfig)
+		if err != nil {
+			return "", err
+		}
+		hash.Write(data)
+	}
+	// Hash ModalKeyConfig
+	if key.ModalKeyConfig != nil {
+		data, err := sonic.Marshal(key.ModalKeyConfig)
 		if err != nil {
 			return "", err
 		}

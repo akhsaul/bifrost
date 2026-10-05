@@ -442,7 +442,7 @@
           "$ref": "#/$defs/provider"
         },
         "modal": {
-          "$ref": "#/$defs/provider"
+          "$ref": "#/$defs/provider_with_modal_config"
         },
         "byteplus": {
           "$ref": "#/$defs/provider"
@@ -456,31 +456,16 @@
         "inferx": {
           "$ref": "#/$defs/provider"
         },
-        "dahl": {
-          "$ref": "#/$defs/provider"
-        },
         "morphllm": {
           "$ref": "#/$defs/provider"
         },
         "tokenharbor": {
           "$ref": "#/$defs/provider"
         },
-        "aisure": {
-          "$ref": "#/$defs/provider"
-        },
-        "tokenfaucet": {
-          "$ref": "#/$defs/provider"
-        },
-        "seekai": {
-          "$ref": "#/$defs/provider"
-        },
-        "gorouter": {
+        "apmix": {
           "$ref": "#/$defs/provider"
         },
         "vyceai": {
-          "$ref": "#/$defs/provider"
-        },
-        "hcnsec": {
           "$ref": "#/$defs/provider"
         },
         "neuralwatt": {
@@ -5244,6 +5229,45 @@
         }
       ]
     },
+    "modal_key": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/base_key"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "modal_key_config": {
+              "type": "object",
+              "properties": {
+                "model": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Body/advertised model identifier sent to the endpoint, e.g. deepseek-ai/DeepSeek-V4.1-Flash. Each Modal key serves exactly one model."
+                },
+                "endpoint_model": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Host segment of the deployment name, e.g. deepseek-v4-1-flash. Used verbatim in <username>--ep-<endpoint_model>-server.<region>.modal.direct; may differ from model and is never derived from it."
+                },
+                "username": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Modal workspace username/namespace owning the deployment (can use env. prefix)"
+                },
+                "region": {
+                  "type": "string",
+                  "description": "Modal region (defaults to us-west when empty, can use env. prefix)"
+                }
+              },
+              "required": ["model", "endpoint_model", "username"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["modal_key_config"]
+        }
+      ]
+    },
     "cline_key": {
       "allOf": [
         {
@@ -5932,6 +5956,45 @@
         },
         "network_config": {
           "$ref": "#/$defs/network_config"
+        },
+        "concurrency_and_buffer_size": {
+          "$ref": "#/$defs/concurrency_and_buffer_size"
+        },
+        "proxy_config": {
+          "$ref": "#/$defs/proxy_config"
+        },
+        "send_back_raw_request": {
+          "type": "boolean",
+          "description": "Include raw request in BifrostResponse (default: false)"
+        },
+        "send_back_raw_response": {
+          "type": "boolean",
+          "description": "Include raw response in BifrostResponse (default: false)"
+        },
+        "store_raw_request_response": {
+          "type": "boolean",
+          "description": "Capture raw request/response for internal logging only; strip from API responses returned to clients (default: false)"
+        },
+        "custom_provider_config": {
+          "$ref": "#/$defs/custom_provider_config"
+        }
+      },
+      "required": ["keys"],
+      "additionalProperties": false
+    },
+    "provider_with_modal_config": {
+      "type": "object",
+      "properties": {
+        "keys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/modal_key"
+          },
+          "minItems": 1,
+          "description": "API keys for this provider. Each key targets exactly one Modal deployment; the same proxy credential value may be reused across keys with different names."
+        },
+        "network_config": {
+          "$ref": "#/$defs/network_config_without_base_url"
         },
         "concurrency_and_buffer_size": {
           "$ref": "#/$defs/concurrency_and_buffer_size"
@@ -9189,15 +9252,10 @@
 			"poolside",
 			"longcat",
 			"inferx",
-			"dahl",
 			"morphllm",
 			"tokenharbor",
-			"aisure",
-			"tokenfaucet",
-			"seekai",
-			"gorouter",
+			"apmix",
 			"vyceai",
-			"hcnsec",
 			"neuralwatt",
 			"bai",
 			"bitdeer",

@@ -85,15 +85,10 @@ const (
 	Poolside        ModelProvider = "poolside"
 	Longcat         ModelProvider = "longcat"
 	Inferx          ModelProvider = "inferx"
-	Dahl            ModelProvider = "dahl"
 	Morphllm        ModelProvider = "morphllm"
 	TokenHarbor     ModelProvider = "tokenharbor"
-	AISure          ModelProvider = "aisure"
-	TokenFaucet     ModelProvider = "tokenfaucet"
-	SeekAI          ModelProvider = "seekai"
-	GoRouter        ModelProvider = "gorouter"
+	Apmix           ModelProvider = "apmix"
 	VyceAI          ModelProvider = "vyceai"
-	Hcnsec          ModelProvider = "hcnsec"
 	Neuralwatt      ModelProvider = "neuralwatt"
 	Bai             ModelProvider = "bai"
 	Antigravity     ModelProvider = "antigravity"
@@ -156,15 +151,10 @@ var StandardProviders = []ModelProvider{
 	Poolside,
 	Longcat,
 	Inferx,
-	Dahl,
 	Morphllm,
 	TokenHarbor,
-	AISure,
-	TokenFaucet,
-	SeekAI,
-	GoRouter,
+	Apmix,
 	VyceAI,
-	Hcnsec,
 	Neuralwatt,
 	Bai,
 	Antigravity,

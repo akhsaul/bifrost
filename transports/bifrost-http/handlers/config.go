@@ -568,6 +568,9 @@ func formatExportProviderConfig(p *configstore.ProviderConfig) map[string]any {
 			if k.SGLKeyConfig != nil {
 				km["sgl_key_config"] = k.SGLKeyConfig
 			}
+			if k.ModalKeyConfig != nil {
+				km["modal_key_config"] = k.ModalKeyConfig
+			}
 			keysList[i] = km
 		}
 		out["keys"] = keysList

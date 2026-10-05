@@ -361,6 +361,18 @@ export const clineKeyConfigSchema = z
 		}
 	});
 
+// Modal key config schema. Each Modal key targets exactly one deployment:
+// model is the identifier sent in the request body (it may differ from the
+// host segment), endpoint_model is the host segment used verbatim in
+// <username>--ep-<endpoint_model>-server.<region>.modal.direct, username owns
+// the deployment, region defaults to us-west when empty.
+export const modalKeyConfigSchema = z.object({
+	model: z.string().min(1, "Model is required"),
+	endpoint_model: z.string().min(1, "Endpoint model is required"),
+	username: secretVarSchema.optional(),
+	region: secretVarSchema.optional(),
+});
+
 // Ollama key config schema
 export const ollamaKeyConfigSchema = z
 	.object({
@@ -514,6 +526,7 @@ export const modelProviderKeySchema = z
 		databricks_key_config: databricksKeyConfigSchema.optional(),
 		github_copilot_key_config: githubCopilotKeyConfigSchema.optional(),
 		cline_key_config: clineKeyConfigSchema.optional(),
+		modal_key_config: modalKeyConfigSchema.optional(),
 		use_for_batch_api: z.boolean().optional(),
 		use_anthropic_endpoints: z.boolean().optional(),
 		use_openai_endpoints: z.boolean().optional(),
@@ -592,6 +605,23 @@ export const modelProviderKeySchema = z
 					return isSecretVarSet(data.value);
 				}
 				return true;
+			}
+			// Modal authenticates with the proxy credential in value plus the
+			// deployment binding in modal_key_config. Enforce the single-model
+			// binding here too so the form cannot submit a wildcard or empty
+			// models list, or one that disagrees with modal_key_config.model.
+			if (data.modal_key_config) {
+				const cfg = data.modal_key_config;
+				if (!cfg.model?.trim() || !cfg.endpoint_model?.trim() || !isSecretVarSet(cfg.username)) {
+					return false;
+				}
+				if (!Array.isArray(data.models) || data.models.length !== 1 || data.models[0] === "*") {
+					return false;
+				}
+				if (data.models[0].trim().toLowerCase() !== cfg.model.trim().toLowerCase()) {
+					return false;
+				}
+				return isSecretVarSet(data.value);
 			}
 			// Otherwise, value is required
 			return isSecretVarSet(data.value);

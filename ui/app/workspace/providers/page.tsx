@@ -7,7 +7,7 @@ import { TruncatedLabel } from "@/components/ui/truncatedLabel";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DefaultNetworkConfig, DefaultPerformanceConfig } from "@/lib/constants/config";
 import { ProviderIconType, RenderProviderIcon } from "@/lib/constants/icons";
-import { HiddenProviders, ProviderLabels, ProviderNames, VisibleProviderNames } from "@/lib/constants/logs";
+import { HiddenProviders, ProviderLabels, ProviderNames, ProviderWarnings, VisibleProviderNames } from "@/lib/constants/logs";
 import { useDismissedProviderCollisions } from "@/lib/hooks/useDismissedProviderCollisions";
 import {
 	getErrorMessage,
@@ -24,7 +24,7 @@ import { DATABRICKS_PROVIDER, isCustomDatabricksProvider } from "@/lib/utils/dat
 import { findCustomProviderCollisions, normalizeProviderName } from "@/lib/utils/providerCollision";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
 import { useNavigate } from "@tanstack/react-router";
-import { AlertCircle, ArrowLeft, Server } from "lucide-react";
+import { AlertCircle, AlertTriangle, ArrowLeft, Server } from "lucide-react";
 import { useQueryState } from "nuqs";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -324,6 +324,7 @@ export default function Providers() {
 												className="h-4 w-4 shrink-0"
 											/>
 											<TruncatedLabel className="flex-1 text-sm">{label}</TruncatedLabel>
+											<ProviderWarningBadge providerName={p.name} />
 											<KeyDiscoveryFailedBadge provider={p} />
 											<ProviderStatusBadge status={p.provider_status} />
 											{isCustom && (
@@ -377,6 +378,19 @@ export default function Providers() {
 				)}
 			</div>
 		</div>
+	);
+}
+
+function ProviderWarningBadge({ providerName }: { providerName: string }) {
+	const warning = ProviderWarnings[providerName.toLowerCase().trim() as keyof typeof ProviderWarnings];
+	if (!warning) return null;
+	return (
+		<Tooltip>
+			<TooltipTrigger>
+				<AlertTriangle data-testid={`provider-warning-${providerName}`} className="h-3 w-3 text-amber-500" />
+			</TooltipTrigger>
+			<TooltipContent>{warning}</TooltipContent>
+		</Tooltip>
 	);
 }
 

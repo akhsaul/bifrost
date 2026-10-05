@@ -7,8 +7,9 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdownMenu";
 import { ProviderIconType, RenderProviderIcon } from "@/lib/constants/icons";
-import { ProviderLabels } from "@/lib/constants/logs";
-import { PlusIcon, Settings2Icon } from "lucide-react";
+import { ProviderLabels, ProviderWarnings } from "@/lib/constants/logs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AlertTriangle, PlusIcon, Settings2Icon } from "lucide-react";
 
 export type ProviderOption = { name: string };
 
@@ -54,12 +55,25 @@ export function AddProviderDropdown({
 				className="custom-scrollbar max-h-[min(70vh,24rem)] min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto"
 				data-testid="add-provider-dropdown"
 			>
-				{availableKnown.map((p) => (
-					<DropdownMenuItem key={p.name} data-testid={`add-provider-option-${p.name}`} onSelect={() => onSelectKnownProvider(p.name)}>
-						<RenderProviderIcon provider={p.name as ProviderIconType} size="sm" className="h-4 w-4" />
-						<span>{ProviderLabels[p.name as keyof typeof ProviderLabels] ?? p.name}</span>
-					</DropdownMenuItem>
-				))}
+				{availableKnown.map((p) => {
+					const warning = ProviderWarnings[p.name.toLowerCase().trim() as keyof typeof ProviderWarnings];
+					return (
+						<DropdownMenuItem key={p.name} data-testid={`add-provider-option-${p.name}`} onSelect={() => onSelectKnownProvider(p.name)}>
+							<RenderProviderIcon provider={p.name as ProviderIconType} size="sm" className="h-4 w-4" />
+							<span>{ProviderLabels[p.name as keyof typeof ProviderLabels] ?? p.name}</span>
+							{warning && (
+								<TooltipProvider>
+									<Tooltip>
+										<TooltipTrigger asChild onClick={(e) => e.stopPropagation()}>
+											<AlertTriangle data-testid={`provider-warning-${p.name}`} className="ml-auto h-3 w-3 shrink-0 text-amber-500" />
+										</TooltipTrigger>
+										<TooltipContent>{warning}</TooltipContent>
+									</Tooltip>
+								</TooltipProvider>
+							)}
+						</DropdownMenuItem>
+					);
+				})}
 				{hasKnown && <DropdownMenuSeparator />}
 				{/* Add New Provider > Custom provider... — used by E2E (add-provider-option-custom) */}
 				<DropdownMenuItem data-testid="add-provider-option-custom" onSelect={onAddCustomProvider}>

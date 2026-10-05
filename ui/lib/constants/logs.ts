@@ -2,9 +2,9 @@
 // Kept alphabetically sorted: the Add-provider dropdown renders this order
 // (pinned by logs.test.ts "dropdown-facing provider list is alphabetical").
 export const KnownProvidersNames = [
-	"aisure",
 	"anthropic",
 	"antigravity",
+	"apmix",
 	"azure",
 	"bai",
 	"bedrock",
@@ -14,16 +14,13 @@ export const KnownProvidersNames = [
 	"cerebras",
 	"cline",
 	"cohere",
-	"dahl",
 	"databricks",
 	"deepseek",
 	"elevenlabs",
 	"fireworks",
 	"gemini",
 	"github-copilot",
-	"gorouter",
 	"groq",
-	"hcnsec",
 	"huggingface",
 	"inferx",
 	"longcat",
@@ -45,9 +42,7 @@ export const KnownProvidersNames = [
 	"runware",
 	"runway",
 	"sarvam",
-	"seekai",
 	"sgl",
-	"tokenfaucet",
 	"tokenharbor",
 	"tokenrouter",
 	"typesafe",
@@ -206,15 +201,10 @@ export const ProviderLabels: Record<ProviderName, string> = {
 	poolside: "Poolside",
 	longcat: "Longcat",
 	inferx: "Inferx",
-	dahl: "Dahl",
 	morphllm: "Morphllm",
 	tokenharbor: "TokenHarbor",
-	aisure: "AISure",
-	tokenfaucet: "TokenFaucet",
-	seekai: "SeekAI",
-	gorouter: "GoRouter",
+	apmix: "Apmix",
 	vyceai: "VyceAI",
-	hcnsec: "HCNSEC",
 	neuralwatt: "Neuralwatt",
 	bai: "B.ai",
 	antigravity: "Antigravity",
@@ -229,6 +219,13 @@ export const getProviderLabel = (provider: string): string => {
 
 	// For custom providers, return the original provider name as is
 	return provider;
+};
+
+// Providers with a trust warning surfaced in the UI (sidebar row + Add
+// Provider dropdown) as an amber hint with tooltip.
+export const ProviderWarnings: Partial<Record<ProviderName, string>> = {
+	tokenharbor: "warn: maybe using fake AI model",
+	vyceai: "warn: maybe using fake AI model",
 };
 
 // ClientApp is the display info for a client application resolved from a raw

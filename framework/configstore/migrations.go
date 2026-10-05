@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"slices"
@@ -501,6 +502,8 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_content_logging_on_error_column"}, run: migrationAddContentLoggingOnErrorColumn},
 	{IDs: []string{"add_cline_key_config_columns"}, run: migrationAddClineKeyConfigColumns},
 	{IDs: []string{"cleanup_antigravity_oauth_keys"}, run: migrationCleanupAntigravityOAuthKeys},
+	{IDs: []string{"drop_removed_providers"}, run: migrationDropRemovedProviders},
+	{IDs: []string{"add_modal_key_config_columns"}, run: migrationAddModalKeyConfigColumns},
 }
 
 // videoResolutionPricingColumns are the resolution-banded video output rate columns.
@@ -13977,6 +13980,93 @@ func migrationCleanupAntigravityOAuthKeys(ctx context.Context, db *gorm.DB, logg
 		},
 		Rollback: func(*gorm.DB) error {
 			return fmt.Errorf("cleanup_antigravity_oauth_keys is non-rollbackable: access tokens and duplicate values were removed by design and are reconstituted dynamically at runtime")
+		},
+	}})
+
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error running %s migration: %w", migrationName, err)
+	}
+	return nil
+}
+
+var removedProviderNames = []string{"seekai", "dahl", "hcnsec", "tokenfaucet", "gorouter", "aisure"}
+
+// migrationDropRemovedProviders deletes provider rows (and their keys via
+// CASCADE) for providers removed from the codebase: seekai (fake model route),
+// dahl and hcnsec (fake model route), tokenfaucet and gorouter (shutdown), and
+// aisure (web-chat backend that cannot accept tools). Without this, boot fails
+// with "unsupported provider". The providers are dropped with a warning log,
+// never converted: their upstreams are gone or untrustworthy, so keeping
+// traffic flowing to them would be worse than dropping them.
+func migrationDropRemovedProviders(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "drop_removed_providers"
+	logger.Info("[configstore] starting migration %s", migrationName)
+	defer logger.Info("[configstore] finished migration %s", migrationName)
+
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: migrationName,
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			for _, name := range removedProviderNames {
+				var provider tables.TableProvider
+				if err := tx.Where("name = ?", name).First(&provider).Error; err != nil {
+					if errors.Is(err, gorm.ErrRecordNotFound) {
+						continue
+					}
+					return fmt.Errorf("failed to look up removed provider %s: %w", name, err)
+				}
+				logger.Warn("[configstore] %s: dropping removed provider %q and its keys", migrationName, name)
+				if err := tx.Where("provider_id = ?", provider.ID).Delete(&tables.TableKey{}).Error; err != nil {
+					return fmt.Errorf("failed to delete keys for removed provider %s: %w", name, err)
+				}
+				if err := tx.Delete(&provider).Error; err != nil {
+					return fmt.Errorf("failed to delete removed provider %s: %w", name, err)
+				}
+			}
+			return nil
+		},
+		Rollback: func(*gorm.DB) error {
+			return fmt.Errorf("drop_removed_providers is non-rollbackable: dropped provider rows and keys cannot be reconstructed")
+		},
+	}})
+
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error running %s migration: %w", migrationName, err)
+	}
+	return nil
+}
+
+// modalKeyConfigColumns are the Modal per-deployment credential columns on the key table.
+var modalKeyConfigColumns = []string{
+	"modal_model",
+	"modal_endpoint_model",
+	"modal_username",
+	"modal_region",
+}
+
+// migrationAddModalKeyConfigColumns adds the Modal per-deployment columns to
+// the key table. There is nothing to backfill: modal keys previously carried
+// no per-key config (the host came from network_config.base_url), so no
+// existing row can carry these values. Operators re-enter username/region and
+// the two model forms per key.
+func migrationAddModalKeyConfigColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "add_modal_key_config_columns"
+	logger.Info("[configstore] starting migration %s", migrationName)
+	defer logger.Info("[configstore] finished migration %s", migrationName)
+
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: migrationName,
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			for _, column := range modalKeyConfigColumns {
+				if err := addColumnIfNotExists(tx, logger, &tables.TableKey{}, column); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+		Rollback: func(*gorm.DB) error {
+			return fmt.Errorf("add_modal_key_config_columns is non-rollbackable: dropping the modal_* columns would permanently delete every stored deployment binding, which cannot be re-derived from the request history; the columns are additive and older binaries safely ignore them")
 		},
 	}})
 

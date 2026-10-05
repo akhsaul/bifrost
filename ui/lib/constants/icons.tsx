@@ -887,16 +887,6 @@ export const ProviderIcons = {
 			</svg>
 		);
 	},
-	dahl: ({ size = "md", className = "" }: IconProps) => {
-		const resolvedSize = resolveSize(size);
-		return (
-			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Dahl">
-				<title>Dahl</title>
-				<circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="3" />
-				<path d="M12 4v16" stroke="currentColor" strokeWidth="2" />
-			</svg>
-		);
-	},
 	morphllm: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
 		return (
@@ -916,44 +906,12 @@ export const ProviderIcons = {
 			</svg>
 		);
 	},
-	aisure: ({ size = "md", className = "" }: IconProps) => {
+	apmix: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
 		return (
-			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="AISure">
-				<title>AISure</title>
-				<path d="M12 4l8 16H4L12 4z" stroke="currentColor" strokeWidth="2" />
-				<path d="M12 10v5M12 18v.1" stroke="currentColor" strokeWidth="2" />
-			</svg>
-		);
-	},
-	tokenfaucet: ({ size = "md", className = "" }: IconProps) => {
-		const resolvedSize = resolveSize(size);
-		return (
-			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="TokenFaucet">
-				<title>TokenFaucet</title>
-				<path d="M7 4h10v4H7zM9 8h6v12H9z" fill="currentColor" />
-				<path d="M5 12h14" stroke="currentColor" strokeWidth="2" />
-			</svg>
-		);
-	},
-	seekai: ({ size = "md", className = "" }: IconProps) => {
-		const resolvedSize = resolveSize(size);
-		return (
-			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="SeekAI">
-				<title>SeekAI</title>
-				<circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-				<path d="M16 16l4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-				<path d="M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-			</svg>
-		);
-	},
-	gorouter: ({ size = "md", className = "" }: IconProps) => {
-		const resolvedSize = resolveSize(size);
-		return (
-			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="GoRouter">
-				<title>GoRouter</title>
-				<circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
-				<path d="M8 12h8M12 8l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Apmix">
+				<title>Apmix</title>
+				<path d="M4 5h16v5H4zM4 14h7v5H4zM14 14h6v5h-6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
 			</svg>
 		);
 	},
@@ -964,16 +922,6 @@ export const ProviderIcons = {
 				<title>VyceAI</title>
 				<path d="M4 6l8 12 8-12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
 				<circle cx="12" cy="10" r="2" fill="currentColor" />
-			</svg>
-		);
-	},
-	hcnsec: ({ size = "md", className = "" }: IconProps) => {
-		const resolvedSize = resolveSize(size);
-		return (
-			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="HCNSEC">
-				<title>HCNSEC</title>
-				<path d="M12 3l7 4v6c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V7l7-4z" stroke="currentColor" strokeWidth="2" />
-				<path d="M9 12h6M12 9v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
 			</svg>
 		);
 	},

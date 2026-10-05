@@ -671,6 +671,26 @@ func (h *ProviderHandler) mergeUpdatedKey(oldRawKey, updateKey schemas.Key) (sch
 			}
 		}
 	}
+	if mergedKey.ModalKeyConfig != nil {
+		var oldUsername, oldRegion *schemas.SecretVar
+		if oldRawKey.ModalKeyConfig != nil {
+			oldUsername = &oldRawKey.ModalKeyConfig.Username
+			oldRegion = oldRawKey.ModalKeyConfig.Region
+		}
+		for _, field := range []struct {
+			name    string
+			updated *schemas.SecretVar
+			stored  *schemas.SecretVar
+		}{
+			{"username", &mergedKey.ModalKeyConfig.Username, oldUsername},
+			{"region", modalRegionOrNil(mergedKey.ModalKeyConfig), oldRegion},
+		} {
+			if err := preserve(field.updated, field.stored, "modal_key_config."+field.name); err != nil {
+
+				return schemas.Key{}, err
+			}
+		}
+	}
 
 	mergedKey.ConfigHash = oldRawKey.ConfigHash
 	mergedKey.Status = oldRawKey.Status
@@ -767,6 +787,16 @@ func clineFieldOrNil(config *schemas.ClineKeyConfig, pick func(*schemas.ClineKey
 		return nil
 	}
 	return pick(config)
+}
+
+// modalRegionOrNil returns a settable pointer to a Modal key config's region,
+// allocating it when the incoming update left it nil so masked-preview
+// preservation has an address to write back to.
+func modalRegionOrNil(config *schemas.ModalKeyConfig) *schemas.SecretVar {
+	if config.Region == nil {
+		config.Region = &schemas.SecretVar{}
+	}
+	return config.Region
 }
 
 func getKeyIDFromCtx(ctx *fasthttp.RequestCtx) (string, error) {
@@ -897,6 +927,37 @@ func validateProviderKeyURL(provider schemas.ModelProvider, key schemas.Key) err
 		}
 		if !key.ClineKeyConfig.RefreshToken.IsSet() {
 			return fmt.Errorf("cline_key_config.refresh_token is required for Cline keys")
+		}
+	case schemas.Modal:
+		// Each Modal key targets exactly one deployment. Model is the identifier
+		// sent in the request body (it may differ from the host segment), so it
+		// is also pinned here alongside modal_key_config.model: the generic key
+		// selection filter only routes requests whose model is in Models, and a
+		// wildcard or empty list would route any model to a single-model host.
+		if key.ModalKeyConfig == nil {
+			return fmt.Errorf("modal_key_config is required for Modal keys")
+		}
+		if strings.TrimSpace(key.ModalKeyConfig.Model) == "" {
+			return fmt.Errorf("modal_key_config.model is required for Modal keys")
+		}
+		if strings.TrimSpace(key.ModalKeyConfig.EndpointModel) == "" {
+			return fmt.Errorf("modal_key_config.endpoint_model is required for Modal keys")
+		}
+		if !key.ModalKeyConfig.Username.IsSet() {
+			return fmt.Errorf("modal_key_config.username is required for Modal keys")
+		}
+		if len(key.Models) != 1 || key.Models.IsUnrestricted() || key.Models.IsEmpty() {
+			return fmt.Errorf("modal keys must list exactly one model in models, matching modal_key_config.model")
+		}
+		matched := false
+		for _, m := range key.Models {
+			if strings.EqualFold(strings.TrimSpace(m), strings.TrimSpace(key.ModalKeyConfig.Model)) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return fmt.Errorf("modal keys must list exactly one model in models, matching modal_key_config.model")
 		}
 	}
 	return nil

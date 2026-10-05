@@ -152,6 +152,7 @@ type Key struct {
 	DatabricksKeyConfig    *DatabricksKeyConfig    `json:"databricks_key_config,omitempty"`     // Databricks-specific key configuration
 	GithubCopilotKeyConfig *GithubCopilotKeyConfig `json:"github_copilot_key_config,omitempty"` // GitHub Copilot-specific key configuration
 	ClineKeyConfig         *ClineKeyConfig         `json:"cline_key_config,omitempty"`          // Cline-specific key configuration (OAuth refresh token)
+	ModalKeyConfig         *ModalKeyConfig         `json:"modal_key_config,omitempty"`          // Modal-specific key configuration (per-deployment username/region/model)
 	Enabled                *bool                   `json:"enabled,omitempty"`                   // Whether the key is active (default:true)
 	UseForBatchAPI         *bool                   `json:"use_for_batch_api,omitempty"`         // Whether this key can be used for batch API operations (default:false for new keys, migrated keys default to true)
 	UseAnthropicEndpoints  *bool                   `json:"use_anthropic_endpoints,omitempty"`   // Whether to use anthropic endpoints for this key
@@ -913,6 +914,24 @@ type GithubCopilotKeyConfig struct {
 type ClineKeyConfig struct {
 	ClientID     SecretVar `json:"client_id,omitempty"`     // WorkOS client ID. Empty means the built-in Cline VSCode client ID.
 	RefreshToken SecretVar `json:"refresh_token,omitempty"` // OAuth refresh token from the device flow (required in OAuth mode)
+}
+
+// ModalKeyConfig holds the per-deployment material for a Modal serverless endpoint.
+//
+// Each Modal deployment serves exactly one model on its own host:
+// <username>--ep-<endpoint_model>-server.<region>.modal.direct
+// The same proxy credential (Key.Value, "$id.$secret") may be reused across
+// multiple keys, but each key entry (unique Key.Name) targets exactly one
+// deployment. No transformation is applied: model is the identifier sent in
+// the request body (e.g. "deepseek-ai/DeepSeek-V4.1-Flash") while
+// endpoint_model is the host segment baked into the deployment name
+// (e.g. "deepseek-v4-1-flash"). They may differ and are never derived from
+// each other.
+type ModalKeyConfig struct {
+	Model         string     `json:"model"`            // Body/advertised model identifier sent to the endpoint (required)
+	EndpointModel string     `json:"endpoint_model"`   // Host segment of the deployment name (required, used verbatim in the URL)
+	Username      SecretVar  `json:"username"`         // Modal workspace username/namespace owning the deployment (required)
+	Region        *SecretVar `json:"region,omitempty"` // Modal region (defaults to "us-west" when empty)
 }
 
 // Account defines the interface for managing provider accounts and their configurations.

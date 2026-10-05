@@ -127,6 +127,12 @@ type TableKey struct {
 	ClineClientID     *schemas.SecretVar `gorm:"type:text" json:"cline_client_id,omitempty"`
 	ClineRefreshToken *schemas.SecretVar `gorm:"type:text" json:"cline_refresh_token,omitempty"`
 
+	// Modal config fields (embedded)
+	ModalModel         *string            `gorm:"type:varchar(255)" json:"modal_model,omitempty"`
+	ModalEndpointModel *string            `gorm:"type:varchar(255)" json:"modal_endpoint_model,omitempty"`
+	ModalUsername      *schemas.SecretVar `gorm:"type:text" json:"modal_username,omitempty"`
+	ModalRegion        *schemas.SecretVar `gorm:"type:text" json:"modal_region,omitempty"`
+
 	// Virtual fields for runtime use (not stored in DB)
 	Models                 schemas.WhiteList               `gorm:"-" json:"models"` // ["*"] allows all models; empty denies all (deny-by-default)
 	BlacklistedModels      schemas.BlackList               `gorm:"-" json:"blacklisted_models"`
@@ -143,6 +149,7 @@ type TableKey struct {
 	DatabricksKeyConfig    *schemas.DatabricksKeyConfig    `gorm:"-" json:"databricks_key_config,omitempty"`
 	GithubCopilotKeyConfig *schemas.GithubCopilotKeyConfig `gorm:"-" json:"github_copilot_key_config,omitempty"`
 	ClineKeyConfig         *schemas.ClineKeyConfig         `gorm:"-" json:"cline_key_config,omitempty"`
+	ModalKeyConfig         *schemas.ModalKeyConfig         `gorm:"-" json:"modal_key_config,omitempty"`
 }
 
 // TableName sets the table name for each model
@@ -624,6 +631,40 @@ func (k *TableKey) BeforeSave(tx *gorm.DB) error {
 		k.ClineClientID = nil
 		k.ClineRefreshToken = nil
 	}
+	// Modal. Model and endpoint_model are plain strings (identifiers, not
+	// secrets); username/region are SecretVars and value-copied per the
+	// invariant above.
+	if k.ModalKeyConfig != nil {
+		if strings.TrimSpace(k.ModalKeyConfig.Model) != "" {
+			m := k.ModalKeyConfig.Model
+			k.ModalModel = &m
+		} else {
+			k.ModalModel = nil
+		}
+		if strings.TrimSpace(k.ModalKeyConfig.EndpointModel) != "" {
+			em := k.ModalKeyConfig.EndpointModel
+			k.ModalEndpointModel = &em
+		} else {
+			k.ModalEndpointModel = nil
+		}
+		if k.ModalKeyConfig.Username.IsSet() {
+			u := k.ModalKeyConfig.Username
+			k.ModalUsername = &u
+		} else {
+			k.ModalUsername = nil
+		}
+		if k.ModalKeyConfig.Region != nil && k.ModalKeyConfig.Region.IsSet() {
+			r := *k.ModalKeyConfig.Region
+			k.ModalRegion = &r
+		} else {
+			k.ModalRegion = nil
+		}
+	} else {
+		k.ModalModel = nil
+		k.ModalEndpointModel = nil
+		k.ModalUsername = nil
+		k.ModalRegion = nil
+	}
 
 	// Store plaintext SecretVar columns into the vault and rewrite them to vault refs.
 	// This must run after the columns are populated (above) and before encryption (below):
@@ -794,6 +835,14 @@ func (k *TableKey) BeforeSave(tx *gorm.DB) error {
 		if err := encryptSecretVarPtr(&k.ClineRefreshToken); err != nil {
 			return fmt.Errorf("failed to encrypt cline refresh token: %w", err)
 		}
+		// Modal. Username/region are proxy credentials; model/endpoint_model are
+		// plain identifiers and need no encryption.
+		if err := encryptSecretVarPtr(&k.ModalUsername); err != nil {
+			return fmt.Errorf("failed to encrypt modal username: %w", err)
+		}
+		if err := encryptSecretVarPtr(&k.ModalRegion); err != nil {
+			return fmt.Errorf("failed to encrypt modal region: %w", err)
+		}
 		k.EncryptionStatus = EncryptionStatusEncrypted
 	}
 	return nil
@@ -958,6 +1007,13 @@ func (k *TableKey) AfterFind(tx *gorm.DB) error {
 		}
 		if err := decryptSecretVarPtr(&k.ClineRefreshToken); err != nil {
 			return fmt.Errorf("failed to decrypt cline refresh token: %w", err)
+		}
+		// Modal
+		if err := decryptSecretVarPtr(&k.ModalUsername); err != nil {
+			return fmt.Errorf("failed to decrypt modal username: %w", err)
+		}
+		if err := decryptSecretVarPtr(&k.ModalRegion); err != nil {
+			return fmt.Errorf("failed to decrypt modal region: %w", err)
 		}
 	}
 
@@ -1250,6 +1306,25 @@ func (k *TableKey) AfterFind(tx *gorm.DB) error {
 		k.ClineKeyConfig = config
 	} else {
 		k.ClineKeyConfig = nil
+	}
+	// Reconstruct Modal config if any field is present
+	if k.ModalModel != nil || k.ModalEndpointModel != nil || k.ModalUsername != nil || k.ModalRegion != nil {
+		config := &schemas.ModalKeyConfig{}
+		if k.ModalModel != nil {
+			config.Model = *k.ModalModel
+		}
+		if k.ModalEndpointModel != nil {
+			config.EndpointModel = *k.ModalEndpointModel
+		}
+		if k.ModalUsername != nil {
+			config.Username = *k.ModalUsername
+		}
+		if k.ModalRegion != nil {
+			config.Region = k.ModalRegion
+		}
+		k.ModalKeyConfig = config
+	} else {
+		k.ModalKeyConfig = nil
 	}
 	return nil
 }

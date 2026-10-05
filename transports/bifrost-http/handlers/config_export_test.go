@@ -150,12 +150,12 @@ func TestExportConfig_CustomProviderAllowedRequestsDefaults(t *testing.T) {
 			},
 		},
 		Providers: map[schemas.ModelProvider]configstore.ProviderConfig{
-			schemas.TokenFaucet: {
+			schemas.Apmix: {
 				Keys: []schemas.Key{
 					{
 						ID:     "key-tf-1",
-						Name:   "tokenfaucet-primary",
-						Value:  *schemas.NewSecretVar("env.TOKENFAUCET_API_KEY"),
+						Name:   "apmix-primary",
+						Value:  *schemas.NewSecretVar("env.APMIX_API_KEY"),
 						Weight: 1,
 					},
 				},
@@ -189,13 +189,13 @@ func TestExportConfig_CustomProviderAllowedRequestsDefaults(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected providers object, got %T", result["providers"])
 	}
-	tokenfaucet, ok := providers["tokenfaucet"].(map[string]any)
+	apmix, ok := providers["apmix"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected tokenfaucet provider object, got %T", providers["tokenfaucet"])
+		t.Fatalf("expected apmix provider object, got %T", providers["apmix"])
 	}
-	cpc, ok := tokenfaucet["custom_provider_config"].(map[string]any)
+	cpc, ok := apmix["custom_provider_config"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected custom_provider_config object, got %T", tokenfaucet["custom_provider_config"])
+		t.Fatalf("expected custom_provider_config object, got %T", apmix["custom_provider_config"])
 	}
 	if cpc["base_provider_type"] != "openai" {
 		t.Errorf("expected base_provider_type openai, got %v", cpc["base_provider_type"])

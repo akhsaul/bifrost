@@ -283,6 +283,41 @@ func validateKey(providerKey schemas.ModelProvider, key *schemas.Key) error {
 		if key.ClineKeyConfig == nil || strings.TrimSpace(key.ClineKeyConfig.RefreshToken.GetValue()) == "" {
 			return fmt.Errorf("cline_key_config.refresh_token is required when value is not set")
 		}
+	case schemas.Modal:
+		// Each Modal key targets exactly one deployment: model is the identifier
+		// sent in the request body, endpoint_model is the host segment baked into
+		// the deployment name, username owns the deployment, region defaults to
+		// "us-west" when empty. The proxy credential (key value) may be shared
+		// across keys, but each key entry serves exactly one model.
+		if key.ModalKeyConfig == nil {
+			return fmt.Errorf("modal_key_config is required")
+		}
+		if strings.TrimSpace(key.ModalKeyConfig.Model) == "" {
+			return fmt.Errorf("modal_key_config.model is required")
+		}
+		if strings.TrimSpace(key.ModalKeyConfig.EndpointModel) == "" {
+			return fmt.Errorf("modal_key_config.endpoint_model is required")
+		}
+		if strings.TrimSpace(key.ModalKeyConfig.Username.GetValue()) == "" {
+			return fmt.Errorf("modal_key_config.username is required")
+		}
+		// Key.Models must pin exactly this key's model so the generic key
+		// selection filter (bifrost.go) only routes matching requests here.
+		// Wildcards and empty lists are rejected for modal: with one model per
+		// deployment there is no valid "serve anything" key.
+		if len(key.Models) != 1 || key.Models.IsUnrestricted() || key.Models.IsEmpty() {
+			return fmt.Errorf("modal keys must list exactly one model in models, matching modal_key_config.model")
+		}
+		matched := false
+		for _, m := range key.Models {
+			if strings.EqualFold(m, key.ModalKeyConfig.Model) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return fmt.Errorf("modal keys must list exactly one model in models, matching modal_key_config.model")
+		}
 	case schemas.Antigravity:
 		// Two auth modes, either is sufficient: a manual credential in value (refresh token,
 		// ya29. access token, or JSON), or an OAuth refresh token in antigravity_key_config.

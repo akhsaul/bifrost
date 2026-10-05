@@ -20,9 +20,9 @@ import (
 	"github.com/maximhq/bifrost/core/mcp"
 	"github.com/maximhq/bifrost/core/mcp/codemode/starlark"
 	"github.com/maximhq/bifrost/core/mcp/credstore"
-	"github.com/maximhq/bifrost/core/providers/aisure"
 	"github.com/maximhq/bifrost/core/providers/anthropic"
 	"github.com/maximhq/bifrost/core/providers/antigravity"
+	"github.com/maximhq/bifrost/core/providers/apmix"
 	"github.com/maximhq/bifrost/core/providers/azure"
 	"github.com/maximhq/bifrost/core/providers/bai"
 	"github.com/maximhq/bifrost/core/providers/bedrock"
@@ -32,16 +32,13 @@ import (
 	"github.com/maximhq/bifrost/core/providers/cerebras"
 	"github.com/maximhq/bifrost/core/providers/cline"
 	"github.com/maximhq/bifrost/core/providers/cohere"
-	"github.com/maximhq/bifrost/core/providers/dahl"
 	"github.com/maximhq/bifrost/core/providers/databricks"
 	"github.com/maximhq/bifrost/core/providers/deepseek"
 	"github.com/maximhq/bifrost/core/providers/elevenlabs"
 	"github.com/maximhq/bifrost/core/providers/fireworks"
 	"github.com/maximhq/bifrost/core/providers/gemini"
 	"github.com/maximhq/bifrost/core/providers/githubcopilot"
-	"github.com/maximhq/bifrost/core/providers/gorouter"
 	"github.com/maximhq/bifrost/core/providers/groq"
-	"github.com/maximhq/bifrost/core/providers/hcnsec"
 	"github.com/maximhq/bifrost/core/providers/huggingface"
 	"github.com/maximhq/bifrost/core/providers/inferx"
 	"github.com/maximhq/bifrost/core/providers/longcat"
@@ -63,9 +60,7 @@ import (
 	"github.com/maximhq/bifrost/core/providers/runware"
 	"github.com/maximhq/bifrost/core/providers/runway"
 	"github.com/maximhq/bifrost/core/providers/sarvam"
-	"github.com/maximhq/bifrost/core/providers/seekai"
 	"github.com/maximhq/bifrost/core/providers/sgl"
-	"github.com/maximhq/bifrost/core/providers/tokenfaucet"
 	"github.com/maximhq/bifrost/core/providers/tokenharbor"
 	"github.com/maximhq/bifrost/core/providers/tokenrouter"
 	"github.com/maximhq/bifrost/core/providers/typesafe"
@@ -4635,24 +4630,14 @@ func (bifrost *Bifrost) createBaseProvider(providerKey schemas.ModelProvider, co
 		return longcat.NewLongcatProvider(config, bifrost.logger)
 	case schemas.Inferx:
 		return inferx.NewInferxProvider(config, bifrost.logger)
-	case schemas.Dahl:
-		return dahl.NewDahlProvider(config, bifrost.logger)
 	case schemas.Morphllm:
 		return morphllm.NewMorphllmProvider(config, bifrost.logger)
 	case schemas.TokenHarbor:
 		return tokenharbor.NewTokenHarborProvider(config, bifrost.logger)
-	case schemas.AISure:
-		return aisure.NewAISureProvider(config, bifrost.logger)
-	case schemas.TokenFaucet:
-		return tokenfaucet.NewTokenFaucetProvider(config, bifrost.logger)
-	case schemas.SeekAI:
-		return seekai.NewSeekAIProvider(config, bifrost.logger)
-	case schemas.GoRouter:
-		return gorouter.NewGoRouterProvider(config, bifrost.logger)
+	case schemas.Apmix:
+		return apmix.NewApmixProvider(config, bifrost.logger)
 	case schemas.VyceAI:
 		return vyceai.NewVyceAIProvider(config, bifrost.logger)
-	case schemas.Hcnsec:
-		return hcnsec.NewHcnsecProvider(config, bifrost.logger)
 	case schemas.Neuralwatt:
 		return neuralwatt.NewNeuralwattProvider(config, bifrost.logger)
 	case schemas.Antigravity:
@@ -9454,6 +9439,25 @@ func (bifrost *Bifrost) getKeysForBatchAndFileOps(ctx *schemas.BifrostContext, p
 	return filteredKeys, nil
 }
 
+// isModalKeyPinned reports whether key was explicitly pinned for this request
+// (routing-rule pin, x-bf-api-key(-id) caller pin, or fallback pin), as opposed
+// to arriving via the general eligible pool.
+func isModalKeyPinned(ctx *schemas.BifrostContext, key schemas.Key) bool {
+	if ctx == nil {
+		return false
+	}
+	if pin, ok := ctx.Value(schemas.BifrostContextKeyRoutingPinnedAPIKeyID).(string); ok && strings.TrimSpace(pin) != "" && strings.TrimSpace(pin) == key.ID {
+		return true
+	}
+	if pin, ok := ctx.Value(schemas.BifrostContextKeyAPIKeyID).(string); ok && strings.TrimSpace(pin) != "" && strings.TrimSpace(pin) == key.ID {
+		return true
+	}
+	if pin, ok := ctx.Value(schemas.BifrostContextKeyAPIKeyName).(string); ok && strings.TrimSpace(pin) != "" && strings.EqualFold(strings.TrimSpace(pin), key.Name) {
+		return true
+	}
+	return false
+}
+
 // selectKeyFromProviderForModelWithPool returns the filtered pool of eligible keys for the given
 // provider/model, along with a canRotate flag indicating whether key rotation across retries is
 // permitted. Key selection (choosing which key to use) is deferred to executeRequestWithRetries
@@ -9546,6 +9550,19 @@ func (bifrost *Bifrost) selectKeyFromProviderForModelWithPool(ctx *schemas.Bifro
 			if baseProviderType == schemas.VLLM && key.VLLMKeyConfig != nil {
 				if key.VLLMKeyConfig.ModelName != "" {
 					modelSupported = modelSupported && (key.VLLMKeyConfig.ModelName == key.Aliases.Resolve(model))
+				}
+			}
+			// Modal binds each key to exactly one deployment (modal_key_config.model).
+			// A pinned key (routing-rule pin, x-bf-api-key(-id), or fallback pin)
+			// whose deployment does not serve the requested model is rejected with
+			// the key name, even when the generic allowlist would also exclude it —
+			// the pin names the cause, so the caller sees it instead of a generic
+			// pool error. Unpinned mismatched keys fall through to the normal
+			// allowlist filter below (their Models list holds exactly their
+			// deployment model, so they are skipped there).
+			if baseProviderType == schemas.Modal && key.ModalKeyConfig != nil && strings.TrimSpace(key.ModalKeyConfig.Model) != "" {
+				if !strings.EqualFold(strings.TrimSpace(model), strings.TrimSpace(key.ModalKeyConfig.Model)) && isModalKeyPinned(ctx, key) {
+					return nil, false, fmt.Errorf("can't use model `%s` for key `%s`", model, key.Name)
 				}
 			}
 			if modelSupported {

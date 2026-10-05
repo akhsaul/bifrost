@@ -165,6 +165,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 	const isDatabricks = effectiveProvider === "databricks";
 	const isGithubCopilot = effectiveProvider === "github-copilot";
 	const isCline = effectiveProvider === "cline";
+	const isModal = effectiveProvider === "modal";
 	// Reactive, so the App-credential labels stay truthful. Once a Copilot token is present
 	// those fields genuinely are optional, and a static "(Required)" would contradict the
 	// section note telling the operator they can leave them blank.
@@ -1547,6 +1548,88 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 								<FormDescription>Leave blank for the built-in Cline client.</FormDescription>
 								<FormControl>
 									<SecretVarInput data-testid="key-input-cline-client-id" placeholder="client_01K3A541FN8TA3EPPHTD2325AR" {...field} />
+								</FormControl>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+				</div>
+			)}
+			{isModal && (
+				<div className="space-y-4">
+					<Separator />
+					<div className="bg-muted/50 flex items-start gap-2 rounded-md border p-3">
+						<Info className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+						<p className="text-muted-foreground text-sm">
+							Each Modal key targets <strong>exactly one deployment</strong> (one model on its own host). <strong>Model</strong> is the
+							identifier sent in the request body (e.g. <code>deepseek-ai/DeepSeek-V4.1-Flash</code>); <strong>Endpoint model</strong> is
+							the host segment baked into the deployment name (e.g. <code>deepseek-v4-1-flash</code>) used verbatim in{" "}
+							<code>&lt;username&gt;--ep-&lt;endpoint_model&gt;-server.&lt;region&gt;.modal.direct</code>. They may differ — both are
+							stored as-is and never derived from each other. The same proxy credential value may be reused across keys with different
+							names. The key&apos;s <strong>models</strong> list must contain exactly this model.
+						</p>
+					</div>
+					<FormField
+						control={control}
+						name="key.modal_key_config.model"
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>Model (Required)</FormLabel>
+								<FormDescription>The model identifier sent in the request body.</FormDescription>
+								<FormControl>
+									<Input
+										data-testid="key-input-modal-model"
+										placeholder="deepseek-ai/DeepSeek-V4.1-Flash"
+										{...field}
+										value={typeof field.value === "string" ? field.value : ""}
+									/>
+								</FormControl>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+					<FormField
+						control={control}
+						name="key.modal_key_config.endpoint_model"
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>Endpoint Model (Required)</FormLabel>
+								<FormDescription>The host segment of the deployment name, used verbatim in the endpoint URL.</FormDescription>
+								<FormControl>
+									<Input
+										data-testid="key-input-modal-endpoint-model"
+										placeholder="deepseek-v4-1-flash"
+										{...field}
+										value={typeof field.value === "string" ? field.value : ""}
+									/>
+								</FormControl>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+					<FormField
+						control={control}
+						name="key.modal_key_config.username"
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>Username (Required)</FormLabel>
+								<FormDescription>Modal workspace username/namespace owning the deployment.</FormDescription>
+								<FormControl>
+									<SecretVarInput data-testid="key-input-modal-username" placeholder="your-modal-username or env.MODAL_USERNAME" {...field} />
+								</FormControl>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+					<FormField
+						control={control}
+						name="key.modal_key_config.region"
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>Region (Optional, defaults to us-west)</FormLabel>
+								<FormDescription>Modal region of the deployment. Leave blank for us-west.</FormDescription>
+								<FormControl>
+									<SecretVarInput data-testid="key-input-modal-region" placeholder="us-west or env.MODAL_REGION" {...field} />
 								</FormControl>
 								<FormMessage />
 							</FormItem>

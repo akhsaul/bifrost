@@ -1,19 +1,46 @@
 ---
 title: "Modal"
-description: "Configure Modal OpenAI-compatible endpoints"
+description: "Configure Modal serverless endpoints (one deployment per model)"
 ---
 
-Modal endpoints expose an OpenAI-compatible API. The default base URL is `https://api.us-west-2.modal.direct`; configure a deployment-specific `base_url` when required. Bifrost sends Bearer authentication and supports chat completions, model listing, SSE streaming, and Responses-to-Chat fallback.
+Each Modal deployment serves exactly one model on its own host:
+
+```
+https://<username>--ep-<endpoint_model>-server.<region>.modal.direct/v1/chat/completions
+```
+
+Modal deployments expose no `/v1/models` surface, so Bifrost never calls upstream for model listing: ListModels aggregates the configured model of every Modal key. Chat builds the host from the selected key's deployment binding and rejects a request whose model does not match the key with ``can't use model `<model>` for key `<key_name>` ``.
 
 ```json
 {
   "providers": {
     "modal": {
-      "network_config": { "base_url": "https://api.us-west-2.modal.direct" },
-      "keys": [{ "name": "modal", "value": "env.MODAL_TOKEN" }]
+      "keys": [
+        {
+          "name": "modal-deepseek",
+          "value": "env.MODAL_PROXY_TOKEN",
+          "models": ["deepseek-ai/DeepSeek-V4.1-Flash"],
+          "modal_key_config": {
+            "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+            "endpoint_model": "deepseek-v4-1-flash",
+            "username": "env.MODAL_USERNAME",
+            "region": "us-west"
+          }
+        }
+      ]
     }
   }
 }
 ```
 
-Use the model name exposed by the Modal endpoint. Unsupported upstream operations return an explicit unsupported-operation error.
+Field notes:
+
+- `model` is the identifier sent in the request body (e.g. `deepseek-ai/DeepSeek-V4.1-Flash`).
+- `endpoint_model` is the host segment baked into the deployment name (e.g. `deepseek-v4-1-flash`). Stored verbatim, never derived from `model` — the two forms may differ.
+- `username` is the Modal workspace username/namespace owning the deployment.
+- `region` defaults to `us-west` when empty.
+- `models` must list exactly the one `model` above (wildcards are rejected for Modal).
+- The same proxy credential (`$id.$secret` value) may be reused across keys with different names, one key per deployment.
+- Conversation stickiness: when the caller has a session id it is forwarded as the `Modal-Routing-Affinity-Key` header. Send it explicitly (`x-bf-eh-modal-routing-affinity-key: <conversation-id>`), or set `x-bf-session-id` — Bifrost's session stickiness resolves it into the context and the provider forwards it with that name. With no session id the header is omitted.
+
+Bifrost sends Bearer authentication and supports chat completions, SSE streaming, and Responses-to-Chat fallback. Unsupported upstream operations return an explicit unsupported-operation error.

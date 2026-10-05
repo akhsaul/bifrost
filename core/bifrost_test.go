@@ -1556,6 +1556,70 @@ func TestSelectKeyFromProviderForModel_VLLMAliasResolution(t *testing.T) {
 	})
 }
 
+func TestSelectKeyFromProviderForModel_ModalBinding(t *testing.T) {
+	account := NewMockAccount()
+	account.AddProvider(schemas.Modal, 5, 1000)
+	bifrost := &Bifrost{account: account, logger: NewDefaultLogger(schemas.LogLevelError)}
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+
+	modalKey := func(id, name, model, endpointModel string) schemas.Key {
+		return schemas.Key{
+			ID: id, Name: name, Value: *schemas.NewSecretVar("tok"), Weight: 1,
+			Models:         schemas.WhiteList{model},
+			ModalKeyConfig: &schemas.ModalKeyConfig{Model: model, EndpointModel: endpointModel, Username: *schemas.NewSecretVar("user")},
+		}
+	}
+
+	t.Run("matching key is selected", func(t *testing.T) {
+		account.SetKeysForProvider(schemas.Modal, []schemas.Key{
+			modalKey("m1", "modal-a", "deepseek-ai/DeepSeek-V4.1-Flash", "deepseek-v4-1-flash"),
+		})
+		pool, _, err := bifrost.selectKeyFromProviderForModelWithPool(ctx, schemas.ChatCompletionRequest, schemas.Modal, "deepseek-ai/DeepSeek-V4.1-Flash", schemas.Modal)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(pool) != 1 || pool[0].ID != "m1" {
+			t.Fatalf("expected pool=[m1], got %v", pool)
+		}
+	})
+
+	t.Run("mismatched deployment model is skipped without pin", func(t *testing.T) {
+		account.SetKeysForProvider(schemas.Modal, []schemas.Key{{
+			ID: "m1", Name: "modal-a", Value: *schemas.NewSecretVar("tok"), Weight: 1,
+			Models:         schemas.WhiteList{"other-model"},
+			ModalKeyConfig: &schemas.ModalKeyConfig{Model: "deepseek-ai/DeepSeek-V4.1-Flash", EndpointModel: "deepseek-v4-1-flash", Username: *schemas.NewSecretVar("user")},
+		}})
+		// Unpinned: the mismatched key is skipped, pool is empty.
+		_, _, err := bifrost.selectKeyFromProviderForModelWithPool(ctx, schemas.ChatCompletionRequest, schemas.Modal, "other-model", schemas.Modal)
+		if err == nil {
+			t.Fatal("expected error for unsupported model, got nil")
+		}
+		if !strings.Contains(err.Error(), "no keys found that support model") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("pinned mismatched key is rejected with key name", func(t *testing.T) {
+		account.SetKeysForProvider(schemas.Modal, []schemas.Key{{
+			ID: "m1", Name: "modal-a", Value: *schemas.NewSecretVar("tok"), Weight: 1,
+			Models:         schemas.WhiteList{"deepseek-ai/DeepSeek-V4.1-Flash"},
+			ModalKeyConfig: &schemas.ModalKeyConfig{Model: "deepseek-ai/DeepSeek-V4.1-Flash", EndpointModel: "deepseek-v4-1-flash", Username: *schemas.NewSecretVar("user")},
+		}})
+		pinned := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+		pinned.SetValue(schemas.BifrostContextKeyRoutingPinnedAPIKeyID, "m1")
+		// The pin forces key m1 into consideration for a model its deployment
+		// does not serve; the binding check rejects with the key name.
+		_, _, err := bifrost.selectKeyFromProviderForModelWithPool(pinned, schemas.ChatCompletionRequest, schemas.Modal, "other-model", schemas.Modal)
+		if err == nil {
+			t.Fatal("expected mismatch error, got nil")
+		}
+		want := "can't use model `other-model` for key `modal-a`"
+		if err.Error() != want {
+			t.Fatalf("error = %q, want %q", err.Error(), want)
+		}
+	})
+}
+
 // Test key rotation in executeRequestWithRetries on rate-limit errors
 func TestExecuteRequestWithRetries_KeyRotation(t *testing.T) {
 	config := createTestConfig(3, 0, 0)

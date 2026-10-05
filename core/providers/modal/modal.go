@@ -20,7 +20,6 @@ type Provider struct {
 	networkConfig       schemas.NetworkConfig // Network configuration including extra headers
 	sendBackRawRequest  bool                  // Whether to include raw request in BifrostResponse
 	sendBackRawResponse bool                  // Whether to include raw response in BifrostResponse
-	modelsPath          string
 	chatPath            string
 }
 
@@ -56,7 +55,6 @@ func NewModalProvider(config *schemas.ProviderConfig, logger schemas.Logger) (*P
 		networkConfig:       config.NetworkConfig,
 		sendBackRawRequest:  config.SendBackRawRequest,
 		sendBackRawResponse: config.SendBackRawResponse,
-		modelsPath:          "/v1/models",
 		chatPath:            "/v1/chat/completions",
 	}, nil
 }
@@ -66,19 +64,141 @@ func (provider *Provider) GetProviderKey() schemas.ModelProvider {
 	return schemas.Modal
 }
 
-// ListModels performs a list models request to Modal's API.
+// DefaultModalRegion is the Modal region used when a key's modal_key_config
+// leaves region empty.
+const DefaultModalRegion = "us-west"
+
+// resolveKeyDeployment validates a Modal key's deployment binding and returns
+// the request-independent parts of its host: username, region, and the request
+// model. The endpoint_model segment is stored verbatim on the key (it is the
+// host segment baked into the deployment name and may differ from the body
+// model), so no transformation is ever applied here.
+func resolveKeyDeployment(key schemas.Key, requestModel string) (username, region, endpointModel, keyModel string, bifrostErr *schemas.BifrostError) {
+	cfg := key.ModalKeyConfig
+	if cfg == nil {
+		return "", "", "", "", providerUtils.NewConfigurationError("modal_key_config is required")
+	}
+	keyModel = cfg.Model
+	if strings.TrimSpace(keyModel) == "" {
+		return "", "", "", "", providerUtils.NewConfigurationError("modal_key_config.model is required")
+	}
+	if !strings.EqualFold(strings.TrimSpace(requestModel), strings.TrimSpace(keyModel)) {
+		return "", "", "", "", providerUtils.NewConfigurationError(
+			"can't use model `" + requestModel + "` for key `" + key.Name + "`",
+		)
+	}
+	endpointModel = cfg.EndpointModel
+	if strings.TrimSpace(endpointModel) == "" {
+		return "", "", "", "", providerUtils.NewConfigurationError("modal_key_config.endpoint_model is required")
+	}
+	username = strings.TrimSpace(cfg.Username.GetValue())
+	if username == "" {
+		return "", "", "", "", providerUtils.NewConfigurationError("modal_key_config.username is required")
+	}
+	region = DefaultModalRegion
+	if cfg.Region != nil && strings.TrimSpace(cfg.Region.GetValue()) != "" {
+		region = strings.TrimSpace(cfg.Region.GetValue())
+	}
+	return username, region, strings.TrimSpace(endpointModel), strings.TrimSpace(keyModel), nil
+}
+
+// affinityHeaderName is the upstream header Modal uses for conversation
+// stickiness. It is sent only when the caller has a session id: either
+// explicitly via Modal-Routing-Affinity-Key (x-bf-eh-modal-routing-affinity-key),
+// or via Bifrost's session stickiness (x-bf-session-id).
+const affinityHeaderName = "Modal-Routing-Affinity-Key"
+
+// resolveAffinityKey returns the session id to send as Modal-Routing-Affinity-Key,
+// or "" when the caller has none. An explicit per-request header wins; otherwise
+// Bifrost's session id (x-bf-session-id, incl. harness fallbacks) applies.
+func resolveAffinityKey(ctx *schemas.BifrostContext, extraHeaders map[string]string) string {
+	if ctx != nil {
+		if ctxHeaders, ok := ctx.Value(schemas.BifrostContextKeyExtraHeaders).(map[string][]string); ok {
+			for k, vs := range ctxHeaders {
+				if strings.EqualFold(k, affinityHeaderName) && len(vs) > 0 && strings.TrimSpace(vs[0]) != "" {
+					return strings.TrimSpace(vs[0])
+				}
+			}
+		}
+		if sid, ok := ctx.Value(schemas.BifrostContextKeySessionID).(string); ok && strings.TrimSpace(sid) != "" {
+			return strings.TrimSpace(sid)
+		}
+	}
+	for k, v := range extraHeaders {
+		if strings.EqualFold(k, affinityHeaderName) && strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}
+
+// affinityHeaders returns the auth headers plus Modal-Routing-Affinity-Key when
+// the caller has a session id.
+func affinityHeaders(ctx *schemas.BifrostContext, key schemas.Key, extraHeaders map[string]string) map[string]string {
+	headers := openai.BearerAuthHeader(key)
+	if affinity := resolveAffinityKey(ctx, extraHeaders); affinity != "" {
+		headers[affinityHeaderName] = affinity
+	}
+	return headers
+}
+
+// deploymentBaseURL builds the per-deployment host for a Modal endpoint:
+// <username>--ep-<endpoint_model>-server.<region>.modal.direct
+// Segments are used verbatim from the key config; the caller is responsible
+// for storing DNS-safe values.
+func deploymentBaseURL(username, region, endpointModel string) string {
+	return "https://" + username + "--ep-" + endpointModel + "-server." + region + ".modal.direct"
+}
+
+// chatRequestURL resolves the chat completions URL for this attempt. The host
+// comes from the key's deployment binding; only the path suffix may be
+// overridden from context (a full absolute URL override is honored verbatim,
+// which unit tests use to point at a mock server).
+func (provider *Provider) chatRequestURL(ctx *schemas.BifrostContext, key schemas.Key, requestModel string) (string, *schemas.BifrostError) {
+	if pathInContext, ok := ctx.Value(schemas.BifrostContextKeyURLPath).(string); ok && strings.TrimSpace(pathInContext) != "" {
+		if path, isCompleteURL := providerUtils.GetRequestPath(ctx, provider.chatPath, nil, schemas.ChatCompletionRequest); isCompleteURL {
+			return path, nil
+		}
+	}
+	username, region, endpointModel, _, bifrostErr := resolveKeyDeployment(key, requestModel)
+	if bifrostErr != nil {
+		return "", bifrostErr
+	}
+	path := providerUtils.GetPathFromContext(ctx, provider.chatPath)
+	return deploymentBaseURL(username, region, endpointModel) + path, nil
+}
+
+// ChatCompletionURLForTest exposes chatRequestURL for unit tests.
+func (provider *Provider) ChatCompletionURLForTest(ctx *schemas.BifrostContext, key schemas.Key, requestModel string) (string, *schemas.BifrostError) {
+	return provider.chatRequestURL(ctx, key, requestModel)
+}
+
+// ListModels aggregates the configured model of every Modal key. Modal
+// deployments expose no /v1/models surface (each deployment serves exactly one
+// model on its own host), so this performs no upstream calls: one complete key
+// contributes one model. Keys missing modal_key_config or required fields are
+// skipped.
 func (provider *Provider) ListModels(ctx *schemas.BifrostContext, keys []schemas.Key, request *schemas.BifrostListModelsRequest) (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
-	return openai.HandleOpenAIListModelsRequest(
-		ctx,
-		provider.client,
-		request,
-		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, provider.modelsPath),
-		keys,
-		provider.networkConfig.ExtraHeaders,
-		provider.GetProviderKey(),
-		providerUtils.ShouldSendBackRawRequest(ctx, provider.sendBackRawRequest),
-		providerUtils.ShouldSendBackRawResponse(ctx, provider.sendBackRawResponse),
-	)
+	_ = ctx
+	seen := make(map[string]struct{}, len(keys))
+	models := make([]schemas.Model, 0, len(keys))
+	statuses := make([]schemas.KeyStatus, 0, len(keys))
+	for _, key := range keys {
+		cfg := key.ModalKeyConfig
+		if cfg == nil || strings.TrimSpace(cfg.Model) == "" || strings.TrimSpace(cfg.EndpointModel) == "" || strings.TrimSpace(cfg.Username.GetValue()) == "" {
+			continue
+		}
+		model := strings.TrimSpace(cfg.Model)
+		statuses = append(statuses, schemas.KeyStatus{KeyID: key.ID, Status: schemas.KeyStatusSuccess, Provider: provider.GetProviderKey()})
+		if _, ok := seen[strings.ToLower(model)]; ok {
+			continue
+		}
+		seen[strings.ToLower(model)] = struct{}{}
+		name := model
+		models = append(models, schemas.Model{ID: model, Name: &name})
+	}
+	response := &schemas.BifrostListModelsResponse{Data: models, KeyStatuses: statuses}
+	return response.ApplyPagination(request.PageSize, request.PageToken), nil
 }
 
 // TextCompletion is not supported by the Modal provider.
@@ -93,12 +213,16 @@ func (provider *Provider) TextCompletionStream(_ *schemas.BifrostContext, _ sche
 
 // ChatCompletion performs a chat completion request to the Modal API.
 func (provider *Provider) ChatCompletion(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostChatRequest) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
+	url, bifrostErr := provider.chatRequestURL(ctx, key, request.Model)
+	if bifrostErr != nil {
+		return nil, bifrostErr
+	}
 	return openai.HandleOpenAIChatCompletionRequest(
 		ctx,
 		provider.client,
-		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, provider.chatPath),
+		url,
 		request,
-		openai.BearerAuthHeader(key),
+		affinityHeaders(ctx, key, provider.networkConfig.ExtraHeaders),
 		provider.networkConfig.ExtraHeaders,
 		providerUtils.ShouldSendBackRawRequest(ctx, provider.sendBackRawRequest),
 		providerUtils.ShouldSendBackRawResponse(ctx, provider.sendBackRawResponse),
@@ -112,12 +236,16 @@ func (provider *Provider) ChatCompletion(ctx *schemas.BifrostContext, key schema
 
 // ChatCompletionStream performs a streaming chat completion request to the Modal API.
 func (provider *Provider) ChatCompletionStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostChatRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+	url, bifrostErr := provider.chatRequestURL(ctx, key, request.Model)
+	if bifrostErr != nil {
+		return nil, bifrostErr
+	}
 	return openai.HandleOpenAIChatCompletionStreaming(
 		ctx,
 		provider.streamingClient,
-		provider.networkConfig.BaseURL+providerUtils.GetPathFromContext(ctx, provider.chatPath),
+		url,
 		request,
-		openai.BearerAuthHeader(key),
+		affinityHeaders(ctx, key, provider.networkConfig.ExtraHeaders),
 		provider.networkConfig.ExtraHeaders,
 		provider.networkConfig.StreamIdleTimeoutInSeconds,
 		providerUtils.ShouldSendBackRawRequest(ctx, provider.sendBackRawRequest),
