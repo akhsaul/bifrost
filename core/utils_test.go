@@ -520,6 +520,7 @@ func TestCanProviderKeyValueBeEmpty(t *testing.T) {
 	assert.True(t, CanProviderKeyValueBeEmpty(schemas.Antigravity), "Antigravity should allow empty key value")
 	assert.True(t, CanProviderKeyValueBeEmpty(schemas.GithubCopilot), "GithubCopilot should allow empty key value")
 	assert.True(t, CanProviderKeyValueBeEmpty(schemas.Cline), "Cline should allow empty key value")
+	assert.True(t, CanProviderKeyValueBeEmpty(schemas.Zed), "Zed should allow empty key value (LLM token is minted from zed_key_config)")
 	assert.False(t, CanProviderKeyValueBeEmpty(schemas.OpenAI), "OpenAI requires key value")
 }
 
