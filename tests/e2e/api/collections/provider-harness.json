@@ -170628,6 +170628,395 @@
         }
       ]
     },
+      {
+        "name": "117. Zed provider (zed)",
+        "description": "Zed is a single-endpoint cloud gateway at cloud.zed.dev with four wire-visible deviations pinned here: (1) all chat/responses traffic goes to POST /completions inside a {thread_id, prompt_id, provider, model, provider_request} envelope where provider is Zed's own vocabulary (anthropic | google | open_ai), (2) Zed only streams NDJSON until stream_ended so unary calls accumulate, (3) inner families reuse native shapes (Anthropic Messages, Gemini generateContent, OpenAI Responses input[]), (4) list models serves the live /models catalog verbatim. Requires a zed key in the harness gateway config (ZED_USER_ID + ZED_ACCESS_TOKEN).",
+        "item": [
+          {
+            "name": "POST /v1/chat/completions - zed anthropic inner format - zed/claude-haiku-4-5",
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('zed chat succeeds', function () {",
+                    "  pm.expect(pm.response.code, 'failed: ' + pm.response.text()).to.be.below(400);",
+                    "});",
+                    "pm.test('zed anthropic model answers with content', function () {",
+                    "  var body = pm.response.json();",
+                    "  var content = body.choices && body.choices[0] && body.choices[0].message && body.choices[0].message.content;",
+                    "  pm.expect(content, 'missing content: ' + pm.response.text()).to.be.a('string');",
+                    "  pm.expect(content.length, 'empty content').to.be.above(0);",
+                    "});"
+                  ]
+                }
+              }
+            ],
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "url": {
+                "raw": "{{baseUrl}}/v1/chat/completions",
+                "host": [
+                  "{{baseUrl}}"
+                ],
+                "path": [
+                  "v1",
+                  "chat",
+                  "completions"
+                ]
+              },
+              "response": [],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"model\": \"zed/claude-haiku-4-5\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": \"Reply with exactly: zed-ok\" }\n  ]\n}"
+              }
+            }
+          },
+          {
+            "name": "POST /v1/chat/completions - zed open_ai inner format - zed/gpt-5-nano",
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('zed chat succeeds', function () {",
+                    "  pm.expect(pm.response.code, 'failed: ' + pm.response.text()).to.be.below(400);",
+                    "});",
+                    "pm.test('zed open_ai model answers with content', function () {",
+                    "  var body = pm.response.json();",
+                    "  var content = body.choices && body.choices[0] && body.choices[0].message && body.choices[0].message.content;",
+                    "  pm.expect(content, 'missing content: ' + pm.response.text()).to.be.a('string');",
+                    "  pm.expect(content.length, 'empty content').to.be.above(0);",
+                    "});"
+                  ]
+                }
+              }
+            ],
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "url": {
+                "raw": "{{baseUrl}}/v1/chat/completions",
+                "host": [
+                  "{{baseUrl}}"
+                ],
+                "path": [
+                  "v1",
+                  "chat",
+                  "completions"
+                ]
+              },
+              "response": [],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"model\": \"zed/gpt-5-nano\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": \"Reply with exactly: zed-ok\" }\n  ]\n}"
+              }
+            }
+          },
+          {
+            "name": "POST /v1/chat/completions - zed google inner format - zed/gemini-3.5-flash",
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('zed chat succeeds', function () {",
+                    "  pm.expect(pm.response.code, 'failed: ' + pm.response.text()).to.be.below(400);",
+                    "});",
+                    "pm.test('zed google model answers with content', function () {",
+                    "  var body = pm.response.json();",
+                    "  var content = body.choices && body.choices[0] && body.choices[0].message && body.choices[0].message.content;",
+                    "  pm.expect(content, 'missing content: ' + pm.response.text()).to.be.a('string');",
+                    "  pm.expect(content.length, 'empty content').to.be.above(0);",
+                    "});"
+                  ]
+                }
+              }
+            ],
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "url": {
+                "raw": "{{baseUrl}}/v1/chat/completions",
+                "host": [
+                  "{{baseUrl}}"
+                ],
+                "path": [
+                  "v1",
+                  "chat",
+                  "completions"
+                ]
+              },
+              "response": [],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"model\": \"zed/gemini-3.5-flash\",\n  \"messages\": [\n    { \"role\": \"user\", \"content\": \"Reply with exactly: zed-ok\" }\n  ]\n}"
+              }
+            }
+          },
+          {
+            "name": "POST /v1/chat/completions (stream) - zed NDJSON accumulated SSE - zed/gpt-5-nano",
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('zed stream succeeds', function () {",
+                    "  pm.expect(pm.response.code, 'failed: ' + pm.response.text()).to.be.below(400);",
+                    "});",
+                    "pm.test('zed stream uses SSE framing', function () {",
+                    "  var ct = pm.response.headers.get('content-type') || '';",
+                    "  pm.expect(ct, 'expected SSE, got ' + ct).to.include('text/event-stream');",
+                    "  var lines = (pm.response.text() || '').split('\\n');",
+                    "  var chunks = 0, sawDone = false;",
+                    "  lines.forEach(function (l) {",
+                    "    if (l.indexOf('data: ') !== 0) { return; }",
+                    "    chunks++;",
+                    "    if (l.slice(6).trim() === '[DONE]') { sawDone = true; }",
+                    "  });",
+                    "  pm.expect(chunks, 'expected SSE data chunks, got ' + chunks).to.be.above(1);",
+                    "  pm.expect(sawDone, 'expected an SSE [DONE] terminator').to.be.true;",
+                    "});"
+                  ]
+                }
+              }
+            ],
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "url": {
+                "raw": "{{baseUrl}}/v1/chat/completions",
+                "host": [
+                  "{{baseUrl}}"
+                ],
+                "path": [
+                  "v1",
+                  "chat",
+                  "completions"
+                ]
+              },
+              "response": [],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"model\": \"zed/gpt-5-nano\",\n  \"stream\": true,\n  \"messages\": [\n    { \"role\": \"user\", \"content\": \"Reply with exactly: zed-ok\" }\n  ]\n}"
+              }
+            }
+          },
+          {
+            "name": "POST /v1/responses - zed responses native open_ai - zed/gpt-5-nano",
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('zed responses succeeds', function () {",
+                    "  pm.expect(pm.response.code, 'failed: ' + pm.response.text()).to.be.below(400);",
+                    "});",
+                    "pm.test('zed responses output has text', function () {",
+                    "  var body = pm.response.json();",
+                    "  var output = body.output || [];",
+                    "  var text = '';",
+                    "  output.forEach(function (m) {",
+                    "    (m.content || []).forEach(function (b) { if (b.text) { text += b.text; } });",
+                    "  });",
+                    "  pm.expect(text.length, 'empty responses output: ' + pm.response.text()).to.be.above(0);",
+                    "});"
+                  ]
+                }
+              }
+            ],
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "url": {
+                "raw": "{{baseUrl}}/v1/responses",
+                "host": [
+                  "{{baseUrl}}"
+                ],
+                "path": [
+                  "v1",
+                  "responses"
+                ]
+              },
+              "response": [],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"model\": \"zed/gpt-5-nano\",\n  \"input\": [\n    { \"type\": \"message\", \"role\": \"user\", \"content\": [{ \"type\": \"input_text\", \"text\": \"Reply with exactly: zed-ok\" }] }\n  ]\n}"
+              }
+            }
+          },
+          {
+            "name": "POST /anthropic/v1/messages - zed via anthropic drop-in - zed/claude-haiku-4-5",
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('zed anthropic drop-in succeeds', function () {",
+                    "  pm.expect(pm.response.code, 'failed: ' + pm.response.text()).to.be.below(400);",
+                    "});",
+                    "pm.test('zed anthropic drop-in answers with text', function () {",
+                    "  var body = pm.response.json();",
+                    "  var blocks = (body.content || []).filter(function (b) { return b.type === 'text'; });",
+                    "  var text = blocks.map(function (b) { return b.text || ''; }).join('');",
+                    "  pm.expect(text.length, 'empty anthropic content: ' + pm.response.text()).to.be.above(0);",
+                    "});"
+                  ]
+                }
+              }
+            ],
+            "request": {
+              "method": "POST",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "anthropic-version",
+                  "value": "2023-06-01"
+                }
+              ],
+              "url": {
+                "raw": "{{baseUrl}}/anthropic/v1/messages",
+                "host": [
+                  "{{baseUrl}}"
+                ],
+                "path": [
+                  "anthropic",
+                  "v1",
+                  "messages"
+                ]
+              },
+              "response": [],
+              "body": {
+                "mode": "raw",
+                "raw": "{\n  \"model\": \"zed/claude-haiku-4-5\",\n  \"max_tokens\": 64,\n  \"messages\": [\n    { \"role\": \"user\", \"content\": \"Reply with exactly: zed-ok\" }\n  ]\n}"
+              }
+            }
+          },
+          {
+            "name": "GET /v1/models?provider=zed - catalog serves live zed models",
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('zed list models succeeds', function () {",
+                    "  pm.expect(pm.response.code, 'failed: ' + pm.response.text()).to.be.below(400);",
+                    "});",
+                    "pm.test('zed catalog carries known models', function () {",
+                    "  var data = pm.response.json().data || [];",
+                    "  var ids = data.map(function (m) { return m.id; });",
+                    "  pm.expect(ids.indexOf('claude-haiku-4-5') !== -1, 'missing claude-haiku-4-5: ' + pm.response.text()).to.be.true;",
+                    "  pm.expect(ids.indexOf('gpt-5-nano') !== -1, 'missing gpt-5-nano: ' + pm.response.text()).to.be.true;",
+                    "  pm.expect(ids.indexOf('gemini-3.5-flash') !== -1, 'missing gemini-3.5-flash: ' + pm.response.text()).to.be.true;",
+                    "});"
+                  ]
+                }
+              }
+            ],
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{baseUrl}}/v1/models?provider=zed",
+                "host": [
+                  "{{baseUrl}}"
+                ],
+                "path": [
+                  "v1",
+                  "models"
+                ],
+                "query": [
+                  {
+                    "key": "provider",
+                    "value": "zed"
+                  }
+                ]
+              },
+              "response": []
+            }
+          },
+          {
+            "name": "GET /v1/models?provider=zed - response carries per-key list_models statuses",
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "type": "text/javascript",
+                  "exec": [
+                    "pm.test('zed list models succeeds', function () {",
+                    "  pm.expect(pm.response.code, 'failed: ' + pm.response.text()).to.be.below(400);",
+                    "});",
+                    "pm.test('zed list models reports one status per key', function () {",
+                    "  var body = pm.response.json();",
+                    "  var statuses = body.key_statuses || [];",
+                    "  pm.expect(statuses.length, 'no key_statuses: ' + pm.response.text()).to.be.above(0);",
+                    "  var bad = statuses.filter(function (s) { return !s.key_id || (s.status !== 'success' && s.status !== 'list_models_failed'); });",
+                    "  pm.expect(bad, 'malformed statuses: ' + JSON.stringify(bad)).to.be.empty;",
+                    "});"
+                  ]
+                }
+              }
+            ],
+            "request": {
+              "method": "GET",
+              "header": [],
+              "url": {
+                "raw": "{{baseUrl}}/v1/models?provider=zed",
+                "host": [
+                  "{{baseUrl}}"
+                ],
+                "path": [
+                  "v1",
+                  "models"
+                ],
+                "query": [
+                  {
+                    "key": "provider",
+                    "value": "zed"
+                  }
+                ]
+              },
+              "response": []
+            }
+          }
+        ]
+      },
     {
       "name": "117. Opencode Zen Free per-model routing (opencode-zen-free)",
       "description": "opencode-zen-free routes each model to its required upstream endpoint: muse-spark-1.3-contributor-free to /v1/responses (OpenAI format), space-bunny-free to /v1/chat/completions (OpenAI format), qwen3.5-plus to /v1/messages (Anthropic format), Gemini-kind models to /v1/models/<model> (Google Generative Language format). Unary requests force stream:true upstream and accumulate the SSE stream. Regression: space-bunny-free sent to /v1/responses failed with \"Model space-bunny-free is not supported for format openai\". Each case pins the model on its correct endpoint and asserts the format error is absent.",

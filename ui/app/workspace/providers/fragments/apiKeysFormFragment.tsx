@@ -17,8 +17,11 @@ import {
 	useStartClineDeviceFlowMutation,
 	usePollClineDeviceAuthMutation,
 	type ClineDeviceChallenge,
+	useStartZedLoginFlowMutation,
+	usePollZedLoginAuthMutation,
+	type ZedLoginChallenge,
 } from "@/lib/store/apis/providersApi";
-import { hasAntigravityOAuthRefresh, hasClineApiToken, hasClineOAuthRefresh, hasCopilotApiToken, isRedacted } from "@/lib/utils/validation";
+import { hasAntigravityOAuthRefresh, hasClineApiToken, hasClineOAuthRefresh, hasCopilotApiToken, hasZedCredentials, isRedacted } from "@/lib/utils/validation";
 import { getErrorMessage } from "@/lib/store/apis/baseApi";
 import { CheckCircle2, Info, Loader2, RefreshCw, Copy, Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -165,6 +168,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 	const isDatabricks = effectiveProvider === "databricks";
 	const isGithubCopilot = effectiveProvider === "github-copilot";
 	const isCline = effectiveProvider === "cline";
+	const isZed = effectiveProvider === "zed";
 	const isModal = effectiveProvider === "modal";
 	// Reactive, so the App-credential labels stay truthful. Once a Copilot token is present
 	// those fields genuinely are optional, and a static "(Required)" would contradict the
@@ -220,6 +224,20 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 	const [clineCopied, setClineCopied] = useState<"url" | "code" | null>(null);
 	const clinePollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 	const clinePollActive = useRef(false);
+
+	// Zed browser login state. The backend holds an ephemeral loopback
+	// listener; the UI opens the signin tab, offers copy-URL, and polls every
+	// second until the redirect lands. Remote Bifrosts cannot receive the
+	// loopback redirect, so manual paste stays available below.
+	const [startZedLoginFlow, { isLoading: isStartingZedFlow }] = useStartZedLoginFlowMutation();
+	const [pollZedLoginAuth] = usePollZedLoginAuthMutation();
+	const [zedChallenge, setZedChallenge] = useState<ZedLoginChallenge | null>(null);
+	const [zedPolling, setZedPolling] = useState(false);
+	const [zedError, setZedError] = useState<string | null>(null);
+	const [zedExpiresLeft, setZedExpiresLeft] = useState(0);
+	const [zedCopied, setZedCopied] = useState(false);
+	const zedPollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+	const zedPollActive = useRef(false);
 
 	// Detect Antigravity auth type
 	useEffect(() => {
@@ -326,6 +344,8 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 		return () => {
 			clinePollActive.current = false;
 			if (clinePollTimer.current) clearInterval(clinePollTimer.current);
+			zedPollActive.current = false;
+			if (zedPollTimer.current) clearInterval(zedPollTimer.current);
 		};
 	}, []);
 
@@ -386,6 +406,87 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			// A single failed poll (network blip, 5xx) must not kill the flow;
 			// the next tick retries. Only expired/denied stop it, via the body above.
 			if (!clinePollActive.current) return;
+		}
+	};
+
+	const stopZedPolling = () => {
+		zedPollActive.current = false;
+		setZedPolling(false);
+		if (zedPollTimer.current) {
+			clearInterval(zedPollTimer.current);
+			zedPollTimer.current = null;
+		}
+	};
+
+	const handleZedConnect = async () => {
+		setZedError(null);
+		stopZedPolling();
+		try {
+			const challenge = await startZedLoginFlow({}).unwrap();
+			if (!challenge?.session_id || !challenge?.login_url) {
+				throw new Error("No login challenge returned");
+			}
+			setZedChallenge(challenge);
+			setZedExpiresLeft(challenge.expires_in || 300);
+			// A new tab is opened automatically; popup blockers may stop it, in
+			// which case the operator uses the Open tab / Copy URL buttons below.
+			window.open(challenge.login_url, "_blank", "noopener,noreferrer");
+			zedPollActive.current = true;
+			setZedPolling(true);
+			zedPollTimer.current = setInterval(() => {
+				void pollZedOnce(challenge.session_id);
+			}, 1000);
+		} catch (err: any) {
+			setZedError(err?.data?.error || err?.message || "Failed to start Zed login flow");
+		}
+	};
+
+	const pollZedOnce = async (sessionId: string) => {
+		if (!zedPollActive.current) return;
+		try {
+			const res = await pollZedLoginAuth({ session_id: sessionId }).unwrap();
+			if (!zedPollActive.current) return;
+			if (res.status === "success" && res.user_id && res.access_token) {
+				stopZedPolling();
+				form.setValue("key.zed_key_config.user_id", { value: res.user_id, ref: "" }, { shouldDirty: true });
+				form.setValue("key.zed_key_config.access_token", { value: res.access_token, ref: "" }, { shouldDirty: true });
+				const currentName = form.getValues("key.name");
+				if (!currentName || currentName.startsWith("oauth-zed-") || currentName.startsWith("zed-")) {
+					form.setValue("key.name", `oauth-zed-${res.user_id}`, {
+						shouldDirty: true,
+						shouldValidate: true,
+					});
+				}
+				setZedChallenge(null);
+				toast.success("Zed connected successfully!");
+			} else if (res.status === "expired" || res.status === "error") {
+				stopZedPolling();
+				setZedError(res.message || `Login flow ${res.status}. Start over to get a new link.`);
+			}
+			// "pending" keeps the 1s cadence going.
+			setZedExpiresLeft((s) => {
+				if (s <= 1) {
+					stopZedPolling();
+					setZedError("The login link expired. Start over to get a new one.");
+					return 0;
+				}
+				return s - 1;
+			});
+		} catch (err: any) {
+			// A single failed poll (network blip, 5xx) must not kill the flow;
+			// the next tick retries.
+			if (!zedPollActive.current) return;
+		}
+	};
+
+	const handleZedCopy = async () => {
+		if (!zedChallenge) return;
+		try {
+			await navigator.clipboard.writeText(zedChallenge.login_url);
+			setZedCopied(true);
+			setTimeout(() => setZedCopied(false), 2500);
+		} catch {
+			toast.error("Failed to copy to clipboard");
 		}
 	};
 
@@ -567,7 +668,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 				/>
 			</div>
 			{/* Hide API Key field for providers with dedicated auth tabs */}
-			{!isAzure && !isBedrock && !isBedrockMantle && !isVertex && !isAntigravity && !isDatabricks && !isGithubCopilot && (
+			{!isAzure && !isBedrock && !isBedrockMantle && !isVertex && !isAntigravity && !isDatabricks && !isGithubCopilot && !isZed && (
 				<FormField
 					control={control}
 					name={`key.value`}
@@ -1553,6 +1654,177 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 							</FormItem>
 						)}
 					/>
+				</div>
+			)}
+			{isZed && (
+				<div className="space-y-4">
+					<Separator />
+					<div className="bg-muted/20 space-y-3 rounded-md border p-4">
+						<div className="flex items-center justify-between gap-2">
+							<div>
+								<div className="text-sm font-semibold">Connect with Zed</div>
+								<p className="text-muted-foreground text-xs">
+									Approve in your browser; Bifrost fills the user ID and access token in automatically. No manual key
+									needed.
+								</p>
+							</div>
+							<Button
+								type="button"
+								variant={
+									zedChallenge ||
+									hasZedCredentials(
+										form.watch("key.zed_key_config.user_id"),
+										form.watch("key.zed_key_config.access_token"),
+									)
+										? "outline"
+										: "default"
+								}
+								size="sm"
+								data-testid="zed-oauth-connect-btn"
+								onClick={handleZedConnect}
+								disabled={isStartingZedFlow || zedPolling}
+							>
+								{isStartingZedFlow || zedPolling ? (
+									<Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+								) : (
+									<RefreshCw className="mr-2 h-3.5 w-3.5" />
+								)}
+								{zedPolling
+									? "Waiting for approval…"
+									: hasZedCredentials(
+												form.watch("key.zed_key_config.user_id"),
+												form.watch("key.zed_key_config.access_token"),
+										)
+										? "Reconnect"
+										: "Authenticate"}
+							</Button>
+						</div>
+						{zedError && <p className="text-destructive text-xs">{zedError}</p>}
+						{zedChallenge && (
+							<div className="space-y-2 rounded-md border p-3">
+								<div className="flex items-center justify-between gap-2">
+									<span className="text-muted-foreground text-xs">
+										Sign in with Zed, then return here — the fields below fill in automatically.
+									</span>
+									<span className="text-muted-foreground text-xs">expires in {zedExpiresLeft}s</span>
+									</div>
+								<div className="flex flex-wrap gap-2">
+									<Button type="button" variant="outline" size="sm" className="text-xs" asChild>
+										<a
+											href={zedChallenge.login_url}
+											target="_blank"
+											rel="noopener noreferrer"
+											data-testid="zed-oauth-open-tab-btn"
+										>
+											Open login tab
+										</a>
+									</Button>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										className="text-xs"
+										data-testid="zed-oauth-copy-url-btn"
+										onClick={() => void handleZedCopy()}
+									>
+										{zedCopied ? <Check className="mr-2 h-3.5 w-3.5 text-green-600" /> : <Copy className="mr-2 h-3.5 w-3.5" />}
+										{zedCopied ? "Copied!" : "Copy URL"}
+									</Button>
+								</div>
+								{zedPolling && <p className="text-muted-foreground text-xs">Checking approval every second…</p>}
+								<p className="text-muted-foreground text-xs">
+									Remote Bifrost? The login tab only works on this machine — paste the user ID and access token
+									below instead.
+								</p>
+							</div>
+						)}
+					</div>
+					<div className="bg-muted/50 flex items-start gap-2 rounded-md border p-3">
+						<Info className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+						<p className="text-muted-foreground text-sm">
+							Zed needs a <strong>user ID + access token</strong> pair. <strong>Browser login</strong> above fills both
+							in automatically; <strong>manual paste</strong> below works everywhere, including remote servers.
+						</p>
+					</div>
+					<div className="space-y-1.5">
+						<Label>Zed Credentials</Label>
+						<p className="text-muted-foreground text-sm">
+							Paste the values from your Zed login. The access token is the raw JSON blob (
+							<span className="font-mono">{"{"}"version":2,…{"}"}</span>) — paste it verbatim, exactly as Zed issued
+							it.
+						</p>
+					</div>
+					<FormField
+						control={control}
+						name="key.zed_key_config.user_id"
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>User ID (Required)</FormLabel>
+								<FormDescription>The numeric Zed user id, e.g. 678672.</FormDescription>
+								<FormControl>
+									<SecretVarInput data-testid="key-input-zed-user-id" placeholder="678672 or env.ZED_USER_ID" {...field} />
+								</FormControl>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+					<FormField
+						control={control}
+						name="key.zed_key_config.access_token"
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>Access Token (Required)</FormLabel>
+								<FormDescription>
+									The raw JSON blob from Zed login (<span className="font-mono">{"{"}"version":2,…{"}"}</span>),
+									pasted verbatim.
+								</FormDescription>
+								<FormControl>
+									<SecretVarInput
+										data-testid="key-input-zed-access-token"
+										placeholder='{"version":2,"id":"client_token_…","token":"…"} or env.ZED_ACCESS_TOKEN'
+										{...field}
+									/>
+								</FormControl>
+								<FormMessage />
+								</FormItem>
+							)}
+					/>
+					<FormField
+						control={control}
+						name="key.zed_key_config.system_id"
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>System ID (Optional)</FormLabel>
+								<FormDescription>Leave blank for the well-known Zed editor default.</FormDescription>
+								<FormControl>
+									<SecretVarInput
+										data-testid="key-input-zed-system-id"
+										placeholder="3dfad06a-5c48-4c7b-a480-7ea86b311eb9"
+										{...field}
+									/>
+								</FormControl>
+								<FormMessage />
+								</FormItem>
+							)}
+						/>
+					<FormField
+						control={control}
+						name="key.zed_key_config.organization_id"
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>Organization ID (Optional)</FormLabel>
+								<FormDescription>Leave blank to use the default_organization_id from Zed.</FormDescription>
+								<FormControl>
+									<SecretVarInput
+										data-testid="key-input-zed-organization-id"
+										placeholder="org_01km1bf8f68enexw8gag4sv1zn"
+										{...field}
+									/>
+								</FormControl>
+								<FormMessage />
+								</FormItem>
+								)}
+						/>
 				</div>
 			)}
 			{isModal && (

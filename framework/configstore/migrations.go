@@ -504,6 +504,45 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"cleanup_antigravity_oauth_keys"}, run: migrationCleanupAntigravityOAuthKeys},
 	{IDs: []string{"drop_removed_providers"}, run: migrationDropRemovedProviders},
 	{IDs: []string{"add_modal_key_config_columns"}, run: migrationAddModalKeyConfigColumns},
+	{IDs: []string{"add_zed_key_config_columns"}, run: migrationAddZedKeyConfigColumns},
+}
+
+// zedKeyConfigColumns are the Zed login credential columns on the key table.
+var zedKeyConfigColumns = []string{
+	"zed_user_id",
+	"zed_access_token",
+	"zed_system_id",
+	"zed_organization_id",
+}
+
+// migrationAddZedKeyConfigColumns adds the Zed login credential columns to the
+// key table. There is nothing to backfill: zed is a new provider, so no
+// existing row can carry these values.
+func migrationAddZedKeyConfigColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "add_zed_key_config_columns"
+	logger.Info("[configstore] starting migration %s", migrationName)
+	defer logger.Info("[configstore] finished migration %s", migrationName)
+
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: migrationName,
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			for _, column := range zedKeyConfigColumns {
+				if err := addColumnIfNotExists(tx, logger, &tables.TableKey{}, column); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+		Rollback: func(*gorm.DB) error {
+			return fmt.Errorf("add_zed_key_config_columns is non-rollbackable: dropping the zed_* columns would permanently delete every stored Zed login blob, which cannot be re-supplied without logging in to Zed again; the columns are additive and older binaries safely ignore them")
+		},
+	}})
+
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error running %s migration: %w", migrationName, err)
+	}
+	return nil
 }
 
 // videoResolutionPricingColumns are the resolution-banded video output rate columns.

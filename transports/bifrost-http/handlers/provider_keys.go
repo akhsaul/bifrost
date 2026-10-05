@@ -671,6 +671,27 @@ func (h *ProviderHandler) mergeUpdatedKey(oldRawKey, updateKey schemas.Key) (sch
 			}
 		}
 	}
+	if mergedKey.ZedKeyConfig != nil {
+		var old *schemas.ZedKeyConfig
+		if oldRawKey.ZedKeyConfig != nil {
+			old = oldRawKey.ZedKeyConfig
+		}
+		for _, field := range []struct {
+			name    string
+			updated *schemas.SecretVar
+			stored  *schemas.SecretVar
+		}{
+			{"user_id", &mergedKey.ZedKeyConfig.UserID, zedFieldOrNil(old, func(c *schemas.ZedKeyConfig) *schemas.SecretVar { return &c.UserID })},
+			{"access_token", &mergedKey.ZedKeyConfig.AccessToken, zedFieldOrNil(old, func(c *schemas.ZedKeyConfig) *schemas.SecretVar { return &c.AccessToken })},
+			{"system_id", zedOptFieldOrNil(mergedKey.ZedKeyConfig, old, true), zedStoredOpt(old, true)},
+			{"organization_id", zedOptFieldOrNil(mergedKey.ZedKeyConfig, old, false), zedStoredOpt(old, false)},
+		} {
+			if err := preserve(field.updated, field.stored, "zed_key_config."+field.name); err != nil {
+
+				return schemas.Key{}, err
+			}
+		}
+	}
 	if mergedKey.ModalKeyConfig != nil {
 		var oldUsername, oldRegion *schemas.SecretVar
 		if oldRawKey.ModalKeyConfig != nil {
@@ -787,6 +808,46 @@ func clineFieldOrNil(config *schemas.ClineKeyConfig, pick func(*schemas.ClineKey
 		return nil
 	}
 	return pick(config)
+}
+
+// zedFieldOrNil is fieldOrNil for Zed key configs.
+func zedFieldOrNil(config *schemas.ZedKeyConfig, pick func(*schemas.ZedKeyConfig) *schemas.SecretVar) *schemas.SecretVar {
+	if config == nil {
+		return nil
+	}
+	return pick(config)
+}
+
+// zedOptFieldOrNil returns a settable pointer to an optional Zed key config
+// field, allocating it when the incoming update left it nil so masked-preview
+// preservation has an address to write back to. system selects SystemID,
+// otherwise OrganizationID.
+func zedOptFieldOrNil(config *schemas.ZedKeyConfig, old *schemas.ZedKeyConfig, system bool) *schemas.SecretVar {
+	if config == nil {
+		return nil
+	}
+	if system {
+		if config.SystemID == nil {
+			config.SystemID = &schemas.SecretVar{}
+		}
+		return config.SystemID
+	}
+	if config.OrganizationID == nil {
+		config.OrganizationID = &schemas.SecretVar{}
+	}
+	return config.OrganizationID
+}
+
+// zedStoredOpt returns the stored optional field for masked-preview
+// preservation. system selects SystemID, otherwise OrganizationID.
+func zedStoredOpt(old *schemas.ZedKeyConfig, system bool) *schemas.SecretVar {
+	if old == nil {
+		return nil
+	}
+	if system {
+		return old.SystemID
+	}
+	return old.OrganizationID
 }
 
 // modalRegionOrNil returns a settable pointer to a Modal key config's region,
@@ -927,6 +988,20 @@ func validateProviderKeyURL(provider schemas.ModelProvider, key schemas.Key) err
 		}
 		if !key.ClineKeyConfig.RefreshToken.IsSet() {
 			return fmt.Errorf("cline_key_config.refresh_token is required for Cline keys")
+		}
+	case schemas.Zed:
+		// A Zed key always carries zed_key_config: the user login cannot live
+		// in Key.Value (the user-auth header needs user_id and the blob as
+		// separate fields). user_id + access_token are required; system_id and
+		// organization_id are optional (defaults apply at request time).
+		if key.ZedKeyConfig == nil {
+			return fmt.Errorf("zed_key_config is required for Zed keys")
+		}
+		if !key.ZedKeyConfig.UserID.IsSet() {
+			return fmt.Errorf("zed_key_config.user_id is required for Zed keys")
+		}
+		if !key.ZedKeyConfig.AccessToken.IsSet() {
+			return fmt.Errorf("zed_key_config.access_token is required for Zed keys (the raw JSON blob from Zed login, e.g. {\"version\":2,...})")
 		}
 	case schemas.Modal:
 		// Each Modal key targets exactly one deployment. Model is the identifier

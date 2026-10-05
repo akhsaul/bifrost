@@ -1,0 +1,4 @@
+{"event":{"candidates":[{"content":{"parts":[{"text":"Hello!"}],"role":"model"}}],"usageMetadata":{}}}
+{"event":{"candidates":[{"content":{"parts":[{"text":" How can I help you with the Bifrost codebase today?"}],"role":"model"}}],"usageMetadata":{}}}
+{"event":{"candidates":[{"content":{"parts":[{"text":"","thoughtSignature":"AY89a18O++aeSyy9WBmdNTWONLkDOQ2Nd7KD0Z6pnTpodsto0pjFGIVDBxuzABE735ze2oWDSgpZOahHiF7VXL+kjtqijCeXqeHp+Sr4JeG0bw=="}],"role":"model"},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":27783,"candidatesTokenCount":14,"totalTokenCount":27797}}}
+{"status":"stream_ended"}

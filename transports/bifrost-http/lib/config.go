@@ -1700,6 +1700,7 @@ func mergeProviderKeys(provider schemas.ModelProvider, fileKeys, dbKeys []schema
 					GithubCopilotKeyConfig: dbKey.GithubCopilotKeyConfig,
 					ClineKeyConfig:         dbKey.ClineKeyConfig,
 					ModalKeyConfig:         dbKey.ModalKeyConfig,
+					ZedKeyConfig:           dbKey.ZedKeyConfig,
 					Enabled:                dbKey.Enabled,
 					UseForBatchAPI:         dbKey.UseForBatchAPI,
 					UseAnthropicEndpoints:  dbKey.UseAnthropicEndpoints,
@@ -1787,6 +1788,7 @@ func reconcileProviderKeys(provider schemas.ModelProvider, fileKeys, dbKeys []sc
 					GithubCopilotKeyConfig: dbKey.GithubCopilotKeyConfig,
 					ClineKeyConfig:         dbKey.ClineKeyConfig,
 					ModalKeyConfig:         dbKey.ModalKeyConfig,
+					ZedKeyConfig:           dbKey.ZedKeyConfig,
 					Enabled:                dbKey.Enabled,
 					UseForBatchAPI:         dbKey.UseForBatchAPI,
 					UseAnthropicEndpoints:  dbKey.UseAnthropicEndpoints,
@@ -7143,6 +7145,18 @@ func (c *Config) GetAllKeys() ([]configstoreTables.TableKey, error) {
 					cfg.Region = cfg.Region.Redacted()
 				}
 				configStoreKey.ModalKeyConfig = &cfg
+			}
+			if key.ZedKeyConfig != nil {
+				cfg := *key.ZedKeyConfig // safe copy
+				cfg.UserID = *cfg.UserID.Redacted()
+				cfg.AccessToken = *cfg.AccessToken.Redacted()
+				if cfg.SystemID != nil {
+					cfg.SystemID = cfg.SystemID.Redacted()
+				}
+				if cfg.OrganizationID != nil {
+					cfg.OrganizationID = cfg.OrganizationID.Redacted()
+				}
+				configStoreKey.ZedKeyConfig = &cfg
 			}
 			keys = append(keys, configStoreKey)
 		}

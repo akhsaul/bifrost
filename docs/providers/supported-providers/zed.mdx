@@ -1,0 +1,46 @@
+---
+title: "Zed"
+description: "Configure Zed cloud LLMs (one gateway endpoint, three inner model families)"
+---
+
+Zed exposes a single inference endpoint, `POST https://cloud.zed.dev/completions`. Every request carries an envelope naming the inner model family (`anthropic`, `google`, or `open_ai`) plus that family's native request shape. Bifrost picks the family from the live `GET /models` catalog — no static model map — and converts OpenAI chat / Responses / Anthropic Messages traffic into it.
+
+```json
+{
+  "providers": {
+    "zed": {
+      "keys": [
+        {
+          "name": "zed-main",
+          "models": ["claude-haiku-4-5", "gpt-5-nano", "gemini-3.5-flash"],
+          "zed_key_config": {
+            "user_id": "env.ZED_USER_ID",
+            "access_token": "env.ZED_ACCESS_TOKEN"
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+Field notes:
+
+- `user_id` is the numeric Zed user id (e.g. `678672`).
+- `access_token` is the raw JSON blob from Zed login (`{"version":2,"id":"client_token_…","token":"…"}`) — paste it verbatim, exactly as Zed issued it.
+- `system_id` defaults to the well-known Zed editor value (`3dfad06a-5c48-4c7b-a480-7ea86b311eb9`) when empty.
+- `organization_id` defaults to the `default_organization_id` from Zed when empty.
+- There is no `value` API key for Zed: the login pair above mints a short-lived LLM token per organization automatically.
+
+Login:
+
+- **Browser login** (local Bifrost): Providers → Zed → Authenticate opens the Zed signin tab; approving fills `user_id` + `access_token` in automatically.
+- **Manual paste** (works everywhere, including remote servers): paste the two values into the Zed Credentials form.
+
+Behavior notes:
+
+- Zed only streams (NDJSON until `stream_ended`), so unary chat/Responses calls accumulate the stream server-side.
+- `thread_id` reuses the caller's session id (`x-bf-session-id` or any harness session header) when present, else a fresh UUID; `prompt_id` is always fresh per request.
+- Conversation stickiness: send `x-bf-session-id` (or any harness session header) to keep turns on one Zed thread.
+- Inner families: `claude-*` → Anthropic Messages, `gpt-*` → OpenAI Responses (`input[]`), `gemini-*` → `generateContent`. Tool calls convert to all three.
+- Bifrost sends Zed client-identity headers (`user-agent`, `x-zed-version`, status-message capability flags) and supports chat completions, SSE streaming, Responses (native for `open_ai` models, via chat fallback otherwise), and `/v1/messages`. Unsupported upstream operations return an explicit unsupported-operation error.

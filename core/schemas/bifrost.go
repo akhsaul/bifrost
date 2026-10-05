@@ -94,6 +94,7 @@ const (
 	Antigravity     ModelProvider = "antigravity"
 	OpencodeZenFree ModelProvider = "opencode-zen-free"
 	Cline           ModelProvider = "cline"
+	Zed             ModelProvider = "zed"
 )
 
 // SupportedBaseProviders is the list of base providers allowed for custom providers.
@@ -160,6 +161,7 @@ var StandardProviders = []ModelProvider{
 	Antigravity,
 	OpencodeZenFree,
 	Cline,
+	Zed,
 }
 
 // RequestType represents the type of request being made to a provider.

@@ -806,6 +806,21 @@ func (p *ProviderConfig) Redacted() *ProviderConfig {
 			}
 			redactedConfig.Keys[i].ModalKeyConfig = modalCfg
 		}
+		if key.ZedKeyConfig != nil {
+			// user_id is an account identifier surfaced as-is; the token blob
+			// and system/org ids are credential-adjacent and redacted.
+			zedCfg := &schemas.ZedKeyConfig{
+				UserID:      key.ZedKeyConfig.UserID,
+				AccessToken: *key.ZedKeyConfig.AccessToken.Redacted(),
+			}
+			if key.ZedKeyConfig.SystemID != nil {
+				zedCfg.SystemID = key.ZedKeyConfig.SystemID.Redacted()
+			}
+			if key.ZedKeyConfig.OrganizationID != nil {
+				zedCfg.OrganizationID = key.ZedKeyConfig.OrganizationID.Redacted()
+			}
+			redactedConfig.Keys[i].ZedKeyConfig = zedCfg
+		}
 	}
 	return &redactedConfig
 }
@@ -1040,6 +1055,14 @@ func GenerateKeyHash(key schemas.Key) (string, error) {
 	// Hash ModalKeyConfig
 	if key.ModalKeyConfig != nil {
 		data, err := sonic.Marshal(key.ModalKeyConfig)
+		if err != nil {
+			return "", err
+		}
+		hash.Write(data)
+	}
+	// Hash ZedKeyConfig
+	if key.ZedKeyConfig != nil {
+		data, err := sonic.Marshal(key.ZedKeyConfig)
 		if err != nil {
 			return "", err
 		}

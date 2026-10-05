@@ -18,6 +18,7 @@ import (
 	bifrost "github.com/maximhq/bifrost/core"
 	antigravity "github.com/maximhq/bifrost/core/providers/antigravity"
 	"github.com/maximhq/bifrost/core/providers/cline"
+	"github.com/maximhq/bifrost/core/providers/zed"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore"
 	"github.com/maximhq/bifrost/framework/configstore/tables"
@@ -273,6 +274,9 @@ func (h *ProviderHandler) RegisterRoutes(r *router.Router, middlewares ...schema
 	// Cline OAuth (WorkOS device flow) helper endpoints
 	r.POST("/api/providers/cline/oauth/device", lib.ChainMiddlewares(h.startClineDeviceFlow, middlewares...))
 	r.POST("/api/providers/cline/oauth/poll", lib.ChainMiddlewares(h.pollClineDeviceFlow, middlewares...))
+	// Zed browser-login helper endpoints
+	r.POST("/api/providers/zed/oauth/device", lib.ChainMiddlewares(h.startZedLoginFlow, middlewares...))
+	r.POST("/api/providers/zed/oauth/poll", lib.ChainMiddlewares(h.pollZedLoginFlow, middlewares...))
 	// Quota Information endpoints
 	r.GET("/api/providers/{provider}/keys/{key_id}/quota", lib.ChainMiddlewares(h.getKeyQuota, middlewares...))
 	r.GET("/api/providers/{provider}/keys/{key_id}/models-quota", lib.ChainMiddlewares(h.getModelsQuota, middlewares...))
@@ -1782,6 +1786,94 @@ func (h *ProviderHandler) pollClineDeviceFlow(ctx *fasthttp.RequestCtx) {
 	}
 	if result.Status == cline.DevicePollDenied {
 		SendError(ctx, fasthttp.StatusForbidden, result.Message)
+		return
+	}
+
+	data, err := sonic.Marshal(result)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
+}
+
+type zedLoginPayload struct {
+	// SigninBaseURL overrides the login host (default https://zed.dev).
+	// The editor's default server_url; staging setups point it at
+	// https://staging.zed.dev.
+	SigninBaseURL string `json:"signin_base_url,omitempty"`
+	// SystemID is forwarded as system_id on the signin URL when set.
+	SystemID string `json:"system_id,omitempty"`
+}
+
+// startZedLoginFlow handles POST /api/providers/zed/oauth/device. It opens
+// an ephemeral loopback listener and returns the Zed signin URL the operator
+// opens in a browser. The UI polls pollZedLoginFlow with the session id.
+func (h *ProviderHandler) startZedLoginFlow(ctx *fasthttp.RequestCtx) {
+	var payload zedLoginPayload
+	if len(ctx.PostBody()) > 0 {
+		if err := sonic.Unmarshal(ctx.PostBody(), &payload); err != nil {
+			SendError(ctx, fasthttp.StatusBadRequest, "Invalid request payload")
+			return
+		}
+	}
+
+	challenge, bifrostErr := zed.StartLogin(ctx, payload.SigninBaseURL, payload.SystemID)
+	if bifrostErr != nil {
+		msg := "Failed to start Zed login flow"
+		if bifrostErr.Error != nil && bifrostErr.Error.Message != "" {
+			msg = bifrostErr.Error.Message
+		}
+		status := fasthttp.StatusBadGateway
+		if bifrostErr.StatusCode != nil && *bifrostErr.StatusCode >= 400 && *bifrostErr.StatusCode < 600 {
+			status = *bifrostErr.StatusCode
+		}
+		SendError(ctx, status, msg)
+		return
+	}
+
+	data, err := sonic.Marshal(challenge)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
+}
+
+type zedLoginPollPayload struct {
+	SessionID string `json:"session_id"`
+}
+
+// pollZedLoginFlow handles POST /api/providers/zed/oauth/poll. It performs
+// exactly one login-session check: the UI owns the 1s cadence and stops on
+// any non-pending status. A success carries the user_id + verbatim
+// access_token blob the UI stores on the key; pending carries no credential.
+func (h *ProviderHandler) pollZedLoginFlow(ctx *fasthttp.RequestCtx) {
+	var payload zedLoginPollPayload
+	if err := sonic.Unmarshal(ctx.PostBody(), &payload); err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, "Invalid request payload")
+		return
+	}
+	if strings.TrimSpace(payload.SessionID) == "" {
+		SendError(ctx, fasthttp.StatusBadRequest, "session_id is required")
+		return
+	}
+
+	result, bifrostErr := zed.PollLogin(ctx, payload.SessionID)
+	if bifrostErr != nil {
+		msg := "Failed to poll Zed login flow"
+		if bifrostErr.Error != nil && bifrostErr.Error.Message != "" {
+			msg = bifrostErr.Error.Message
+		}
+		SendError(ctx, fasthttp.StatusBadGateway, msg)
+		return
+	}
+	if result.Status == zed.LoginPollExpired {
+		SendError(ctx, fasthttp.StatusGone, result.Message)
 		return
 	}
 

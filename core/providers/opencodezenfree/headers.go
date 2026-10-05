@@ -10,6 +10,7 @@ import (
 	"crypto/rand"
 	"math/big"
 
+	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
 	"github.com/maximhq/bifrost/core/schemas"
 )
 
@@ -148,10 +149,8 @@ func ResolveSessionID(ctx *schemas.BifrostContext, configExtraHeaders map[string
 	if v := lookupHeader(ctx, configExtraHeaders, "x-opencode-session", "x-session-affinity", "x-session-id"); v != "" {
 		return v
 	}
-	if ctx != nil {
-		if sid, ok := ctx.Value(schemas.BifrostContextKeySessionID).(string); ok && sid != "" {
-			return sid
-		}
+	if sid := providerUtils.ResolveSessionID(ctx, nil); sid != nil {
+		return *sid
 	}
 	return GenerateOpencodeSessionID()
 }

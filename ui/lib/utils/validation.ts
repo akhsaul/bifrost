@@ -631,6 +631,19 @@ export function hasClineOAuthRefresh(value: string | { value?: string; ref?: str
 	return !!value.value?.trim() || !!value.ref?.trim();
 }
 
+// hasZedCredentials reports whether a Zed user_id/access_token pair is present.
+export function hasZedCredentials(
+	userId: string | { value?: string; ref?: string; type?: string } | null | undefined,
+	accessToken: string | { value?: string; ref?: string; type?: string } | null | undefined,
+): boolean {
+	const has = (v: typeof userId) => {
+		if (!v) return false;
+		if (typeof v === "string") return v.trim() !== "";
+		return !!v.value?.trim() || !!v.ref?.trim();
+	};
+	return has(userId) && has(accessToken);
+}
+
 // hasAntigravityOAuthRefresh reports whether an Antigravity OAuth refresh token is present.
 export function hasAntigravityOAuthRefresh(value: string | { value?: string; ref?: string; type?: string } | null | undefined): boolean {
 	if (!value) return false;

@@ -133,6 +133,12 @@ type TableKey struct {
 	ModalUsername      *schemas.SecretVar `gorm:"type:text" json:"modal_username,omitempty"`
 	ModalRegion        *schemas.SecretVar `gorm:"type:text" json:"modal_region,omitempty"`
 
+	// Zed config fields (embedded)
+	ZedUserID         *schemas.SecretVar `gorm:"type:text" json:"zed_user_id,omitempty"`
+	ZedAccessToken    *schemas.SecretVar `gorm:"type:text" json:"zed_access_token,omitempty"`
+	ZedSystemID       *schemas.SecretVar `gorm:"type:text" json:"zed_system_id,omitempty"`
+	ZedOrganizationID *schemas.SecretVar `gorm:"type:text" json:"zed_organization_id,omitempty"`
+
 	// Virtual fields for runtime use (not stored in DB)
 	Models                 schemas.WhiteList               `gorm:"-" json:"models"` // ["*"] allows all models; empty denies all (deny-by-default)
 	BlacklistedModels      schemas.BlackList               `gorm:"-" json:"blacklisted_models"`
@@ -150,6 +156,7 @@ type TableKey struct {
 	GithubCopilotKeyConfig *schemas.GithubCopilotKeyConfig `gorm:"-" json:"github_copilot_key_config,omitempty"`
 	ClineKeyConfig         *schemas.ClineKeyConfig         `gorm:"-" json:"cline_key_config,omitempty"`
 	ModalKeyConfig         *schemas.ModalKeyConfig         `gorm:"-" json:"modal_key_config,omitempty"`
+	ZedKeyConfig           *schemas.ZedKeyConfig           `gorm:"-" json:"zed_key_config,omitempty"`
 }
 
 // TableName sets the table name for each model
@@ -665,6 +672,39 @@ func (k *TableKey) BeforeSave(tx *gorm.DB) error {
 		k.ModalUsername = nil
 		k.ModalRegion = nil
 	}
+	// Zed. Every SecretVar is value-copied before assignment, per the invariant
+	// above.
+	if k.ZedKeyConfig != nil {
+		if k.ZedKeyConfig.UserID.IsSet() {
+			v := k.ZedKeyConfig.UserID
+			k.ZedUserID = &v
+		} else {
+			k.ZedUserID = nil
+		}
+		if k.ZedKeyConfig.AccessToken.IsSet() {
+			v := k.ZedKeyConfig.AccessToken
+			k.ZedAccessToken = &v
+		} else {
+			k.ZedAccessToken = nil
+		}
+		if k.ZedKeyConfig.SystemID != nil && k.ZedKeyConfig.SystemID.IsSet() {
+			r := *k.ZedKeyConfig.SystemID
+			k.ZedSystemID = &r
+		} else {
+			k.ZedSystemID = nil
+		}
+		if k.ZedKeyConfig.OrganizationID != nil && k.ZedKeyConfig.OrganizationID.IsSet() {
+			r := *k.ZedKeyConfig.OrganizationID
+			k.ZedOrganizationID = &r
+		} else {
+			k.ZedOrganizationID = nil
+		}
+	} else {
+		k.ZedUserID = nil
+		k.ZedAccessToken = nil
+		k.ZedSystemID = nil
+		k.ZedOrganizationID = nil
+	}
 
 	// Store plaintext SecretVar columns into the vault and rewrite them to vault refs.
 	// This must run after the columns are populated (above) and before encryption (below):
@@ -842,6 +882,20 @@ func (k *TableKey) BeforeSave(tx *gorm.DB) error {
 		}
 		if err := encryptSecretVarPtr(&k.ModalRegion); err != nil {
 			return fmt.Errorf("failed to encrypt modal region: %w", err)
+		}
+		// Zed. The access token blob is the whole credential; user_id is an
+		// account identifier but encrypted uniformly with the rest.
+		if err := encryptSecretVarPtr(&k.ZedUserID); err != nil {
+			return fmt.Errorf("failed to encrypt zed user id: %w", err)
+		}
+		if err := encryptSecretVarPtr(&k.ZedAccessToken); err != nil {
+			return fmt.Errorf("failed to encrypt zed access token: %w", err)
+		}
+		if err := encryptSecretVarPtr(&k.ZedSystemID); err != nil {
+			return fmt.Errorf("failed to encrypt zed system id: %w", err)
+		}
+		if err := encryptSecretVarPtr(&k.ZedOrganizationID); err != nil {
+			return fmt.Errorf("failed to encrypt zed organization id: %w", err)
 		}
 		k.EncryptionStatus = EncryptionStatusEncrypted
 	}
@@ -1306,6 +1360,25 @@ func (k *TableKey) AfterFind(tx *gorm.DB) error {
 		k.ClineKeyConfig = config
 	} else {
 		k.ClineKeyConfig = nil
+	}
+	// Reconstruct Zed config if any field is present
+	if k.ZedUserID != nil || k.ZedAccessToken != nil || k.ZedSystemID != nil || k.ZedOrganizationID != nil {
+		config := &schemas.ZedKeyConfig{}
+		if k.ZedUserID != nil {
+			config.UserID = *k.ZedUserID
+		}
+		if k.ZedAccessToken != nil {
+			config.AccessToken = *k.ZedAccessToken
+		}
+		if k.ZedSystemID != nil {
+			config.SystemID = k.ZedSystemID
+		}
+		if k.ZedOrganizationID != nil {
+			config.OrganizationID = k.ZedOrganizationID
+		}
+		k.ZedKeyConfig = config
+	} else {
+		k.ZedKeyConfig = nil
 	}
 	// Reconstruct Modal config if any field is present
 	if k.ModalModel != nil || k.ModalEndpointModel != nil || k.ModalUsername != nil || k.ModalRegion != nil {

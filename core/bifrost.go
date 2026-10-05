@@ -70,6 +70,7 @@ import (
 	"github.com/maximhq/bifrost/core/providers/vyceai"
 	"github.com/maximhq/bifrost/core/providers/wafer"
 	"github.com/maximhq/bifrost/core/providers/xai"
+	zedprovider "github.com/maximhq/bifrost/core/providers/zed"
 	schemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/valyala/fasthttp"
 )
@@ -4664,6 +4665,8 @@ func (bifrost *Bifrost) createBaseProvider(providerKey schemas.ModelProvider, co
 		return cerebras.NewCerebrasProvider(config, bifrost.logger)
 	case schemas.Cline:
 		return cline.NewClineProvider(config, bifrost.logger)
+	case schemas.Zed:
+		return zedprovider.NewZedProvider(config, bifrost.logger)
 	case schemas.DeepSeek:
 		return deepseek.NewDeepSeekProvider(config, bifrost.logger)
 	case schemas.Wafer:

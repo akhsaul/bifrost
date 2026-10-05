@@ -691,6 +691,18 @@ export const ProviderIcons = {
 	nebius: ({ className = "" }: IconProps) => {
 		return <img src="/images/nebius.webp" alt="nebius" width={14} height={14} loading="lazy" decoding="async" className={className} />;
 	},
+	zed: ({ size = "md", className = "" }: IconProps) => {
+		const resolvedSize = resolveSize(size);
+		return (
+			<span
+				style={{ width: resolvedSize, height: resolvedSize, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}
+				className={className}
+				title="Zed"
+			>
+				Z
+			</span>
+		);
+	},
 	xai: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
 

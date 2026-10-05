@@ -329,6 +329,27 @@
         "default_request_timeout_in_seconds": 300
       }
     },
+    "zed": {
+      "send_back_raw_request": true,
+      "send_back_raw_response": true,
+      "store_raw_request_response": true,
+      "keys": [
+        {
+          "name": "Zed Key",
+          "weight": 1,
+          "models": ["*"],
+          "zed_key_config": {
+            "user_id": "env.ZED_USER_ID",
+            "access_token": "env.ZED_ACCESS_TOKEN",
+            "system_id": "env.ZED_SYSTEM_ID",
+            "organization_id": "env.ZED_ORGANIZATION_ID"
+          }
+        }
+      ],
+      "network_config": {
+        "default_request_timeout_in_seconds": 300
+      }
+    },
     "openrouter": {
       "send_back_raw_request": true,
       "send_back_raw_response": true,

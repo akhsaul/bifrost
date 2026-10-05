@@ -155,6 +155,7 @@
                   "providers/supported-providers/groq",
                   "providers/supported-providers/tokenrouter",
                   "providers/supported-providers/modal",
+                  "providers/supported-providers/zed",
                   "providers/supported-providers/byteplus",
                   "providers/supported-providers/poolside",
                   "providers/supported-providers/longcat",

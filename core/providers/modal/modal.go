@@ -112,22 +112,8 @@ const affinityHeaderName = "Modal-Routing-Affinity-Key"
 // or "" when the caller has none. An explicit per-request header wins; otherwise
 // Bifrost's session id (x-bf-session-id, incl. harness fallbacks) applies.
 func resolveAffinityKey(ctx *schemas.BifrostContext, extraHeaders map[string]string) string {
-	if ctx != nil {
-		if ctxHeaders, ok := ctx.Value(schemas.BifrostContextKeyExtraHeaders).(map[string][]string); ok {
-			for k, vs := range ctxHeaders {
-				if strings.EqualFold(k, affinityHeaderName) && len(vs) > 0 && strings.TrimSpace(vs[0]) != "" {
-					return strings.TrimSpace(vs[0])
-				}
-			}
-		}
-		if sid, ok := ctx.Value(schemas.BifrostContextKeySessionID).(string); ok && strings.TrimSpace(sid) != "" {
-			return strings.TrimSpace(sid)
-		}
-	}
-	for k, v := range extraHeaders {
-		if strings.EqualFold(k, affinityHeaderName) && strings.TrimSpace(v) != "" {
-			return strings.TrimSpace(v)
-		}
+	if affinity := providerUtils.ResolveSessionID(ctx, extraHeaders, affinityHeaderName); affinity != nil {
+		return *affinity
 	}
 	return ""
 }

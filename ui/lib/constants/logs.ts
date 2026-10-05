@@ -51,6 +51,7 @@ export const KnownProvidersNames = [
 	"vyceai",
 	"wafer",
 	"xai",
+	"zed",
 ] as const;
 
 // Local Provider type derived from KNOWN_PROVIDERS constant
@@ -180,6 +181,7 @@ export const ProviderLabels: Record<ProviderName, string> = {
 	sgl: "SGLang",
 	cerebras: "Cerebras",
 	cline: "Cline",
+	zed: "Zed",
 	gemini: "Gemini",
 	openrouter: "OpenRouter",
 	huggingface: "HuggingFace",

@@ -154,6 +154,7 @@ const PROVIDER_KEYWORDS = {
   runware: ["runware", "runware/"],
   typesafe: ["typesafe", "/typesafe", "jev-"],
   cline: ["cline"],
+  zed: ["117. Zed provider", "zed/claude", "zed/gpt", "zed/gemini", "provider=zed", "provider%22%3Azed"],
 };
 
 // Haystack = item JSON + ancestor folder names. Folder names encode the harness

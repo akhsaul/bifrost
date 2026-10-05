@@ -224,6 +224,23 @@ export interface ClineDevicePollRequest {
 	client_id?: string;
 }
 
+export interface ZedLoginChallenge {
+	session_id: string;
+	login_url: string;
+	expires_in: number;
+}
+
+export interface ZedLoginPollRequest {
+	session_id: string;
+}
+
+export interface ZedLoginPollResponse {
+	status: "pending" | "success" | "expired" | "error";
+	user_id?: string;
+	access_token?: string;
+	message?: string;
+}
+
 export interface ClineDevicePollResponse {
 	status: "pending" | "success" | "expired" | "denied" | "error";
 	refresh_token?: string;
@@ -647,6 +664,22 @@ export const providersApi = baseApi.injectEndpoints({
 			}),
 		}),
 
+		startZedLoginFlow: builder.mutation<ZedLoginChallenge, { signin_base_url?: string; system_id?: string } | void>({
+			query: (body) => ({
+				url: "/providers/zed/oauth/device",
+				method: "POST",
+				body: body || {},
+			}),
+		}),
+
+		pollZedLoginAuth: builder.mutation<ZedLoginPollResponse, ZedLoginPollRequest>({
+			query: (body) => ({
+				url: "/providers/zed/oauth/poll",
+				method: "POST",
+				body,
+			}),
+		}),
+
 		pollClineDeviceAuth: builder.mutation<ClineDevicePollResponse, ClineDevicePollRequest>({
 			query: (body) => ({
 				url: "/providers/cline/oauth/poll",
@@ -703,6 +736,8 @@ export const {
 	useExchangeAntigravityAuthCodeMutation,
 	useStartClineDeviceFlowMutation,
 	usePollClineDeviceAuthMutation,
+	useStartZedLoginFlowMutation,
+	usePollZedLoginAuthMutation,
 	useGetKeyQuotaQuery,
 	useLazyGetKeyQuotaQuery,
 	useGetModelsQuotaQuery,

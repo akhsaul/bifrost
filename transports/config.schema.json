@@ -551,6 +551,9 @@
         },
         "cline": {
           "$ref": "#/$defs/provider_with_cline_config"
+        },
+        "zed": {
+          "$ref": "#/$defs/provider_with_zed_config"
         }
       },
       "additionalProperties": true
@@ -5307,6 +5310,46 @@
         }
       ]
     },
+    "zed_key": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/base_key"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "zed_key_config": {
+              "type": "object",
+              "properties": {
+                "user_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Zed numeric user id, e.g. \"678672\" (can use env. prefix)"
+                },
+                "access_token": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Raw access_token JSON blob from Zed login, verbatim, e.g. {\"version\":2,...} (can use env. prefix)"
+                },
+                "system_id": {
+                  "type": "string",
+                  "description": "x-zed-system-id. Leave unset for the well-known Zed editor default (can use env. prefix)"
+                },
+                "organization_id": {
+                  "type": "string",
+                  "description": "Billing org. Leave unset to auto-resolve from default_organization_id (can use env. prefix)"
+                }
+              },
+              "required": ["user_id", "access_token"],
+              "additionalProperties": false
+            }
+          }
+        },
+        {
+          "required": ["zed_key_config"]
+        }
+      ]
+    },
     "github_copilot_key": {
       "allOf": [
         {
@@ -5911,6 +5954,45 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/cline_key"
+          },
+          "minItems": 1,
+          "description": "API keys for this provider"
+        },
+        "network_config": {
+          "$ref": "#/$defs/network_config"
+        },
+        "concurrency_and_buffer_size": {
+          "$ref": "#/$defs/concurrency_and_buffer_size"
+        },
+        "proxy_config": {
+          "$ref": "#/$defs/proxy_config"
+        },
+        "send_back_raw_request": {
+          "type": "boolean",
+          "description": "Include raw request in BifrostResponse (default: false)"
+        },
+        "send_back_raw_response": {
+          "type": "boolean",
+          "description": "Include raw response in BifrostResponse (default: false)"
+        },
+        "store_raw_request_response": {
+          "type": "boolean",
+          "description": "Capture raw request/response for internal logging only; strip from API responses returned to clients (default: false)"
+        },
+        "custom_provider_config": {
+          "$ref": "#/$defs/custom_provider_config"
+        }
+      },
+      "required": ["keys"],
+      "additionalProperties": false
+    },
+    "provider_with_zed_config": {
+      "type": "object",
+      "properties": {
+        "keys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/zed_key"
           },
           "minItems": 1,
           "description": "API keys for this provider"

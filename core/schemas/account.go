@@ -153,6 +153,7 @@ type Key struct {
 	GithubCopilotKeyConfig *GithubCopilotKeyConfig `json:"github_copilot_key_config,omitempty"` // GitHub Copilot-specific key configuration
 	ClineKeyConfig         *ClineKeyConfig         `json:"cline_key_config,omitempty"`          // Cline-specific key configuration (OAuth refresh token)
 	ModalKeyConfig         *ModalKeyConfig         `json:"modal_key_config,omitempty"`          // Modal-specific key configuration (per-deployment username/region/model)
+	ZedKeyConfig           *ZedKeyConfig           `json:"zed_key_config,omitempty"`            // Zed-specific key configuration (user_id + access_token blob)
 	Enabled                *bool                   `json:"enabled,omitempty"`                   // Whether the key is active (default:true)
 	UseForBatchAPI         *bool                   `json:"use_for_batch_api,omitempty"`         // Whether this key can be used for batch API operations (default:false for new keys, migrated keys default to true)
 	UseAnthropicEndpoints  *bool                   `json:"use_anthropic_endpoints,omitempty"`   // Whether to use anthropic endpoints for this key
@@ -932,6 +933,23 @@ type ModalKeyConfig struct {
 	EndpointModel string     `json:"endpoint_model"`   // Host segment of the deployment name (required, used verbatim in the URL)
 	Username      SecretVar  `json:"username"`         // Modal workspace username/namespace owning the deployment (required)
 	Region        *SecretVar `json:"region,omitempty"` // Modal region (defaults to "us-west" when empty)
+}
+
+// ZedKeyConfig holds the credential material for a Zed cloud account.
+//
+// The access_token is the opaque JSON blob Zed issues at login
+// ({"version":2,"id":"client_token_...","token":"..."}), passed through
+// verbatim: the user-info endpoints expect
+// "authorization: <user_id> <access_token>" and the completions endpoint
+// expects the short-lived LLM token minted from it. SystemID defaults to
+// the well-known Zed editor value when empty. OrganizationID selects the
+// billing org; empty means auto-resolve from default_organization_id via
+// GET /client/users/me.
+type ZedKeyConfig struct {
+	UserID         SecretVar  `json:"user_id"`                   // Zed numeric user id, e.g. "678672" (required)
+	AccessToken    SecretVar  `json:"access_token"`              // Raw access_token JSON blob from Zed login, verbatim (required)
+	SystemID       *SecretVar `json:"system_id,omitempty"`       // x-zed-system-id. Empty means DefaultZedSystemID.
+	OrganizationID *SecretVar `json:"organization_id,omitempty"` // Billing org. Empty means auto-resolve from default_organization_id.
 }
 
 // Account defines the interface for managing provider accounts and their configurations.
