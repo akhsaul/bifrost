@@ -238,6 +238,8 @@ export interface ZedLoginPollResponse {
 	status: "pending" | "success" | "expired" | "error";
 	user_id?: string;
 	access_token?: string;
+	username?: string;
+	organization_id?: string;
 	message?: string;
 }
 

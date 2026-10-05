@@ -21,7 +21,14 @@ import {
 	usePollZedLoginAuthMutation,
 	type ZedLoginChallenge,
 } from "@/lib/store/apis/providersApi";
-import { hasAntigravityOAuthRefresh, hasClineApiToken, hasClineOAuthRefresh, hasCopilotApiToken, hasZedCredentials, isRedacted } from "@/lib/utils/validation";
+import {
+	hasAntigravityOAuthRefresh,
+	hasClineApiToken,
+	hasClineOAuthRefresh,
+	hasCopilotApiToken,
+	hasZedCredentials,
+	isRedacted,
+} from "@/lib/utils/validation";
 import { getErrorMessage } from "@/lib/store/apis/baseApi";
 import { CheckCircle2, Info, Loader2, RefreshCw, Copy, Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -448,17 +455,31 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			if (!zedPollActive.current) return;
 			if (res.status === "success" && res.user_id && res.access_token) {
 				stopZedPolling();
-				form.setValue("key.zed_key_config.user_id", { value: res.user_id, ref: "" }, { shouldDirty: true });
-				form.setValue("key.zed_key_config.access_token", { value: res.access_token, ref: "" }, { shouldDirty: true });
+				form.setValue("key.zed_key_config.user_id", { value: res.user_id, ref: "" }, { shouldDirty: true, shouldValidate: true });
+				form.setValue("key.zed_key_config.access_token", { value: res.access_token, ref: "" }, { shouldDirty: true, shouldValidate: true });
+				// The poll already verified the login against /client/users/me,
+				// so organization_id is known-good: prefill it so the key is
+				// saveable as-is (the backend would resolve the same value at
+				// request time, this just makes the credential explicit).
+				if (res.organization_id) {
+					form.setValue(
+						"key.zed_key_config.organization_id",
+						{ value: res.organization_id, ref: "" },
+						{ shouldDirty: true, shouldValidate: true },
+					);
+				}
+				// Key name uses the human username from /client/users/me, not
+				// the numeric user_id used for the wire auth header.
+				const displayName = res.username?.trim() || res.user_id;
 				const currentName = form.getValues("key.name");
 				if (!currentName || currentName.startsWith("oauth-zed-") || currentName.startsWith("zed-")) {
-					form.setValue("key.name", `oauth-zed-${res.user_id}`, {
+					form.setValue("key.name", `oauth-zed-${displayName}`, {
 						shouldDirty: true,
 						shouldValidate: true,
 					});
 				}
 				setZedChallenge(null);
-				toast.success("Zed connected successfully!");
+				toast.success(res.username ? `Zed connected as ${res.username}!` : "Zed connected successfully!");
 			} else if (res.status === "expired" || res.status === "error") {
 				stopZedPolling();
 				setZedError(res.message || `Login flow ${res.status}. Start over to get a new link.`);
@@ -1671,18 +1692,13 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 							<div>
 								<div className="text-sm font-semibold">Connect with Zed</div>
 								<p className="text-muted-foreground text-xs">
-									Approve in your browser; Bifrost fills the user ID and access token in automatically. No manual key
-									needed.
+									Approve in your browser; Bifrost fills the user ID and access token in automatically. No manual key needed.
 								</p>
 							</div>
 							<Button
 								type="button"
 								variant={
-									zedChallenge ||
-									hasZedCredentials(
-										form.watch("key.zed_key_config.user_id"),
-										form.watch("key.zed_key_config.access_token"),
-									)
+									zedChallenge || hasZedCredentials(form.watch("key.zed_key_config.user_id"), form.watch("key.zed_key_config.access_token"))
 										? "outline"
 										: "default"
 								}
@@ -1698,10 +1714,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 								)}
 								{zedPolling
 									? "Waiting for approval…"
-									: hasZedCredentials(
-												form.watch("key.zed_key_config.user_id"),
-												form.watch("key.zed_key_config.access_token"),
-										)
+									: hasZedCredentials(form.watch("key.zed_key_config.user_id"), form.watch("key.zed_key_config.access_token"))
 										? "Reconnect"
 										: "Authenticate"}
 							</Button>
@@ -1714,15 +1727,10 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 										Sign in with Zed, then return here — the fields below fill in automatically.
 									</span>
 									<span className="text-muted-foreground text-xs">expires in {zedExpiresLeft}s</span>
-									</div>
+								</div>
 								<div className="flex flex-wrap gap-2">
 									<Button type="button" variant="outline" size="sm" className="text-xs" asChild>
-										<a
-											href={zedChallenge.login_url}
-											target="_blank"
-											rel="noopener noreferrer"
-											data-testid="zed-oauth-open-tab-btn"
-										>
+										<a href={zedChallenge.login_url} target="_blank" rel="noopener noreferrer" data-testid="zed-oauth-open-tab-btn">
 											Open login tab
 										</a>
 									</Button>
@@ -1740,8 +1748,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 								</div>
 								{zedPolling && <p className="text-muted-foreground text-xs">Checking approval every second…</p>}
 								<p className="text-muted-foreground text-xs">
-									Remote Bifrost? The login tab only works on this machine — paste the user ID and access token
-									below instead.
+									Remote Bifrost? The login tab only works on this machine — paste the user ID and access token below instead.
 								</p>
 							</div>
 						)}
@@ -1749,16 +1756,18 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 					<div className="bg-muted/50 flex items-start gap-2 rounded-md border p-3">
 						<Info className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
 						<p className="text-muted-foreground text-sm">
-							Zed needs a <strong>user ID + access token</strong> pair. <strong>Browser login</strong> above fills both
-							in automatically; <strong>manual paste</strong> below works everywhere, including remote servers.
+							Zed needs a <strong>user ID + access token</strong> pair. <strong>Browser login</strong> above fills both in automatically;{" "}
+							<strong>manual paste</strong> below works everywhere, including remote servers.
 						</p>
 					</div>
 					<div className="space-y-1.5">
 						<Label>Zed Credentials</Label>
 						<p className="text-muted-foreground text-sm">
 							Paste the values from your Zed login. The access token is the raw JSON blob (
-							<span className="font-mono">{"{"}"version":2,…{"}"}</span>) — paste it verbatim, exactly as Zed issued
-							it.
+							<span className="font-mono">
+								{"{"}"version":2,…{"}"}
+							</span>
+							) — paste it verbatim, exactly as Zed issued it.
 						</p>
 					</div>
 					<FormField
@@ -1782,8 +1791,11 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 							<FormItem>
 								<FormLabel>Access Token (Required)</FormLabel>
 								<FormDescription>
-									The raw JSON blob from Zed login (<span className="font-mono">{"{"}"version":2,…{"}"}</span>),
-									pasted verbatim.
+									The raw JSON blob from Zed login (
+									<span className="font-mono">
+										{"{"}"version":2,…{"}"}
+									</span>
+									), pasted verbatim.
 								</FormDescription>
 								<FormControl>
 									<SecretVarInput
@@ -1793,8 +1805,8 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 									/>
 								</FormControl>
 								<FormMessage />
-								</FormItem>
-							)}
+							</FormItem>
+						)}
 					/>
 					<FormField
 						control={control}
@@ -1804,16 +1816,12 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 								<FormLabel>System ID (Optional)</FormLabel>
 								<FormDescription>Leave blank for the well-known Zed editor default.</FormDescription>
 								<FormControl>
-									<SecretVarInput
-										data-testid="key-input-zed-system-id"
-										placeholder="3dfad06a-5c48-4c7b-a480-7ea86b311eb9"
-										{...field}
-									/>
+									<SecretVarInput data-testid="key-input-zed-system-id" placeholder="3dfad06a-5c48-4c7b-a480-7ea86b311eb9" {...field} />
 								</FormControl>
 								<FormMessage />
-								</FormItem>
-							)}
-						/>
+							</FormItem>
+						)}
+					/>
 					<FormField
 						control={control}
 						name="key.zed_key_config.organization_id"
@@ -1822,16 +1830,12 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 								<FormLabel>Organization ID (Optional)</FormLabel>
 								<FormDescription>Leave blank to use the default_organization_id from Zed.</FormDescription>
 								<FormControl>
-									<SecretVarInput
-										data-testid="key-input-zed-organization-id"
-										placeholder="org_01km1bf8f68enexw8gag4sv1zn"
-										{...field}
-									/>
+									<SecretVarInput data-testid="key-input-zed-organization-id" placeholder="org_01km1bf8f68enexw8gag4sv1zn" {...field} />
 								</FormControl>
 								<FormMessage />
-								</FormItem>
-								)}
-						/>
+							</FormItem>
+						)}
+					/>
 				</div>
 			)}
 			{isModal && (
@@ -1843,9 +1847,9 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 							Each Modal key targets <strong>exactly one deployment</strong> (one model on its own host). <strong>Model</strong> is the
 							identifier sent in the request body (e.g. <code>deepseek-ai/DeepSeek-V4.1-Flash</code>); <strong>Endpoint model</strong> is
 							the host segment baked into the deployment name (e.g. <code>deepseek-v4-1-flash</code>) used verbatim in{" "}
-							<code>&lt;username&gt;--ep-&lt;endpoint_model&gt;-server.&lt;region&gt;.modal.direct</code>. They may differ — both are
-							stored as-is and never derived from each other. The same proxy credential value may be reused across keys with different
-							names. The key&apos;s <strong>models</strong> list must contain exactly this model.
+							<code>&lt;username&gt;--ep-&lt;endpoint_model&gt;-server.&lt;region&gt;.modal.direct</code>. They may differ — both are stored
+							as-is and never derived from each other. The same proxy credential value may be reused across keys with different names. The
+							key&apos;s <strong>models</strong> list must contain exactly this model.
 						</p>
 					</div>
 					<FormField
@@ -1894,7 +1898,11 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 								<FormLabel>Username (Required)</FormLabel>
 								<FormDescription>Modal workspace username/namespace owning the deployment.</FormDescription>
 								<FormControl>
-									<SecretVarInput data-testid="key-input-modal-username" placeholder="your-modal-username or env.MODAL_USERNAME" {...field} />
+									<SecretVarInput
+										data-testid="key-input-modal-username"
+										placeholder="your-modal-username or env.MODAL_USERNAME"
+										{...field}
+									/>
 								</FormControl>
 								<FormMessage />
 							</FormItem>

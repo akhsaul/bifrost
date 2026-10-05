@@ -1850,8 +1850,10 @@ type zedLoginPollPayload struct {
 
 // pollZedLoginFlow handles POST /api/providers/zed/oauth/poll. It performs
 // exactly one login-session check: the UI owns the 1s cadence and stops on
-// any non-pending status. A success carries the user_id + verbatim
-// access_token blob the UI stores on the key; pending carries no credential.
+// any non-pending status. A success carries user_id + verbatim access_token
+// + username + organization_id (verified once against /client/users/me), so
+// the UI can fill the key and the operator can safely press Save; pending
+// carries no credential.
 func (h *ProviderHandler) pollZedLoginFlow(ctx *fasthttp.RequestCtx) {
 	var payload zedLoginPollPayload
 	if err := sonic.Unmarshal(ctx.PostBody(), &payload); err != nil {

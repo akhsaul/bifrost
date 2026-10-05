@@ -361,6 +361,43 @@ export const clineKeyConfigSchema = z
 		}
 	});
 
+// zedKeyConfigComplete reports whether a Zed login pair is present. It is
+// the check the outer key schema uses to decide whether this block is a real
+// credential: Zed has no top-level API key — the LLM token is minted from
+// user_id + access_token at request time.
+export const zedKeyConfigComplete = (data: { user_id?: unknown; access_token?: unknown } | undefined): boolean => {
+	if (!data) return false;
+	const d = data as Record<string, { value?: string; ref?: string } | undefined>;
+	return isSecretVarSet(d.user_id) && isSecretVarSet(d.access_token);
+};
+
+// Zed key config schema. user_id + access_token are required once the block
+// is present; system_id / organization_id stay optional (defaults apply at
+// request time). Fields are optional at the object level because the whole
+// block is validated as a unit by the outer key schema.
+export const zedKeyConfigSchema = z
+	.object({
+		user_id: secretVarSchema.optional(),
+		access_token: secretVarSchema.optional(),
+		system_id: secretVarSchema.optional(),
+		organization_id: secretVarSchema.optional(),
+	})
+	.superRefine((data, ctx) => {
+		const started =
+			isSecretVarSet(data.user_id) ||
+			isSecretVarSet(data.access_token) ||
+			isSecretVarSet(data.system_id) ||
+			isSecretVarSet(data.organization_id);
+		if (!started) return;
+
+		if (!isSecretVarSet(data.user_id)) {
+			ctx.addIssue({ code: "custom", path: ["user_id"], message: "User ID is required" });
+		}
+		if (!isSecretVarSet(data.access_token)) {
+			ctx.addIssue({ code: "custom", path: ["access_token"], message: "Access token is required" });
+		}
+	});
+
 // Modal key config schema. Each Modal key targets exactly one deployment:
 // model is the identifier sent in the request body (it may differ from the
 // host segment), endpoint_model is the host segment used verbatim in
@@ -526,6 +563,7 @@ export const modelProviderKeySchema = z
 		databricks_key_config: databricksKeyConfigSchema.optional(),
 		github_copilot_key_config: githubCopilotKeyConfigSchema.optional(),
 		cline_key_config: clineKeyConfigSchema.optional(),
+		zed_key_config: zedKeyConfigSchema.optional(),
 		modal_key_config: modalKeyConfigSchema.optional(),
 		use_for_batch_api: z.boolean().optional(),
 		use_anthropic_endpoints: z.boolean().optional(),
@@ -564,6 +602,12 @@ export const modelProviderKeySchema = z
 			}
 			// Cline authenticates from its OAuth refresh token when no static API key is given.
 			if (clineKeyConfigComplete(data.cline_key_config)) {
+				return true;
+			}
+			// Zed authenticates from its login pair (user_id + access_token);
+			// there is no top-level API key — the LLM token is minted per
+			// request from this block.
+			if (zedKeyConfigComplete(data.zed_key_config)) {
 				return true;
 			}
 			// Antigravity allows OAuth credentials via antigravity_key_config or top-level value

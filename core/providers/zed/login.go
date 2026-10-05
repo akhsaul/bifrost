@@ -34,8 +34,10 @@ import (
 //  2. The operator signs in; Zed redirects to
 //     http://127.0.0.1:<port>/?user_id=<id>&access_token=<encrypted>.
 //  3. PollLogin returns pending until the redirect lands, then decrypts
-//     (OAEP-SHA256, fallback PKCS1v15 for older servers) and hands back the
-//     verbatim access_token blob for zed_key_config.
+//     (OAEP-SHA256, fallback PKCS1v15 for older servers), verifies the login
+//     once against GET /client/users/me (username + organization_id), and
+//     hands back everything the UI needs to fill + safely save the key:
+//     user_id + verbatim access_token blob + organization_id.
 //
 // Auth lives on the base domain (zed.dev); the cloud.* host is only the API
 // surface. Remote Bifrosts cannot receive the loopback redirect, so the UI
@@ -51,10 +53,12 @@ type ZedLoginChallenge struct {
 
 // ZedLoginPollResult is the outcome of one poll attempt.
 type ZedLoginPollResult struct {
-	Status      string `json:"status"` // pending | success | expired | error
-	UserID      string `json:"user_id,omitempty"`
-	AccessToken string `json:"access_token,omitempty"`
-	Message     string `json:"message,omitempty"`
+	Status         string `json:"status"` // pending | success | expired | error
+	UserID         string `json:"user_id,omitempty"`
+	AccessToken    string `json:"access_token,omitempty"`
+	Username       string `json:"username,omitempty"`
+	OrganizationID string `json:"organization_id,omitempty"`
+	Message        string `json:"message,omitempty"`
 }
 
 // Poll statuses returned by PollLogin.
@@ -83,13 +87,17 @@ const (
 )
 
 // zedLoginSession holds one in-flight login: the private key for decryption
-// and the redirect payload once the browser lands.
+// and the redirect payload once the browser lands. apiBaseURL + systemID are
+// captured at StartLogin so PollLogin can verify against /client/users/me
+// with the same identity headers the mint path uses.
 type zedLoginSession struct {
 	privateKey *rsa.PrivateKey
 	createdAt  time.Time
 	listener   net.Listener
 	userID     string
 	blob       string
+	apiBaseURL string
+	systemID   string
 	done       bool
 	mu         sync.Mutex
 }
@@ -130,7 +138,7 @@ func StartLogin(ctx context.Context, signinBaseURL string, systemID string) (*Ze
 		return nil, providerUtils.NewProviderAPIError("zed: could not open the login callback listener (browser login needs loopback access to this Bifrost instance)", err, 0, nil, nil)
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
-	session := &zedLoginSession{privateKey: privateKey, createdAt: time.Now(), listener: listener}
+	session := &zedLoginSession{privateKey: privateKey, createdAt: time.Now(), listener: listener, apiBaseURL: DefaultBaseURL, systemID: strings.TrimSpace(systemID)}
 	sessionID := newSessionID()
 	zedLoginPool.Store(sessionID, session)
 
@@ -201,10 +209,14 @@ func isLoopback(remoteAddr string) bool {
 
 // PollLogin performs exactly one login-session check. It is stateless by
 // design: the caller (the UI) owns the 1s cadence and stops on any
-// non-pending status or expiry. A success carries the user_id + verbatim
-// access_token blob the UI stores on the key; pending carries no credential.
-// Decryption failures surface as status=error (HTTP 200) so the UI poll keeps
-// a machine-readable signal instead of an HTTP 5xx per-tick retry.
+// non-pending status or expiry. On success it decrypts the redirect blob,
+// verifies the login once against GET /client/users/me, and returns
+// user_id + verbatim access_token + username + organization_id so the UI can
+// fill the key AND prove the credential works before the operator presses
+// Save. A success that fails verification surfaces as status=error (HTTP
+// 200) with the Zed-side reason, never as a half-filled success.
+// Decryption failures surface the same way so the UI poll keeps a
+// machine-readable signal instead of an HTTP 5xx per-tick retry.
 func PollLogin(ctx context.Context, sessionID string) (*ZedLoginPollResult, *schemas.BifrostError) {
 	_ = ctx
 	if strings.TrimSpace(sessionID) == "" {
@@ -222,6 +234,7 @@ func PollLogin(ctx context.Context, sessionID string) (*ZedLoginPollResult, *sch
 	}
 	session.mu.Lock()
 	done, userID, blob := session.done, session.userID, session.blob
+	baseURL, systemID := session.apiBaseURL, session.systemID
 	session.mu.Unlock()
 	if !done {
 		return &ZedLoginPollResult{Status: LoginPollPending}, nil
@@ -236,9 +249,78 @@ func PollLogin(ctx context.Context, sessionID string) (*ZedLoginPollResult, *sch
 		}
 		return &ZedLoginPollResult{Status: LoginPollError, Message: msg}, nil
 	}
+	// Verify the login once against /client/users/me before reporting
+	// success: the token could be stale/revoked between the browser redirect
+	// and this poll, and Save-time verification would surface it only after
+	// the operator fills the form. A failure here is status=error (HTTP 200)
+	// with the Zed-side reason, never a half-filled success.
+	username, orgID, bErr := verifyLoginCredentials(ctx, baseURL, systemID, userID, accessToken)
+	if bErr != nil {
+		zedLoginPool.Delete(sessionID)
+		session.listener.Close()
+		msg := "Could not verify the Zed login."
+		if bErr.Error != nil && bErr.Error.Message != "" {
+			msg = bErr.Error.Message
+		}
+		return &ZedLoginPollResult{Status: LoginPollError, Message: msg}, nil
+	}
 	zedLoginPool.Delete(sessionID)
 	session.listener.Close()
-	return &ZedLoginPollResult{Status: LoginPollSuccess, UserID: userID, AccessToken: accessToken}, nil
+	return &ZedLoginPollResult{Status: LoginPollSuccess, UserID: userID, AccessToken: accessToken, Username: username, OrganizationID: orgID}, nil
+}
+
+// verifyLoginCredentials hits GET /client/users/me with the freshly
+// decrypted login material and returns the username + default organization.
+// It uses a throwaway client so it never touches the provider token cache —
+// there is no minted LLM token yet at poll time, only raw login material.
+func verifyLoginCredentials(ctx context.Context, baseURL, systemID, userID, accessToken string) (string, string, *schemas.BifrostError) {
+	base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if base == "" {
+		base = DefaultBaseURL
+	}
+	if strings.TrimSpace(systemID) == "" {
+		systemID = DefaultSystemID
+	}
+	userAuth := strings.TrimSpace(userID) + " " + strings.TrimSpace(accessToken)
+
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseRequest(req)
+	defer fasthttp.ReleaseResponse(resp)
+
+	req.SetRequestURI(base + "/client/users/me")
+	req.Header.SetMethod(http.MethodGet)
+	req.Header.Set("Accept", "application/json")
+	applyUserAuthHeaders(req, userAuth, systemID, nil)
+
+	client := LoginClient()
+	var doErr error
+	if ctx != nil {
+		if deadline, ok := ctx.Deadline(); ok {
+			doErr = client.DoDeadline(req, resp, deadline)
+		} else {
+			doErr = client.DoTimeout(req, resp, refreshTimeout)
+		}
+	} else {
+		doErr = client.DoTimeout(req, resp, refreshTimeout)
+	}
+	if doErr != nil {
+		return "", "", providerUtils.NewProviderAPIError("zed: could not reach Zed to verify the login", doErr, 0, nil, nil)
+	}
+	if len(resp.Body()) > maxAuthBodyBytes {
+		return "", "", providerUtils.NewProviderAPIError("zed: users/me response exceeded size limit", nil, resp.StatusCode(), nil, nil)
+	}
+	if resp.StatusCode() != http.StatusOK {
+		return "", "", classifyAuthError("zed: verifying the login failed", resp.StatusCode())
+	}
+	var parsed ZedUsersMeResponse
+	if err := sonic.Unmarshal(resp.Body(), &parsed); err != nil {
+		return "", "", providerUtils.NewProviderAPIError("zed: could not parse the users/me response", err, resp.StatusCode(), nil, nil)
+	}
+	if strings.TrimSpace(parsed.DefaultOrganizationID) == "" {
+		return "", "", blockingError("zed: Zed returned no default_organization_id for this account", resp.StatusCode())
+	}
+	return strings.TrimSpace(parsed.User.Username), strings.TrimSpace(parsed.DefaultOrganizationID), nil
 }
 
 // decryptAccessToken base64url-decodes the redirect blob and decrypts it

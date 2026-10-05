@@ -8,6 +8,7 @@ import {
 	githubCopilotKeyConfigComplete,
 	githubCopilotKeyConfigSchema,
 	secretVarSchema,
+	zedKeyConfigComplete,
 } from "@/lib/types/schemas";
 import { isValidAliases, isValidVertexAuthCredentials } from "@/lib/utils/validation";
 import { z } from "zod";
@@ -209,6 +210,24 @@ const ReplicateKeyConfigSchema = z.object({
 	use_deployments_endpoint: z.boolean().optional(),
 });
 
+const ZedLoginKeyConfigSchema = z
+	.object({
+		user_id: z.string().optional(),
+		access_token: z.string().optional(),
+		system_id: z.string().optional(),
+		organization_id: z.string().optional(),
+	})
+	.optional();
+
+// zedLoginKeyConfigComplete mirrors the helper in lib/types/schemas.ts over
+// the legacy plain-string key shape used by this file's KeySchema.
+const zedLoginKeyConfigComplete = (data: { user_id?: unknown; access_token?: unknown } | undefined): boolean => {
+	if (!data || typeof data !== "object") return false;
+	const d = data as Record<string, unknown>;
+	const set = (v: unknown) => typeof v === "string" && v.trim() !== "";
+	return set(d.user_id) && set(d.access_token);
+};
+
 const KeySchema = z.object({
 	id: z.string(),
 	name: z.string().min(1, "Name is required for the key"),
@@ -227,6 +246,7 @@ const KeySchema = z.object({
 	github_copilot_key_config: githubCopilotKeyConfigSchema.optional(),
 	cline_key_config: clineKeyConfigSchema.optional(),
 	antigravity_key_config: antigravityKeyConfigSchema.optional(),
+	zed_key_config: ZedLoginKeyConfigSchema,
 	use_for_batch_api: z.boolean().optional(),
 });
 
@@ -339,6 +359,16 @@ export const ProviderFormSchema = z
 						ctx.addIssue({
 							code: z.ZodIssueCode.custom,
 							message: "Set a Cline API key, or fill in the OAuth refresh token",
+							path: ["keys", index, "value"],
+						});
+					}
+				} else if (effectiveProviderType === "zed") {
+					// Zed has no top-level API key: the login pair above mints
+					// the LLM token per request, already verified at OAuth time.
+					if (!zedLoginKeyConfigComplete(key.zed_key_config)) {
+						ctx.addIssue({
+							code: z.ZodIssueCode.custom,
+							message: "Authenticate with Zed OAuth, or fill in the user ID and access token",
 							path: ["keys", index, "value"],
 						});
 					}

@@ -120,3 +120,42 @@ func TestStartLoginURLShape(t *testing.T) {
 		t.Errorf("fresh login poll = %q, want pending", res.Status)
 	}
 }
+
+// TestVerifyLoginAgainstUsersMe pins the OAuth completion step: the freshly
+// decrypted (user_id, access_token) pair is verified once against
+// GET /client/users/me, and the poll result carries the username +
+// organization_id the key form needs to save safely.
+func TestVerifyLoginAgainstUsersMe(t *testing.T) {
+	const userID = "678672"
+	const blob = `{"version":2,"id":"client_token_abc","token":"tok_xyz"}`
+	stub := zed.NewUsersMeStub(t,
+		userID+" "+blob,
+		`{"user":{"id":678672,"username":"akhsaul"},"default_organization_id":"org_01test"}`,
+		200,
+	)
+	username, orgID, bErr := zed.VerifyLoginForTest(stub, "", userID, blob)
+	if bErr != nil {
+		t.Fatalf("VerifyLoginForTest: %v", bErr)
+	}
+	if username != "akhsaul" {
+		t.Errorf("username = %q, want akhsaul", username)
+	}
+	if orgID != "org_01test" {
+		t.Errorf("organization_id = %q, want org_01test", orgID)
+	}
+}
+
+// TestVerifyLoginRejectsBadCredentials pins the failure side: a users/me
+// rejection must surface as an error, never as an empty success the form
+// would then try to save.
+func TestVerifyLoginRejectsBadCredentials(t *testing.T) {
+	stub := zed.NewUsersMeStub(t,
+		"678672 right-blob",
+		`{}`,
+		200,
+	)
+	_, _, bErr := zed.VerifyLoginForTest(stub, "", "678672", "wrong-blob")
+	if bErr == nil {
+		t.Fatal("VerifyLoginForTest with a rejected credential must return an error")
+	}
+}
