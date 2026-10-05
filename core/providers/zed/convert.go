@@ -16,6 +16,7 @@ import (
 // to false; Zed replays full conversations like the native API, so the
 // default (prefill allowed) applies.
 func toInnerAnthropicRequest(ctx *schemas.BifrostContext, request *schemas.BifrostChatRequest) (*anthropic.AnthropicMessageRequest, *schemas.BifrostError) {
+	ensureZedChatSystemPrompt(request)
 	inner, err := anthropic.ToAnthropicChatRequest(ctx, request)
 	if err != nil {
 		return nil, providerUtils.NewBifrostOperationError(schemas.ErrRequestBodyConversion, err)
@@ -36,6 +37,7 @@ func toInnerAnthropicRequest(ctx *schemas.BifrostContext, request *schemas.Bifro
 // generateContent shape Zed expects inside provider_request. The model is
 // sent as a "models/..." resource name, matching the live Zed capture.
 func toInnerGeminiRequest(ctx *schemas.BifrostContext, request *schemas.BifrostChatRequest) (*gemini.GeminiGenerationRequest, *schemas.BifrostError) {
+	ensureZedChatSystemPrompt(request)
 	inner, err := gemini.ToGeminiChatCompletionRequest(ctx, request)
 	if err != nil {
 		return nil, providerUtils.NewBifrostOperationError(schemas.ErrRequestBodyConversion, err)
@@ -54,6 +56,7 @@ func toInnerGeminiRequest(ctx *schemas.BifrostContext, request *schemas.BifrostC
 // only these envelope-level fields are set here; sampling/model params ride
 // inside the converted request itself.
 func toInnerOpenAIRequest(ctx *schemas.BifrostContext, request *schemas.BifrostResponsesRequest, threadID string) (*openai.OpenAIResponsesRequest, *schemas.BifrostError) {
+	ensureZedResponsesSystemPrompt(request)
 	inner := openai.ToOpenAIResponsesRequest(ctx, request)
 	if inner == nil {
 		return nil, providerUtils.NewBifrostOperationError(schemas.ErrRequestBodyConversion, errNilOpenAIRequest)
@@ -65,6 +68,106 @@ func toInnerOpenAIRequest(ctx *schemas.BifrostContext, request *schemas.BifrostR
 	}
 	inner.Store = schemas.Ptr(false)
 	return inner, nil
+}
+
+// zedDefaultSystemPrompt is the fallback system instruction injected into
+// every Zed inner request (anthropic, google, open_ai families) when the
+// caller supplied none. Zed's cloud API rejects Google (and, live-verified,
+// Anthropic/OpenAI-family) requests that carry no system content at all, so
+// the default keeps bare user-only transcripts sendable. Matched against the
+// Bifrost-level shapes (schemas.ChatMessage / schemas.ResponsesMessage),
+// never the serialized wire JSON.
+const zedDefaultSystemPrompt = "You are helpfull assistant"
+
+// hasZedChatSystemPrompt reports whether a chat transcript already carries a
+// system/developer turn with non-empty content.
+func hasZedChatSystemPrompt(request *schemas.BifrostChatRequest) bool {
+	if request == nil {
+		return false
+	}
+	for _, msg := range request.Input {
+		if msg.Role != schemas.ChatMessageRoleSystem && msg.Role != schemas.ChatMessageRoleDeveloper {
+			continue
+		}
+		if msg.Content == nil {
+			continue
+		}
+		if msg.Content.ContentStr != nil && *msg.Content.ContentStr != "" {
+			return true
+		}
+		for _, block := range msg.Content.ContentBlocks {
+			if block.Text != nil && *block.Text != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ensureZedChatSystemPrompt prepends the default system turn to a chat
+// request that carries none, mirroring the Zed editor's own capture shape
+// (system prompt first, then the user transcript). Mutating the caller's
+// request keeps the retry/fallback path on the same transcript: the second
+// converter call sees a system turn present and leaves it untouched.
+func ensureZedChatSystemPrompt(request *schemas.BifrostChatRequest) {
+	if request == nil || hasZedChatSystemPrompt(request) {
+		return
+	}
+	request.Input = append([]schemas.ChatMessage{{
+		Role:    schemas.ChatMessageRoleSystem,
+		Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr(zedDefaultSystemPrompt)},
+	}}, request.Input...)
+}
+
+// hasZedResponsesSystemPrompt reports whether a Responses request already
+// carries a system instruction: top-level instructions, or a system/developer
+// input message with non-empty content. Messages with no role at all are
+// skipped: the OpenAI converter drops role-less non-message items, so they
+// can never satisfy Zed's system requirement.
+func hasZedResponsesSystemPrompt(request *schemas.BifrostResponsesRequest) bool {
+	if request == nil {
+		return false
+	}
+	if request.Params != nil && request.Params.Instructions != nil && *request.Params.Instructions != "" {
+		return true
+	}
+	for _, msg := range request.Input {
+		if msg.Role == nil || (*msg.Role != schemas.ResponsesInputMessageRoleSystem && *msg.Role != schemas.ResponsesInputMessageRoleDeveloper) {
+			continue
+		}
+		if msg.Content == nil {
+			continue
+		}
+		if msg.Content.ContentStr != nil && *msg.Content.ContentStr != "" {
+			return true
+		}
+		for _, block := range msg.Content.ContentBlocks {
+			if block.Text != nil && *block.Text != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ensureZedResponsesSystemPrompt prepends a default system input message to a
+// Responses request that carries none (neither top-level instructions nor a
+// system/developer turn). Only the inner open_ai family funnels through
+// ToResponsesRequest conversion, so input message placement — not
+// instructions — matches the live Zed capture for that family (system first in
+// input[]). Idempotent like the chat counterpart.
+func ensureZedResponsesSystemPrompt(request *schemas.BifrostResponsesRequest) {
+	if request == nil || hasZedResponsesSystemPrompt(request) {
+		return
+	}
+	systemType := schemas.ResponsesMessageTypeMessage
+	request.Input = append([]schemas.ResponsesMessage{{
+		Type: &systemType,
+		Role: schemas.Ptr(schemas.ResponsesInputMessageRoleSystem),
+		Content: &schemas.ResponsesMessageContent{
+			ContentStr: schemas.Ptr(zedDefaultSystemPrompt),
+		},
+	}}, request.Input...)
 }
 
 // toGeminiResourceName maps a Bifrost model id to the Gemini resource name

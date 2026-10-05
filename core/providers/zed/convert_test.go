@@ -173,6 +173,161 @@ func keysOf(m map[string]interface{}) []string {
 	return out
 }
 
+// TestDefaultSystemPromptInjected verifies the red case behind the fix: a
+// bare user-only transcript (no system prompt from the client) must still
+// carry a system instruction in every Zed inner family, since Zed's cloud API
+// rejects requests with no system content at all.
+func TestDefaultSystemPromptInjected(t *testing.T) {
+	provider := zedTestProvider(t)
+
+	anthropicEnv := provider.BuildEnvelopeForTest(testCtx(), &schemas.BifrostChatRequest{
+		Provider: schemas.Zed,
+		Model:    "claude-haiku-4-5",
+		Input: []schemas.ChatMessage{
+			{Role: schemas.ChatMessageRoleUser, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("hello")}},
+		},
+	}, zed.ZedInnerAnthropic)
+	if anthropicEnv == nil {
+		t.Fatal("nil anthropic envelope")
+	}
+	raw, _ := json.Marshal(anthropicEnv.ProviderRequest)
+	var anthropicInner map[string]interface{}
+	if err := json.Unmarshal(raw, &anthropicInner); err != nil {
+		t.Fatal(err)
+	}
+	sys, ok := anthropicInner["system"]
+	if !ok {
+		t.Fatal("anthropic inner request must carry system when the client sent none")
+	}
+	if !strings.Contains(jsonString(t, sys), "You are helpfull assistant") {
+		t.Errorf("anthropic system = %v, want default prompt", sys)
+	}
+
+	geminiEnv := provider.BuildEnvelopeForTest(testCtx(), &schemas.BifrostChatRequest{
+		Provider: schemas.Zed,
+		Model:    "gemini-3.5-flash",
+		Input: []schemas.ChatMessage{
+			{Role: schemas.ChatMessageRoleUser, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("hello")}},
+		},
+	}, zed.ZedInnerGoogle)
+	if geminiEnv == nil {
+		t.Fatal("nil gemini envelope")
+	}
+	raw, _ = json.Marshal(geminiEnv.ProviderRequest)
+	var geminiInner map[string]interface{}
+	if err := json.Unmarshal(raw, &geminiInner); err != nil {
+		t.Fatal(err)
+	}
+	si, ok := geminiInner["systemInstruction"]
+	if !ok {
+		t.Fatal("gemini inner request must carry systemInstruction when the client sent none")
+	}
+	if !strings.Contains(jsonString(t, si), "You are helpfull assistant") {
+		t.Errorf("gemini systemInstruction = %v, want default prompt", si)
+	}
+
+	responsesEnv := provider.BuildResponsesEnvelopeForTest(testCtx(), &schemas.BifrostResponsesRequest{
+		Provider: schemas.Zed,
+		Model:    "gpt-5-nano",
+		Input: []schemas.ResponsesMessage{
+			{
+				Type: schemas.Ptr(schemas.ResponsesMessageTypeMessage),
+				Role: ptrRole(schemas.ResponsesInputMessageRoleUser),
+				Content: &schemas.ResponsesMessageContent{
+					ContentBlocks: []schemas.ResponsesMessageContentBlock{{Type: "input_text", Text: schemas.Ptr("hello")}},
+				},
+			},
+		},
+	})
+	if responsesEnv == nil {
+		t.Fatal("nil responses envelope")
+	}
+	raw, _ = json.Marshal(responsesEnv.ProviderRequest)
+	var responsesInner map[string]interface{}
+	if err := json.Unmarshal(raw, &responsesInner); err != nil {
+		t.Fatal(err)
+	}
+	input, _ := responsesInner["input"].([]interface{})
+	if len(input) == 0 {
+		t.Fatal("openai inner input must not be empty")
+	}
+	first, _ := input[0].(map[string]interface{})
+	if first["role"] != string(schemas.ResponsesInputMessageRoleSystem) {
+		t.Fatalf("openai inner input[0].role = %v, want system", first["role"])
+	}
+	if !strings.Contains(jsonString(t, first["content"]), "You are helpfull assistant") {
+		t.Errorf("openai inner input[0].content = %v, want default prompt", first["content"])
+	}
+}
+
+// TestExplicitSystemPromptPreserved verifies the guard: a client-supplied
+// system prompt must pass through untouched, never doubled with the default.
+func TestExplicitSystemPromptPreserved(t *testing.T) {
+	provider := zedTestProvider(t)
+
+	chatReq := &schemas.BifrostChatRequest{
+		Provider: schemas.Zed,
+		Model:    "claude-haiku-4-5",
+		Input: []schemas.ChatMessage{
+			{Role: schemas.ChatMessageRoleSystem, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("stay terse")}},
+			{Role: schemas.ChatMessageRoleUser, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("hello")}},
+		},
+	}
+	env := provider.BuildEnvelopeForTest(testCtx(), chatReq, zed.ZedInnerAnthropic)
+	if env == nil {
+		t.Fatal("nil envelope")
+	}
+	raw, _ := json.Marshal(env.ProviderRequest)
+	var inner map[string]interface{}
+	if err := json.Unmarshal(raw, &inner); err != nil {
+		t.Fatal(err)
+	}
+	if got := jsonString(t, inner["system"]); !strings.Contains(got, "stay terse") || strings.Contains(got, "You are helpfull assistant") {
+		t.Errorf("system = %v, want only the client prompt", inner["system"])
+	}
+
+	responsesReq := &schemas.BifrostResponsesRequest{
+		Provider: schemas.Zed,
+		Model:    "gpt-5-nano",
+		Params:   &schemas.ResponsesParameters{Instructions: schemas.Ptr("stay terse")},
+		Input: []schemas.ResponsesMessage{
+			{
+				Type: schemas.Ptr(schemas.ResponsesMessageTypeMessage),
+				Role: ptrRole(schemas.ResponsesInputMessageRoleUser),
+				Content: &schemas.ResponsesMessageContent{
+					ContentBlocks: []schemas.ResponsesMessageContentBlock{{Type: "input_text", Text: schemas.Ptr("hello")}},
+				},
+			},
+		},
+	}
+	responsesEnv := provider.BuildResponsesEnvelopeForTest(testCtx(), responsesReq)
+	if responsesEnv == nil {
+		t.Fatal("nil responses envelope")
+	}
+	raw, _ = json.Marshal(responsesEnv.ProviderRequest)
+	var responsesInner map[string]interface{}
+	if err := json.Unmarshal(raw, &responsesInner); err != nil {
+		t.Fatal(err)
+	}
+	// Top-level instructions pass through as the wire "instructions" field,
+	// so the guard must leave the request untouched (no default injected).
+	if got, _ := responsesInner["instructions"].(string); got != "stay terse" {
+		t.Errorf("instructions = %v, want the client instructions", responsesInner["instructions"])
+	}
+	if got := jsonString(t, responsesInner["input"]); strings.Contains(got, "You are helpfull assistant") {
+		t.Errorf("input = %v, must not gain the default prompt", responsesInner["input"])
+	}
+}
+
+func jsonString(t *testing.T, v interface{}) string {
+	t.Helper()
+	raw, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(raw)
+}
+
 func ptrRole(r schemas.ResponsesMessageRoleType) *schemas.ResponsesMessageRoleType {
 	return &r
 }
