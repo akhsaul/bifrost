@@ -102,8 +102,9 @@ func TestStartLoginURLShape(t *testing.T) {
 	if _, present := q["redirect_uri"]; present {
 		t.Error("LoginURL must NOT carry redirect_uri (editor sends port only)")
 	}
-	// The public key must be BASE64_URL_SAFE(PKCS1 DER) decodable.
-	der, err := base64.RawURLEncoding.DecodeString(q.Get("native_app_public_key"))
+	// The public key must be BASE64_URL_SAFE(PKCS1 DER) decodable (padded,
+	// like the editor's rpc auth TryFrom<PublicKey>).
+	der, err := base64.URLEncoding.DecodeString(q.Get("native_app_public_key"))
 	if err != nil || len(der) == 0 {
 		t.Fatalf("native_app_public_key is not base64url: %v", err)
 	}

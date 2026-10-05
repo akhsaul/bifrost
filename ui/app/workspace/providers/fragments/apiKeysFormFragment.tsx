@@ -473,6 +473,13 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 				return s - 1;
 			});
 		} catch (err: any) {
+			// Expiry is terminal: surface it instead of spinning until the
+			// local countdown runs out.
+			if (err?.status === 410) {
+				stopZedPolling();
+				setZedError(err?.data?.error?.message || "The login link expired. Start over to get a new one.");
+				return;
+			}
 			// A single failed poll (network blip, 5xx) must not kill the flow;
 			// the next tick retries.
 			if (!zedPollActive.current) return;

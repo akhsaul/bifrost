@@ -72,6 +72,10 @@ const (
 	loginListenerTimeout = 5 * time.Minute
 	// zedSigninPath is the login page that accepts the public key.
 	zedSigninPath = "/native_app_signin"
+	// signinSucceededPath is the hosted confirmation page the loopback
+	// listener 302-redirects the browser to after storing the callback
+	// (mirrors crates/client authenticate_with_browser).
+	signinSucceededPath = "/native_app_signin_succeeded"
 	// DefaultSigninBaseURL is the base domain that serves the browser login.
 	// The editor's default server_url is https://zed.dev; signin is a page on
 	// that host, not on the cloud.* API surface used for inference.
@@ -116,7 +120,10 @@ func StartLogin(ctx context.Context, signinBaseURL string, systemID string) (*Ze
 		return nil, providerUtils.NewProviderAPIError("zed: could not generate the login keypair", err, 0, nil, nil)
 	}
 	der := x509.MarshalPKCS1PublicKey(&privateKey.PublicKey)
-	publicKey := base64.RawURLEncoding.EncodeToString(der)
+	// Match the editor exactly (rpc auth TryFrom<PublicKey>: BASE64_URL_SAFE
+	// with padding). RSA-2048 PKCS1 DER happens to need no padding today, but
+	// padded encoding is what Zed's decoder expects, so send padded.
+	publicKey := base64.URLEncoding.EncodeToString(der)
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -127,7 +134,7 @@ func StartLogin(ctx context.Context, signinBaseURL string, systemID string) (*Ze
 	sessionID := newSessionID()
 	zedLoginPool.Store(sessionID, session)
 
-	go serveLoginCallback(sessionID, session)
+	go serveLoginCallback(sessionID, session, base)
 
 	query := "native_app_port=" + strconv.Itoa(port) +
 		"&native_app_public_key=" + url.QueryEscape(publicKey)
@@ -144,8 +151,12 @@ func StartLogin(ctx context.Context, signinBaseURL string, systemID string) (*Ze
 }
 
 // serveLoginCallback serves the single post-login redirect, then closes the
-// listener. Only loopback remotes are accepted.
-func serveLoginCallback(sessionID string, session *zedLoginSession) {
+// listener. Only loopback remotes are accepted. It mirrors the editor: the
+// callback reads user_id + access_token from the query, stores the STILL
+// ENCRYPTED blob, and 302-redirects the browser to the hosted
+// /native_app_signin_succeeded page — the "login received" screen the user
+// sees comes from zed.dev, not from us.
+func serveLoginCallback(sessionID string, session *zedLoginSession, signinBase string) {
 	server := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !isLoopback(r.RemoteAddr) {
@@ -164,8 +175,10 @@ func serveLoginCallback(sessionID string, session *zedLoginSession) {
 			session.blob = blob
 			session.done = true
 			session.mu.Unlock()
-			w.Header().Set("Content-Type", "text/html")
-			_, _ = w.Write([]byte("<html><body><h1>Zed login received.</h1><p>Return to Bifrost — the key form fills in automatically.</p></body></html>"))
+			// Editor behaviour: 302 to the hosted success page. Decryption
+			// happens later, in PollLogin, so a wrong key can never show a
+			// false success screen.
+			http.Redirect(w, r, strings.TrimRight(signinBase, "/")+signinSucceededPath, http.StatusFound)
 		}),
 		ReadTimeout: 30 * time.Second,
 	}
@@ -190,6 +203,8 @@ func isLoopback(remoteAddr string) bool {
 // design: the caller (the UI) owns the 1s cadence and stops on any
 // non-pending status or expiry. A success carries the user_id + verbatim
 // access_token blob the UI stores on the key; pending carries no credential.
+// Decryption failures surface as status=error (HTTP 200) so the UI poll keeps
+// a machine-readable signal instead of an HTTP 5xx per-tick retry.
 func PollLogin(ctx context.Context, sessionID string) (*ZedLoginPollResult, *schemas.BifrostError) {
 	_ = ctx
 	if strings.TrimSpace(sessionID) == "" {
@@ -213,7 +228,13 @@ func PollLogin(ctx context.Context, sessionID string) (*ZedLoginPollResult, *sch
 	}
 	accessToken, bErr := decryptAccessToken(session.privateKey, blob)
 	if bErr != nil {
-		return nil, bErr
+		zedLoginPool.Delete(sessionID)
+		session.listener.Close()
+		msg := "Could not decrypt the login token."
+		if bErr.Error != nil && bErr.Error.Message != "" {
+			msg = bErr.Error.Message
+		}
+		return &ZedLoginPollResult{Status: LoginPollError, Message: msg}, nil
 	}
 	zedLoginPool.Delete(sessionID)
 	session.listener.Close()
@@ -223,9 +244,15 @@ func PollLogin(ctx context.Context, sessionID string) (*ZedLoginPollResult, *sch
 // decryptAccessToken base64url-decodes the redirect blob and decrypts it
 // with the session private key: OAEP-SHA256 first, PKCS1v15 fallback for
 // older servers. The plaintext is the verbatim access_token JSON blob for
-// zed_key_config — never parsed or re-encoded here.
+// zed_key_config — never parsed or re-encoded here. It accepts both padded
+// and unpadded base64url (BASE64_URL_SAFE per rpc auth), because padding is
+// a transport detail the sender may or may not include.
 func decryptAccessToken(privateKey *rsa.PrivateKey, blob string) (string, *schemas.BifrostError) {
-	ciphertext, err := base64.RawURLEncoding.DecodeString(strings.TrimSpace(blob))
+	trimmed := strings.TrimSpace(blob)
+	ciphertext, err := base64.URLEncoding.DecodeString(trimmed)
+	if err != nil {
+		ciphertext, err = base64.RawURLEncoding.DecodeString(trimmed)
+	}
 	if err != nil {
 		// Not encrypted (manual-paste path hands the blob straight through):
 		// treat it as the verbatim token when it already looks like JSON.
