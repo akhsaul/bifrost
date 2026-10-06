@@ -1,0 +1,42 @@
+{
+  "provider": "open_ai",
+  "model": "gpt-6-luna",
+  "provider_request": {
+    "model": "gpt-6-luna",
+    "input": [
+      {
+        "type": "message",
+        "role": "user",
+        "content": [
+          {
+            "type": "input_text",
+            "text": "hello"
+          }
+        ]
+      },
+      {
+        "type": "message",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "Hello! I am ready to help you work on Bifrost. What task, bug, or feature would you like to tackle today?",
+            "annotations": []
+          }
+        ]
+      },
+      {
+        "type": "message",
+        "role": "user",
+        "content": [
+          {
+            "type": "input_text",
+            "text": "Generate a concise 3-7 word title for this conversation, omitting punctuation.\nGo straight to the title, without any preamble and prefix like `Here's a concise suggestion:...` or `Title:`.\nIf the conversation is about a specific subject, include it in the title.\nBe descriptive. DO NOT speak in the first person.\n"
+          }
+        ]
+      }
+    ],
+    "stream": true,
+    "store": false
+  }
+}
