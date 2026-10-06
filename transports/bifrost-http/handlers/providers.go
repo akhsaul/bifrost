@@ -1781,3 +1781,368 @@ func providerDialTargetChanged(old *schemas.NetworkConfig, next schemas.NetworkC
 	}
 	return next.BaseURL != "" && next.BaseURL != oldBaseURL
 }
+// getAntigravityAuthURL handles GET /api/providers/antigravity/oauth/auth-url
+func (h *ProviderHandler) getAntigravityAuthURL(ctx *fasthttp.RequestCtx) {
+	redirectURI := strings.TrimSpace(string(ctx.QueryArgs().Peek("redirect_uri")))
+	state := strings.TrimSpace(string(ctx.QueryArgs().Peek("state")))
+
+	authURL := antigravity.BuildAntigravityAuthURL(redirectURI, state)
+	resp := map[string]string{
+		"auth_url":  authURL,
+		"client_id": antigravity.GetAntigravityClientID(),
+	}
+	data, err := sonic.Marshal(resp)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
+}
+
+type exchangeAntigravityCodePayload struct {
+	Code         string `json:"code"`
+	RedirectURI  string `json:"redirect_uri"`
+	ClientID     string `json:"client_id,omitempty"`
+	ClientSecret string `json:"client_secret,omitempty"`
+}
+
+// exchangeAntigravityAuthCode handles POST /api/providers/antigravity/oauth/exchange
+func (h *ProviderHandler) exchangeAntigravityAuthCode(ctx *fasthttp.RequestCtx) {
+	var payload exchangeAntigravityCodePayload
+	if err := sonic.Unmarshal(ctx.PostBody(), &payload); err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	payload.Code = strings.TrimSpace(payload.Code)
+	if payload.Code == "" {
+		SendError(ctx, fasthttp.StatusBadRequest, "Authorization code is required")
+		return
+	}
+
+	creds, err := antigravity.ExchangeAuthCode(
+		nil,
+		nil,
+		payload.Code,
+		payload.RedirectURI,
+		payload.ClientID,
+		payload.ClientSecret,
+		nil,
+	)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Failed to exchange auth code: %v", err))
+		return
+	}
+
+	resp := map[string]string{
+		"refresh_token": creds.RefreshToken,
+		"access_token":  creds.AccessToken,
+		"project_id":    creds.ProjectID,
+		"client_id":     creds.ClientID,
+		"client_secret": creds.ClientSecret,
+		"email":         creds.Email,
+		"name":          creds.Name,
+	}
+	data, err := sonic.Marshal(resp)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
+}
+
+type clineDevicePayload struct {
+	ClientID string `json:"client_id,omitempty"`
+}
+
+// clineOAuthWorkOSBase overrides the WorkOS base URL for the Cline device
+// helpers. Empty means production. Tests point it at a mock server.
+var clineOAuthWorkOSBase = ""
+
+// startClineDeviceFlow handles POST /api/providers/cline/oauth/device.
+// It starts a WorkOS device authorization and returns the challenge the UI
+// shows to the operator: the verification URI/user code to approve, plus the
+// device code the UI polls with. The device code is short-lived (300s) and
+// single-purpose.
+func (h *ProviderHandler) startClineDeviceFlow(ctx *fasthttp.RequestCtx) {
+	var payload clineDevicePayload
+	if len(ctx.PostBody()) > 0 {
+		if err := sonic.Unmarshal(ctx.PostBody(), &payload); err != nil {
+			SendError(ctx, fasthttp.StatusBadRequest, "Invalid request payload")
+			return
+		}
+	}
+
+	challenge, bifrostErr := cline.StartDeviceFlow(ctx, cline.DeviceFlowClient(), payload.ClientID, clineOAuthWorkOSBase)
+	if bifrostErr != nil {
+		msg := "Failed to start Cline device flow"
+		if bifrostErr.Error != nil && bifrostErr.Error.Message != "" {
+			msg = bifrostErr.Error.Message
+		}
+		status := fasthttp.StatusBadGateway
+		if bifrostErr.StatusCode != nil && *bifrostErr.StatusCode >= 400 && *bifrostErr.StatusCode < 600 {
+			status = *bifrostErr.StatusCode
+		}
+		SendError(ctx, status, msg)
+		return
+	}
+
+	data, err := sonic.Marshal(challenge)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
+}
+
+type clineDevicePollPayload struct {
+	DeviceCode string `json:"device_code"`
+	ClientID   string `json:"client_id,omitempty"`
+}
+
+// pollClineDeviceFlow handles POST /api/providers/cline/oauth/poll. It
+// performs exactly one WorkOS authenticate attempt: the UI owns the 1s
+// cadence and stops on any non-pending status. A success carries the
+// refresh token the UI stores on the key; pending carries no credential.
+func (h *ProviderHandler) pollClineDeviceFlow(ctx *fasthttp.RequestCtx) {
+	var payload clineDevicePollPayload
+	if err := sonic.Unmarshal(ctx.PostBody(), &payload); err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, "Invalid request payload")
+		return
+	}
+	if strings.TrimSpace(payload.DeviceCode) == "" {
+		SendError(ctx, fasthttp.StatusBadRequest, "device_code is required")
+		return
+	}
+
+	result, bifrostErr := cline.PollDeviceAuth(ctx, cline.DeviceFlowClient(), payload.ClientID, payload.DeviceCode, clineOAuthWorkOSBase)
+	if bifrostErr != nil {
+		msg := "Failed to poll Cline device flow"
+		if bifrostErr.Error != nil && bifrostErr.Error.Message != "" {
+			msg = bifrostErr.Error.Message
+		}
+		SendError(ctx, fasthttp.StatusBadGateway, msg)
+		return
+	}
+	if result.Status == cline.DevicePollExpired {
+		SendError(ctx, fasthttp.StatusGone, result.Message)
+		return
+	}
+	if result.Status == cline.DevicePollDenied {
+		SendError(ctx, fasthttp.StatusForbidden, result.Message)
+		return
+	}
+
+	data, err := sonic.Marshal(result)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
+}
+
+type zedLoginPayload struct {
+	// SigninBaseURL overrides the login host (default https://zed.dev).
+	// The editor's default server_url; staging setups point it at
+	// https://staging.zed.dev.
+	SigninBaseURL string `json:"signin_base_url,omitempty"`
+	// SystemID is forwarded as system_id on the signin URL when set.
+	SystemID string `json:"system_id,omitempty"`
+}
+
+// startZedLoginFlow handles POST /api/providers/zed/oauth/device. It opens
+// an ephemeral loopback listener and returns the Zed signin URL the operator
+// opens in a browser. The UI polls pollZedLoginFlow with the session id.
+func (h *ProviderHandler) startZedLoginFlow(ctx *fasthttp.RequestCtx) {
+	var payload zedLoginPayload
+	if len(ctx.PostBody()) > 0 {
+		if err := sonic.Unmarshal(ctx.PostBody(), &payload); err != nil {
+			SendError(ctx, fasthttp.StatusBadRequest, "Invalid request payload")
+			return
+		}
+	}
+
+	challenge, bifrostErr := zed.StartLogin(ctx, payload.SigninBaseURL, payload.SystemID)
+	if bifrostErr != nil {
+		msg := "Failed to start Zed login flow"
+		if bifrostErr.Error != nil && bifrostErr.Error.Message != "" {
+			msg = bifrostErr.Error.Message
+		}
+		status := fasthttp.StatusBadGateway
+		if bifrostErr.StatusCode != nil && *bifrostErr.StatusCode >= 400 && *bifrostErr.StatusCode < 600 {
+			status = *bifrostErr.StatusCode
+		}
+		SendError(ctx, status, msg)
+		return
+	}
+
+	data, err := sonic.Marshal(challenge)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
+}
+
+type zedLoginPollPayload struct {
+	SessionID string `json:"session_id"`
+}
+
+// pollZedLoginFlow handles POST /api/providers/zed/oauth/poll. It performs
+// exactly one login-session check: the UI owns the 1s cadence and stops on
+// any non-pending status. A success carries user_id + verbatim access_token
+// + username + organization_id (verified once against /client/users/me), so
+// the UI can fill the key and the operator can safely press Save; pending
+// carries no credential.
+func (h *ProviderHandler) pollZedLoginFlow(ctx *fasthttp.RequestCtx) {
+	var payload zedLoginPollPayload
+	if err := sonic.Unmarshal(ctx.PostBody(), &payload); err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, "Invalid request payload")
+		return
+	}
+	if strings.TrimSpace(payload.SessionID) == "" {
+		SendError(ctx, fasthttp.StatusBadRequest, "session_id is required")
+		return
+	}
+
+	result, bifrostErr := zed.PollLogin(ctx, payload.SessionID)
+	if bifrostErr != nil {
+		msg := "Failed to poll Zed login flow"
+		if bifrostErr.Error != nil && bifrostErr.Error.Message != "" {
+			msg = bifrostErr.Error.Message
+		}
+		SendError(ctx, fasthttp.StatusBadGateway, msg)
+		return
+	}
+	if result.Status == zed.LoginPollExpired {
+		SendError(ctx, fasthttp.StatusGone, result.Message)
+		return
+	}
+
+	data, err := sonic.Marshal(result)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
+}
+
+// getKeyQuota handles GET /api/providers/{provider}/keys/{key_id}/quota
+func (h *ProviderHandler) getKeyQuota(ctx *fasthttp.RequestCtx) {
+	providerName, err := getProviderFromCtx(ctx)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid provider: %v", err))
+		return
+	}
+
+	keyID, err := getKeyIDFromCtx(ctx)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
+		return
+	}
+
+	key, err := h.inMemoryStore.GetProviderKeyRaw(providerName, keyID)
+	if err != nil {
+		if errors.Is(err, lib.ErrNotFound) {
+			SendError(ctx, fasthttp.StatusNotFound, fmt.Sprintf("Provider key not found: %v", err))
+			return
+		}
+		SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("Failed to get provider key: %v", err))
+		return
+	}
+
+	providerInstance := h.client.GetProviderByKey(providerName)
+	if providerInstance == nil {
+		SendError(ctx, fasthttp.StatusNotFound, fmt.Sprintf("Provider instance not found: %v", providerName))
+		return
+	}
+
+	quotaProvider, ok := providerInstance.(schemas.QuotaInfoProvider)
+	if !ok {
+		SendError(ctx, fasthttp.StatusNotImplemented, fmt.Sprintf("Provider %s does not support active quota info probing", providerName))
+		return
+	}
+
+	bifrostCtx := schemas.NewBifrostContext(ctx, schemas.NoDeadline)
+	summary, bErr := quotaProvider.GetKeyQuotaSummary(bifrostCtx, *key)
+	if bErr != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("Failed to retrieve quota summary: %s", bErr.GetErrorString()))
+		return
+	}
+
+	data, err := sonic.Marshal(summary)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
+}
+
+// getModelsQuota handles GET /api/providers/{provider}/keys/{key_id}/models-quota
+func (h *ProviderHandler) getModelsQuota(ctx *fasthttp.RequestCtx) {
+	providerName, err := getProviderFromCtx(ctx)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Invalid provider: %v", err))
+		return
+	}
+
+	keyID, err := getKeyIDFromCtx(ctx)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, err.Error())
+		return
+	}
+
+	key, err := h.inMemoryStore.GetProviderKeyRaw(providerName, keyID)
+	if err != nil {
+		if errors.Is(err, lib.ErrNotFound) {
+			SendError(ctx, fasthttp.StatusNotFound, fmt.Sprintf("Provider key not found: %v", err))
+			return
+		}
+		SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("Failed to get provider key: %v", err))
+		return
+	}
+
+	providerInstance := h.client.GetProviderByKey(providerName)
+	if providerInstance == nil {
+		SendError(ctx, fasthttp.StatusNotFound, fmt.Sprintf("Provider instance not found: %v", providerName))
+		return
+	}
+
+	quotaProvider, ok := providerInstance.(schemas.QuotaInfoProvider)
+	if !ok {
+		SendError(ctx, fasthttp.StatusNotImplemented, fmt.Sprintf("Provider %s does not support active quota info probing", providerName))
+		return
+	}
+
+	bifrostCtx := schemas.NewBifrostContext(ctx, schemas.NoDeadline)
+	modelsQuota, bErr := quotaProvider.GetModelsQuota(bifrostCtx, *key)
+	if bErr != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("Failed to retrieve models quota: %s", bErr.GetErrorString()))
+		return
+	}
+
+	data, err := sonic.Marshal(modelsQuota)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
+}
