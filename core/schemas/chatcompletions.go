@@ -260,6 +260,7 @@ func (cp *ChatParameters) UnmarshalJSON(data []byte) error {
 		ReasoningEffort    *string `json:"reasoning_effort"` // only for input
 		ReasoningMaxTokens *int    `json:"reasoning_max_tokens"`
 		ReasoningDisplay   *string `json:"reasoning_display"`
+	Summary   *string `json:"summary,omitempty"`    // Reasoning output summary style: "auto" | "brief" | "detailed" (provider-specific)
 	}
 
 	aux.Alias = (*Alias)(cp)
@@ -331,6 +332,7 @@ type ChatReasoning struct {
 	Effort    *string `json:"effort,omitempty"`     // "none" |  "minimal" | "low" | "medium" | "high" (any value other than "none" will enable reasoning)
 	MaxTokens *int    `json:"max_tokens,omitempty"` // Maximum number of tokens to generate for the reasoning output (required for anthropic)
 	Display   *string `json:"display,omitempty"`    // Anthropic thinking.display: "summarized" | "omitted" (requires model support for adaptive thinking)
+	Summary   *string `json:"summary,omitempty"`    // Reasoning output summary style: "auto" | "brief" | "detailed" (provider-specific)
 	Type      *string `json:"type,omitempty"`       // Anthropic thinking.type: "between_tools" (no up-front thinking); independent of effort
 }
 
