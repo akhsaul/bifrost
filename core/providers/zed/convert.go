@@ -56,7 +56,9 @@ func toInnerGeminiRequest(ctx *schemas.BifrostContext, request *schemas.BifrostC
 // only these envelope-level fields are set here; sampling/model params ride
 // inside the converted request itself.
 func toInnerOpenAIRequest(ctx *schemas.BifrostContext, request *schemas.BifrostResponsesRequest, threadID string) (*openai.OpenAIResponsesRequest, *schemas.BifrostError) {
+	stripEmptyZedResponsesSystemMessages(request)
 	ensureZedResponsesSystemPrompt(request)
+	normalizeZedResponsesInput(request)
 	inner := openai.ToOpenAIResponsesRequest(ctx, request)
 	if inner == nil {
 		return nil, providerUtils.NewBifrostOperationError(schemas.ErrRequestBodyConversion, errNilOpenAIRequest)
@@ -200,6 +202,38 @@ func responsesMessageHasRenderableContent(content *schemas.ResponsesMessageConte
 	return false
 }
 
+// normalizeZedResponsesInput rewrites every Responses input message to the
+// wire shape Zed's Responses parser accepts: content as an ARRAY of blocks,
+// never a bare string. The shared OpenAI converter passes ContentStr
+// through verbatim, which serializes to "content":"..." — every Zed capture
+// in debug/zed-dev carries content as [{"type":"input_text","text":...}]
+// instead, and Zed rejects the string form outright
+// ("invalid type: string ..., expected a sequence").
+// Messages without renderable content are left untouched: the empty-system
+// strip runs first and drops them if they are system/developer turns.
+func normalizeZedResponsesInput(request *schemas.BifrostResponsesRequest) {
+	for i := range request.Input {
+		msg := &request.Input[i]
+		if msg.Content == nil || msg.Content.ContentStr == nil || *msg.Content.ContentStr == "" {
+			continue
+		}
+		if len(msg.Content.ContentBlocks) > 0 {
+			continue
+		}
+		text := *msg.Content.ContentStr
+		blockType := schemas.ResponsesInputMessageContentBlockTypeText
+		if msg.Role != nil && *msg.Role == schemas.ResponsesInputMessageRoleAssistant {
+			blockType = schemas.ResponsesOutputMessageContentTypeText
+		}
+		msg.Content = &schemas.ResponsesMessageContent{
+			ContentBlocks: []schemas.ResponsesMessageContentBlock{{
+				Type: blockType,
+				Text: &text,
+			}},
+		}
+	}
+}
+
 // stripEmptyZedResponsesSystemMessages drops system/developer input messages
 // that carry no renderable content, so an empty client system prompt neither
 // blocks the default injection nor leaks into the inner request as an empty
@@ -229,7 +263,6 @@ func ensureZedResponsesSystemPrompt(request *schemas.BifrostResponsesRequest) {
 	if request == nil {
 		return
 	}
-	stripEmptyZedResponsesSystemMessages(request)
 	if hasZedResponsesSystemPrompt(request) {
 		return
 	}

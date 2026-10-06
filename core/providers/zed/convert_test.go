@@ -260,6 +260,64 @@ func TestDefaultSystemPromptInjected(t *testing.T) {
 	}
 }
 
+// TestResponsesStringContentNormalizedToBlocks is the red test for the second
+// live failure: user content arriving as a bare ContentStr serializes to
+// "content":"..." on the wire, which Zed's Responses parser rejects
+// ("invalid type: string ..., expected a sequence"). Every debug/zed-dev
+// capture carries content as [{"type":"input_text","text":...}], so the
+// converter must normalize string content into that block shape.
+func TestResponsesStringContentNormalizedToBlocks(t *testing.T) {
+	provider := zedTestProvider(t)
+	env := provider.BuildResponsesEnvelopeForTest(testCtx(), &schemas.BifrostResponsesRequest{
+		Provider: schemas.Zed,
+		Model:    "gpt-5-nano",
+		Input: []schemas.ResponsesMessage{
+			{
+				Type:    schemas.Ptr(schemas.ResponsesMessageTypeMessage),
+				Role:    ptrRole(schemas.ResponsesInputMessageRoleSystem),
+				Content: &schemas.ResponsesMessageContent{ContentStr: schemas.Ptr("remember NYF is 528901")},
+			},
+			{
+				Type:    schemas.Ptr(schemas.ResponsesMessageTypeMessage),
+				Role:    ptrRole(schemas.ResponsesInputMessageRoleUser),
+				Content: &schemas.ResponsesMessageContent{ContentStr: schemas.Ptr("1+8= ? also remember NYF is 528901")},
+			},
+		},
+	})
+	if env == nil {
+		t.Fatal("nil envelope")
+	}
+	raw, _ := json.Marshal(env.ProviderRequest)
+	var inner map[string]interface{}
+	if err := json.Unmarshal(raw, &inner); err != nil {
+		t.Fatal(err)
+	}
+	input, _ := inner["input"].([]interface{})
+	if len(input) != 2 {
+		t.Fatalf("input has %d items, want 2, got %v", len(input), jsonString(t, inner["input"]))
+	}
+	for i, want := range []struct{ role, text string }{
+		{string(schemas.ResponsesInputMessageRoleSystem), "remember NYF is 528901"},
+		{string(schemas.ResponsesInputMessageRoleUser), "1+8= ? also remember NYF is 528901"},
+	} {
+		item, _ := input[i].(map[string]interface{})
+		if item["role"] != want.role {
+			t.Errorf("input[%d].role = %v, want %s", i, item["role"], want.role)
+		}
+		blocks, ok := item["content"].([]interface{})
+		if !ok || len(blocks) != 1 {
+			t.Fatalf("input[%d].content = %v, want single block array", i, item["content"])
+		}
+		block, _ := blocks[0].(map[string]interface{})
+		if block["type"] != string(schemas.ResponsesInputMessageContentBlockTypeText) {
+			t.Errorf("input[%d].content[0].type = %v, want input_text", i, block["type"])
+		}
+		if block["text"] != want.text {
+			t.Errorf("input[%d].content[0].text = %v, want %q", i, block["text"], want.text)
+		}
+	}
+}
+
 // TestEmptySystemPromptTreatedAsAbsent is the red test for the live client
 // report: {"role":"system","content":""} must behave exactly like no system
 // prompt at all — the empty turn is dropped and the default injected, never
