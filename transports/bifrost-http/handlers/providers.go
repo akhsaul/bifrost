@@ -16,7 +16,10 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/fasthttp/router"
 	bifrost "github.com/maximhq/bifrost/core"
+	"github.com/maximhq/bifrost/core/providers/antigravity"
+	"github.com/maximhq/bifrost/core/providers/cline"
 	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
+	"github.com/maximhq/bifrost/core/providers/zed"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore"
 	"github.com/maximhq/bifrost/framework/configstore/tables"
@@ -24,9 +27,6 @@ import (
 	"github.com/maximhq/bifrost/transports/bifrost-http/lib"
 	"github.com/tidwall/gjson"
 	"github.com/valyala/fasthttp"
-	"github.com/maximhq/bifrost/core/providers/antigravity"
-	"github.com/maximhq/bifrost/core/providers/cline"
-	"github.com/maximhq/bifrost/core/providers/zed"
 )
 
 // ModelsManager defines the interface for managing provider models
@@ -1784,6 +1784,7 @@ func providerDialTargetChanged(old *schemas.NetworkConfig, next schemas.NetworkC
 	}
 	return next.BaseURL != "" && next.BaseURL != oldBaseURL
 }
+
 // getAntigravityAuthURL handles GET /api/providers/antigravity/oauth/auth-url
 func (h *ProviderHandler) getAntigravityAuthURL(ctx *fasthttp.RequestCtx) {
 	redirectURI := strings.TrimSpace(string(ctx.QueryArgs().Peek("redirect_uri")))
