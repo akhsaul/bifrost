@@ -312,18 +312,4 @@ func FetchAvailableModelsFromAPI(
 	return models, nil
 }
 
-// StaticListModelsResponse returns the compiled static Antigravity model list.
-// It is the fallback for a direct ListModels call with no keys configured; the
-// live discovery path always supplies keys and reports per-key statuses instead.
-func StaticListModelsResponse() *schemas.BifrostListModelsResponse {
-	models := make([]schemas.Model, len(AntigravityPublicModels))
-	copy(models, AntigravityPublicModels)
 
-	return &schemas.BifrostListModelsResponse{
-		Data: models,
-		ExtraFields: schemas.BifrostResponseExtraFields{
-			Provider: schemas.Antigravity,
-			Latency:  0,
-		},
-	}
-}

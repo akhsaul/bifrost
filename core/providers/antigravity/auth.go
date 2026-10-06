@@ -73,8 +73,9 @@ type CachedToken struct {
 }
 
 var (
-	tokenCacheMu sync.RWMutex
-	tokenCache   = make(map[string]*CachedToken)
+	tokenCacheMu     sync.RWMutex
+	tokenCache       = make(map[string]*CachedToken)
+	tokenEndpointURL = GoogleOAuthTokenURL
 )
 
 // ClearTokenCache clears the in-memory token cache (useful for tests).
@@ -82,6 +83,22 @@ func ClearTokenCache() {
 	tokenCacheMu.Lock()
 	defer tokenCacheMu.Unlock()
 	tokenCache = make(map[string]*CachedToken)
+}
+
+// InvalidateCredentials discards the cached access token for a key after an
+// upstream call rejected it with 401. It preserves the project ID if already known
+// so subsequent requests can re-use it immediately after token refresh.
+func InvalidateCredentials(key schemas.Key) {
+	creds := GetCredentials(key)
+	cacheKey := computeCacheKey(key.ID, creds)
+	tokenCacheMu.Lock()
+	if entry, ok := tokenCache[cacheKey]; ok && entry != nil {
+		entry.AccessToken = ""
+		entry.ExpiresAt = time.Time{}
+	} else {
+		delete(tokenCache, cacheKey)
+	}
+	tokenCacheMu.Unlock()
 }
 
 // GetUserAgent returns the appropriate User-Agent string for the given Antigravity client profile.
@@ -324,7 +341,7 @@ func RefreshToken(
 	}
 
 	req.Header.SetMethod(http.MethodPost)
-	req.SetRequestURI(GoogleOAuthTokenURL)
+	req.SetRequestURI(tokenEndpointURL)
 	req.Header.SetContentType("application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", GetUserAgent(creds.ClientProfile))

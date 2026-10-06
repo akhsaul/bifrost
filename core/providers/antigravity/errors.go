@@ -2,7 +2,9 @@ package antigravity
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/bytedance/sonic"
 	schemas "github.com/maximhq/bifrost/core/schemas"
@@ -104,4 +106,18 @@ func newAuthenticationError(message string, err error) *schemas.BifrostError {
 			Provider: schemas.Antigravity,
 		},
 	}
+}
+
+// isUnauthorized reports whether the error is an upstream 401 Unauthorized.
+func isUnauthorized(bErr *schemas.BifrostError) bool {
+	return bErr != nil && bErr.StatusCode != nil && *bErr.StatusCode == http.StatusUnauthorized
+}
+
+// isErrUnauthorized reports whether an error represents an HTTP 401 Unauthorized.
+func isErrUnauthorized(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	return strings.Contains(errStr, "status 401") || strings.Contains(errStr, "401 Unauthorized")
 }

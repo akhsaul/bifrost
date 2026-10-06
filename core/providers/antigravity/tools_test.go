@@ -302,7 +302,7 @@ func TestToAntigravityChatRequest_MixedTools_DropsGoogleSearch(t *testing.T) {
 func TestParseAntigravitySearchResponse(t *testing.T) {
 	respData, err := os.ReadFile("/mnt/data/Projects/bifrost/agy-resp-search.json")
 	if err != nil {
-		t.Fatalf("failed to read agy-resp-search.json: %v", err)
+		t.Skipf("skipping test, agy-resp-search.json not present: %v", err)
 	}
 
 	genResp, err := parseAntigravityChunk(respData)

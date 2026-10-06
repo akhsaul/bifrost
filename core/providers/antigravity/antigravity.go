@@ -71,7 +71,7 @@ func (provider *AntigravityProvider) ListModels(
 	request *schemas.BifrostListModelsRequest,
 ) (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
 	if len(keys) == 0 {
-		return StaticListModelsResponse(), nil
+		return nil, newAuthenticationError("antigravity: no keys configured", nil)
 	}
 
 	return providerUtils.HandleMultipleListModelsRequests(
@@ -96,7 +96,18 @@ func (provider *AntigravityProvider) listModelsByKey(
 		return nil, newAuthenticationError("missing Google Cloud project ID for Antigravity account", nil)
 	}
 
+	creds := GetCredentials(key)
 	dynamicModels, fetchErr := FetchAvailableModelsFromAPI(ctx, provider.client, accessToken, projectID, provider.networkConfig.BaseURL, provider.networkConfig.ExtraHeaders, provider.logger)
+	if fetchErr != nil && creds.RefreshToken != "" && isErrUnauthorized(fetchErr) {
+		InvalidateCredentials(key)
+		if newAccessToken, newProjectID, newAuthErr := GetAccessTokenAndProject(ctx, provider.client, key, provider.networkConfig.BaseURL, provider.logger); newAuthErr == nil {
+			accessToken = newAccessToken
+			if newProjectID != "" {
+				projectID = newProjectID
+			}
+			dynamicModels, fetchErr = FetchAvailableModelsFromAPI(ctx, provider.client, accessToken, projectID, provider.networkConfig.BaseURL, provider.networkConfig.ExtraHeaders, provider.logger)
+		}
+	}
 	if fetchErr != nil {
 		return nil, providerUtils.NewProviderAPIError(fmt.Sprintf("failed to fetch models from Antigravity API: %v", fetchErr), nil, 0, nil, nil)
 	}
@@ -145,7 +156,18 @@ func (provider *AntigravityProvider) GetKeyQuotaSummary(
 		return nil, newAuthenticationError("missing Google Cloud project ID for Antigravity account", nil)
 	}
 
+	creds := GetCredentials(key)
 	summaryResp, err := RetrieveUserQuotaSummaryFromAPI(ctx, provider.client, accessToken, projectID, provider.networkConfig.BaseURL, provider.networkConfig.ExtraHeaders, provider.logger)
+	if err != nil && creds.RefreshToken != "" && isErrUnauthorized(err) {
+		InvalidateCredentials(key)
+		if newAccessToken, newProjectID, newAuthErr := GetAccessTokenAndProject(ctx, provider.client, key, provider.networkConfig.BaseURL, provider.logger); newAuthErr == nil {
+			accessToken = newAccessToken
+			if newProjectID != "" {
+				projectID = newProjectID
+			}
+			summaryResp, err = RetrieveUserQuotaSummaryFromAPI(ctx, provider.client, accessToken, projectID, provider.networkConfig.BaseURL, provider.networkConfig.ExtraHeaders, provider.logger)
+		}
+	}
 	if err != nil {
 		return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderDoRequest, err)
 	}
@@ -204,7 +226,18 @@ func (provider *AntigravityProvider) GetModelsQuota(
 		return nil, newAuthenticationError("missing Google Cloud project ID for Antigravity account", nil)
 	}
 
+	creds := GetCredentials(key)
 	fetchResp, err := FetchRawAvailableModelsFromAPI(ctx, provider.client, accessToken, projectID, provider.networkConfig.BaseURL, provider.networkConfig.ExtraHeaders, provider.logger)
+	if err != nil && creds.RefreshToken != "" && isErrUnauthorized(err) {
+		InvalidateCredentials(key)
+		if newAccessToken, newProjectID, newAuthErr := GetAccessTokenAndProject(ctx, provider.client, key, provider.networkConfig.BaseURL, provider.logger); newAuthErr == nil {
+			accessToken = newAccessToken
+			if newProjectID != "" {
+				projectID = newProjectID
+			}
+			fetchResp, err = FetchRawAvailableModelsFromAPI(ctx, provider.client, accessToken, projectID, provider.networkConfig.BaseURL, provider.networkConfig.ExtraHeaders, provider.logger)
+		}
+	}
 	if err != nil {
 		return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderDoRequest, err)
 	}
@@ -268,7 +301,7 @@ func (provider *AntigravityProvider) ChatCompletion(
 		"User-Agent":    resolveUserAgent(creds.ClientProfile, provider.networkConfig.ExtraHeaders),
 	}
 
-	return HandleAntigravityChatCompletion(
+	resp, bErr := HandleAntigravityChatCompletion(
 		ctx,
 		provider.client,
 		targetURL,
@@ -280,6 +313,28 @@ func (provider *AntigravityProvider) ChatCompletion(
 		providerUtils.ShouldSendBackRawResponse(ctx, provider.sendBackRawResponse),
 		provider.logger,
 	)
+	if bErr != nil && creds.RefreshToken != "" && isUnauthorized(bErr) {
+		InvalidateCredentials(key)
+		if newAccessToken, newProjectID, newAuthErr := GetAccessTokenAndProject(ctx, provider.client, key, provider.networkConfig.BaseURL, provider.logger); newAuthErr == nil {
+			if newProjectID != "" && newProjectID != projectID {
+				_, jsonBytes, _ = ToAntigravityChatRequest(ctx, request, newProjectID)
+			}
+			headers["Authorization"] = "Bearer " + newAccessToken
+			return HandleAntigravityChatCompletion(
+				ctx,
+				provider.client,
+				targetURL,
+				jsonBytes,
+				headers,
+				provider.networkConfig.ExtraHeaders,
+				request.Model,
+				providerUtils.ShouldSendBackRawRequest(ctx, provider.sendBackRawRequest),
+				providerUtils.ShouldSendBackRawResponse(ctx, provider.sendBackRawResponse),
+				provider.logger,
+			)
+		}
+	}
+	return resp, bErr
 }
 
 // ChatCompletionStream performs a streaming chat completion request to the Antigravity API.
@@ -311,7 +366,7 @@ func (provider *AntigravityProvider) ChatCompletionStream(
 		"User-Agent":    resolveUserAgent(creds.ClientProfile, provider.networkConfig.ExtraHeaders),
 	}
 
-	return HandleAntigravityChatCompletionStream(
+	stream, bErr := HandleAntigravityChatCompletionStream(
 		ctx,
 		provider.streamingClient,
 		targetURL,
@@ -326,6 +381,31 @@ func (provider *AntigravityProvider) ChatCompletionStream(
 		postHookSpanFinalizer,
 		provider.logger,
 	)
+	if bErr != nil && creds.RefreshToken != "" && isUnauthorized(bErr) {
+		InvalidateCredentials(key)
+		if newAccessToken, newProjectID, newAuthErr := GetAccessTokenAndProject(ctx, provider.client, key, provider.networkConfig.BaseURL, provider.logger); newAuthErr == nil {
+			if newProjectID != "" && newProjectID != projectID {
+				_, jsonBytes, _ = ToAntigravityChatRequest(ctx, request, newProjectID)
+			}
+			headers["Authorization"] = "Bearer " + newAccessToken
+			return HandleAntigravityChatCompletionStream(
+				ctx,
+				provider.streamingClient,
+				targetURL,
+				jsonBytes,
+				headers,
+				provider.networkConfig.ExtraHeaders,
+				request.Model,
+				provider.networkConfig.StreamIdleTimeoutInSeconds,
+				providerUtils.ShouldSendBackRawRequest(ctx, provider.sendBackRawRequest),
+				providerUtils.ShouldSendBackRawResponse(ctx, provider.sendBackRawResponse),
+				postHookRunner,
+				postHookSpanFinalizer,
+				provider.logger,
+			)
+		}
+	}
+	return stream, bErr
 }
 
 // Responses performs a responses request using the Antigravity Responses converter.
@@ -367,6 +447,27 @@ func (provider *AntigravityProvider) Responses(
 		providerUtils.ShouldSendBackRawResponse(ctx, provider.sendBackRawResponse),
 		provider.logger,
 	)
+	if bErr != nil && creds.RefreshToken != "" && isUnauthorized(bErr) {
+		InvalidateCredentials(key)
+		if newAccessToken, newProjectID, newAuthErr := GetAccessTokenAndProject(ctx, provider.client, key, provider.networkConfig.BaseURL, provider.logger); newAuthErr == nil {
+			if newProjectID != "" && newProjectID != projectID {
+				_, jsonBytes, _ = ToAntigravityResponsesRequest(ctx, request, newProjectID)
+			}
+			headers["Authorization"] = "Bearer " + newAccessToken
+			chatResp, bErr = HandleAntigravityChatCompletion(
+				ctx,
+				provider.client,
+				targetURL,
+				jsonBytes,
+				headers,
+				provider.networkConfig.ExtraHeaders,
+				request.Model,
+				providerUtils.ShouldSendBackRawRequest(ctx, provider.sendBackRawRequest),
+				providerUtils.ShouldSendBackRawResponse(ctx, provider.sendBackRawResponse),
+				provider.logger,
+			)
+		}
+	}
 	if bErr != nil {
 		return nil, bErr
 	}
@@ -404,7 +505,7 @@ func (provider *AntigravityProvider) ResponsesStream(
 		"User-Agent":    resolveUserAgent(creds.ClientProfile, provider.networkConfig.ExtraHeaders),
 	}
 
-	return HandleAntigravityChatCompletionStream(
+	stream, bErr := HandleAntigravityChatCompletionStream(
 		ctx,
 		provider.streamingClient,
 		targetURL,
@@ -419,6 +520,31 @@ func (provider *AntigravityProvider) ResponsesStream(
 		postHookSpanFinalizer,
 		provider.logger,
 	)
+	if bErr != nil && creds.RefreshToken != "" && isUnauthorized(bErr) {
+		InvalidateCredentials(key)
+		if newAccessToken, newProjectID, newAuthErr := GetAccessTokenAndProject(ctx, provider.client, key, provider.networkConfig.BaseURL, provider.logger); newAuthErr == nil {
+			if newProjectID != "" && newProjectID != projectID {
+				_, jsonBytes, _ = ToAntigravityResponsesRequest(ctx, request, newProjectID)
+			}
+			headers["Authorization"] = "Bearer " + newAccessToken
+			return HandleAntigravityChatCompletionStream(
+				ctx,
+				provider.streamingClient,
+				targetURL,
+				jsonBytes,
+				headers,
+				provider.networkConfig.ExtraHeaders,
+				request.Model,
+				provider.networkConfig.StreamIdleTimeoutInSeconds,
+				providerUtils.ShouldSendBackRawRequest(ctx, provider.sendBackRawRequest),
+				providerUtils.ShouldSendBackRawResponse(ctx, provider.sendBackRawResponse),
+				postHookRunner,
+				postHookSpanFinalizer,
+				provider.logger,
+			)
+		}
+	}
+	return stream, bErr
 }
 
 // CountTokens is not supported directly by the Antigravity provider.

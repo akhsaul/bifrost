@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bytedance/sonic"
 	schemas "github.com/maximhq/bifrost/core/schemas"
@@ -238,6 +239,23 @@ func TestRefreshToken(t *testing.T) {
 	if creds.RefreshToken != "mock-rt" {
 		t.Fatalf("expected refresh token mock-rt, got %s", creds.RefreshToken)
 	}
+
+	origURL := tokenEndpointURL
+	tokenEndpointURL = server.URL
+	defer func() { tokenEndpointURL = origURL }()
+
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	client := &fasthttp.Client{}
+	tok, exp, err := RefreshToken(ctx, client, creds, nil)
+	if err != nil {
+		t.Fatalf("RefreshToken failed: %v", err)
+	}
+	if tok != "mock-new-access-token" {
+		t.Errorf("expected mock-new-access-token, got %s", tok)
+	}
+	if exp.IsZero() {
+		t.Error("expected non-zero expiration time")
+	}
 }
 
 func TestParseAntigravityError(t *testing.T) {
@@ -439,23 +457,17 @@ func TestAntigravityProvider_ListModels(t *testing.T) {
 
 	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 	resp, bErr := provider.ListModels(ctx, nil, nil)
-	if bErr != nil {
-		t.Fatalf("ListModels failed: %v", bErr)
+	if resp != nil {
+		t.Fatalf("expected nil response when no keys configured, got %v", resp)
 	}
-
-	if resp == nil || len(resp.Data) == 0 {
-		t.Fatal("expected non-empty model list")
+	if bErr == nil {
+		t.Fatal("expected authentication error when no keys configured, got nil")
 	}
-
-	found := false
-	for _, m := range resp.Data {
-		if m.ID == "gemini-3.6-flash-high" {
-			found = true
-			break
-		}
+	if bErr.StatusCode == nil || *bErr.StatusCode != 401 {
+		t.Errorf("expected 401 status code, got %v", bErr.StatusCode)
 	}
-	if !found {
-		t.Error("expected gemini-3.6-flash-high in model list")
+	if bErr.Error == nil || !strings.Contains(bErr.Error.Message, "no keys configured") {
+		t.Errorf("expected 'no keys configured' message, got %v", bErr.Error)
 	}
 }
 
@@ -842,5 +854,190 @@ func TestAntigravityProvider_ChatCompletion_UserAgentPrecedence(t *testing.T) {
 	}
 	if got := serverUA; got != "my-custom-ua/2.0" {
 		t.Errorf("User-Agent = %q, want user override %q (default is %q)", got, "my-custom-ua/2.0", GetUserAgent("cli"))
+	}
+}
+
+func TestAntigravityProvider_ChatCompletion_401InvalidateAndRetry(t *testing.T) {
+	ClearTokenCache()
+
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Token refresh endpoint
+		if r.URL.Path == "/token" || r.FormValue("grant_type") == "refresh_token" {
+			_ = r.ParseForm()
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"access_token": "fresh-token-after-401", "expires_in": 3600}`))
+			return
+		}
+
+		if strings.Contains(r.URL.Path, "generateContent") {
+			attempts++
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "Bearer dead-cached-token" {
+				w.WriteHeader(http.StatusUnauthorized)
+				_, _ = w.Write([]byte(`{"error": {"code": 401, "message": "Request had invalid authentication credentials.", "status": "UNAUTHENTICATED"}}`))
+				return
+			}
+			if authHeader == "Bearer fresh-token-after-401" {
+				w.Header().Set("Content-Type", "text/event-stream")
+				w.WriteHeader(http.StatusOK)
+				chunk := `{"response":{"candidates":[{"content":{"parts":[{"text":"Success after 401 retry!"}],"role":"model"},"finishReason":"STOP"}]}}`
+				_, _ = fmt.Fprintf(w, "data: %s\n\ndata: [DONE]\n\n", chunk)
+				return
+			}
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	origURL := tokenEndpointURL
+	tokenEndpointURL = server.URL + "/token"
+	defer func() { tokenEndpointURL = origURL }()
+
+	config := &schemas.ProviderConfig{
+		NetworkConfig: schemas.NetworkConfig{
+			BaseURL: server.URL,
+		},
+	}
+	provider, err := NewAntigravityProvider(config, nil)
+	if err != nil {
+		t.Fatalf("failed to create provider: %v", err)
+	}
+
+	key := schemas.Key{
+		ID: "test-401-key",
+		AntigravityKeyConfig: &schemas.AntigravityKeyConfig{
+			ProjectID:    schemas.NewSecretVar("test-proj"),
+			RefreshToken: schemas.NewSecretVar("my-refresh-token"),
+			AccessToken:  schemas.NewSecretVar("dead-cached-token"),
+		},
+	}
+
+	// Pre-seed tokenCache with the dead token
+	creds := GetCredentials(key)
+	cacheKey := computeCacheKey(key.ID, creds)
+	tokenCacheMu.Lock()
+	tokenCache[cacheKey] = &CachedToken{
+		AccessToken: "dead-cached-token",
+		ExpiresAt:   time.Now().Add(10 * time.Minute),
+		ProjectID:   "test-proj",
+	}
+	tokenCacheMu.Unlock()
+
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	req := &schemas.BifrostChatRequest{
+		Model: "gemini-3.6-flash-high",
+		Input: []schemas.ChatMessage{
+			{
+				Role: schemas.ChatMessageRoleUser,
+				Content: &schemas.ChatMessageContent{
+					ContentStr: schemas.Ptr("Test prompt"),
+				},
+			},
+		},
+	}
+
+	resp, bErr := provider.ChatCompletion(ctx, key, req)
+	if bErr != nil {
+		t.Fatalf("expected successful retry after 401, but got error: %v", bErr.Error.Message)
+	}
+	if resp == nil || len(resp.Choices) == 0 {
+		t.Fatal("expected non-empty response after 401 retry")
+	}
+	choice := resp.Choices[0]
+	if choice.Message.Content == nil || *choice.Message.Content.ContentStr != "Success after 401 retry!" {
+		t.Errorf("unexpected content: %v", choice.Message.Content)
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts (initial 401 + 1 retry), got %d", attempts)
+	}
+
+	// Verify tokenCache was updated with fresh token
+	tokenCacheMu.RLock()
+	cachedToken := tokenCache[cacheKey]
+	tokenCacheMu.RUnlock()
+	if cachedToken == nil || cachedToken.AccessToken != "fresh-token-after-401" {
+		t.Errorf("expected cached token to be fresh-token-after-401, got %+v", cachedToken)
+	}
+}
+
+func TestAntigravityProvider_ChatCompletion_Non401DoesNotInvalidate(t *testing.T) {
+	ClearTokenCache()
+
+	var attempts int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "generateContent") {
+			attempts++
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"error": {"code": 429, "message": "Rate limit exceeded", "status": "RESOURCE_EXHAUSTED"}}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	config := &schemas.ProviderConfig{
+		NetworkConfig: schemas.NetworkConfig{
+			BaseURL: server.URL,
+		},
+	}
+	provider, err := NewAntigravityProvider(config, nil)
+	if err != nil {
+		t.Fatalf("failed to create provider: %v", err)
+	}
+
+	key := schemas.Key{
+		ID: "test-non401-key",
+		AntigravityKeyConfig: &schemas.AntigravityKeyConfig{
+			ProjectID:    schemas.NewSecretVar("test-proj"),
+			RefreshToken: schemas.NewSecretVar("my-refresh-token"),
+			AccessToken:  schemas.NewSecretVar("good-token"),
+		},
+	}
+
+	// Pre-seed tokenCache with good token
+	creds := GetCredentials(key)
+	cacheKey := computeCacheKey(key.ID, creds)
+	tokenCacheMu.Lock()
+	tokenCache[cacheKey] = &CachedToken{
+		AccessToken: "good-token",
+		ExpiresAt:   time.Now().Add(10 * time.Minute),
+		ProjectID:   "test-proj",
+	}
+	tokenCacheMu.Unlock()
+
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	req := &schemas.BifrostChatRequest{
+		Model: "gemini-3.6-flash-high",
+		Input: []schemas.ChatMessage{
+			{
+				Role: schemas.ChatMessageRoleUser,
+				Content: &schemas.ChatMessageContent{
+					ContentStr: schemas.Ptr("Test prompt"),
+				},
+			},
+		},
+	}
+
+	resp, bErr := provider.ChatCompletion(ctx, key, req)
+	if resp != nil {
+		t.Fatalf("expected error, got response: %v", resp)
+	}
+	if bErr == nil || bErr.StatusCode == nil || *bErr.StatusCode != 429 {
+		t.Fatalf("expected 429 error, got: %v", bErr)
+	}
+	if attempts != 1 {
+		t.Errorf("expected exactly 1 attempt (no retry on 429), got %d", attempts)
+	}
+
+	// Verify tokenCache was NOT invalidated
+	tokenCacheMu.RLock()
+	cachedToken := tokenCache[cacheKey]
+	tokenCacheMu.RUnlock()
+	if cachedToken == nil || cachedToken.AccessToken != "good-token" {
+		t.Errorf("expected cached token to remain 'good-token', got %+v", cachedToken)
 	}
 }
