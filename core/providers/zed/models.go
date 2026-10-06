@@ -217,7 +217,9 @@ func (provider *ZedProvider) listModelsByKey(ctx *schemas.BifrostContext, key sc
 }
 
 // modelsToBifrostResponse converts a cached Zed catalog through the shared
-// allowlist/blacklist/alias pipeline. Zed ids are advertised verbatim.
+// allowlist/blacklist/alias pipeline. IDs are advertised with the serving
+// provider prefix (e.g. "zed/claude-haiku-4-5"), matching every other
+// provider's ListModels contract.
 func modelsToBifrostResponse(cache *zedModelsCache, key schemas.Key, unfiltered bool) *schemas.BifrostListModelsResponse {
 	pipeline := &providerUtils.ListModelsPipeline{
 		AllowedModels:     key.Models,
@@ -238,7 +240,7 @@ func modelsToBifrostResponse(cache *zedModelsCache, key schemas.Key, unfiltered 
 				continue
 			}
 			seen[strings.ToLower(result.ResolvedID)] = true
-			model := schemas.Model{ID: result.ResolvedID}
+			model := schemas.Model{ID: string(schemas.Zed) + "/" + result.ResolvedID}
 			if name := strings.TrimSpace(entry.DisplayName); name != "" {
 				model.Name = schemas.Ptr(name)
 			}

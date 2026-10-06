@@ -24,6 +24,7 @@ import (
 	"github.com/maximhq/bifrost/framework/configstore/tables"
 	"github.com/maximhq/bifrost/framework/modelcatalog"
 	"github.com/maximhq/bifrost/transports/bifrost-http/lib"
+	"github.com/tidwall/gjson"
 	"github.com/valyala/fasthttp"
 )
 
@@ -1285,12 +1286,17 @@ func buildListedModels(
 // getModelParameters handles GET /api/models/parameters - Get model parameters for a specific model
 // Query parameters:
 //   - model: The model name to get parameters for (required)
+//   - provider: The serving provider disambiguating same-named models (optional).
+//     When set, only a row keyed for that provider answers; there is no
+//     cross-provider fallback (strict 404). When empty, the legacy
+//     provider-agnostic resolution applies.
 func (h *ProviderHandler) getModelParameters(ctx *fasthttp.RequestCtx) {
 	modelParam := string(ctx.QueryArgs().Peek("model"))
 	if modelParam == "" {
 		SendError(ctx, fasthttp.StatusBadRequest, "model query parameter is required")
 		return
 	}
+	providerParam := schemas.ModelProvider(strings.TrimSpace(string(ctx.QueryArgs().Peek("provider"))))
 
 	if h.dbStore == nil {
 		SendError(ctx, fasthttp.StatusServiceUnavailable, "database store not available")
@@ -1304,7 +1310,16 @@ func (h *ProviderHandler) getModelParameters(ctx *fasthttp.RequestCtx) {
 	var params *tables.TableModelParameters
 	var err error
 	if h.inMemoryStore != nil && h.inMemoryStore.ModelCatalog != nil {
-		params, err = h.inMemoryStore.ModelCatalog.ResolveModelParameters(ctx, modelParam)
+		if providerParam != "" {
+			params, err = h.inMemoryStore.ModelCatalog.ResolveModelParametersForProvider(ctx, modelParam, providerParam)
+		} else {
+			params, err = h.inMemoryStore.ModelCatalog.ResolveModelParameters(ctx, modelParam)
+		}
+	} else if providerParam != "" {
+		// Without the catalog there is no candidate chain; resolve strictly:
+		// the qualified key first, then the bare key only if its embedded
+		// provider field matches.
+		params, err = h.resolveModelParametersStrictDB(ctx, modelParam, providerParam)
 	} else {
 		params, err = h.dbStore.GetModelParametersByModel(ctx, modelParam)
 	}
@@ -1313,6 +1328,10 @@ func (h *ProviderHandler) getModelParameters(ctx *fasthttp.RequestCtx) {
 	}
 	if err != nil {
 		if errors.Is(err, configstore.ErrNotFound) {
+			if providerParam != "" {
+				SendError(ctx, fasthttp.StatusNotFound, fmt.Sprintf("no parameters found for model %s with provider %s", modelParam, providerParam))
+				return
+			}
 			SendError(ctx, fasthttp.StatusNotFound, fmt.Sprintf("no parameters found for model %s", modelParam))
 			return
 		}
@@ -1323,6 +1342,37 @@ func (h *ProviderHandler) getModelParameters(ctx *fasthttp.RequestCtx) {
 	ctx.SetContentType("application/json")
 	ctx.SetStatusCode(fasthttp.StatusOK)
 	ctx.SetBodyString(params.Data)
+}
+
+// resolveModelParametersStrictDB is the no-catalog fallback for
+// provider-scoped lookups. A qualified model whose qualifier disagrees with
+// the hint is rejected outright; otherwise the qualified "<provider>/<model>"
+// key is tried first, then the bare model only if its embedded provider JSON
+// field matches. Strict: any other provider's row stays untouched.
+func (h *ProviderHandler) resolveModelParametersStrictDB(ctx *fasthttp.RequestCtx, model string, provider schemas.ModelProvider) (*tables.TableModelParameters, error) {
+	if modelProvider, _ := schemas.ParseModelString(model, ""); modelProvider != "" && modelProvider != provider {
+		return nil, configstore.ErrNotFound
+	}
+	qualified := string(provider) + "/" + model
+	if !strings.Contains(model, "/") {
+		if params, err := h.dbStore.GetModelParametersByModel(ctx, qualified); err == nil {
+			return params, nil
+		} else if !errors.Is(err, configstore.ErrNotFound) {
+			return nil, err
+		}
+	}
+	params, err := h.dbStore.GetModelParametersByModel(ctx, model)
+	if err != nil {
+		return nil, err
+	}
+	if params == nil {
+		return nil, configstore.ErrNotFound
+	}
+	rowProvider := gjson.Get(params.Data, "provider").String()
+	if rowProvider != "" && rowProvider != string(provider) {
+		return nil, configstore.ErrNotFound
+	}
+	return params, nil
 }
 
 // keyAllowsModelForList reports whether a provider key permits model for catalog listing.

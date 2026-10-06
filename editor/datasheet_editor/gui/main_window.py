@@ -46,7 +46,8 @@ from ..merge import (
     merge_param_array,
 )
 from ..validate import validate_overlay
-from .adddialogs import AddFieldDialog, AddModelDialog, ask_output_policy
+from ..zed_import import apply_import, import_zed_models
+from .adddialogs import AddFieldDialog, AddModelDialog, ZedImportDialog, ask_output_policy
 from .fieldeditor import FieldRow
 from .models import (
     ChangeListModel,
@@ -186,6 +187,13 @@ class MainWindow(QMainWindow):
         self.btn_add_model.clicked.connect(self._on_add_model)
         bar.addWidget(self.btn_add_model)
 
+        self.btn_import_zed = QPushButton("Import Zed…")
+        self.btn_import_zed.setToolTip(
+            "Convert a Zed GET /models file into zed/<id> overlay entries"
+        )
+        self.btn_import_zed.clicked.connect(self._on_import_zed)
+        bar.addWidget(self.btn_import_zed)
+
         self.btn_merge = QPushButton("Merge & Preview")
         self.btn_merge.clicked.connect(self._on_merge)
         self.btn_merge.setEnabled(False)
@@ -202,6 +210,67 @@ class MainWindow(QMainWindow):
         bar.addWidget(self.btn_save_custom)
 
         return bar
+
+    def _on_import_zed(self) -> None:
+        """Import a Zed /models file into the overlay as zed/<id> entries.
+
+        The file is parsed by the same pure importer the CLI uses, so the two
+        front-ends cannot disagree. Nothing touches the overlay until the
+        confirm dialog is accepted; after that Save Custom is still needed,
+        like every other overlay edit.
+        """
+        chosen, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Zed /models file",
+            self._browse_dir(),
+            "JSON files (*.json)",
+        )
+        if not chosen:
+            return
+        try:
+            with open(chosen, encoding="utf-8") as fh:
+                zed_data = json.load(fh)
+        except (OSError, json.JSONDecodeError) as exc:
+            QMessageBox.critical(self, "Import failed", f"Could not read {chosen}:\n{exc}")
+            return
+        try:
+            from ..zed_import import ZedImportError
+
+            preview = import_zed_models(zed_data, self.overlay)
+        except ZedImportError as exc:
+            QMessageBox.critical(self, "Import failed", str(exc))
+            return
+        if not preview.added and not preview.skipped:
+            QMessageBox.information(self, "Import Zed models", "The file holds no models.")
+            return
+        dialog = ZedImportDialog(
+            Path(chosen).name, preview.added, preview.skipped, self
+        )
+        from PySide6.QtWidgets import QDialog
+
+        if dialog.exec() != QDialog.Accepted:
+            self.status_label.setText("zed import cancelled — overlay left as it was")
+            return
+        result = import_zed_models(
+            zed_data, self.overlay,
+            overwrite_existing=dialog.overwrite_existing(),
+        )
+        apply_import(
+            self.overlay, result,
+            overwrite_existing=dialog.overwrite_existing(),
+        )
+        self.dirty = True
+        self.btn_save_custom.setEnabled(True)
+        self._refresh_rows()
+        added, overwritten = len(result.added), len(result.overwritten)
+        parts = []
+        if added:
+            parts.append(f"{added} added")
+        if overwritten:
+            parts.append(f"{overwritten} overwritten")
+        self.status_label.setText(
+            f"zed import: {', '.join(parts)}. Save Custom to keep it."
+        )
 
     def _build_filterbar(self) -> QHBoxLayout:
         bar = QHBoxLayout()
@@ -688,11 +757,13 @@ class MainWindow(QMainWindow):
             self.btn_load_params,
             self.btn_load_pricing,
             self.btn_load_custom,
+            self.btn_import_zed,
         ):
             button.setEnabled(not busy)
         has_data = bool(self.model_list.rowCount())
         selected = bool(self._selected_model())
         self.btn_add_model.setEnabled(not busy and has_data)
+        self.btn_import_zed.setEnabled(not busy)
         self.btn_add_param_field.setEnabled(not busy and selected)
         self.btn_add_pricing_field.setEnabled(not busy and selected)
         self.btn_merge.setEnabled(not busy and has_data)

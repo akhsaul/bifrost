@@ -43373,7 +43373,7 @@
       "get": {
         "operationId": "getModelParameters",
         "summary": "Get model parameters",
-        "description": "Returns the available parameter definitions for a model. The model ID is resolved against the model-parameters catalog with fallbacks, so provider-qualified IDs returned by /v1/models (e.g. \"openai/gpt-4o\", \"openrouter/openai/gpt-4o\") and bare aliases of provider-qualified catalog entries resolve to the same record as the stored key.",
+        "description": "Returns the available parameter definitions for a model. The model ID is resolved against the model-parameters catalog with fallbacks, so provider-qualified IDs returned by /v1/models (e.g. \"openai/gpt-4o\", \"openrouter/openai/gpt-4o\") and bare aliases of provider-qualified catalog entries resolve to the same record as the stored key. The optional provider disambiguates same-named models served by different providers (e.g. a gateway row vs its base-provider row); when set, only a row keyed for that provider answers (strict 404 otherwise).",
         "tags": [
           "Providers"
         ],
@@ -43391,6 +43391,15 @@
             "in": "query",
             "required": true,
             "description": "Model ID to get parameters for; provider-qualified IDs are resolved automatically",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "description": "Serving provider disambiguating same-named models; strict, no cross-provider fallback",
             "schema": {
               "type": "string"
             }
@@ -113718,19 +113727,9 @@
             "type": "string",
             "description": "CEL (Common Expression Language) expression for matching"
           },
-          "strategy": {
-            "type": "string",
-            "enum": [
-              "weighted",
-              "adaptive",
-              "priority"
-            ],
-            "description": "Target selection strategy: weighted distribution (weights sum to 1), adaptive latency-based selection (EWMA), or strict priority order (weight carries an integer priority, lower = higher precedence, must be >= 1)",
-            "default": "weighted"
-          },
           "targets": {
             "type": "array",
-            "description": "Weighted routing targets; weights must sum to 1; target is selected probabilistically at request time",
+            "description": "Routing targets; for weighted/adaptive strategies weights must sum to 1 (probabilistic selection), for priority strategy each target carries a priority rank (>= 1, lower = higher precedence, deterministic selection)",
             "items": {
               "type": "object",
               "description": "A single weighted routing target within a routing rule",
@@ -113768,8 +113767,17 @@
                   "type": "number",
                   "format": "double",
                   "exclusiveMinimum": 0,
-                  "description": "Probability weight for this target (must be > 0; all target weights in a rule must sum to 1, e.g. 0.7 + 0.3 = 1.0)",
+                  "description": "Probability weight for this target (must be > 0; all target weights in a rule must sum to 1, e.g. 0.7 + 0.3 = 1.0; ignored when strategy is 'priority')",
                   "example": 0.5
+                },
+                "priority": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1,
+                  "description": "Priority rank for this target (>= 1, lower number = higher precedence). Required for each target when rule strategy is 'priority'",
+                  "example": 1
                 }
               }
             }
@@ -113946,20 +113954,10 @@
             "type": "string",
             "description": "CEL expression for matching"
           },
-          "strategy": {
-            "type": "string",
-            "enum": [
-              "weighted",
-              "adaptive",
-              "priority"
-            ],
-            "description": "Target selection strategy: weighted distribution (weights sum to 1), adaptive latency-based selection (EWMA), or strict priority order (weight carries an integer priority, lower = higher precedence, must be >= 1)",
-            "default": "weighted"
-          },
           "targets": {
             "type": "array",
             "minItems": 1,
-            "description": "Weighted routing targets; weights must sum to 1; target is selected probabilistically at request time",
+            "description": "Routing targets; for weighted/adaptive strategies weights must sum to 1, for priority strategy each target carries an integer priority rank (>= 1, lower = higher precedence)",
             "items": {
               "type": "object",
               "description": "A single weighted routing target within a routing rule",
@@ -113997,8 +113995,17 @@
                   "type": "number",
                   "format": "double",
                   "exclusiveMinimum": 0,
-                  "description": "Probability weight for this target (must be > 0; all target weights in a rule must sum to 1, e.g. 0.7 + 0.3 = 1.0)",
+                  "description": "Probability weight for this target (must be > 0; all target weights in a rule must sum to 1, e.g. 0.7 + 0.3 = 1.0; ignored when strategy is 'priority')",
                   "example": 0.5
+                },
+                "priority": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1,
+                  "description": "Priority rank for this target (>= 1, lower number = higher precedence). Required for each target when rule strategy is 'priority'",
+                  "example": 1
                 }
               }
             }
@@ -114128,19 +114135,10 @@
           "cel_expression": {
             "type": "string"
           },
-          "strategy": {
-            "type": "string",
-            "enum": [
-              "weighted",
-              "adaptive",
-              "priority"
-            ],
-            "description": "Target selection strategy: weighted, adaptive (EWMA), or priority (weight carries an integer priority, lower = higher precedence, must be >= 1)"
-          },
           "targets": {
             "type": "array",
             "minItems": 1,
-            "description": "Replaces all existing targets when provided; weights must sum to 1",
+            "description": "Replaces all existing targets when provided; weights must sum to 1 for weighted/adaptive strategies, or each target must carry an integer priority (>= 1) for the priority strategy",
             "items": {
               "type": "object",
               "description": "A single weighted routing target within a routing rule",
@@ -114178,8 +114176,17 @@
                   "type": "number",
                   "format": "double",
                   "exclusiveMinimum": 0,
-                  "description": "Probability weight for this target (must be > 0; all target weights in a rule must sum to 1, e.g. 0.7 + 0.3 = 1.0)",
+                  "description": "Probability weight for this target (must be > 0; all target weights in a rule must sum to 1, e.g. 0.7 + 0.3 = 1.0; ignored when strategy is 'priority')",
                   "example": 0.5
+                },
+                "priority": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1,
+                  "description": "Priority rank for this target (>= 1, lower number = higher precedence). Required for each target when rule strategy is 'priority'",
+                  "example": 1
                 }
               }
             }

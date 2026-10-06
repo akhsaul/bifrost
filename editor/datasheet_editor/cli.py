@@ -25,6 +25,11 @@ from .merge import (
     PricingFieldPolicy,
     merge,
 )
+from .zed_import import (
+    ZedImportError,
+    apply_import,
+    import_zed_models,
+)
 from .output import (
     OUTPUT_FILENAMES,
     PARAMETERS_FILENAME,
@@ -316,6 +321,65 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return EXIT_OK if not errors else EXIT_VALIDATION
 
 
+def _load_zed_models(path: Path) -> Any:
+    try:
+        with path.open(encoding="utf-8") as fh:
+            return json.load(fh)
+    except json.JSONDecodeError as exc:
+        raise MergeError(f"{path} is not valid JSON: {exc}") from exc
+
+
+def cmd_import_zed(args: argparse.Namespace) -> int:
+    from .dataset import write_json_atomic as _write_atomic
+
+    zed_path = Path(args.zed_models)
+    custom_path = Path(args.custom)
+    try:
+        zed_data = _load_zed_models(zed_path)
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+
+    overlay: dict[str, dict[str, Any]] = {}
+    if custom_path.exists():
+        overlay = _load_overlay(custom_path)
+
+    try:
+        result = import_zed_models(
+            zed_data, overlay, overwrite_existing=args.overwrite_existing
+        )
+    except ZedImportError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_VALIDATION
+
+    if not result.added and not result.overwritten:
+        print(f"no changes: all {len(result.skipped)} zed model(s) already in {custom_path}")
+        return EXIT_OK
+
+    apply_import(overlay, result, overwrite_existing=args.overwrite_existing)
+
+    if args.dry_run:
+        for key in result.added:
+            print(f"  + {key}")
+        for key in result.overwritten:
+            print(f"  ~ {key} (overwritten)")
+        if result.skipped:
+            print(f"skipped {len(result.skipped)} existing (re-run with --overwrite-existing to replace):")
+            for key in result.skipped:
+                print(f"    {key}")
+        print(f"\ndry run: would write {custom_path}")
+        return EXIT_OK
+
+    _write_atomic(overlay, custom_path, indent=2)
+    print(f"added {len(result.added)}, overwrote {len(result.overwritten)}, "
+          f"skipped {len(result.skipped)} -> {custom_path}")
+    for key in result.added:
+        print(f"  + {key}")
+    for key in result.overwritten:
+        print(f"  ~ {key} (overwritten)")
+    return EXIT_OK
+
+
 def cmd_info(args: argparse.Namespace) -> int:
     from .fields import pricing_read_set
     from .validate import summarize_unknown_pricing_fields
@@ -430,6 +494,25 @@ def build_parser() -> argparse.ArgumentParser:
     p_info = sub.add_parser("info", help="summarize a datasheet file")
     p_info.add_argument("path")
     p_info.set_defaults(func=cmd_info)
+
+    p_zed = sub.add_parser(
+        "import-zed",
+        help="convert a Zed /models file into custom overlay entries (zed/<id>)",
+    )
+    p_zed.add_argument(
+        "--zed-models", required=True,
+        help="path to the Zed GET /models JSON file ({\"models\": [...]})",
+    )
+    p_zed.add_argument(
+        "--custom", required=True,
+        help="path to custom_model_metadata.json (created if missing; updated in place)",
+    )
+    p_zed.add_argument(
+        "--overwrite-existing", action="store_true",
+        help="replace zed/* entries already in the custom file; without it they are skipped",
+    )
+    p_zed.add_argument("--dry-run", action="store_true", help="report without writing")
+    p_zed.set_defaults(func=cmd_import_zed)
 
     p_gui = sub.add_parser("gui", help="launch the Qt editor")
     p_gui.add_argument("--original-parameters")

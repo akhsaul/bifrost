@@ -147,6 +147,88 @@ class OutputConflictDialog(QDialog):
         self.accept()
 
 
+class ZedImportDialog(QDialog):
+    """Confirm a Zed /models import into the custom overlay.
+
+    States what would happen before anything is written: how many entries are
+    new, how many already exist (skipped unless overwrite is ticked), and which
+    keys those are. Cancel leaves the overlay untouched.
+    """
+
+    def __init__(
+        self,
+        source_name: str,
+        added: list[str],
+        skipped: list[str],
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Import Zed models")
+        self.setMinimumWidth(520)
+        self._overwrite = False
+
+        layout = QVBoxLayout(self)
+
+        headline = QLabel(
+            f"{source_name} holds {len(added) + len(skipped)} model(s): "
+            f"{len(added)} new, {len(skipped)} already in the overlay."
+        )
+        headline.setWordWrap(True)
+        layout.addWidget(headline)
+
+        listing = QGroupBox()
+        listing_layout = QVBoxLayout(listing)
+        self._list_text = QPlainTextEdit()
+        self._list_text.setReadOnly(True)
+        self._list_text.setMaximumHeight(220)
+        lines = [f"+ {key}" for key in added]
+        lines += [f"= {key} (already present)" for key in skipped]
+        self._list_text.setPlainText("\n".join(lines) if lines else "nothing to import")
+        listing_layout.addWidget(self._list_text)
+        layout.addWidget(listing)
+
+        self.overwrite_box = QCheckBox(
+            f"Overwrite the {len(skipped)} existing entr{'y' if len(skipped) == 1 else 'ies'} "
+            "with the Zed data"
+        )
+        self.overwrite_box.setEnabled(bool(skipped))
+        self.overwrite_box.stateChanged.connect(self._on_overwrite_changed)
+        layout.addWidget(self.overwrite_box)
+
+        note = QLabel(
+            "New entries are appended as zed/<id>. Existing ones are left "
+            "untouched unless overwrite is ticked. Nothing is written until "
+            "you press Import, and Save Custom is still needed afterwards."
+        )
+        note.setWordWrap(True)
+        note.setStyleSheet("color:#475569;")
+        layout.addWidget(note)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Ok).setText("&Import")
+        buttons.accepted.connect(self._accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        self._buttons = buttons
+        self._update_ok()
+
+    def _on_overwrite_changed(self) -> None:
+        self._overwrite = self.overwrite_box.isChecked()
+
+    def _update_ok(self) -> None:
+        ok = self._buttons.button(QDialogButtonBox.Ok)
+        if ok is not None:
+            ok.setEnabled(True)
+
+    def _accept(self) -> None:
+        self._overwrite = self.overwrite_box.isChecked() and self.overwrite_box.isEnabled()
+        super().accept()
+
+    def overwrite_existing(self) -> bool:
+        """True when existing zed/* entries should be replaced."""
+        return self._overwrite
+
+
 def _describe_file(path: Any) -> str:
     """Size and mtime, so the risk is legible rather than nominal."""
     try:

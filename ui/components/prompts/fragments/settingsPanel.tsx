@@ -286,7 +286,13 @@ export function SettingsPanel() {
 									<>
 										<Separator />
 										<div className="flex flex-col gap-4">
-											<ModelParameters model={model} config={modelParams} onChange={handleModelParamsChange} hideFields={["promptTools"]} />
+											<ModelParameters
+												model={model}
+												provider={provider}
+												config={modelParams}
+												onChange={handleModelParamsChange}
+												hideFields={["promptTools"]}
+											/>
 										</div>
 									</>
 								)}

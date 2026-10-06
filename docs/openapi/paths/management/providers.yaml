@@ -507,7 +507,10 @@ models-parameters:
       is resolved against the model-parameters catalog with fallbacks, so
       provider-qualified IDs returned by /v1/models (e.g. "openai/gpt-4o",
       "openrouter/openai/gpt-4o") and bare aliases of provider-qualified
-      catalog entries resolve to the same record as the stored key.
+      catalog entries resolve to the same record as the stored key. The
+      optional provider disambiguates same-named models served by different
+      providers (e.g. a gateway row vs its base-provider row); when set, only
+      a row keyed for that provider answers (strict 404 otherwise).
     tags:
       - Providers
     security:
@@ -518,6 +521,12 @@ models-parameters:
         in: query
         required: true
         description: Model ID to get parameters for; provider-qualified IDs are resolved automatically
+        schema:
+          type: string
+      - name: provider
+        in: query
+        required: false
+        description: Serving provider disambiguating same-named models; strict, no cross-provider fallback
         schema:
           type: string
     responses:

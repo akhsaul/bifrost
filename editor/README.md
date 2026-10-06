@@ -79,6 +79,7 @@ Two details:
 | `diff` | show what the overlay would change, plus cross-file disagreements |
 | `validate` | check an overlay; exits `1` on errors |
 | `info` | summarize a datasheet file |
+| `import-zed` | convert a Zed `/models` file into `zed/<id>` overlay entries |
 | `gui` | launch the Qt editor |
 
 Useful flags: `--dry-run` (report without writing), `--report <path>` (full
@@ -87,6 +88,32 @@ change list as JSON), `--indent N` (pretty output), `--sort-keys`,
 
 Exit codes: `0` ok, `1` validation failure, `2` usage/IO error, `3` an output
 name is already taken in `--output` (retry with `--overwrite` or `--add-number`).
+
+### Importing Zed models
+
+```bash
+.venv/bin/python -m datasheet_editor import-zed \
+  --zed-models path/to/zed-models.json \
+  --custom custom_model_metadata.json
+```
+
+Converts a Zed `GET /models` file (`{"models": [...]}`) into `zed/<id>`
+overlay entries. Every capability value comes from that file — nothing is
+guessed and no base-provider data is mixed in. The overlay `provider` is
+always `zed` (the Bifrost provider serving the model, which is what the
+capability lookup matches on); Zed's inner `provider` field
+(`anthropic`/`open_ai`/`google`) is only validated, never written. Models with no `supported_effort_levels` get
+an explicit empty ladder and no `reasoning_effort` descriptor, so the prompt
+playground offers no effort control for them. Effort values keep their Zed
+casing (Gemini's `MINIMAL`/`LOW`/...) as-is. The `pricing` section carries identity + token limits
+only; capability flags live in `parameters`, following the merge engine's own
+placement rule. Fields with no datasheet counterpart (`display_name`,
+`is_latest`, `supports_max_mode`, `is_disabled`, ...) are omitted.
+
+Entries already in the custom file are skipped and reported; `--overwrite-existing`
+replaces them, `--dry-run` reports without writing. The GUI has the same flow
+behind the **Import Zed…** button (file picker → confirm dialog with
+overwrite checkbox → apply, then Save Custom as usual).
 
 ## The custom overlay
 
@@ -418,12 +445,14 @@ editor/
 │   ├── param_fields.json     # GENERATED from modelcapabilities.go — do not edit
 │   ├── dataset.py       # load/save, key order, atomic writes
 │   ├── merge.py         # the merge engine (pure, no Qt, no IO)
+│   ├── zed_import.py    # Zed /models → overlay entries (pure, no Qt, no IO)
 │   ├── validate.py      # errors, warnings, conflict detection
-│   ├── cli.py
+│   ├── cli.py           # merge/diff/validate/info/import-zed/gui subcommands
 │   └── gui/              # models, workers, typed field editor, add dialogs
 ├── tools/gen_pricing_fields.py
 ├── tools/gen_param_fields.py
 └── tests/
+    └── test_zed_import.py  # importer mapping + CLI + GUI wiring
 ```
 
 `merge.py` is deliberately free of Qt and IO so the GUI and CLI cannot drift

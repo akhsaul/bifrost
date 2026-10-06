@@ -204,8 +204,10 @@ export function PromptProvider({ children }: { children: ReactNode }) {
 		});
 	}, [requiredHeaders]);
 
-	// Fetch model datasheet for capabilities
-	const { data: datasheetData } = useGetModelParametersQuery(model, { skip: !model });
+	// Fetch model datasheet for capabilities. The serving provider rides along
+	// so gateway-served models resolve their own row, not a same-named
+	// base-provider row (see ModelParameters).
+	const { data: datasheetData } = useGetModelParametersQuery({ model, ...(provider ? { provider } : {}) }, { skip: !model });
 	const supportsVision = datasheetData?.supports_vision ?? false;
 
 	// Derived data

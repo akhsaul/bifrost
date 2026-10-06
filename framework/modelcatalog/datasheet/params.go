@@ -352,6 +352,70 @@ func (s *Store) ResolveModelParameters(ctx context.Context, model string) (*conf
 	return nil, firstErr
 }
 
+// ResolveModelParametersForProvider is ResolveModelParameters with an
+// explicit serving-provider hint. The model-parameters table keys gateway
+// rows by qualified key ("zed/claude-haiku-4-5"), so the hint is matched
+// against the row key first: the exact qualified form
+// ("<hint>/<model>") wins when present, and when the model is already
+// qualified the hint must agree with that qualifier — a qualified key from
+// another provider is never silently served. A bare fallback candidate
+// answers only when its row's embedded provider field is empty or matches
+// the hint (under the same normalizeProvider/foldFreeTierProvider folding as
+// LoadModelCapabilities), which is what makes gateway paths like
+// "openrouter/openai/gpt-5.5" still resolve to the bare/provider-less
+// "gpt-5.5" row when asked with provider=openai.
+//
+// Strict: when the hint names no row the result is ErrNotFound — there is no
+// cross-provider fallback, so an explicit provider never silently serves
+// another provider's parameters. An empty provider falls back to the legacy
+// unscoped resolution above.
+func (s *Store) ResolveModelParametersForProvider(ctx context.Context, model string, provider schemas.ModelProvider) (*configstoreTables.TableModelParameters, error) {
+	if strings.TrimSpace(string(provider)) == "" {
+		return s.ResolveModelParameters(ctx, model)
+	}
+	if s.configStore == nil {
+		return nil, nil
+	}
+	modelProvider, _ := schemas.ParseModelString(model, "")
+	if modelProvider != "" && strings.TrimSpace(string(provider)) != "" && modelProvider != provider {
+		return nil, configstore.ErrNotFound
+	}
+	// 1. The model's own qualified form under the hinted provider wins when
+	// the row exists ("claude-haiku-4-5" + zed → "zed/claude-haiku-4-5").
+	if _, bareOfModel := schemas.ParseModelString(model, ""); bareOfModel == model {
+		if params, err := s.configStore.GetModelParametersByModel(ctx, string(provider)+"/"+model); err == nil {
+			return params, nil
+		} else if !errors.Is(err, configstore.ErrNotFound) {
+			return nil, err
+		}
+	}
+	for _, candidate := range s.modelParameterCandidates(model) {
+		candidateProvider, _ := schemas.ParseModelString(candidate, "")
+		if candidateProvider != "" && candidateProvider != provider {
+			continue
+		}
+		params, err := s.configStore.GetModelParametersByModel(ctx, candidate)
+		if err != nil {
+			if !errors.Is(err, configstore.ErrNotFound) {
+				return nil, err
+			}
+			continue
+		}
+		if params == nil {
+			continue
+		}
+		if candidateProvider == "" {
+			rowProvider := gjson.Get(params.Data, "provider").String()
+			if rowProvider != "" &&
+				(rowProvider != string(provider) && normalizeProvider(rowProvider) != foldFreeTierProvider(provider)) {
+				continue
+			}
+		}
+		return params, nil
+	}
+	return nil, configstore.ErrNotFound
+}
+
 // modelParameterCandidates returns the ordered lookup keys tried by
 // ResolveModelParameters: the exact model, each progressively
 // provider-stripped form ("openrouter/openai/gpt-5.5" → "openai/gpt-5.5" →

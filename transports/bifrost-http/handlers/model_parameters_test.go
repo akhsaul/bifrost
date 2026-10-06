@@ -30,12 +30,14 @@ func TestGetModelParameters_ResolvesQualifiedAndBareIDs(t *testing.T) {
 	require.NoError(t, store.UpsertModelParametersBatch(ctx, []configstoreTables.TableModelParameters{
 		{Model: "gpt-5.5", Data: `{"model_parameters":[{"id":"reasoning_effort"}]}`},
 		{Model: "openrouter/moonshotai/kimi-k2.5", Data: `{"model_parameters":[{"id":"temperature"}]}`},
+		{Model: "claude-haiku-4-5", Data: `{"provider":"anthropic","model_parameters":[{"id":"temperature"},{"id":"top_p"}]}`},
+		{Model: "zed/claude-haiku-4-5", Data: `{"provider":"zed","model_parameters":[{"id":"thinking"}]}`},
 	}))
 
 	ds := datasheet.New(store, &mockLogger{}, datasheet.Config{})
 	rows, err := ds.LoadModelParamsFromDB(ctx)
 	require.NoError(t, err)
-	require.Equal(t, 2, rows)
+	require.Equal(t, 4, rows)
 
 	h := &ProviderHandler{
 		dbStore: store,
@@ -47,6 +49,7 @@ func TestGetModelParameters_ResolvesQualifiedAndBareIDs(t *testing.T) {
 	tests := []struct {
 		name       string
 		model      string
+		provider   string
 		wantStatus int
 		wantBody   string
 	}{
@@ -79,12 +82,49 @@ func TestGetModelParameters_ResolvesQualifiedAndBareIDs(t *testing.T) {
 			model:      "definitely-not-a-model",
 			wantStatus: fasthttp.StatusNotFound,
 		},
+		{
+			name:       "provider hint selects the gateway row over the base row",
+			model:      "claude-haiku-4-5",
+			provider:   "zed",
+			wantStatus: fasthttp.StatusOK,
+			wantBody:   `{"provider":"zed","model_parameters":[{"id":"thinking"}]}`,
+		},
+		{
+			name:       "provider hint selects the base row when asked",
+			model:      "claude-haiku-4-5",
+			provider:   "anthropic",
+			wantStatus: fasthttp.StatusOK,
+			wantBody:   `{"provider":"anthropic","model_parameters":[{"id":"temperature"},{"id":"top_p"}]}`,
+		},
+		{
+			name:       "qualified model with matching provider hint resolves",
+			model:      "zed/claude-haiku-4-5",
+			provider:   "zed",
+			wantStatus: fasthttp.StatusOK,
+			wantBody:   `{"provider":"zed","model_parameters":[{"id":"thinking"}]}`,
+		},
+		{
+			name:       "qualified model with mismatched hint is strict 404",
+			model:      "zed/claude-haiku-4-5",
+			provider:   "anthropic",
+			wantStatus: fasthttp.StatusNotFound,
+		},
+		{
+			name:       "provider hint with no row for that provider is strict 404",
+			model:      "claude-haiku-4-5",
+			provider:   "openai",
+			wantStatus: fasthttp.StatusNotFound,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			uri := fmt.Sprintf("/api/models/parameters?model=%s", tt.model)
+			if tt.provider != "" {
+				uri += "&provider=" + tt.provider
+			}
 			var req fasthttp.Request
-			req.SetRequestURI(fmt.Sprintf("/api/models/parameters?model=%s", tt.model))
+			req.SetRequestURI(uri)
 			reqCtx := &fasthttp.RequestCtx{}
 			reqCtx.Init(&req, &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 12345}, nil)
 

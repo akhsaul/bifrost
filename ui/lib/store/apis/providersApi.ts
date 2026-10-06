@@ -579,11 +579,18 @@ export const providersApi = baseApi.injectEndpoints({
 			providesTags: ["BaseModels"],
 		}),
 
-		// Get model parameters (parameters, capabilities) from local API
-		// Falls back to default parameters if the API returns an error (e.g. model not found)
-		getModelParameters: builder.query<ModelDatasheetResponse, string>({
-			queryFn: async (model, _queryApi, _extraOptions, baseQuery) => {
-				const result = await baseQuery(`/models/parameters?model=${encodeURIComponent(model)}`);
+		// Get model parameters (parameters, capabilities) from local API.
+		// Falls back to default parameters if the API returns an error (e.g. model not found).
+		// The optional provider disambiguates same-named models served by
+		// different providers (e.g. a gateway row vs its base-provider row);
+		// the server answers strictly and 404s when that provider has no row.
+		getModelParameters: builder.query<ModelDatasheetResponse, string | { model: string; provider?: string }>({
+			queryFn: async (arg, _queryApi, _extraOptions, baseQuery) => {
+				const model = typeof arg === "string" ? arg : arg.model;
+				const provider = typeof arg === "string" ? undefined : arg.provider;
+				const params = new URLSearchParams({ model });
+				if (provider) params.set("provider", provider);
+				const result = await baseQuery(`/models/parameters?${params.toString()}`);
 				if (result.error) {
 					// If the model is not found, return the default parameters
 					if ((result.error as any)?.status === 404) {

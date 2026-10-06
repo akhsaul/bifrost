@@ -8,6 +8,10 @@ const SUPPORTED_TYPES = new Set<string>(Object.values(ParameterType));
 
 interface ModelParametersProps {
 	model: string;
+	/** Serving provider selected alongside the model — sent as `?provider=` so
+	 * the datasheet resolves the serving provider's row instead of a
+	 * same-named base-provider row. */
+	provider?: string;
 	config: Record<string, any>;
 	onChange: (config: Record<string, any>) => void;
 	disabled?: boolean;
@@ -28,10 +32,17 @@ function ModelParametersSkeleton() {
 	);
 }
 
-export default function ModelParameters({ model, config, onChange, disabled, hideFields }: ModelParametersProps) {
-	const { data, isLoading, isError } = useGetModelParametersQuery(model, {
-		skip: !model,
-	});
+export default function ModelParameters({ model, provider, config, onChange, disabled, hideFields }: ModelParametersProps) {
+	// Pass the serving provider explicitly so gateway-served models resolve
+	// their own datasheet row, not a same-named base-provider row. A model
+	// that already carries a qualifier keeps working: the server rejects a
+	// qualifier that disagrees with the hint instead of serving it silently.
+	const { data, isLoading, isError } = useGetModelParametersQuery(
+		{ model, ...(provider ? { provider } : {}) },
+		{
+			skip: !model,
+		},
+	);
 
 	// Ensure parameters belong to the current model (RTK Query may briefly return stale cached data)
 	const datasheetModel = data?.base_model;

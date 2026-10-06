@@ -76,6 +76,14 @@ func (mc *ModelCatalog) ResolveModelParameters(ctx context.Context, model string
 	return mc.datasheet.ResolveModelParameters(ctx, model)
 }
 
+// ResolveModelParametersForProvider is ResolveModelParameters with an
+// explicit serving-provider hint. Strict: when the hint names no row the
+// result is a not-found error, never another provider's row. An empty
+// provider falls back to the legacy unscoped resolution.
+func (mc *ModelCatalog) ResolveModelParametersForProvider(ctx context.Context, model string, provider schemas.ModelProvider) (*configstoreTables.TableModelParameters, error) {
+	return mc.datasheet.ResolveModelParametersForProvider(ctx, model, provider)
+}
+
 func (mc *ModelCatalog) IsTextCompletionSupported(model string, provider schemas.ModelProvider) bool {
 	return mc.datasheet.IsTextCompletionSupported(model, provider)
 }
