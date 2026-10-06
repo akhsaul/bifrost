@@ -15,21 +15,18 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/klauspost/compress v1.20.0
 	github.com/mark3labs/mcp-go v0.43.2
-	github.com/maximhq/bifrost/core v1.10.2
-	github.com/maximhq/bifrost/framework v1.7.4
-	github.com/maximhq/bifrost/plugins/adaptiverouting v0.0.0-00010101000000-000000000000
-	github.com/maximhq/bifrost/plugins/compat v0.3.3
-	github.com/maximhq/bifrost/plugins/extradetection v0.0.0-00010101000000-000000000000
-	github.com/maximhq/bifrost/plugins/governance v1.8.3
-	github.com/maximhq/bifrost/plugins/guardrails v0.0.0-00010101000000-000000000000
-	github.com/maximhq/bifrost/plugins/logging v1.8.3
-	github.com/maximhq/bifrost/plugins/maxim v1.7.6
-	github.com/maximhq/bifrost/plugins/modelcatalogresolver v1.1.6
-	github.com/maximhq/bifrost/plugins/otel v1.5.6
-	github.com/maximhq/bifrost/plugins/prompts v1.1.6
-	github.com/maximhq/bifrost/plugins/routing v1.1.3
-	github.com/maximhq/bifrost/plugins/semanticcache v1.6.6
-	github.com/maximhq/bifrost/plugins/telemetry v1.8.2
+	github.com/maximhq/bifrost/core v1.11.2
+	github.com/maximhq/bifrost/framework v1.8.1
+	github.com/maximhq/bifrost/plugins/compat v0.3.6
+	github.com/maximhq/bifrost/plugins/governance v1.8.6
+	github.com/maximhq/bifrost/plugins/logging v1.8.6
+	github.com/maximhq/bifrost/plugins/maxim v1.7.9
+	github.com/maximhq/bifrost/plugins/modelcatalogresolver v1.1.9
+	github.com/maximhq/bifrost/plugins/otel v1.5.9
+	github.com/maximhq/bifrost/plugins/prompts v1.1.9
+	github.com/maximhq/bifrost/plugins/routing v1.1.6
+	github.com/maximhq/bifrost/plugins/semanticcache v1.6.9
+	github.com/maximhq/bifrost/plugins/telemetry v1.8.5
 	github.com/pion/rtcp v1.2.16
 	github.com/pion/webrtc/v4 v4.2.9
 	github.com/prometheus/client_golang v1.23.2
@@ -174,7 +171,7 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mattn/go-sqlite3 v1.14.32 // indirect
-	github.com/maximhq/bifrost/plugins/mocker v1.6.6 // indirect
+	github.com/maximhq/bifrost/plugins/mocker v1.6.9 // indirect
 	github.com/maximhq/maxim-go v0.2.1 // indirect
 	github.com/mholt/archives v0.1.6-0.20260429171216-ef71b7a32fae // indirect
 	github.com/mikelolasagasti/xz v1.0.1 // indirect

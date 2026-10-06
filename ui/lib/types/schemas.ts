@@ -1100,8 +1100,7 @@ export const coreConfigSchema = z.object({
 	prometheus_labels: z.array(z.string()).default([]),
 	enable_logging: z.boolean().default(true),
 	disable_content_logging: z.boolean().default(false),
-	content_logging_on_error: z.boolean().default(false),
-	enforce_auth_on_inference: z.boolean().default(false),
+	enforce_auth_on_inference: z.boolean().default(true),
 	hide_deleted_virtual_keys_in_filters: z.boolean().default(false),
 	hidden_request_types: z.array(z.string()).default([]),
 	allowed_origins: z.array(z.string()).default(["*"]),
@@ -1676,91 +1675,9 @@ export type GlobalHeaderFilterConfigSchema = z.infer<typeof globalHeaderFilterCo
 export type GlobalHeaderFilterFormSchema = z.infer<typeof globalHeaderFilterFormSchema>;
 export type RoutingRuleSchema = z.infer<typeof routingRuleSchema>;
 export type BudgetOverrideFormSchema = z.infer<typeof budgetOverrideFormSchema>;
-
-// ---- OSS Guardrails (regex) ----
-
-export const guardrailPatternSchema = z.object({
-	pattern: z.string().min(1, "Regex pattern is required"),
-	description: z.string().max(255, "Description must be less than 255 characters").optional(),
-	entity_type: z.string().max(64, "Entity type must be less than 64 characters").optional(),
-	flags: z
-		.string()
-		.regex(/^[ims]{0,3}$/, "Flags can only combine i (case-insensitive), m (multiline), s (dot matches newline)")
-		.optional(),
-	action: z.enum(["detect_only", "block", "redact"]).default("block"),
-	redaction_strategy: z.enum(["replace", "mask", "hash"]).default("replace"),
-	redaction_mode: z.enum(["runtime", "runtime_reversible", "logs_only"]).default("runtime").optional(),
+// OSS setup lock: the operator's setup token entered on the login setup view.
+export const setupTokenFormSchema = z.object({
+	setup_token: z.string().trim().min(1, "Enter the setup token configured for this Bifrost instance"),
 });
 
-export const guardrailProviderSchema = z.object({
-	id: z.number().int().positive("Provider id is required"),
-	provider_name: z.enum(["regex", "secrets", "prompt-guardrail", "prompt_guardrail"]),
-	policy_name: z.string().min(1, "Configuration name is required").max(255),
-	enabled: z.boolean(),
-	timeout: z.number().int().min(0).optional(),
-	config: z.object({
-		patterns: z.array(guardrailPatternSchema).optional(),
-		ignored_secret_keywords: z.array(z.string()).optional(),
-		action: z.enum(["detect_only", "block", "redact"]).optional(),
-		redaction_strategy: z.enum(["replace", "mask", "hash"]).optional(),
-		redaction_mode: z.enum(["runtime", "runtime_reversible", "logs_only"]).optional(),
-		judge_provider: z.string().optional(),
-		judge_model: z.string().optional(),
-		rule: z.string().optional(),
-		prompt_template: z.string().optional(),
-		timeout: z.number().int().positive().max(600, "Timeout must be 600 seconds or less").optional(),
-		max_output_tokens: z.number().int().optional(),
-	}),
-});
-
-export const guardrailRuleSchema = z.object({
-	id: z.number().int().positive("Rule id is required"),
-	name: z.string().min(1, "Rule name is required").max(255),
-	description: z.string().max(1000).optional(),
-	enabled: z.boolean(),
-	target: z.enum(["llm", "mcp"]).default("llm").optional(),
-	cel_expression: z.string().optional(),
-	apply_to: z.enum(["input", "output", "both"]),
-	sampling_rate: z.number().int().min(0).max(100).optional(),
-	timeout: z.number().int().min(0).optional(),
-	max_turns_to_send: z.number().int().min(0).optional(),
-	provider_config_ids: z.array(z.number().int()).min(1, "Attach at least one guardrail provider"),
-});
-
-export const guardrailsConfigSchema = z
-	.object({
-		guardrail_providers: z.array(guardrailProviderSchema),
-		guardrail_rules: z.array(guardrailRuleSchema),
-	})
-	.refine(
-		(data) => {
-			const providerIds = new Set(data.guardrail_providers.map((p) => p.id));
-			return data.guardrail_rules.every((r) => r.provider_config_ids.every((id) => providerIds.has(id)));
-		},
-		{
-			message: "A rule references a guardrail provider that does not exist",
-			path: ["guardrail_rules"],
-		},
-	)
-	.refine(
-		(data) => {
-			const providerIds = data.guardrail_providers.map((p) => p.id);
-			return new Set(providerIds).size === providerIds.length;
-		},
-		{
-			message: "Provider ids must be unique",
-			path: ["guardrail_providers"],
-		},
-	)
-	.refine(
-		(data) => {
-			const ruleIds = data.guardrail_rules.map((r) => r.id);
-			return new Set(ruleIds).size === ruleIds.length;
-		},
-		{
-			message: "Rule ids must be unique",
-			path: ["guardrail_rules"],
-		},
-	);
-
-export type GuardrailsConfigSchema = z.infer<typeof guardrailsConfigSchema>;
+export type SetupTokenFormSchema = z.infer<typeof setupTokenFormSchema>;

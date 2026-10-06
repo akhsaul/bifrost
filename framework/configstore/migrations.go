@@ -499,50 +499,8 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"add_use_openai_endpoints_column"}, run: migrationAddUseOpenAIEndpointsColumn},
 	{IDs: []string{"add_time_of_day_pricing_columns"}, run: migrationAddTimeOfDayPricingColumns},
 	{IDs: []string{"migrate_vk_standalone_limits_to_model_configs"}, run: migrationMigrateVKStandaloneLimitsToModelConfigs},
-	{IDs: []string{"add_content_logging_on_error_column"}, run: migrationAddContentLoggingOnErrorColumn},
-	{IDs: []string{"add_cline_key_config_columns"}, run: migrationAddClineKeyConfigColumns},
-	{IDs: []string{"cleanup_antigravity_oauth_keys"}, run: migrationCleanupAntigravityOAuthKeys},
-	{IDs: []string{"drop_removed_providers"}, run: migrationDropRemovedProviders},
-	{IDs: []string{"add_modal_key_config_columns"}, run: migrationAddModalKeyConfigColumns},
-	{IDs: []string{"add_zed_key_config_columns"}, run: migrationAddZedKeyConfigColumns},
-}
-
-// zedKeyConfigColumns are the Zed login credential columns on the key table.
-var zedKeyConfigColumns = []string{
-	"zed_user_id",
-	"zed_access_token",
-	"zed_system_id",
-	"zed_organization_id",
-}
-
-// migrationAddZedKeyConfigColumns adds the Zed login credential columns to the
-// key table. There is nothing to backfill: zed is a new provider, so no
-// existing row can carry these values.
-func migrationAddZedKeyConfigColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_zed_key_config_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, column := range zedKeyConfigColumns {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableKey{}, column); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(*gorm.DB) error {
-			return fmt.Errorf("add_zed_key_config_columns is non-rollbackable: dropping the zed_* columns would permanently delete every stored Zed login blob, which cannot be re-supplied without logging in to Zed again; the columns are additive and older binaries safely ignore them")
-		},
-	}})
-
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
+	{IDs: []string{"add_ultrafast_above_272k_pricing_columns"}, run: migrationAddUltrafastAbove272kPricingColumns},
+	{IDs: []string{"add_priority_above_272k_cache_creation_pricing_column"}, run: migrationAddPriorityAbove272kCacheCreationPricingColumn},
 }
 
 // videoResolutionPricingColumns are the resolution-banded video output rate columns.
@@ -13142,6 +13100,46 @@ func migrationAddUltrafastPricingColumns(ctx context.Context, db *gorm.DB, logge
 	return nil
 }
 
+// migrationAddUltrafastAbove272kPricingColumns adds the OpenAI Ultrafast rates
+// for prompts above 272k tokens. The fields are nullable so catalogs without them
+// keep the flat Ultrafast rate as the fallback.
+func migrationAddUltrafastAbove272kPricingColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "add_ultrafast_above_272k_pricing_columns"
+	logger.Info("[configstore] starting migration %s", migrationName)
+	defer logger.Info("[configstore] finished migration %s", migrationName)
+	columns := []string{
+		"input_cost_per_token_above_272k_tokens_ultrafast",
+		"output_cost_per_token_above_272k_tokens_ultrafast",
+		"cache_read_input_token_cost_above_272k_tokens_ultrafast",
+		"cache_creation_input_token_cost_above_272k_tokens_ultrafast",
+	}
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: migrationName,
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			for _, field := range columns {
+				if err := addColumnIfNotExists(tx, logger, &tables.TableModelPricing{}, field); err != nil {
+					return fmt.Errorf("failed to add column %s: %w", field, err)
+				}
+			}
+			return nil
+		},
+		Rollback: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			for _, field := range columns {
+				if err := dropColumnIfExists(tx, logger, &tables.TableModelPricing{}, field); err != nil {
+					return fmt.Errorf("failed to drop column %s: %w", field, err)
+				}
+			}
+			return nil
+		},
+	}})
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error running %s migration: %s", migrationName, err.Error())
+	}
+	return nil
+}
+
 // migrationAddImageSizeQualityPricingColumns adds the per-size and joint
 // size+quality per-image output rate columns to the model pricing table.
 func migrationAddImageSizeQualityPricingColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
@@ -13977,140 +13975,35 @@ func migrationMigrateVKStandaloneLimitsToModelConfigs(ctx context.Context, db *g
 	return nil
 }
 
-// migrationCleanupAntigravityOAuthKeys removes legacy duplicate value and access_token
-// storage for Antigravity OAuth keys (which only require refresh_token and project_id).
-func migrationCleanupAntigravityOAuthKeys(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "cleanup_antigravity_oauth_keys"
+// migrationAddPriorityAbove272kCacheCreationPricingColumn adds the OpenAI
+// Priority/Fast cache-write rate for prompts above 272k tokens. The input,
+// output, and cache-read >272k priority columns already exist; this is the
+// one the datasheet publishes that the table had no home for. Nullable so
+// catalogs without it keep the flat priority cache-write rate as the fallback.
+func migrationAddPriorityAbove272kCacheCreationPricingColumn(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "add_priority_above_272k_cache_creation_pricing_column"
 	logger.Info("[configstore] starting migration %s", migrationName)
 	defer logger.Info("[configstore] finished migration %s", migrationName)
-
+	column := "cache_creation_input_token_cost_above_272k_tokens_priority"
 	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
 		ID: migrationName,
 		Migrate: func(tx *gorm.DB) error {
 			tx = tx.WithContext(ctx)
-
-			var keys []tables.TableKey
-			if err := tx.Where("provider = ? AND antigravity_refresh_token IS NOT NULL AND antigravity_refresh_token != ''", string(schemas.Antigravity)).Find(&keys).Error; err != nil {
-				return fmt.Errorf("failed to query antigravity keys: %w", err)
-			}
-
-			// Access tokens used to live in their own column. Fresh databases never get it
-			// (the field is no longer mapped), so only touch it when it is actually present.
-			hasAccessTokenColumn := tx.Migrator().HasColumn(&tables.TableKey{}, "antigravity_access_token")
-
-			for _, k := range keys {
-				if schemas.VaultStoreWriteEnabled() {
-					base := schemas.VaultBasePath("config_keys", k.KeyID)
-					_ = schemas.VaultRemoveHook(ctx, base+"/value")
-					_ = schemas.VaultRemoveHook(ctx, base+"/antigravity_access_token")
-				}
-
-				updates := map[string]interface{}{
-					"value": schemas.NewSecretVar(""),
-				}
-				if hasAccessTokenColumn {
-					updates["antigravity_access_token"] = nil
-				}
-				if err := tx.Model(&tables.TableKey{}).Where("id = ?", k.ID).Updates(updates).Error; err != nil {
-					return fmt.Errorf("failed to clean up antigravity key %s: %w", k.KeyID, err)
-				}
+			if err := addColumnIfNotExists(tx, logger, &tables.TableModelPricing{}, column); err != nil {
+				return fmt.Errorf("failed to add column %s: %w", column, err)
 			}
 			return nil
 		},
-		Rollback: func(*gorm.DB) error {
-			return fmt.Errorf("cleanup_antigravity_oauth_keys is non-rollbackable: access tokens and duplicate values were removed by design and are reconstituted dynamically at runtime")
-		},
-	}})
-
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
-var removedProviderNames = []string{"seekai", "dahl", "hcnsec", "tokenfaucet", "gorouter", "aisure"}
-
-// migrationDropRemovedProviders deletes provider rows (and their keys via
-// CASCADE) for providers removed from the codebase: seekai (fake model route),
-// dahl and hcnsec (fake model route), tokenfaucet and gorouter (shutdown), and
-// aisure (web-chat backend that cannot accept tools). Without this, boot fails
-// with "unsupported provider". The providers are dropped with a warning log,
-// never converted: their upstreams are gone or untrustworthy, so keeping
-// traffic flowing to them would be worse than dropping them.
-func migrationDropRemovedProviders(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "drop_removed_providers"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
+		Rollback: func(tx *gorm.DB) error {
 			tx = tx.WithContext(ctx)
-			for _, name := range removedProviderNames {
-				var provider tables.TableProvider
-				if err := tx.Where("name = ?", name).First(&provider).Error; err != nil {
-					if errors.Is(err, gorm.ErrRecordNotFound) {
-						continue
-					}
-					return fmt.Errorf("failed to look up removed provider %s: %w", name, err)
-				}
-				logger.Warn("[configstore] %s: dropping removed provider %q and its keys", migrationName, name)
-				if err := tx.Where("provider_id = ?", provider.ID).Delete(&tables.TableKey{}).Error; err != nil {
-					return fmt.Errorf("failed to delete keys for removed provider %s: %w", name, err)
-				}
-				if err := tx.Delete(&provider).Error; err != nil {
-					return fmt.Errorf("failed to delete removed provider %s: %w", name, err)
-				}
+			if err := dropColumnIfExists(tx, logger, &tables.TableModelPricing{}, column); err != nil {
+				return fmt.Errorf("failed to drop column %s: %w", column, err)
 			}
 			return nil
 		},
-		Rollback: func(*gorm.DB) error {
-			return fmt.Errorf("drop_removed_providers is non-rollbackable: dropped provider rows and keys cannot be reconstructed")
-		},
 	}})
-
 	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
-	}
-	return nil
-}
-
-// modalKeyConfigColumns are the Modal per-deployment credential columns on the key table.
-var modalKeyConfigColumns = []string{
-	"modal_model",
-	"modal_endpoint_model",
-	"modal_username",
-	"modal_region",
-}
-
-// migrationAddModalKeyConfigColumns adds the Modal per-deployment columns to
-// the key table. There is nothing to backfill: modal keys previously carried
-// no per-key config (the host came from network_config.base_url), so no
-// existing row can carry these values. Operators re-enter username/region and
-// the two model forms per key.
-func migrationAddModalKeyConfigColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
-	migrationName := "add_modal_key_config_columns"
-	logger.Info("[configstore] starting migration %s", migrationName)
-	defer logger.Info("[configstore] finished migration %s", migrationName)
-
-	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
-		ID: migrationName,
-		Migrate: func(tx *gorm.DB) error {
-			tx = tx.WithContext(ctx)
-			for _, column := range modalKeyConfigColumns {
-				if err := addColumnIfNotExists(tx, logger, &tables.TableKey{}, column); err != nil {
-					return err
-				}
-			}
-			return nil
-		},
-		Rollback: func(*gorm.DB) error {
-			return fmt.Errorf("add_modal_key_config_columns is non-rollbackable: dropping the modal_* columns would permanently delete every stored deployment binding, which cannot be re-derived from the request history; the columns are additive and older binaries safely ignore them")
-		},
-	}})
-
-	if err := m.Migrate(); err != nil {
-		return fmt.Errorf("error running %s migration: %w", migrationName, err)
+		return fmt.Errorf("error running %s migration: %s", migrationName, err.Error())
 	}
 	return nil
 }
