@@ -155,7 +155,10 @@ func hasZedResponsesSystemPrompt(request *schemas.BifrostResponsesRequest) bool 
 // system/developer turn). Only the inner open_ai family funnels through
 // ToResponsesRequest conversion, so input message placement — not
 // instructions — matches the live Zed capture for that family (system first in
-// input[]). Idempotent like the chat counterpart.
+// input[]). The content is an input_text block array, not a bare string:
+// Zed's parser rejects string content on the Responses wire shape
+// ("invalid type: string ..., expected a sequence"). Idempotent like the chat
+// counterpart.
 func ensureZedResponsesSystemPrompt(request *schemas.BifrostResponsesRequest) {
 	if request == nil || hasZedResponsesSystemPrompt(request) {
 		return
@@ -165,7 +168,10 @@ func ensureZedResponsesSystemPrompt(request *schemas.BifrostResponsesRequest) {
 		Type: &systemType,
 		Role: schemas.Ptr(schemas.ResponsesInputMessageRoleSystem),
 		Content: &schemas.ResponsesMessageContent{
-			ContentStr: schemas.Ptr(zedDefaultSystemPrompt),
+			ContentBlocks: []schemas.ResponsesMessageContentBlock{{
+				Type: schemas.ResponsesInputMessageContentBlockTypeText,
+				Text: schemas.Ptr(zedDefaultSystemPrompt),
+			}},
 		},
 	}}, request.Input...)
 }
