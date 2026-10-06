@@ -260,6 +260,83 @@ func TestDefaultSystemPromptInjected(t *testing.T) {
 	}
 }
 
+// TestEmptySystemPromptTreatedAsAbsent is the red test for the live client
+// report: {"role":"system","content":""} must behave exactly like no system
+// prompt at all — the empty turn is dropped and the default injected, never
+// leaked into the inner request as an empty system block (which Zed rejects
+// the same way it rejects a missing one).
+func TestEmptySystemPromptTreatedAsAbsent(t *testing.T) {
+	provider := zedTestProvider(t)
+
+	chatEnv := provider.BuildEnvelopeForTest(testCtx(), &schemas.BifrostChatRequest{
+		Provider: schemas.Zed,
+		Model:    "claude-haiku-4-5",
+		Input: []schemas.ChatMessage{
+			{Role: schemas.ChatMessageRoleSystem, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("")}},
+			{Role: schemas.ChatMessageRoleUser, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("5+3= ?")}},
+		},
+	}, zed.ZedInnerAnthropic)
+	if chatEnv == nil {
+		t.Fatal("nil chat envelope")
+	}
+	raw, _ := json.Marshal(chatEnv.ProviderRequest)
+	var chatInner map[string]interface{}
+	if err := json.Unmarshal(raw, &chatInner); err != nil {
+		t.Fatal(err)
+	}
+	sys, ok := chatInner["system"]
+	if !ok {
+		t.Fatal("anthropic inner request must carry system (default) for an empty client system")
+	}
+	sysStr := jsonString(t, sys)
+	if !strings.Contains(sysStr, "You are helpfull assistant") {
+		t.Errorf("anthropic system = %v, want default prompt", sys)
+	}
+	if strings.Count(sysStr, "text") > 1 {
+		t.Errorf("anthropic system = %v, want exactly one default block, no empty leftover", sys)
+	}
+
+	responsesEnv := provider.BuildResponsesEnvelopeForTest(testCtx(), &schemas.BifrostResponsesRequest{
+		Provider: schemas.Zed,
+		Model:    "gpt-5-nano",
+		Input: []schemas.ResponsesMessage{
+			{
+				Type:    schemas.Ptr(schemas.ResponsesMessageTypeMessage),
+				Role:    ptrRole(schemas.ResponsesInputMessageRoleSystem),
+				Content: &schemas.ResponsesMessageContent{ContentStr: schemas.Ptr("")},
+			},
+			{
+				Type:    schemas.Ptr(schemas.ResponsesMessageTypeMessage),
+				Role:    ptrRole(schemas.ResponsesInputMessageRoleUser),
+				Content: &schemas.ResponsesMessageContent{ContentStr: schemas.Ptr("5+3= ?")},
+			},
+		},
+	})
+	if responsesEnv == nil {
+		t.Fatal("nil responses envelope")
+	}
+	raw, _ = json.Marshal(responsesEnv.ProviderRequest)
+	var responsesInner map[string]interface{}
+	if err := json.Unmarshal(raw, &responsesInner); err != nil {
+		t.Fatal(err)
+	}
+	input, _ := responsesInner["input"].([]interface{})
+	if len(input) != 2 {
+		t.Fatalf("openai inner input has %d items, want 2 (default system + user), got %v", len(input), jsonString(t, responsesInner["input"]))
+	}
+	first, _ := input[0].(map[string]interface{})
+	if first["role"] != string(schemas.ResponsesInputMessageRoleSystem) {
+		t.Fatalf("openai inner input[0].role = %v, want system", first["role"])
+	}
+	content, _ := first["content"].([]interface{})
+	if len(content) != 1 {
+		t.Fatalf("openai inner input[0].content = %v, want single default block array", first["content"])
+	}
+	if !strings.Contains(jsonString(t, content[0]), "You are helpfull assistant") {
+		t.Errorf("openai inner input[0].content = %v, want default prompt", first["content"])
+	}
+}
+
 // TestExplicitSystemPromptPreserved verifies the guard: a client-supplied
 // system prompt must pass through untouched, never doubled with the default.
 func TestExplicitSystemPromptPreserved(t *testing.T) {

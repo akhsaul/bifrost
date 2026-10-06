@@ -80,7 +80,10 @@ func toInnerOpenAIRequest(ctx *schemas.BifrostContext, request *schemas.BifrostR
 const zedDefaultSystemPrompt = "You are helpfull assistant"
 
 // hasZedChatSystemPrompt reports whether a chat transcript already carries a
-// system/developer turn with non-empty content.
+// system/developer turn with renderable content. Turns with an empty string
+// or no text blocks count as absent: clients routinely send
+// {"role":"system","content":""}, which must not satisfy Zed's system
+// requirement nor survive as an empty system block on the wire.
 func hasZedChatSystemPrompt(request *schemas.BifrostChatRequest) bool {
 	if request == nil {
 		return false
@@ -89,19 +92,47 @@ func hasZedChatSystemPrompt(request *schemas.BifrostChatRequest) bool {
 		if msg.Role != schemas.ChatMessageRoleSystem && msg.Role != schemas.ChatMessageRoleDeveloper {
 			continue
 		}
-		if msg.Content == nil {
-			continue
-		}
-		if msg.Content.ContentStr != nil && *msg.Content.ContentStr != "" {
+		if chatMessageHasRenderableContent(msg.Content) {
 			return true
-		}
-		for _, block := range msg.Content.ContentBlocks {
-			if block.Text != nil && *block.Text != "" {
-				return true
-			}
 		}
 	}
 	return false
+}
+
+// chatMessageHasRenderableContent reports whether chat content carries
+// anything worth sending: non-empty text, or a media/file payload.
+func chatMessageHasRenderableContent(content *schemas.ChatMessageContent) bool {
+	if content == nil {
+		return false
+	}
+	if content.ContentStr != nil && *content.ContentStr != "" {
+		return true
+	}
+	for _, block := range content.ContentBlocks {
+		if block.Text != nil && *block.Text != "" {
+			return true
+		}
+		if block.ImageURLStruct != nil || block.File != nil || block.InputAudio != nil || block.Refusal != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// stripEmptyZedChatSystemMessages drops system/developer turns that carry no
+// renderable content, so an empty client system prompt neither blocks the
+// default injection nor leaks into the inner request as an empty system
+// block (which Zed rejects the same way it rejects a missing one).
+func stripEmptyZedChatSystemMessages(request *schemas.BifrostChatRequest) {
+	kept := make([]schemas.ChatMessage, 0, len(request.Input))
+	for _, msg := range request.Input {
+		if (msg.Role == schemas.ChatMessageRoleSystem || msg.Role == schemas.ChatMessageRoleDeveloper) &&
+			!chatMessageHasRenderableContent(msg.Content) {
+			continue
+		}
+		kept = append(kept, msg)
+	}
+	request.Input = kept
 }
 
 // ensureZedChatSystemPrompt prepends the default system turn to a chat
@@ -110,7 +141,11 @@ func hasZedChatSystemPrompt(request *schemas.BifrostChatRequest) bool {
 // request keeps the retry/fallback path on the same transcript: the second
 // converter call sees a system turn present and leaves it untouched.
 func ensureZedChatSystemPrompt(request *schemas.BifrostChatRequest) {
-	if request == nil || hasZedChatSystemPrompt(request) {
+	if request == nil {
+		return
+	}
+	stripEmptyZedChatSystemMessages(request)
+	if hasZedChatSystemPrompt(request) {
 		return
 	}
 	request.Input = append([]schemas.ChatMessage{{
@@ -121,9 +156,10 @@ func ensureZedChatSystemPrompt(request *schemas.BifrostChatRequest) {
 
 // hasZedResponsesSystemPrompt reports whether a Responses request already
 // carries a system instruction: top-level instructions, or a system/developer
-// input message with non-empty content. Messages with no role at all are
+// input message with renderable content. Messages with no role at all are
 // skipped: the OpenAI converter drops role-less non-message items, so they
-// can never satisfy Zed's system requirement.
+// can never satisfy Zed's system requirement. Empty-content system turns
+// (clients routinely send {"role":"system","content":""}) count as absent.
 func hasZedResponsesSystemPrompt(request *schemas.BifrostResponsesRequest) bool {
 	if request == nil {
 		return false
@@ -135,19 +171,49 @@ func hasZedResponsesSystemPrompt(request *schemas.BifrostResponsesRequest) bool 
 		if msg.Role == nil || (*msg.Role != schemas.ResponsesInputMessageRoleSystem && *msg.Role != schemas.ResponsesInputMessageRoleDeveloper) {
 			continue
 		}
-		if msg.Content == nil {
-			continue
-		}
-		if msg.Content.ContentStr != nil && *msg.Content.ContentStr != "" {
+		if responsesMessageHasRenderableContent(msg.Content) {
 			return true
-		}
-		for _, block := range msg.Content.ContentBlocks {
-			if block.Text != nil && *block.Text != "" {
-				return true
-			}
 		}
 	}
 	return false
+}
+
+// responsesMessageHasRenderableContent reports whether Responses content
+// carries anything worth sending: non-empty text, or a media/file payload.
+func responsesMessageHasRenderableContent(content *schemas.ResponsesMessageContent) bool {
+	if content == nil {
+		return false
+	}
+	if content.ContentStr != nil && *content.ContentStr != "" {
+		return true
+	}
+	for _, block := range content.ContentBlocks {
+		if block.Text != nil && *block.Text != "" {
+			return true
+		}
+		if block.FileID != nil || block.ResponsesInputMessageContentBlockImage != nil ||
+			block.ResponsesInputMessageContentBlockFile != nil || block.Audio != nil ||
+			block.ResponsesOutputMessageContentText != nil || block.ResponsesOutputMessageContentRefusal != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// stripEmptyZedResponsesSystemMessages drops system/developer input messages
+// that carry no renderable content, so an empty client system prompt neither
+// blocks the default injection nor leaks into the inner request as an empty
+// system block (which Zed rejects the same way it rejects a missing one).
+func stripEmptyZedResponsesSystemMessages(request *schemas.BifrostResponsesRequest) {
+	kept := make([]schemas.ResponsesMessage, 0, len(request.Input))
+	for _, msg := range request.Input {
+		if msg.Role != nil && (*msg.Role == schemas.ResponsesInputMessageRoleSystem || *msg.Role == schemas.ResponsesInputMessageRoleDeveloper) &&
+			!responsesMessageHasRenderableContent(msg.Content) {
+			continue
+		}
+		kept = append(kept, msg)
+	}
+	request.Input = kept
 }
 
 // ensureZedResponsesSystemPrompt prepends a default system input message to a
@@ -160,7 +226,11 @@ func hasZedResponsesSystemPrompt(request *schemas.BifrostResponsesRequest) bool 
 // ("invalid type: string ..., expected a sequence"). Idempotent like the chat
 // counterpart.
 func ensureZedResponsesSystemPrompt(request *schemas.BifrostResponsesRequest) {
-	if request == nil || hasZedResponsesSystemPrompt(request) {
+	if request == nil {
+		return
+	}
+	stripEmptyZedResponsesSystemMessages(request)
+	if hasZedResponsesSystemPrompt(request) {
 		return
 	}
 	systemType := schemas.ResponsesMessageTypeMessage
