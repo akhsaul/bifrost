@@ -4,6 +4,8 @@
 1. enhance "export settings", currently there is missing config_store, key allowed_requests only written to config.json when the provider is a custom, etc.
 2. enhance feature "Prompt Repository" to add custom headers and custom body, so user doesn't have to depend only on model-parameter datasheet.
 3. guardrails use typesafe/Jev (an AI model with endpoint /decisions) can be used to detect secret, AI can see which secret related to context. Need to do more test to know how accurate the model find a secret without giving more examples. As i know AI need more examples to make it more accurate, otherwise it will be false positive.
+4. provider antigravity, zed.dev and openrouter has a lot metadata for their models but unfortunately the metadata is not already converted to bifrost metadata (bifrost datasheet). maybe we don't have to add feature in bifrost, let bifrost use their format (datasheet bifrost) and make datasheet_editor to support converter from specific provider into bifrost metadata.
+5. (NEED TO INVESTIGATE), does bifrost can auto-convert metadata like (thinking level, reasoning disabled/enabled, topP, topK, etc) from other format request into requested format request by provider ? for example: if client send a request using openai-format + using model gemini + contains metadata, does bifrost can auto-convert the metadata into google-format ?
 
 
 # idea that maybe will not implemented because too many conflict with other features
