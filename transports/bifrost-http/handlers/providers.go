@@ -24,6 +24,9 @@ import (
 	"github.com/maximhq/bifrost/transports/bifrost-http/lib"
 	"github.com/tidwall/gjson"
 	"github.com/valyala/fasthttp"
+	"github.com/maximhq/bifrost/core/providers/antigravity"
+	"github.com/maximhq/bifrost/core/providers/cline"
+	"github.com/maximhq/bifrost/core/providers/zed"
 )
 
 // ModelsManager defines the interface for managing provider models
