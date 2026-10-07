@@ -1,0 +1,10 @@
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"thought": true,"text": ""}]}}],"usageMetadata": {"promptTokenCount": 9618,"totalTokenCount": 9618},"modelVersion": "gemini-2.5-flash-thinking","responseId": "HcHFaui1Bsz-4-EP14GOmQU"},"traceId": "fdfe2d55defb482b","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": "Hello!"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 2,"totalTokenCount": 9620},"modelVersion": "gemini-2.5-flash-thinking","responseId": "HcHFaui1Bsz-4-EP14GOmQU"},"traceId": "fdfe2d55defb482b","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": " I'm Antigravity, your AI coding assistant for the Bifrost project. How can"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 21,"totalTokenCount": 9639},"modelVersion": "gemini-2.5-flash-thinking","responseId": "HcHFaui1Bsz-4-EP14GOmQU"},"traceId": "fdfe2d55defb482b","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": " I help you today?"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 26,"totalTokenCount": 9644},"modelVersion": "gemini-2.5-flash-thinking","responseId": "HcHFaui1Bsz-4-EP14GOmQU"},"traceId": "fdfe2d55defb482b","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"thoughtSignature": "EmcKZQFpFH0TtcGuvFeHGh6E4zSbw/Xjb0JWgLalqhDSpzq3yQmTjcuWmd0dXpILI2+wX28grWdnd8gRxcptoQXO6T69SGY8X8I6Z1f8PKV99GR7LGLnpavRtJUs3Me+rHnlu1YOLs2a","text": ""}]},"finishReason": "STOP"}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 26,"totalTokenCount": 9644,"cachedContentTokenCount": 4080},"modelVersion": "gemini-2.5-flash-thinking","responseId": "HcHFaui1Bsz-4-EP14GOmQU"},"traceId": "fdfe2d55defb482b","metadata": {}}
+

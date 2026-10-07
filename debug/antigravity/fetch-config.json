@@ -1,0 +1,1683 @@
+{
+  "experimentConfig": {
+    "enabledExperimentIds": [
+      106260793,
+      106597020,
+      106724031,
+      106263850,
+      106584325,
+      106654029,
+      106281951,
+      106264532
+    ],
+    "experimentFlags": [
+      {
+        "name": "disable-system-message-tag",
+        "boolValue": false
+      },
+      {
+        "name": "enable-feature-manager-keybindings",
+        "boolValue": false
+      },
+      {
+        "name": "enable-plugin-themes",
+        "boolValue": false
+      },
+      {
+        "name": "enable-programmatic-tools",
+        "boolValue": false
+      },
+      {
+        "name": "enable-pseudo-project",
+        "boolValue": true
+      },
+      {
+        "name": "enable-remote-ai",
+        "boolValue": false
+      },
+      {
+        "name": "jetski-generative-ui",
+        "boolValue": false
+      },
+      {
+        "name": "jetski-sidecar-declared-permissions",
+        "boolValue": false
+      },
+      {
+        "name": "1p-projects-v5",
+        "boolValue": false
+      },
+      {
+        "name": "cli-enable-jetmon",
+        "boolValue": false
+      },
+      {
+        "name": "enable-battle-mode-custom-agents",
+        "boolValue": true
+      },
+      {
+        "name": "enable-gob-cog-vcs-ui",
+        "boolValue": true
+      },
+      {
+        "name": "mcp-lazy-load-tools",
+        "boolValue": true
+      },
+      {
+        "name": "shadow-call-aicode-mendel",
+        "boolValue": true
+      },
+      {
+        "name": "disable-tool-hook-notices",
+        "boolValue": false
+      },
+      {
+        "name": "enable-fork-with-subagents",
+        "boolValue": false
+      },
+      {
+        "name": "enable-get-screenshot-data",
+        "boolValue": false
+      },
+      {
+        "name": "enable-mcp-non-blocking-turn-load",
+        "boolValue": true
+      },
+      {
+        "name": "enable-remote-3p-environment",
+        "boolValue": false
+      },
+      {
+        "name": "enable-context-menu-system",
+        "boolValue": false
+      },
+      {
+        "name": "enable-deepagent",
+        "boolValue": false
+      },
+      {
+        "name": "enable-file-viewer-keyboard-navigation",
+        "boolValue": false
+      },
+      {
+        "name": "enable-fork-in-new-abfs-workspace",
+        "boolValue": false
+      },
+      {
+        "name": "enable-notebook-rendering",
+        "boolValue": false
+      },
+      {
+        "name": "enable-pty",
+        "boolValue": true
+      },
+      {
+        "name": "cortex-snapshot-recording",
+        "boolValue": false
+      },
+      {
+        "name": "enable-browser-subagent-v2",
+        "boolValue": true
+      },
+      {
+        "name": "enable-code-search-palette",
+        "boolValue": false
+      },
+      {
+        "name": "enable-native-swarm",
+        "boolValue": false
+      },
+      {
+        "name": "enable-plugin-auth",
+        "boolValue": false
+      },
+      {
+        "name": "disable-loop-detection",
+        "boolValue": true
+      },
+      {
+        "name": "disable-search-tools",
+        "boolValue": false
+      },
+      {
+        "name": "enable-ask-permission-tool",
+        "boolValue": false
+      },
+      {
+        "name": "enable-daemon-commands",
+        "boolValue": false
+      },
+      {
+        "name": "enable-persistent-terminals",
+        "boolValue": true
+      },
+      {
+        "name": "jetski-autonomous-mode",
+        "boolValue": false
+      },
+      {
+        "name": "sso-based-user-identity",
+        "boolValue": false
+      },
+      {
+        "name": "collect-x20-quotas-on-checkin",
+        "boolValue": false
+      },
+      {
+        "name": "enable-command-assessor",
+        "boolValue": true
+      },
+      {
+        "name": "enable-concierge-agent",
+        "boolValue": false
+      },
+      {
+        "name": "enable-conversation-groups",
+        "boolValue": false
+      },
+      {
+        "name": "enable-file-explorer-tab",
+        "boolValue": false
+      },
+      {
+        "name": "enable-jetbox-gcert",
+        "boolValue": false
+      },
+      {
+        "name": "enable-jetbox-gcert-v2",
+        "boolValue": false
+      },
+      {
+        "name": "enable-sidebar-unread-dot",
+        "boolValue": false
+      },
+      {
+        "name": "cascade-enable-messaging",
+        "boolValue": true
+      },
+      {
+        "name": "enable-directory-local-discovery",
+        "boolValue": false
+      },
+      {
+        "name": "enable-learn-slash-command",
+        "boolValue": true
+      },
+      {
+        "name": "enable-sidecars",
+        "boolValue": false
+      },
+      {
+        "name": "enable-sidecars-user-config-migration-ready",
+        "boolValue": false
+      },
+      {
+        "name": "enable-skill-icons",
+        "boolValue": false
+      },
+      {
+        "name": "enable-split-view",
+        "boolValue": false
+      },
+      {
+        "name": "enable-subagent-hub",
+        "boolValue": false
+      },
+      {
+        "name": "enable-aux-pane-redesign",
+        "boolValue": false
+      },
+      {
+        "name": "enable-input-draft-persistence",
+        "boolValue": false
+      },
+      {
+        "name": "enable-styles-css-cleanup",
+        "boolValue": false
+      },
+      {
+        "name": "enable-trustedcli-config-files",
+        "boolValue": false
+      },
+      {
+        "name": "enable-conversation-project-migration",
+        "boolValue": true
+      },
+      {
+        "name": "enable-run-command-semantic-rendering",
+        "boolValue": false
+      },
+      {
+        "name": "use-core-direct",
+        "boolValue": true
+      },
+      {
+        "name": "apply-trajectory-acls",
+        "boolValue": true
+      },
+      {
+        "name": "enable-deferred-tool-loading",
+        "boolValue": false
+      },
+      {
+        "name": "enable-fork-artifact-streaming",
+        "boolValue": false
+      },
+      {
+        "name": "enable-generative-hooks",
+        "boolValue": false
+      },
+      {
+        "name": "enable-skill-search-tool",
+        "boolValue": false
+      },
+      {
+        "name": "summary-store-reads",
+        "boolValue": false
+      },
+      {
+        "name": "enable-compact-slash-command",
+        "boolValue": false
+      },
+      {
+        "name": "enable-fig-vcs-ui",
+        "boolValue": true
+      },
+      {
+        "name": "enable-gob-repo-vcs-ui",
+        "boolValue": true
+      },
+      {
+        "name": "enable-swarm-narrator",
+        "boolValue": false
+      },
+      {
+        "name": "enable-terminal-setup-script",
+        "boolValue": false
+      },
+      {
+        "name": "disable-command-assessor",
+        "boolValue": false
+      },
+      {
+        "name": "enable-project-4k",
+        "boolValue": false
+      },
+      {
+        "name": "enable-subagent-user-messaging",
+        "boolValue": false
+      },
+      {
+        "name": "enable-teamwork-subagent",
+        "boolValue": true
+      },
+      {
+        "name": "enable-ui-sidecars",
+        "boolValue": false
+      },
+      {
+        "name": "json-hooks-enabled",
+        "boolValue": true
+      },
+      {
+        "name": "show-trajectory-labeling-ad",
+        "boolValue": false
+      },
+      {
+        "name": "use-slash-plan",
+        "boolValue": true
+      },
+      {
+        "name": "enable-continue-after-injection",
+        "boolValue": false
+      },
+      {
+        "name": "enable-fork-in-new-citc-workspace",
+        "boolValue": false
+      },
+      {
+        "name": "enable-list-plugin-accounts-tool",
+        "boolValue": false
+      },
+      {
+        "name": "enable-agent-team",
+        "boolValue": false
+      },
+      {
+        "name": "enable-git-vcs-ui",
+        "boolValue": false
+      },
+      {
+        "name": "enable-per-conversation-telemetry-toggle",
+        "boolValue": false
+      },
+      {
+        "name": "enable-settings-error-card",
+        "boolValue": true
+      },
+      {
+        "name": "turn-on-projects-internally",
+        "boolValue": true
+      },
+      {
+        "name": "use-component-rewrite",
+        "boolValue": false
+      },
+      {
+        "name": "cascade-use-sed-edit-tool",
+        "boolValue": false
+      },
+      {
+        "name": "enable-ripgrep-path-search",
+        "boolValue": true
+      },
+      {
+        "name": "enable-timeout-notification",
+        "boolValue": false
+      },
+      {
+        "name": "sidecar-iframe-prewarm",
+        "boolValue": false
+      },
+      {
+        "name": "cascade-enable-notebook-edit-tool",
+        "boolValue": false
+      },
+      {
+        "name": "convenient-multi-agent-coordination",
+        "boolValue": false
+      },
+      {
+        "name": "enable-conversation-forking",
+        "boolValue": false
+      },
+      {
+        "name": "enable-jj-vcs-ui",
+        "boolValue": false
+      },
+      {
+        "name": "enable-lazy-loaded-projects",
+        "boolValue": false
+      },
+      {
+        "name": "inject_3_memories_1_skill",
+        "boolValue": false
+      },
+      {
+        "name": "remote-control-setting-enabled",
+        "boolValue": true
+      },
+      {
+        "name": "enable-fork-at-historical-step",
+        "boolValue": false
+      },
+      {
+        "name": "enable-state-accumulator",
+        "boolValue": false
+      },
+      {
+        "name": "enable-swarm",
+        "boolValue": false
+      },
+      {
+        "name": "enable-tasks",
+        "boolValue": true
+      },
+      {
+        "name": "enable-trajectory-debug-in-battle-mode",
+        "boolValue": false
+      },
+      {
+        "name": "enable-wait-tool",
+        "boolValue": false
+      },
+      {
+        "name": "show-model-selection-change",
+        "boolValue": true
+      },
+      {
+        "name": "enable-auto-permission-preset",
+        "boolValue": false
+      },
+      {
+        "name": "enable-hook-status",
+        "boolValue": true
+      },
+      {
+        "name": "enable-profiles",
+        "boolValue": false
+      },
+      {
+        "name": "enable-resume-conversations-from-restart",
+        "boolValue": false
+      },
+      {
+        "name": "enable-retroactive-projects-migration",
+        "boolValue": true
+      },
+      {
+        "name": "enable-scoped-csrf-tokens",
+        "boolValue": false
+      },
+      {
+        "name": "use-canonical-stub-for-checkin",
+        "boolValue": false
+      },
+      {
+        "name": "allow-experimental-monitors",
+        "boolValue": false
+      },
+      {
+        "name": "enable-autonomous-mode-critic",
+        "boolValue": false
+      },
+      {
+        "name": "enable-conversation-sharing-prototype",
+        "boolValue": false
+      },
+      {
+        "name": "enable-review",
+        "boolValue": false
+      },
+      {
+        "name": "enable-skill-accumulator",
+        "boolValue": false
+      },
+      {
+        "name": "markdown-table-v2",
+        "boolValue": false
+      },
+      {
+        "name": "cli-enable-conversation-groups",
+        "boolValue": false
+      },
+      {
+        "name": "enable-context-role",
+        "boolValue": false
+      },
+      {
+        "name": "enable-customization-load-error-notice",
+        "boolValue": false
+      },
+      {
+        "name": "enable-jetbox-terminal-v2",
+        "boolValue": false
+      },
+      {
+        "name": "enable-model-capacity-exhausted-retries",
+        "boolValue": true
+      },
+      {
+        "name": "enable-remote-control-audio-transcription",
+        "boolValue": false
+      },
+      {
+        "name": "enable-thumbs-down-reroll",
+        "boolValue": false
+      },
+      {
+        "name": "enable-vscode-injection-removal",
+        "boolValue": false
+      },
+      {
+        "name": "enable-cost-accumulator",
+        "boolValue": false
+      },
+      {
+        "name": "enable-file-diff-accumulator",
+        "boolValue": true
+      },
+      {
+        "name": "enable-sqlite-trajectory",
+        "boolValue": true
+      },
+      {
+        "name": "send-subagent-initial-prompt-as-message",
+        "boolValue": true
+      },
+      {
+        "name": "enable-abfs-workspace-ui",
+        "boolValue": false
+      },
+      {
+        "name": "enable-ask-question-tool",
+        "boolValue": true
+      },
+      {
+        "name": "enable-audio-transcription",
+        "boolValue": false
+      },
+      {
+        "name": "enable-image-generator-subagent",
+        "boolValue": true
+      },
+      {
+        "name": "enable-owl-slash-command",
+        "boolValue": true
+      },
+      {
+        "name": "enable-plugins",
+        "boolValue": false
+      },
+      {
+        "name": "enable-simplified-skin",
+        "boolValue": false
+      },
+      {
+        "name": "disable-system-message-merging",
+        "boolValue": false
+      },
+      {
+        "name": "enable-background-task-accumulator",
+        "boolValue": false
+      },
+      {
+        "name": "enable-developer-mode",
+        "boolValue": false
+      },
+      {
+        "name": "enable-markdown-agents",
+        "boolValue": true
+      },
+      {
+        "name": "enable-marketplace-search-tool",
+        "boolValue": false
+      },
+      {
+        "name": "enable-sidecar-sdk",
+        "boolValue": false
+      },
+      {
+        "name": "permission-v2",
+        "boolValue": true
+      },
+      {
+        "name": "allow-pss-experimental-monitors",
+        "boolValue": false
+      },
+      {
+        "name": "cortex-snapshot-revert",
+        "boolValue": false
+      },
+      {
+        "name": "enable-ark",
+        "boolValue": false
+      },
+      {
+        "name": "enable-conversation-search-v2",
+        "boolValue": false
+      },
+      {
+        "name": "enable-gil-logging",
+        "boolValue": false
+      },
+      {
+        "name": "enable-input-autocomplete",
+        "boolValue": false
+      },
+      {
+        "name": "enable-jetski-chat",
+        "boolValue": false
+      },
+      {
+        "name": "enable-thought-steering-from-selection",
+        "boolValue": false
+      },
+      {
+        "name": "cli-enable-search-everything",
+        "boolValue": false
+      },
+      {
+        "name": "enable-continuous-pprof",
+        "boolValue": false
+      },
+      {
+        "name": "enable-critique-preview",
+        "boolValue": false
+      },
+      {
+        "name": "enable-customization-skills",
+        "boolValue": true
+      },
+      {
+        "name": "enable-plugin-bundles",
+        "boolValue": false
+      },
+      {
+        "name": "enable-reconcile-summaries",
+        "boolValue": false
+      },
+      {
+        "name": "enable-url-artifacts",
+        "boolValue": false
+      },
+      {
+        "name": "jetski-unified-customizations-panel-enabled",
+        "boolValue": false
+      },
+      {
+        "name": "disable-teamwork-forced-flash-model",
+        "boolValue": false
+      },
+      {
+        "name": "enable-critique-decorator",
+        "boolValue": false
+      },
+      {
+        "name": "enable-upload-html-artifact-to-drive",
+        "boolValue": false
+      },
+      {
+        "name": "deprecate-workflows",
+        "boolValue": false
+      },
+      {
+        "name": "enable-ask-custom-permission-tool",
+        "boolValue": false
+      },
+      {
+        "name": "enable-hub-builtin-browser",
+        "boolValue": false
+      },
+      {
+        "name": "enable-notifications-settings",
+        "boolValue": false
+      },
+      {
+        "name": "enable-permissions-selector",
+        "boolValue": false
+      },
+      {
+        "name": "remote-control-webrtc-mesh",
+        "boolValue": false
+      },
+      {
+        "name": "sidecar-gateway",
+        "boolValue": false
+      },
+      {
+        "name": "enable-agent-omnitrace",
+        "boolValue": false
+      },
+      {
+        "name": "enable-battle-contrib-variants",
+        "boolValue": false
+      },
+      {
+        "name": "enable-fork-in-new-worktree",
+        "boolValue": false
+      },
+      {
+        "name": "enable-mcp-apps",
+        "boolValue": false
+      },
+      {
+        "name": "enable-pdf-viewer",
+        "boolValue": false
+      },
+      {
+        "name": "enable-remote-agent-fastpush-pin",
+        "boolValue": true
+      },
+      {
+        "name": "enable-run-workflow-tool",
+        "boolValue": false
+      },
+      {
+        "name": "google-workspace-mentions",
+        "boolValue": false
+      },
+      {
+        "name": "enable-agent-plugins-spec",
+        "boolValue": false
+      },
+      {
+        "name": "enable-battle-mode",
+        "boolValue": false
+      },
+      {
+        "name": "enable-conversation-selection-quoting",
+        "boolValue": false
+      },
+      {
+        "name": "scheduled-tasks-v2",
+        "boolValue": false
+      },
+      {
+        "name": "use-aicode-jetski-endpoint",
+        "boolValue": false
+      },
+      {
+        "name": "cli-enable-vetted-permission",
+        "boolValue": false
+      },
+      {
+        "name": "configure-artifact-width",
+        "boolValue": false
+      },
+      {
+        "name": "enable-base-ui-tooltips",
+        "boolValue": true
+      },
+      {
+        "name": "enable-fork-provenance",
+        "boolValue": false
+      },
+      {
+        "name": "enable-thought-editing",
+        "boolValue": false
+      },
+      {
+        "name": "remove-conversation-history",
+        "boolValue": false
+      },
+      {
+        "name": "enable-conversation-only-revert",
+        "boolValue": false
+      },
+      {
+        "name": "enable-gemini-next-opt-out-switch",
+        "boolValue": false
+      },
+      {
+        "name": "enable-permissioned-github",
+        "boolValue": false
+      },
+      {
+        "name": "native-swarm-spanner-board",
+        "boolValue": false
+      },
+      {
+        "name": "agy-hub-announcement-message",
+        "stringValue": ""
+      },
+      {
+        "name": "agy-plugin-shelves",
+        "stringValue": ""
+      },
+      {
+        "name": "auto-mode-permission-preset",
+        "stringValue": "vetted"
+      },
+      {
+        "name": "cascade-agent-api-config",
+        "stringValue": ""
+      },
+      {
+        "name": "cascade-knowledge-config",
+        "stringValue": "{\"enabled\": false, \"min_turns_between_knowledge_generation\": 10000}"
+      },
+      {
+        "name": "checkpoint-variant",
+        "stringValue": ""
+      },
+      {
+        "name": "remote-control-proxy-server-url",
+        "stringValue": "jetski-webchannel.googleapis.com:443"
+      },
+      {
+        "name": "agent-retry-config",
+        "stringValue": ""
+      },
+      {
+        "name": "browser-subagent-model",
+        "stringValue": "MODEL_PLACEHOLDER_M18"
+      },
+      {
+        "name": "contrib-experiment-variant",
+        "stringValue": ""
+      },
+      {
+        "name": "deepagent-arm",
+        "stringValue": ""
+      },
+      {
+        "name": "invoke-subagent-config",
+        "stringValue": "{\"enabled\": true, \"always_inherit_model\": false}"
+      },
+      {
+        "name": "jetski-cli-announcement-message",
+        "stringValue": ""
+      },
+      {
+        "name": "log-artifacts-config",
+        "stringValue": "{\"enabled\": true, \"hideNominalToolSteps\": false, \"hidePlannerResponseText\": false, \"maxBytesPerStep\": 4096, \"maxBytesPerToolArg\": 2048, \"hideSystemSteps\": false, \"hideUserImplicitSteps\": false}"
+      },
+      {
+        "name": "CASCADE_USE_REPLACE_CONTENT_EDIT_TOOL",
+        "stringValue": "{\"max_fuzzy_edit_distance_fraction\": 0.001, \"allow_partial_replacement_success\": true, \"use_line_range\": true, \"fast_apply_fallback_config\": {\"enabled\": false, \"prompt_unchanged_threshold\": 5, \"content_view_radius_lines\": 200, \"content_edit_radius_lines\": 5}}"
+      },
+      {
+        "name": "agent-script-reroute",
+        "stringValue": ""
+      },
+      {
+        "name": "jetski-hiring-link-text",
+        "stringValue": ""
+      },
+      {
+        "name": "remote-control-version",
+        "stringValue": "v2"
+      },
+      {
+        "name": "record-error-sampling-rates",
+        "stringValue": "{\n      \"error_match_to_sample_rate\": {\n        \"LS_CRASH\": 1.0\n      }\n    }"
+      },
+      {
+        "name": "agy-cli-announcement-message",
+        "stringValue": ""
+      },
+      {
+        "name": "plugin-kill-switch",
+        "stringValue": ""
+      },
+      {
+        "name": "review-arm",
+        "stringValue": ""
+      },
+      {
+        "name": "jetski-plugin-promotions",
+        "stringValue": ""
+      },
+      {
+        "name": "native-swarm-suggested-models",
+        "stringValue": ""
+      },
+      {
+        "name": "auto-command-config",
+        "stringValue": "{\"system_allowlist\": [\"cd\"], \"sandbox_system_allowlist\": [\"head\", \"tail\", \"mkdir\", \"cd\", \"cp\", \"mv\", \"cat\", \"find\", \"grep\", \"rm\", \"touch\", \"less\", \"clear\", \"ls\"]}"
+      },
+      {
+        "name": "cascade-conversation-history-config",
+        "stringValue": "{\"enabled\": true, \"max_conversations\": 20}"
+      },
+      {
+        "name": "context-engine-config",
+        "stringValue": "{}"
+      },
+      {
+        "name": "jetski-bundle-promotions",
+        "stringValue": ""
+      },
+      {
+        "name": "jetski-hiring-link-url",
+        "stringValue": ""
+      },
+      {
+        "name": "remote-control-companion-url",
+        "stringValue": "https://antigravity.google.com"
+      },
+      {
+        "name": "jetski-hub-announcement-message",
+        "stringValue": ""
+      },
+      {
+        "name": "sonar-monitors-config",
+        "stringValue": ""
+      },
+      {
+        "name": "policy-guardian-config",
+        "stringValue": ""
+      },
+      {
+        "name": "user-interaction-timeout-seconds",
+        "intValue": "0"
+      },
+      {
+        "name": "continuous-pprof-mem-threshold-gib",
+        "intValue": "16"
+      },
+      {
+        "name": "continuous-pprof-cpu-duration-seconds",
+        "intValue": "10"
+      },
+      {
+        "name": "continuous-pprof-heap-interval-minutes",
+        "intValue": "30"
+      },
+      {
+        "name": "continuous-pprof-mem-cooldown-minutes",
+        "intValue": "30"
+      },
+      {
+        "name": "customization-token-budget",
+        "intValue": "20000"
+      },
+      {
+        "name": "dbtrajectory-step-cache-ttl-seconds",
+        "intValue": "0"
+      },
+      {
+        "name": "default_subagent_interaction_timeout_seconds",
+        "intValue": "60"
+      },
+      {
+        "name": "max-best-of-n",
+        "intValue": "10"
+      },
+      {
+        "name": "max-media-attachments",
+        "intValue": "5"
+      },
+      {
+        "name": "battle-mode-max-turns",
+        "intValue": "0"
+      },
+      {
+        "name": "battle-winner-survey-percent",
+        "intValue": "50"
+      },
+      {
+        "name": "continuous-pprof-cpu-interval-minutes",
+        "intValue": "30"
+      },
+      {
+        "name": "max-tokens-per-step",
+        "intValue": "16384"
+      },
+      {
+        "name": "rules-token-budget",
+        "intValue": "20000"
+      },
+      {
+        "name": "tool-output-max-bytes",
+        "intValue": "10240"
+      },
+      {
+        "name": "best-of-nudge-length-threshold",
+        "intValue": "150"
+      },
+      {
+        "name": "continuous-pprof-mem-check-interval-minutes",
+        "intValue": "1"
+      },
+      {
+        "name": "max-conversation-save-count",
+        "intValue": "500"
+      },
+      {
+        "name": "remote-control-silence-timeout-seconds",
+        "intValue": "60"
+      },
+      {
+        "name": "agy-plugin-marketplaces",
+        "stringListValue": {}
+      },
+      {
+        "name": "jetbox-usage-tips",
+        "stringListValue": {}
+      },
+      {
+        "name": "rpc-telemetry-allowlist",
+        "stringListValue": {}
+      }
+    ]
+  },
+  "availableExperiences": [
+    {
+      "name": "gemini-3.8-flash-medium",
+      "model": {
+        "modelId": "gemini-3.8-flash",
+        "name": "models/gemini-3.8-flash",
+        "displayName": "Gemini 3.8 Flash",
+        "baseModelId": "gemini-3.8-flash",
+        "version": "3.8-flash-08-2026",
+        "description": "Gemini 3.8 Flash",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedThinkingLevels": [
+          "MINIMAL",
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "supportedFeatures": [
+          "AUDIO_INPUT",
+          "BROWSE_AS_A_TOOL",
+          "CODE_EXECUTION",
+          "DOCUMENT_INPUT",
+          "FUNCTION_CALLING",
+          "IMAGE_INPUT",
+          "JSON_SCHEMA_OUTPUT",
+          "SEARCH_AS_A_TOOL",
+          "THINKING",
+          "THINKING_LEVEL",
+          "TOP_P",
+          "VIDEO_INPUT"
+        ],
+        "generationConfig": {
+          "thinkingConfig": {
+            "includeThoughts": true,
+            "thinkingBudget": 4000,
+            "minThinkingBudget": 32
+          },
+          "maxOutputTokens": 65536
+        }
+      }
+    },
+    {
+      "name": "gemini-3-flash",
+      "model": {
+        "modelId": "gemini-3.6-flash",
+        "name": "models/gemini-3.6-flash",
+        "displayName": "Gemini 3.6 Flash",
+        "baseModelId": "gemini-3.6-flash",
+        "version": "3.6-flash-07-2026",
+        "description": "Gemini 3.6 Flash",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedThinkingLevels": [
+          "MINIMAL",
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "supportedFeatures": [
+          "AUDIO_INPUT",
+          "BROWSE_AS_A_TOOL",
+          "CODE_EXECUTION",
+          "DOCUMENT_INPUT",
+          "FUNCTION_CALLING",
+          "IMAGE_INPUT",
+          "JSON_SCHEMA_OUTPUT",
+          "SEARCH_AS_A_TOOL",
+          "THINKING",
+          "THINKING_LEVEL",
+          "TOP_P",
+          "VIDEO_INPUT"
+        ],
+        "generationConfig": {
+          "thinkingConfig": {
+            "includeThoughts": true,
+            "thinkingBudget": -1,
+            "minThinkingBudget": 32
+          },
+          "maxOutputTokens": 65536
+        }
+      }
+    },
+    {
+      "name": "gemini-3.6-flash-medium",
+      "model": {
+        "modelId": "gemini-3.6-flash",
+        "name": "models/gemini-3.6-flash",
+        "displayName": "Gemini 3.6 Flash",
+        "baseModelId": "gemini-3.6-flash",
+        "version": "3.6-flash-07-2026",
+        "description": "Gemini 3.6 Flash",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedThinkingLevels": [
+          "MINIMAL",
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "supportedFeatures": [
+          "AUDIO_INPUT",
+          "BROWSE_AS_A_TOOL",
+          "CODE_EXECUTION",
+          "DOCUMENT_INPUT",
+          "FUNCTION_CALLING",
+          "IMAGE_INPUT",
+          "JSON_SCHEMA_OUTPUT",
+          "SEARCH_AS_A_TOOL",
+          "THINKING",
+          "THINKING_LEVEL",
+          "TOP_P",
+          "VIDEO_INPUT"
+        ],
+        "generationConfig": {
+          "thinkingConfig": {
+            "includeThoughts": true,
+            "thinkingBudget": 4000,
+            "minThinkingBudget": 32
+          },
+          "maxOutputTokens": 65536
+        }
+      }
+    },
+    {
+      "name": "gemini-pro-agent",
+      "model": {
+        "modelId": "gemini-3.1-pro-preview",
+        "name": "models/gemini-3.1-pro-preview",
+        "displayName": "Gemini 3.1 Pro Preview",
+        "baseModelId": "gemini-3.1-pro-preview",
+        "version": "3.1-pro-preview-01-2026",
+        "description": "Gemini 3.1 Pro Preview",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedThinkingLevels": [
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "supportedFeatures": [
+          "AUDIO_INPUT",
+          "BROWSE_AS_A_TOOL",
+          "CODE_EXECUTION",
+          "DOCUMENT_INPUT",
+          "FUNCTION_CALLING",
+          "IMAGE_INPUT",
+          "JSON_SCHEMA_OUTPUT",
+          "SEARCH_AS_A_TOOL",
+          "THINKING",
+          "THINKING_LEVEL",
+          "TOP_P",
+          "VIDEO_INPUT"
+        ],
+        "generationConfig": {
+          "thinkingConfig": {
+            "includeThoughts": true,
+            "thinkingLevel": "HIGH",
+            "minThinkingBudget": 128
+          },
+          "maxOutputTokens": 65535
+        }
+      }
+    },
+    {
+      "name": "gemini-3.8-flash-tiered",
+      "model": {
+        "modelId": "gemini-3.8-flash",
+        "name": "models/gemini-3.8-flash",
+        "displayName": "Gemini 3.8 Flash",
+        "baseModelId": "gemini-3.8-flash",
+        "version": "3.8-flash-08-2026",
+        "description": "Gemini 3.8 Flash",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedThinkingLevels": [
+          "MINIMAL",
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "supportedFeatures": [
+          "AUDIO_INPUT",
+          "BROWSE_AS_A_TOOL",
+          "CODE_EXECUTION",
+          "DOCUMENT_INPUT",
+          "FUNCTION_CALLING",
+          "IMAGE_INPUT",
+          "JSON_SCHEMA_OUTPUT",
+          "SEARCH_AS_A_TOOL",
+          "THINKING",
+          "THINKING_LEVEL",
+          "TOP_P",
+          "VIDEO_INPUT"
+        ],
+        "generationConfig": {
+          "thinkingConfig": {
+            "includeThoughts": true,
+            "thinkingBudget": -1,
+            "minThinkingBudget": 32
+          },
+          "maxOutputTokens": 65536
+        }
+      }
+    },
+    {
+      "name": "gemini-3.7-flash-medium",
+      "model": {
+        "modelId": "gemini-3.7-flash",
+        "name": "models/gemini-3.7-flash",
+        "displayName": "Gemini 3.7 Flash",
+        "baseModelId": "gemini-3.7-flash",
+        "version": "3.7-flash-08-2026",
+        "description": "Gemini 3.7 Flash",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedThinkingLevels": [
+          "MINIMAL",
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "supportedFeatures": [
+          "AUDIO_INPUT",
+          "BROWSE_AS_A_TOOL",
+          "CODE_EXECUTION",
+          "DOCUMENT_INPUT",
+          "FUNCTION_CALLING",
+          "IMAGE_INPUT",
+          "JSON_SCHEMA_OUTPUT",
+          "SEARCH_AS_A_TOOL",
+          "THINKING",
+          "THINKING_LEVEL",
+          "TOP_P",
+          "VIDEO_INPUT"
+        ],
+        "generationConfig": {
+          "thinkingConfig": {
+            "includeThoughts": true,
+            "thinkingBudget": 4000,
+            "minThinkingBudget": 32
+          },
+          "maxOutputTokens": 65536
+        }
+      }
+    },
+    {
+      "name": "gemini-3.7-flash-low",
+      "model": {
+        "modelId": "gemini-3.7-flash",
+        "name": "models/gemini-3.7-flash",
+        "displayName": "Gemini 3.7 Flash",
+        "baseModelId": "gemini-3.7-flash",
+        "version": "3.7-flash-08-2026",
+        "description": "Gemini 3.7 Flash",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedThinkingLevels": [
+          "MINIMAL",
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "supportedFeatures": [
+          "AUDIO_INPUT",
+          "BROWSE_AS_A_TOOL",
+          "CODE_EXECUTION",
+          "DOCUMENT_INPUT",
+          "FUNCTION_CALLING",
+          "IMAGE_INPUT",
+          "JSON_SCHEMA_OUTPUT",
+          "SEARCH_AS_A_TOOL",
+          "THINKING",
+          "THINKING_LEVEL",
+          "TOP_P",
+          "VIDEO_INPUT"
+        ],
+        "generationConfig": {
+          "thinkingConfig": {
+            "includeThoughts": true,
+            "thinkingBudget": 1000,
+            "minThinkingBudget": 32
+          },
+          "maxOutputTokens": 65536
+        }
+      }
+    },
+    {
+      "name": "gemini-3.1-pro-low",
+      "model": {
+        "modelId": "gemini-3.1-pro-preview",
+        "name": "models/gemini-3.1-pro-preview",
+        "displayName": "Gemini 3.1 Pro Preview",
+        "baseModelId": "gemini-3.1-pro-preview",
+        "version": "3.1-pro-preview-01-2026",
+        "description": "Gemini 3.1 Pro Preview",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedThinkingLevels": [
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "supportedFeatures": [
+          "AUDIO_INPUT",
+          "BROWSE_AS_A_TOOL",
+          "CODE_EXECUTION",
+          "DOCUMENT_INPUT",
+          "FUNCTION_CALLING",
+          "IMAGE_INPUT",
+          "JSON_SCHEMA_OUTPUT",
+          "SEARCH_AS_A_TOOL",
+          "THINKING",
+          "THINKING_LEVEL",
+          "TOP_P",
+          "VIDEO_INPUT"
+        ],
+        "generationConfig": {
+          "thinkingConfig": {
+            "includeThoughts": true,
+            "thinkingLevel": "LOW",
+            "minThinkingBudget": 128
+          },
+          "maxOutputTokens": 65535
+        }
+      }
+    },
+    {
+      "name": "gemini-3.1-flash-lite",
+      "model": {
+        "modelId": "gemini-3.1-flash-lite",
+        "name": "models/gemini-3.1-flash-lite",
+        "displayName": "Gemini 3.1 Flash Lite",
+        "baseModelId": "gemini-3.1-flash-lite",
+        "version": "3.1-flash-lite-05-2026",
+        "description": "Gemini 3.1 Flash Lite",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedThinkingLevels": [
+          "MINIMAL",
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "supportedFeatures": [
+          "AUDIO_INPUT",
+          "BROWSE_AS_A_TOOL",
+          "CODE_EXECUTION",
+          "DOCUMENT_INPUT",
+          "FUNCTION_CALLING",
+          "IMAGE_INPUT",
+          "JSON_SCHEMA_OUTPUT",
+          "SEARCH_AS_A_TOOL",
+          "THINKING",
+          "THINKING_LEVEL",
+          "VIDEO_INPUT"
+        ],
+        "generationConfig": {
+          "maxOutputTokens": 65535
+        }
+      }
+    },
+    {
+      "name": "gemini-3.7-flash-high",
+      "model": {
+        "modelId": "gemini-3.7-flash",
+        "name": "models/gemini-3.7-flash",
+        "displayName": "Gemini 3.7 Flash",
+        "baseModelId": "gemini-3.7-flash",
+        "version": "3.7-flash-08-2026",
+        "description": "Gemini 3.7 Flash",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedThinkingLevels": [
+          "MINIMAL",
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "supportedFeatures": [
+          "AUDIO_INPUT",
+          "BROWSE_AS_A_TOOL",
+          "CODE_EXECUTION",
+          "DOCUMENT_INPUT",
+          "FUNCTION_CALLING",
+          "IMAGE_INPUT",
+          "JSON_SCHEMA_OUTPUT",
+          "SEARCH_AS_A_TOOL",
+          "THINKING",
+          "THINKING_LEVEL",
+          "TOP_P",
+          "VIDEO_INPUT"
+        ],
+        "generationConfig": {
+          "thinkingConfig": {
+            "includeThoughts": true,
+            "thinkingBudget": -1,
+            "minThinkingBudget": 32
+          },
+          "maxOutputTokens": 65536
+        }
+      }
+    },
+    {
+      "name": "gemini-3.8-flash-low",
+      "model": {
+        "modelId": "gemini-3.8-flash",
+        "name": "models/gemini-3.8-flash",
+        "displayName": "Gemini 3.8 Flash",
+        "baseModelId": "gemini-3.8-flash",
+        "version": "3.8-flash-08-2026",
+        "description": "Gemini 3.8 Flash",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedThinkingLevels": [
+          "MINIMAL",
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "supportedFeatures": [
+          "AUDIO_INPUT",
+          "BROWSE_AS_A_TOOL",
+          "CODE_EXECUTION",
+          "DOCUMENT_INPUT",
+          "FUNCTION_CALLING",
+          "IMAGE_INPUT",
+          "JSON_SCHEMA_OUTPUT",
+          "SEARCH_AS_A_TOOL",
+          "THINKING",
+          "THINKING_LEVEL",
+          "TOP_P",
+          "VIDEO_INPUT"
+        ],
+        "generationConfig": {
+          "thinkingConfig": {
+            "includeThoughts": true,
+            "thinkingBudget": 1000,
+            "minThinkingBudget": 32
+          },
+          "maxOutputTokens": 65536
+        }
+      }
+    },
+    {
+      "name": "gemini-3.6-flash-high",
+      "model": {
+        "modelId": "gemini-3.6-flash",
+        "name": "models/gemini-3.6-flash",
+        "displayName": "Gemini 3.6 Flash",
+        "baseModelId": "gemini-3.6-flash",
+        "version": "3.6-flash-07-2026",
+        "description": "Gemini 3.6 Flash",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedThinkingLevels": [
+          "MINIMAL",
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "supportedFeatures": [
+          "AUDIO_INPUT",
+          "BROWSE_AS_A_TOOL",
+          "CODE_EXECUTION",
+          "DOCUMENT_INPUT",
+          "FUNCTION_CALLING",
+          "IMAGE_INPUT",
+          "JSON_SCHEMA_OUTPUT",
+          "SEARCH_AS_A_TOOL",
+          "THINKING",
+          "THINKING_LEVEL",
+          "TOP_P",
+          "VIDEO_INPUT"
+        ],
+        "generationConfig": {
+          "thinkingConfig": {
+            "includeThoughts": true,
+            "thinkingBudget": -1,
+            "minThinkingBudget": 32
+          },
+          "maxOutputTokens": 65536
+        }
+      }
+    },
+    {
+      "name": "gemini-3.8-flash-high",
+      "model": {
+        "modelId": "gemini-3.8-flash",
+        "name": "models/gemini-3.8-flash",
+        "displayName": "Gemini 3.8 Flash",
+        "baseModelId": "gemini-3.8-flash",
+        "version": "3.8-flash-08-2026",
+        "description": "Gemini 3.8 Flash",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedThinkingLevels": [
+          "MINIMAL",
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "supportedFeatures": [
+          "AUDIO_INPUT",
+          "BROWSE_AS_A_TOOL",
+          "CODE_EXECUTION",
+          "DOCUMENT_INPUT",
+          "FUNCTION_CALLING",
+          "IMAGE_INPUT",
+          "JSON_SCHEMA_OUTPUT",
+          "SEARCH_AS_A_TOOL",
+          "THINKING",
+          "THINKING_LEVEL",
+          "TOP_P",
+          "VIDEO_INPUT"
+        ],
+        "generationConfig": {
+          "thinkingConfig": {
+            "includeThoughts": true,
+            "thinkingBudget": -1,
+            "minThinkingBudget": 32
+          },
+          "maxOutputTokens": 65536
+        }
+      }
+    },
+    {
+      "name": "gemini-3.1-flash-image",
+      "model": {
+        "modelId": "gemini-3.1-flash-image",
+        "name": "models/gemini-3.1-flash-image",
+        "displayName": "Gemini 3.1 Flash Image",
+        "baseModelId": "gemini-3.1-flash-image",
+        "version": "gemini-3.1-flash-image-preview",
+        "description": "Gemini 3.1 Flash Image Preview",
+        "inputTokenLimit": 65536,
+        "outputTokenLimit": 65536,
+        "supportedFeatures": [
+          "IMAGE_INPUT",
+          "IMAGE_OUTPUT",
+          "SEARCH_AS_A_TOOL"
+        ]
+      }
+    },
+    {
+      "name": "gemini-3.1-pro-high",
+      "model": {
+        "modelId": "gemini-3.1-pro-preview",
+        "name": "models/gemini-3.1-pro-preview",
+        "displayName": "Gemini 3.1 Pro Preview",
+        "baseModelId": "gemini-3.1-pro-preview",
+        "version": "3.1-pro-preview-01-2026",
+        "description": "Gemini 3.1 Pro Preview",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedThinkingLevels": [
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "supportedFeatures": [
+          "AUDIO_INPUT",
+          "BROWSE_AS_A_TOOL",
+          "CODE_EXECUTION",
+          "DOCUMENT_INPUT",
+          "FUNCTION_CALLING",
+          "IMAGE_INPUT",
+          "JSON_SCHEMA_OUTPUT",
+          "SEARCH_AS_A_TOOL",
+          "THINKING",
+          "THINKING_LEVEL",
+          "TOP_P",
+          "VIDEO_INPUT"
+        ],
+        "generationConfig": {
+          "thinkingConfig": {
+            "includeThoughts": true,
+            "thinkingLevel": "HIGH",
+            "minThinkingBudget": 128
+          },
+          "maxOutputTokens": 65535
+        }
+      }
+    },
+    {
+      "name": "gemini-3.6-flash-low",
+      "model": {
+        "modelId": "gemini-3.6-flash",
+        "name": "models/gemini-3.6-flash",
+        "displayName": "Gemini 3.6 Flash",
+        "baseModelId": "gemini-3.6-flash",
+        "version": "3.6-flash-07-2026",
+        "description": "Gemini 3.6 Flash",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedThinkingLevels": [
+          "MINIMAL",
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "supportedFeatures": [
+          "AUDIO_INPUT",
+          "BROWSE_AS_A_TOOL",
+          "CODE_EXECUTION",
+          "DOCUMENT_INPUT",
+          "FUNCTION_CALLING",
+          "IMAGE_INPUT",
+          "JSON_SCHEMA_OUTPUT",
+          "SEARCH_AS_A_TOOL",
+          "THINKING",
+          "THINKING_LEVEL",
+          "TOP_P",
+          "VIDEO_INPUT"
+        ],
+        "generationConfig": {
+          "thinkingConfig": {
+            "includeThoughts": true,
+            "thinkingBudget": 1000,
+            "minThinkingBudget": 32
+          },
+          "maxOutputTokens": 65536
+        }
+      }
+    },
+    {
+      "name": "gemini-3.5-flash-lite",
+      "model": {
+        "modelId": "gemini-3.5-flash-lite",
+        "name": "models/gemini-3.5-flash-lite",
+        "displayName": "Gemini 3.5 Flash Lite",
+        "baseModelId": "gemini-3.5-flash-lite",
+        "version": "3.5-flash-lite-07-2026",
+        "description": "Gemini 3.5 Flash Lite",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedThinkingLevels": [
+          "MINIMAL",
+          "LOW",
+          "MEDIUM",
+          "HIGH"
+        ],
+        "supportedFeatures": [
+          "AUDIO_INPUT",
+          "BROWSE_AS_A_TOOL",
+          "CODE_EXECUTION",
+          "DOCUMENT_INPUT",
+          "FUNCTION_CALLING",
+          "IMAGE_INPUT",
+          "JSON_SCHEMA_OUTPUT",
+          "SEARCH_AS_A_TOOL",
+          "THINKING",
+          "THINKING_LEVEL",
+          "TOP_P",
+          "VIDEO_INPUT"
+        ],
+        "generationConfig": {
+          "thinkingConfig": {
+            "includeThoughts": true,
+            "thinkingLevel": "HIGH",
+            "minThinkingBudget": 128
+          },
+          "maxOutputTokens": 65535
+        }
+      }
+    }
+  ]
+}

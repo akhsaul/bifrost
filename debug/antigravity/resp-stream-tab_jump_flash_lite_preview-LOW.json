@@ -1,0 +1,8 @@
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": "Hello"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 1,"totalTokenCount": 9619},"modelVersion": "tab_jump_flash_lite_preview","responseId": "Q8HFao-8MqTCg8UP4qHFkQc"},"traceId": "4b5723948f182a55","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": "! 👋 I'm ready to help with your Bifrost questions. What'"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 17,"totalTokenCount": 9635},"modelVersion": "tab_jump_flash_lite_preview","responseId": "Q8HFao-8MqTCg8UP4qHFkQc"},"traceId": "4b5723948f182a55","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": "s on your mind?"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 22,"totalTokenCount": 9640},"modelVersion": "tab_jump_flash_lite_preview","responseId": "Q8HFao-8MqTCg8UP4qHFkQc"},"traceId": "4b5723948f182a55","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": ""}]},"finishReason": "STOP"}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 22,"totalTokenCount": 9640},"modelVersion": "tab_jump_flash_lite_preview","responseId": "Q8HFao-8MqTCg8UP4qHFkQc"},"traceId": "4b5723948f182a55","metadata": {}}
+

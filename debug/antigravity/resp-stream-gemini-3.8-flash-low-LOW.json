@@ -1,0 +1,4 @@
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": "Hello! How can I help you today with Bifrost or any other task?"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 16,"totalTokenCount": 9634},"modelVersion": "gemini-3.8-flash-n","responseId": "PsHFao_tMuXGpgf-t4zQCg"},"traceId": "10470dbea3150c01","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"thoughtSignature": "EmoKaAFpFH0ThDvkT/95FvG2UOe8YhBmcwJl3cOq03N3hujVZBWKOnHF+k93LkNTaCjOJxs7zq0uq2CC2c2h5S/u54rB2+EPPVdOFW13aLLOPAXOfhjXj7wD4meI1DG65wSHwTdYSItj6dFq","text": ""}]},"finishReason": "STOP"}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 16,"totalTokenCount": 9634,"cachedContentTokenCount": 4080},"modelVersion": "gemini-3.8-flash-n","responseId": "PsHFao_tMuXGpgf-t4zQCg"},"traceId": "10470dbea3150c01","metadata": {}}
+

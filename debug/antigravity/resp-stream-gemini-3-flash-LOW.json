@@ -1,0 +1,6 @@
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": "Hello! How can"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 4,"totalTokenCount": 9622},"modelVersion": "gemini-3-flash","responseId": "H8HFauXzA9qJqfkPwsim8QQ"},"traceId": "55317eb989a49286","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": " I help you with the Bifrost codebase today?"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 14,"totalTokenCount": 9632},"modelVersion": "gemini-3-flash","responseId": "H8HFauXzA9qJqfkPwsim8QQ"},"traceId": "55317eb989a49286","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"thoughtSignature": "EmUKYwFpFH0TuhDeYUcHmYegygUMmsviuqWGQxeohTQ9moauqED85TvMd/JkaysIg3rfdk6i0bVoYuRJEwdqcTQQs6Dg4lb0sn0csdTyzsPduCU9vBk5FVAR7mLpAhDZ9ikmbgVrrA==","text": ""}]},"finishReason": "STOP"}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 14,"totalTokenCount": 9632},"modelVersion": "gemini-3-flash","responseId": "H8HFauXzA9qJqfkPwsim8QQ"},"traceId": "55317eb989a49286","metadata": {}}
+

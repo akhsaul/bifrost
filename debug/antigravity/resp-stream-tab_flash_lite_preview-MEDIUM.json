@@ -1,0 +1,8 @@
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": "Hi"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 1,"totalTokenCount": 9619},"modelVersion": "tab_flash_lite_preview","responseId": "Q8HFaqu6Iq-0g8UP0ba06QM"},"traceId": "1790bece84c45bb0","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": " there! I'm Gemini 3.8 Flash, a large language model from Google. How can I"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 23,"totalTokenCount": 9641},"modelVersion": "tab_flash_lite_preview","responseId": "Q8HFaqu6Iq-0g8UP0ba06QM"},"traceId": "1790bece84c45bb0","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": " help you today?"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 27,"totalTokenCount": 9645},"modelVersion": "tab_flash_lite_preview","responseId": "Q8HFaqu6Iq-0g8UP0ba06QM"},"traceId": "1790bece84c45bb0","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": ""}]},"finishReason": "STOP"}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 27,"totalTokenCount": 9645,"cachedContentTokenCount": 8181},"modelVersion": "tab_flash_lite_preview","responseId": "Q8HFaqu6Iq-0g8UP0ba06QM"},"traceId": "1790bece84c45bb0","metadata": {}}
+

@@ -1,0 +1,194 @@
+Model: chat_20706
+  HIGH: Error
+  LOW: Error
+  MEDIUM: Error
+  MINIMAL: Error
+Model: chat_23310
+  HIGH: Error
+  LOW: Error
+  MEDIUM: Error
+  MINIMAL: Error
+Model: gemini-2.5-flash
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Success
+Model: gemini-2.5-flash-lite
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Success
+Model: gemini-2.5-flash-thinking
+  LOW: Success
+  HIGH: Success
+  MEDIUM: Success
+  MINIMAL: Success
+Model: gemini-2.5-pro
+  HIGH: Error
+  LOW: Error
+  MEDIUM: Error
+  MINIMAL: Error
+Model: gemini-3-8-flash
+  high: Success
+Model: gemini-3-flash
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Success
+Model: gemini-3-flash-agent
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Success
+Model: gemini-3.1-flash-image
+  HIGH: Success
+  LOW: Error
+  MEDIUM: Error
+  MINIMAL: Success
+Model: gemini-3.1-flash-lite
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Success
+Model: gemini-3.1-pro-high
+  HIGH: Error
+  LOW: Error
+  MEDIUM: Error
+  MINIMAL: Error
+Model: gemini-3.1-pro-low
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Error
+Model: gemini-3.5-flash-extra-low
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Success
+Model: gemini-3.5-flash-lite
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Success
+Model: gemini-3.5-flash-low
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Success
+Model: gemini-3.6-flash-high
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Success
+Model: gemini-3.6-flash-low
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Success
+Model: gemini-3.6-flash-medium
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Success
+Model: gemini-3.6-flash-tiered
+  MINIMAL: Success
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+Model: gemini-3.7-flash-high
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Error
+Model: gemini-3.7-flash-low
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Error
+Model: gemini-3.7-flash-medium
+  MINIMAL: Error
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+Model: gemini-3.7-flash-tiered
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Error
+Model: gemini-3.8-flash-high
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Error
+Model: gemini-3.8-flash-low
+  MINIMAL: Error
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+Model: gemini-3.8-flash-medium
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Error
+Model: gemini-3.8-flash-tiered
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Error
+Model: gemini-pro-agent
+  MINIMAL: Error
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+Model: tab_flash_lite_preview
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Success
+Model: tab_jump_flash_lite_preview
+  HIGH: Success
+  LOW: Success
+  MEDIUM: Success
+  MINIMAL: Success
+
+
+  Terima kasih! Token yang Anda berikan valid dan script berhasil dieksekusi dengan lancar. Saya telah mem-parsing hasil dari seluruh 120 kombinasi (30 model ×
+  4 level: MINIMAL, LOW, MEDIUM, HIGH).
+
+  Berdasarkan respons dari server, ini adalah perilaku backend Google Cloud Code ketika diberikan thinkingLevel:
+
+  ### 1. Validasi Sangat Ketat (Strict Enforcement)
+
+  Server benar-benar mengecek apakah sebuah model mendukung level tertentu. Jika level tersebut tidak didukung, server tidak akan mengabaikannya, melainkan
+  langsung menolak (HTTP 400) dengan pesan error yang sangat eksplisit:
+
+  │ "Thinking level [LEVEL] is not supported for this model. Please retry with other thinking level."
+
+  Ini membuktikan bahwa kita tidak bisa mengirim sembarang level; backend memiliki daftar allowlist per-model.
+
+  ### 2. Pola Penolakan Level
+
+  Dari hasil eksekusi, model-model terbagi menjadi 4 kelompok perilaku utama:
+
+  • Kelompok 1: Menolak level MINIMAL secara spesifik
+      • Model: Semua seri gemini-3.7-flash-*, gemini-3.8-flash-*, gemini-3.1-pro-low, dan gemini-pro-agent.
+      • Perilaku: Menolak keras request jika dikirimkan thinkingLevel: "MINIMAL", tetapi sukses jika dikirim LOW, MEDIUM, atau HIGH. Ini sepertinya karena
+      arsitektur model-model baru Google sudah tidak mendukung mode "tanpa berpikir" (atau minimal thinking).
+  • Kelompok 2: Menerima Semua Level (MINIMAL s/d HIGH)
+      • Model: Seri gemini-2.5-* (kecuali pro), gemini-3-flash, gemini-3.5-flash-*, gemini-3.6-flash-*, dan model autocompletion (tab_flash_lite_preview, dll).
+      • Perilaku: Semuanya sukses ter-stream untuk ke-4 level tersebut. (Catatan: gemini-2.5-pro gagal karena memukul limit HTTP 503 Capacity Exhausted, tetapi
+      tidak gagal di validasi argumen).
+  • Kelompok 3: Perilaku Ganjil (Edge Case)
+      • Model: gemini-3.1-flash-image
+      • Perilaku: Model ini menolak level LOW dan MEDIUM dengan alasan "not supported", tetapi secara aneh ia mengizinkan level MINIMAL dan HIGH.
+  • Kelompok 4: Menolak Secara Keseluruhan (Generic Invalid Argument)
+      • Model: Model chat internal lama (chat_20706, chat_23310) dan gemini-3.1-pro-high.
+      • Perilaku: Mereka melempar error Request contains an invalid argument. tanpa penjelasan spesifik. Ini mengindikasikan bahwa model-model ini mungkin belum
+      mendukung schema thinkingConfig sama sekali.
+
+
+  ### Kesimpulan untuk Arsitektur
+
+  Jika Bifrost atau Antigravity ingin membungkus pemanggilan API ini, jangan pernah mengirimkan thinking level secara asal (blind pass) jika properti
+  supportedThinkingLevels tidak ada di data metadata Anda. Anda harus melakukan fallback atau clamping (seperti memaksanya ke LOW atau tidak mengirimkannya sama
+  sekali jika tidak didefinisikan), karena jika Anda mengirimkan MINIMAL ke model 3.7 atau 3.8, request user akan otomatis rusak (400 Bad Request).

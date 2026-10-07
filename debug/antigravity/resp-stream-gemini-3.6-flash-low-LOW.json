@@ -1,0 +1,6 @@
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": "Hello! How can"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 4,"totalTokenCount": 9622},"modelVersion": "gemini-3.6-flash","responseId": "J8HFav3gHP7cjuMP6dDgyA0"},"traceId": "c22a9fe3376447e8","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": " I help you today with Bifrost?"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 12,"totalTokenCount": 9630},"modelVersion": "gemini-3.6-flash","responseId": "J8HFav3gHP7cjuMP6dDgyA0"},"traceId": "c22a9fe3376447e8","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"thoughtSignature": "EmUKYwFpFH0T5e9KeNuq4UN9A9Epp0zH9FmjFM/jVkCFh0TOWwxcPjo4lQVfzSRVPq4ZnNcgTag4ELLRWrGHvy6V/QkhoD7n1rJEEc6e7l8psLvWGCYtMbAnvjv8XyCh9J3n62SgPQ==","text": ""}]},"finishReason": "STOP"}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 12,"totalTokenCount": 9630,"cachedContentTokenCount": 4080},"modelVersion": "gemini-3.6-flash","responseId": "J8HFav3gHP7cjuMP6dDgyA0"},"traceId": "c22a9fe3376447e8","metadata": {}}
+

@@ -1,0 +1,10 @@
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": "Hello!"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 2,"totalTokenCount": 9620},"modelVersion": "gemini-3.1-flash-lite","responseId": "IMHFaoSrI-z1g8UPzuTy2Q4"},"traceId": "638a536af5627847","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": " I'm Antigravity, your AI coding assistant for the Bifrost codebase"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 18,"totalTokenCount": 9636},"modelVersion": "gemini-3.1-flash-lite","responseId": "IMHFaoSrI-z1g8UPzuTy2Q4"},"traceId": "638a536af5627847","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": ". I'm ready to help you with any tasks related to the Bifrost gateway, its plugin system, provider integrations"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 42,"totalTokenCount": 9660},"modelVersion": "gemini-3.1-flash-lite","responseId": "IMHFaoSrI-z1g8UPzuTy2Q4"},"traceId": "638a536af5627847","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": ", or anything else you're working on.\n\nWhat are we working on today?"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 60,"totalTokenCount": 9678},"modelVersion": "gemini-3.1-flash-lite","responseId": "IMHFaoSrI-z1g8UPzuTy2Q4"},"traceId": "638a536af5627847","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"thoughtSignature": "EnMKcQFpFH0TpP8Ga8ELwD4+A9YRaLY1znK/bZJVynJIYzU9lCNabRLTxDY+yl/2DVBz1uFMS7FZkn9YHCpFUypEdMWiyGoTAkXaTgs9Trdj3HAAli7p9WFdZjNX+SyALv9k0nIjqhII7p0Pc9G9fBCBFysF","text": ""}]},"finishReason": "STOP"}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 60,"totalTokenCount": 9678},"modelVersion": "gemini-3.1-flash-lite","responseId": "IMHFaoSrI-z1g8UPzuTy2Q4"},"traceId": "638a536af5627847","metadata": {}}
+

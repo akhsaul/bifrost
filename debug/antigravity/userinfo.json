@@ -1,0 +1,9 @@
+{
+  "id": "$id_number",
+  "email": "$email",
+  "verified_email": true,
+  "name": "george george",
+  "given_name": "george",
+  "family_name": "george",
+  "picture": "https://lh3.googleusercontent.com/a/dummy"
+}

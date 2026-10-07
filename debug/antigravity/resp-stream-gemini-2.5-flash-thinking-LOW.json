@@ -1,0 +1,8 @@
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"thought": true,"text": ""}]}}],"usageMetadata": {"promptTokenCount": 9618,"totalTokenCount": 9618},"modelVersion": "gemini-2.5-flash-thinking","responseId": "HcHFap_WFpj5juMPoNmBgAY"},"traceId": "bda5d8c89b387184","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": "Hello!"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 2,"totalTokenCount": 9620},"modelVersion": "gemini-2.5-flash-thinking","responseId": "HcHFap_WFpj5juMPoNmBgAY"},"traceId": "bda5d8c89b387184","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": " How can I help you with Bifrost today?"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 12,"totalTokenCount": 9630},"modelVersion": "gemini-2.5-flash-thinking","responseId": "HcHFap_WFpj5juMPoNmBgAY"},"traceId": "bda5d8c89b387184","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"thoughtSignature": "EmcKZQFpFH0T9RJ/4x1jQcNpmIJJlZbS1H4s+MiWK+qyIqc9QQqnwnqoRx/8NmbJlqYBpf0xNG3AxLqs1SI58pgSm3hh9CoXa7y2Kl3QUx7YXpSUJ6bDwQGbFbDR9FDi5wv0CFDlXgkk","text": ""}]},"finishReason": "STOP"}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 12,"totalTokenCount": 9630,"cachedContentTokenCount": 4080},"modelVersion": "gemini-2.5-flash-thinking","responseId": "HcHFap_WFpj5juMPoNmBgAY"},"traceId": "bda5d8c89b387184","metadata": {}}
+

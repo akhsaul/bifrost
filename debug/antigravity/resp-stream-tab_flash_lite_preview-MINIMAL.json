@@ -1,0 +1,6 @@
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": "Hi"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 1,"totalTokenCount": 9619},"modelVersion": "tab_flash_lite_preview","responseId": "QsHFaszsLoLDjuMPiNCB2Q0"},"traceId": "cd62ca621fa8f85a","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": " there! I'm ready to help. What can I do for you today?"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 18,"totalTokenCount": 9636},"modelVersion": "tab_flash_lite_preview","responseId": "QsHFaszsLoLDjuMPiNCB2Q0"},"traceId": "cd62ca621fa8f85a","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": ""}]},"finishReason": "STOP"}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 18,"totalTokenCount": 9636},"modelVersion": "tab_flash_lite_preview","responseId": "QsHFaszsLoLDjuMPiNCB2Q0"},"traceId": "cd62ca621fa8f85a","metadata": {}}
+

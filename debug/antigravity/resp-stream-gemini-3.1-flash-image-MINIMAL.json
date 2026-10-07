@@ -1,0 +1,6 @@
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"thoughtSignature": "EmUKYwFpFH0TF0XnFgThyPZ2Y/X0AfjMapNZfJrSm3Hn5xbTYn0Lo3rvU8Sls7mP7oRZ6UtGUrTYZ88zYRmcN00za1w0H/kTZIB5JRw4qKxoEzPwkBlSkIsEJ2o7MRVCkjRL7CG5cQ==","text": "Hello! I am Antigravity, a coding assistant created by Google DeepMind, and I'm ready to help you with your project in"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 29,"totalTokenCount": 9647},"modelVersion": "gemini-3.1-flash-image","responseId": "H8HFaq2_Na-0g8UP0ba06QM"},"traceId": "b441e16f4122795f","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": " `/mnt/data/Projects/bifrost/debug`. What can I help you with today?"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 50,"totalTokenCount": 9668},"modelVersion": "gemini-3.1-flash-image","responseId": "H8HFaq2_Na-0g8UP0ba06QM"},"traceId": "b441e16f4122795f","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": ""}]},"finishReason": "STOP"}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 50,"totalTokenCount": 9668},"modelVersion": "gemini-3.1-flash-image","responseId": "H8HFaq2_Na-0g8UP0ba06QM"},"traceId": "b441e16f4122795f","metadata": {}}
+

@@ -1,0 +1,6 @@
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": "Hello"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 1,"totalTokenCount": 9619},"modelVersion": "tab_flash_lite_preview","responseId": "Q8HFao67MvP-g8UPvpCH4Ac"},"traceId": "e02ac066bbe3cfbf","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": "! How can I help you today?"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 9,"totalTokenCount": 9627},"modelVersion": "tab_flash_lite_preview","responseId": "Q8HFao67MvP-g8UPvpCH4Ac"},"traceId": "e02ac066bbe3cfbf","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": ""}]},"finishReason": "STOP"}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 9,"totalTokenCount": 9627},"modelVersion": "tab_flash_lite_preview","responseId": "Q8HFao67MvP-g8UPvpCH4Ac"},"traceId": "e02ac066bbe3cfbf","metadata": {}}
+

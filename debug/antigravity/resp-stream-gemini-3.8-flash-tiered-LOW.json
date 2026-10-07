@@ -1,0 +1,4 @@
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"text": "Hello! How can I assist you with the Bifrost codebase or your current project today?"}]}}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 18,"totalTokenCount": 9636},"modelVersion": "gemini-3.8-flash-tiered","responseId": "QMHFap2fGqTCg8UP4qHFkQc"},"traceId": "6277a4a55b101c04","metadata": {}}
+
+data: {"response": {"candidates": [{"content": {"role": "model","parts": [{"thoughtSignature": "EmoKaAFpFH0Tez6d5IV3/P6RFVQS7M0tUbhV8WIj5mTplJjF4mz0qoRU+yQKMxQ3ftVeRvWELRVw7nyJIlImHSCweI3XvD6Ed9t1obUDhreOq/NMJ4MibjSVcDvWyWv/hXJVWRY7ftqudRQU","text": ""}]},"finishReason": "STOP"}],"usageMetadata": {"promptTokenCount": 9618,"candidatesTokenCount": 18,"totalTokenCount": 9636,"cachedContentTokenCount": 4080},"modelVersion": "gemini-3.8-flash-tiered","responseId": "QMHFap2fGqTCg8UP4qHFkQc"},"traceId": "6277a4a55b101c04","metadata": {}}
+

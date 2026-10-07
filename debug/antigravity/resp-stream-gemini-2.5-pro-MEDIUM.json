@@ -1,0 +1,18 @@
+{
+  "error": {
+    "code": 503,
+    "message": "No capacity available for model gemini-2.5-pro on the server",
+    "status": "UNAVAILABLE",
+    "details": [
+      {
+        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+        "reason": "MODEL_CAPACITY_EXHAUSTED",
+        "domain": "cloudcode-pa.googleapis.com",
+        "metadata": {
+          "error_number": "2010",
+          "model": "gemini-2.5-pro"
+        }
+      }
+    ]
+  }
+}
