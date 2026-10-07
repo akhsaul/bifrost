@@ -421,7 +421,8 @@ func TestFetchAvailableModelsFromAPI(t *testing.T) {
 					"displayName": "Internal Model",
 					"isInternal": true
 				}
-			}
+			},
+			"webSearchModelIds": ["gemini-3.5-flash-low"]
 		}`))
 	}))
 	defer server.Close()
@@ -741,7 +742,8 @@ func TestAntigravityProvider_QuotaMethods(t *testing.T) {
 							"resetTime": "2026-08-23T15:30:00Z"
 						}
 					}
-				}
+				},
+				"webSearchModelIds": ["gemini-3.5-flash-low"]
 			}`))
 			return
 		}

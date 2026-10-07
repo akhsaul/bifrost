@@ -226,6 +226,33 @@ func FetchAvailableModelsFromAPI(
 		return nil, fmt.Errorf("no models returned by fetchAvailableModels")
 	}
 
+	allowedModels := make(map[string]bool)
+	for _, sort := range fetchResp.AgentModelSorts {
+		for _, group := range sort.Groups {
+			for _, id := range group.ModelIDs {
+				allowedModels[id] = true
+			}
+		}
+	}
+	for _, id := range fetchResp.CommandModelIDs {
+		allowedModels[id] = true
+	}
+	for _, id := range fetchResp.TabModelIDs {
+		allowedModels[id] = true
+	}
+	for _, id := range fetchResp.ImageGenerationModelIDs {
+		allowedModels[id] = true
+	}
+	for _, id := range fetchResp.MqueryModelIDs {
+		allowedModels[id] = true
+	}
+	for _, id := range fetchResp.WebSearchModelIDs {
+		allowedModels[id] = true
+	}
+	for _, id := range fetchResp.CommitMessageModelIDs {
+		allowedModels[id] = true
+	}
+
 	var models []schemas.Model
 	webSearchSet := make(map[string]bool, len(fetchResp.WebSearchModelIDs))
 	for _, id := range fetchResp.WebSearchModelIDs {
@@ -233,6 +260,9 @@ func FetchAvailableModelsFromAPI(
 	}
 	for modelID, details := range fetchResp.Models {
 		if details.IsInternal {
+			continue
+		}
+		if !allowedModels[modelID] {
 			continue
 		}
 		model := schemas.Model{

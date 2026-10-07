@@ -63,9 +63,21 @@ type AntigravityModelDetails struct {
 	RequiresImageOutputOutsideFunctionResponses bool                       `json:"requiresImageOutputOutsideFunctionResponses,omitempty"`
 }
 
+// AntigravityAgentModelGroup represents a group of models inside an agentModelSort item.
+type AntigravityAgentModelGroup struct {
+	ModelIDs []string `json:"modelIds"`
+}
+
+// AntigravityAgentModelSort represents a sorting group containing multiple model groups.
+type AntigravityAgentModelSort struct {
+	DisplayName string                       `json:"displayName"`
+	Groups      []AntigravityAgentModelGroup `json:"groups"`
+}
+
 // AntigravityFetchModelsResponse is the top-level payload returned by /v1internal:fetchAvailableModels.
 type AntigravityFetchModelsResponse struct {
 	Models                     map[string]AntigravityModelDetails `json:"models"`
+	AgentModelSorts            []AntigravityAgentModelSort        `json:"agentModelSorts,omitempty"`
 	WebSearchModelIDs          []string                           `json:"webSearchModelIds,omitempty"`
 	DefaultAgentModelID        string                             `json:"defaultAgentModelId,omitempty"`
 	CommandModelIDs            []string                           `json:"commandModelIds,omitempty"`
