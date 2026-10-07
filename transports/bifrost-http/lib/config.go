@@ -5998,18 +5998,40 @@ func (c *Config) GetLoadedLLMPlugins() []schemas.LLMPlugin {
 	return nil
 }
 
-// GetKeyPoolFilter returns the first KeyPoolFilter hook provided by any loaded LLM plugin (e.g. adaptive routing).
+// GetKeyPoolFilter returns a chained KeyPoolFilter hook combining all filters provided by loaded LLM plugins.
 func (c *Config) GetKeyPoolFilter() schemas.KeyPoolFilter {
+	var filters []schemas.KeyPoolFilter
 	if plugins := c.LLMPlugins.Load(); plugins != nil {
 		for _, p := range *plugins {
 			if provider, ok := p.(interface{ KeyPoolFilter() schemas.KeyPoolFilter }); ok {
 				if filter := provider.KeyPoolFilter(); filter != nil {
-					return filter
+					filters = append(filters, filter)
 				}
 			}
 		}
 	}
-	return nil
+
+	if len(filters) == 0 {
+		return nil
+	}
+	if len(filters) == 1 {
+		return filters[0]
+	}
+
+	return func(ctx *schemas.BifrostContext, provider schemas.ModelProvider, model string, keys []schemas.Key) ([]schemas.Key, error) {
+		currentKeys := keys
+		for _, filter := range filters {
+			var err error
+			currentKeys, err = filter(ctx, provider, model, currentKeys)
+			if err != nil {
+				return nil, err
+			}
+			if len(currentKeys) == 0 {
+				break
+			}
+		}
+		return currentKeys, nil
+	}
 }
 
 // GetLoadedPluginNames returns the sanitized names of every currently loaded plugin,

@@ -84,8 +84,14 @@ func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostR
 		return resp, bifrostErr, nil
 	}
 
-	// Extract key ID from context
-	keyID := bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeySelectedKeyID)
+	// Extract key ID primarily from the preserved RoutingInfo, fallback to Context
+	keyID := ""
+	if bifrostErr.ExtraFields.RoutingInfo.KeyID != "" {
+		keyID = bifrostErr.ExtraFields.RoutingInfo.KeyID
+	} else {
+		keyID = bifrost.GetStringFromContext(ctx, schemas.BifrostContextKeySelectedKeyID)
+	}
+
 	if keyID == "" {
 		return resp, bifrostErr, nil
 	}

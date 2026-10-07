@@ -8,6 +8,7 @@ import (
 
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/plugins/adaptiverouting"
+	"github.com/maximhq/bifrost/plugins/circuitbreaker"
 	"github.com/maximhq/bifrost/plugins/compat"
 	"github.com/maximhq/bifrost/plugins/extradetection"
 	"github.com/maximhq/bifrost/plugins/governance"
@@ -173,6 +174,17 @@ func loadBuiltinPlugin(ctx context.Context, name string, pluginConfig any, bifro
 			}
 		}
 		return adaptiverouting.New(adaptiveCfg, nil, bifrostConfig.ModelCatalog, bifrostConfig.ConfigStore)
+
+	case circuitbreaker.PluginName:
+		cbConfig, err := MarshalPluginConfig[circuitbreaker.Config](pluginConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal circuit breaker plugin config: %w", err)
+		}
+		if cbConfig == nil {
+			cbConfig = &circuitbreaker.Config{}
+		}
+		return circuitbreaker.New(*cbConfig, nil)
+
 
 	case modelcatalogresolver.PluginName:
 		return modelcatalogresolver.Init(bifrostConfig.ModelCatalog, logger)
@@ -360,6 +372,20 @@ func (s *BifrostHTTPServer) loadBuiltinPlugins(ctx context.Context) error {
 		s.markPluginDisabled(maxim.PluginName)
 	}
 	s.Config.SetPluginOrderInfo(maxim.PluginName, builtinPlacement, schemas.Ptr(9))
+
+	// 5a. Circuit Breaker (default-on in OSS). Runs right before or equal to adaptive routing (order 5), so that
+	// any rate-limited keys are filtered out via KeyPoolFilter before adaptive routing sorts them.
+	circuitbreakerConfig := s.getPluginConfig(circuitbreaker.PluginName)
+	var cbPluginConfig any
+	if circuitbreakerConfig != nil {
+		cbPluginConfig = circuitbreakerConfig.Config
+	}
+	if circuitbreakerConfig == nil || circuitbreakerConfig.Enabled {
+		s.registerPluginWithStatus(ctx, circuitbreaker.PluginName, nil, cbPluginConfig, false)
+	} else {
+		s.markPluginDisabled(circuitbreaker.PluginName)
+	}
+	s.Config.SetPluginOrderInfo(circuitbreaker.PluginName, builtinPlacement, schemas.Ptr(5))
 
 	// 5. Adaptive Routing (default-on in OSS). Runs BEFORE the routing plugin so its
 	// PreRequestHook injects the AdaptiveTargetSelector into the context before routing

@@ -1888,6 +1888,7 @@ type RoutingInfo struct {
 	Provider ModelProvider `json:"provider,omitempty"`
 	Model    string        `json:"model,omitempty"` // model name passed to this attempt's key
 	Key      string        `json:"key,omitempty"`   // KeyName of the key used
+	KeyID    string        `json:"key_id,omitempty"` // ID of the key used
 
 	// Populated only when Model matched an entry in this key's Aliases map
 	ResolvedKeyAlias *ResolvedKeyAlias `json:"resolved_key_alias,omitempty"`
