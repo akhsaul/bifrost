@@ -405,12 +405,7 @@ func (s *BifrostHTTPServer) loadBuiltinPlugins(ctx context.Context) error {
 	// provides its own guardrails implementation). Opt-in: only registered when
 	// an enabled "guardrails" plugin entry exists in config.json / DB.
 	if ctx.Value(schemas.BifrostContextKeyIsEnterprise) == nil {
-		guardrailsConfig := s.getPluginConfig(guardrails.PluginName)
-		if guardrailsConfig != nil && guardrailsConfig.Enabled {
-			s.registerPluginWithStatus(ctx, guardrails.PluginName, nil, guardrailsConfig.Config, false)
-		} else {
-			s.markPluginDisabled(guardrails.PluginName)
-		}
+		s.registerPluginWithStatus(ctx, guardrails.PluginName, nil, s.Config.GuardrailsConfig, false)
 	} else {
 		s.markPluginDisabled(guardrails.PluginName)
 	}

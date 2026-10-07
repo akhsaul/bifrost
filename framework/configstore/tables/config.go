@@ -61,6 +61,7 @@ const (
 	ConfigComplexitySemanticGenerationsKey = "complexity_semantic_generations"
 	ConfigRestartRequiredKey               = "restart_required"
 	ConfigHeaderFilterKey                  = "header_filter_config"
+	ConfigGuardrailsConfigKey              = "guardrails_config"
 )
 
 // Keys for the ClientConfig.MetadataJSON blob.
@@ -111,3 +112,4 @@ type TableGovernanceConfig struct {
 
 // TableName sets the table name for each model
 func (TableGovernanceConfig) TableName() string { return "governance_config" }
+

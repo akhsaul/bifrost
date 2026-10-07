@@ -2502,6 +2502,7 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 	mcpPerUserHeadersHandler := handlers.NewMCPPerUserHeadersHandler(callbacks, s.Config, s.TempTokens)
 	mcpSessionsHandler := handlers.NewMCPSessionsHandler(s.Config, callbacks)
 	configHandler := handlers.NewConfigHandler(callbacks, s.Config)
+	guardrailsHandler := handlers.NewGuardrailsHandler(s.Config)
 	pluginsHandler := handlers.NewPluginsHandler(callbacks, s.Config.ConfigStore)
 	sessionHandler := handlers.NewSessionHandler(s.Config.ConfigStore, s.WSTicketStore)
 	if s.setupLockInstalled && s.AuthMiddleware != nil {
@@ -2529,6 +2530,7 @@ func (s *BifrostHTTPServer) RegisterAPIRoutes(ctx context.Context, callbacks Ser
 	mcpPerUserHeadersHandler.RegisterRoutes(s.Router, middlewares...)
 	mcpSessionsHandler.RegisterRoutes(s.Router, middlewares...)
 	configHandler.RegisterRoutes(s.Router, middlewares...)
+	guardrailsHandler.RegisterRoutes(s.Router, middlewares...)
 	oauthHandler.RegisterRoutes(s.Router, middlewares...)
 	if pluginsHandler != nil {
 		pluginsHandler.RegisterRoutes(s.Router, middlewares...)

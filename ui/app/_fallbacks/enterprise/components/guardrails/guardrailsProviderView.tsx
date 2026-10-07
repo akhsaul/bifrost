@@ -8,7 +8,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { getErrorMessage, useGetPluginQuery, useUpdatePluginMutation } from "@/lib/store";
+import { getErrorMessage, useGetGuardrailsConfigQuery, useUpdateGuardrailsConfigMutation } from "@/lib/store";
 import {
 	GUARDRAILS_PLUGIN_NAME,
 	defaultGuardrailsConfig,
@@ -130,40 +130,23 @@ interface SheetState {
 }
 
 export default function GuardrailsProviderView() {
-	const { data: plugin, isLoading } = useGetPluginQuery(GUARDRAILS_PLUGIN_NAME);
-	const [updatePlugin, { isLoading: isSaving }] = useUpdatePluginMutation();
+	const { data: config, isLoading } = useGetGuardrailsConfigQuery();
+	const [updateConfig, { isLoading: isSaving }] = useUpdateGuardrailsConfigMutation();
 	const [providers, setProviders] = useState<GuardrailProvider[]>([]);
-	const [pluginEnabled, setPluginEnabled] = useState(false);
 	const [activeTab, setActiveTab] = useState<GuardrailProviderType>("regex");
 	const [sheet, setSheet] = useState<SheetState>({ open: false, provider: null, providerType: "regex" });
 
 	useEffect(() => {
-		const cfg = parseConfig(plugin?.config);
+		const cfg = parseConfig(config);
 		setProviders(cfg.guardrail_providers);
-		setPluginEnabled(Boolean(plugin?.enabled));
-	}, [plugin]);
-
-	const handleTogglePlugin = async (newVal: boolean) => {
-		setPluginEnabled(newVal);
-		try {
-			const cfg = parseConfig(plugin?.config);
-			await updatePlugin({ name: GUARDRAILS_PLUGIN_NAME, data: { enabled: newVal, config: cfg } }).unwrap();
-			toast.success(`Guardrails plugin ${newVal ? "enabled" : "disabled"}`);
-		} catch (error) {
-			setPluginEnabled(!newVal);
-			toast.error(getErrorMessage(error));
-		}
-	};
+	}, [config]);
 
 	const handleSheetSave = async (saved: GuardrailProvider) => {
 		const isNew = !providers.some((p) => p.id === saved.id);
 		const next = upsertById(providers, saved);
 		try {
-			const cfg = parseConfig(plugin?.config);
-			await updatePlugin({
-				name: GUARDRAILS_PLUGIN_NAME,
-				data: { enabled: pluginEnabled, config: { ...cfg, guardrail_providers: next } satisfies GuardrailsPluginConfig },
-			}).unwrap();
+			const cfg = parseConfig(config);
+			await updateConfig({ ...cfg, guardrail_providers: next }).unwrap();
 			setProviders(next);
 			setSheet({ open: false, provider: null, providerType: activeTab });
 			toast.success(`Guardrail configuration ${isNew ? "created" : "updated"}`);
@@ -175,11 +158,8 @@ export default function GuardrailsProviderView() {
 	const handleDelete = async (id: number) => {
 		const next = providers.filter((p) => p.id !== id);
 		try {
-			const cfg = parseConfig(plugin?.config);
-			await updatePlugin({
-				name: GUARDRAILS_PLUGIN_NAME,
-				data: { enabled: pluginEnabled, config: { ...cfg, guardrail_providers: next } satisfies GuardrailsPluginConfig },
-			}).unwrap();
+			const cfg = parseConfig(config);
+			await updateConfig({ ...cfg, guardrail_providers: next }).unwrap();
 			setProviders(next);
 			toast.success("Guardrail configuration deleted");
 		} catch (error) {
@@ -190,11 +170,8 @@ export default function GuardrailsProviderView() {
 	const handleToggleProvider = async (id: number, newVal: boolean) => {
 		const next = providers.map((p) => (p.id === id ? { ...p, enabled: newVal } : p));
 		try {
-			const cfg = parseConfig(plugin?.config);
-			await updatePlugin({
-				name: GUARDRAILS_PLUGIN_NAME,
-				data: { enabled: pluginEnabled, config: { ...cfg, guardrail_providers: next } satisfies GuardrailsPluginConfig },
-			}).unwrap();
+			const cfg = parseConfig(config);
+			await updateConfig({ ...cfg, guardrail_providers: next }).unwrap();
 			setProviders(next);
 		} catch (error) {
 			toast.error(getErrorMessage(error));
@@ -355,10 +332,6 @@ export default function GuardrailsProviderView() {
 						</p>
 					</div>
 					<div className="flex items-center gap-3">
-						<div className="flex items-center gap-2">
-							<Switch checked={pluginEnabled} onCheckedChange={handleTogglePlugin} data-testid="guardrails-plugin-enabled-switch" />
-							<Label className="text-xs">Plugin enabled</Label>
-						</div>
 						<Button onClick={() => handleCreate(activeTab)} data-testid="guardrails-provider-add">
 							<Plus className="mr-1.5 h-4 w-4" /> Add Configuration
 						</Button>

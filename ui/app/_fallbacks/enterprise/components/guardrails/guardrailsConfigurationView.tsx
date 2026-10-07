@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { getErrorMessage, useGetPluginQuery, useUpdatePluginMutation } from "@/lib/store";
+import { getErrorMessage, useGetGuardrailsConfigQuery, useUpdateGuardrailsConfigMutation } from "@/lib/store";
 import {
 	GUARDRAILS_PLUGIN_NAME,
 	defaultGuardrailsConfig,
@@ -81,20 +81,20 @@ interface RuleSheetState {
 }
 
 export default function GuardrailsConfigurationView() {
-	const { data: plugin, isLoading } = useGetPluginQuery(GUARDRAILS_PLUGIN_NAME);
-	const [updatePlugin, { isLoading: isSaving }] = useUpdatePluginMutation();
+	const { data: config, isLoading } = useGetGuardrailsConfigQuery();
+	const [updateConfig, { isLoading: isSaving }] = useUpdateGuardrailsConfigMutation();
 	const [rules, setRules] = useState<GuardrailRule[]>([]);
 
 	const [sheet, setSheet] = useState<RuleSheetState>({ open: false, rule: null });
 	const [search, setSearch] = useState("");
 
 	useEffect(() => {
-		const cfg = parseConfig(plugin?.config);
+		const cfg = parseConfig(config);
 		setRules(cfg.guardrail_rules);
 
-	}, [plugin]);
+	}, [config]);
 
-	const providers = parseConfig(plugin?.config).guardrail_providers;
+	const providers = parseConfig(config).guardrail_providers;
 
 
 
@@ -102,11 +102,8 @@ export default function GuardrailsConfigurationView() {
 		const isNew = !rules.some((r) => r.id === saved.id);
 		const next = upsertById(rules, saved);
 		try {
-			const cfg = parseConfig(plugin?.config);
-			await updatePlugin({
-				name: GUARDRAILS_PLUGIN_NAME,
-				data: { enabled: true, config: { ...cfg, guardrail_rules: next } satisfies GuardrailsPluginConfig },
-			}).unwrap();
+			const cfg = parseConfig(config);
+			await updateConfig({ ...cfg, guardrail_rules: next }).unwrap();
 			setRules(next);
 			setSheet({ open: false, rule: null });
 			toast.success(`Guardrail rule ${isNew ? "created" : "updated"}`);
@@ -118,11 +115,8 @@ export default function GuardrailsConfigurationView() {
 	const handleDelete = async (id: number) => {
 		const next = rules.filter((r) => r.id !== id);
 		try {
-			const cfg = parseConfig(plugin?.config);
-			await updatePlugin({
-				name: GUARDRAILS_PLUGIN_NAME,
-				data: { enabled: true, config: { ...cfg, guardrail_rules: next } satisfies GuardrailsPluginConfig },
-			}).unwrap();
+			const cfg = parseConfig(config);
+			await updateConfig({ ...cfg, guardrail_rules: next }).unwrap();
 			setRules(next);
 			toast.success("Guardrail rule deleted");
 		} catch (error) {
@@ -133,11 +127,8 @@ export default function GuardrailsConfigurationView() {
 	const handleToggleRule = async (id: number, newVal: boolean) => {
 		const next = rules.map((r) => (r.id === id ? { ...r, enabled: newVal } : r));
 		try {
-			const cfg = parseConfig(plugin?.config);
-			await updatePlugin({
-				name: GUARDRAILS_PLUGIN_NAME,
-				data: { enabled: true, config: { ...cfg, guardrail_rules: next } satisfies GuardrailsPluginConfig },
-			}).unwrap();
+			const cfg = parseConfig(config);
+			await updateConfig({ ...cfg, guardrail_rules: next }).unwrap();
 			setRules(next);
 		} catch (error) {
 			toast.error(getErrorMessage(error));

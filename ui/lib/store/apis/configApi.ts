@@ -140,6 +140,22 @@ export const configApi = baseApi.injectEndpoints({
 			invalidatesTags: ["Config"],
 		}),
 
+		getGuardrailsConfig: builder.query<any, void>({
+			query: () => ({
+				url: "/config/guardrails",
+			}),
+			providesTags: ["Config"],
+		}),
+
+		updateGuardrailsConfig: builder.mutation<null, any>({
+			query: (data) => ({
+				url: "/config/guardrails",
+				method: "PUT",
+				body: data,
+			}),
+			invalidatesTags: ["Config"],
+		}),
+
 		// Force a pricing sync immediately
 		forcePricingSync: builder.mutation<null, void>({
 			query: () => ({
@@ -219,4 +235,6 @@ export const {
 	useCreateUserAgentMappingMutation,
 	useUpdateUserAgentMappingMutation,
 	useDeleteUserAgentMappingMutation,
+	useGetGuardrailsConfigQuery,
+	useUpdateGuardrailsConfigMutation,
 } = configApi;

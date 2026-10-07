@@ -253,6 +253,7 @@ type ConfigData struct {
 	VectorStoreConfig *vectorstore.Config                   `json:"vector_store,omitempty"`
 	ConfigStoreConfig *configstore.Config                   `json:"config_store,omitempty"`
 	LogsStoreConfig   *logstore.Config                      `json:"logs_store,omitempty"`
+	GuardrailsConfig  *guardrails.Config                    `json:"guardrails_config,omitempty"`
 	Plugins           []*schemas.PluginConfig               `json:"plugins,omitempty"`
 	WebSocket         *schemas.WebSocketConfig              `json:"websocket,omitempty"`
 	FeatureFlags      *FeatureFlagsFileConfig               `json:"feature_flags,omitempty"`
@@ -519,6 +520,7 @@ func (cd *ConfigData) UnmarshalJSON(data []byte) error {
 		VectorStoreConfig json.RawMessage                       `json:"vector_store,omitempty"`
 		ConfigStoreConfig json.RawMessage                       `json:"config_store,omitempty"`
 		LogsStoreConfig   json.RawMessage                       `json:"logs_store,omitempty"`
+	GuardrailsConfig  *guardrails.Config                    `json:"guardrails_config,omitempty"`
 		Plugins           []*schemas.PluginConfig               `json:"plugins,omitempty"`
 		WebSocket         *schemas.WebSocketConfig              `json:"websocket,omitempty"`
 		FeatureFlags      *FeatureFlagsFileConfig               `json:"feature_flags,omitempty"`
@@ -543,6 +545,7 @@ func (cd *ConfigData) UnmarshalJSON(data []byte) error {
 	cd.MCP = temp.MCP
 	cd.Webhooks = temp.Webhooks
 	cd.Governance = temp.Governance
+	cd.GuardrailsConfig = temp.GuardrailsConfig
 	cd.Plugins = temp.Plugins
 	cd.WebSocket = temp.WebSocket
 	cd.FeatureFlags = temp.FeatureFlags
@@ -652,6 +655,7 @@ type Config struct {
 	Providers        map[schemas.ModelProvider]configstore.ProviderConfig
 	MCPConfig        *schemas.MCPConfig
 	GovernanceConfig *configstore.GovernanceConfig
+	GuardrailsConfig *guardrails.Config
 	FrameworkConfig  *framework.FrameworkConfig
 	ProxyConfig      *configstoreTables.GlobalProxyConfig
 
@@ -1071,6 +1075,8 @@ func LoadConfig(ctx context.Context, configDirPath string) (*Config, error) {
 	}
 	// 10. Plugins
 	loadPlugins(ctx, config, &configData)
+	// 10.5 Guardrails
+	loadGuardrailsConfig(ctx, config, &configData)
 	// 11. Skills registry (after plugins, before framework)
 	loadSkillsRegistry(ctx, config, &configData)
 	// 12. Framework config and pricing manager
