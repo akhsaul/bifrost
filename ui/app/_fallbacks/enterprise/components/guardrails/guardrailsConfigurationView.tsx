@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { getErrorMessage, useGetGuardrailsConfigQuery, useUpdateGuardrailsConfigMutation } from "@/lib/store";
+import { getErrorMessage, useGetGuardrailsConfigQuery, useUpdateGuardrailsConfigMutation, useGetProvidersQuery, useGetModelConfigsQuery } from "@/lib/store";
 import {
 	GUARDRAILS_PLUGIN_NAME,
 	defaultGuardrailsConfig,
@@ -32,7 +32,7 @@ import {
 	Wrench,
 	X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { toast } from "sonner";
 import { lazy, Suspense } from "react";
 import { RuleGroupType } from "react-querybuilder";
@@ -323,6 +323,19 @@ function RuleSheet({ open, onOpenChange, rule, providers, onSave, isSaving }: Ru
 	const [conditionMode, setConditionMode] = useState<CELBuilderMode>("builder");
 	const [builderKey, setBuilderKey] = useState(0);
 	const [celError, setCelError] = useState<string | null>(null);
+
+	const { data: providersList } = useGetProvidersQuery();
+	const { data: modelConfigs } = useGetModelConfigsQuery();
+
+	const availableProviders = useMemo(() => {
+		if (!providersList) return [];
+		return providersList.map((p) => p.name);
+	}, [providersList]);
+
+	const availableModels = useMemo(() => {
+		if (!modelConfigs) return [];
+		return modelConfigs.map((m) => m.name);
+	}, [modelConfigs]);
 
 	useEffect(() => {
 		if (rule) {
@@ -669,19 +682,19 @@ function RuleSheet({ open, onOpenChange, rule, providers, onSave, isSaving }: Ru
 							</Label>
 							<span className="text-muted-foreground text-[11px]">e.g. true</span>
 						</div>
-						<Textarea
-							id="rule-cel"
-							className="font-mono text-xs"
-							rows={3}
-							value={formState.cel_expression ?? ""}
-							onChange={(e) => setFormState({ ...formState, cel_expression: e.target.value })}
-							placeholder={`provider in ["openai", "anthropic"]`}
-							data-testid="guardrails-rule-sheet-cel"
+						<CELRuleBuilder
+							onChange={handleQueryChange}
+							initialQuery={query}
+							providers={availableProviders}
+							models={availableModels}
+							allowCustomModels={true}
+							isLoading={false}
+							allowCelMode={true}
+							initialMode={conditionMode}
+							initialCel={formState.cel_expression ?? ""}
+							onModeChange={handleModeChange}
+							celError={celError}
 						/>
-						<p className="text-muted-foreground text-[11px]">
-							Variables: <code>model</code>, <code>provider</code>, <code>headers</code>, <code>query</code>, <code>virtual_key_id</code>,{" "}
-							<code>virtual_key_name</code>.
-						</p>
 					</div>
 
 					{/* Numerical Parameters: Sampling Rate & Timeout */}
