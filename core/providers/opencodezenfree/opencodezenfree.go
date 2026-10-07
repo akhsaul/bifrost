@@ -368,6 +368,8 @@ func wrapResponsesToChatStreamPostHookRunner(postHookRunner schemas.PostHookRunn
 // fan-in (the free tier requires stream:true); on unsupported-format
 // failures the chain chat -> responses -> messages is walked.
 func (p *opencodeZenFreeProvider) ChatCompletion(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostChatRequest) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	if request == nil {
 		return nil, &schemas.BifrostError{
 			IsBifrostError: true,
@@ -457,6 +459,8 @@ func (p *opencodeZenFreeProvider) doResponsesUnaryViaChat(ctx *schemas.BifrostCo
 // pass through untouched (no stream forcing, no accumulation); endpoint
 // fallback applies only to pre-first-chunk errors.
 func (p *opencodeZenFreeProvider) ChatCompletionStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostChatRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	if request == nil {
 		return nil, &schemas.BifrostError{
 			IsBifrostError: true,
@@ -721,6 +725,8 @@ func preserveOpencodeReasoning(wireReq *openai.OpenAIResponsesRequest, request *
 // Non-responses endpoints are served by converting to the target shape;
 // unary requests use stream fan-in where the wire supports it.
 func (p *opencodeZenFreeProvider) Responses(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostResponsesRequest) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	// Resolve once: the generated session ID feeds both prompt_cache_key and
 	// the session headers. A second resolution would generate a DIFFERENT
 	// random session for the headers (counter advanced), breaking the invariant.
@@ -814,6 +820,8 @@ func (p *opencodeZenFreeProvider) openResponsesStream(ctx *schemas.BifrostContex
 // to its required upstream endpoint. Streaming paths pass through untouched;
 // endpoint fallback applies only to pre-first-chunk errors.
 func (p *opencodeZenFreeProvider) ResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostResponsesRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	// Same single-resolution invariant as Responses: headers must carry the
 	// exact session ID used for prompt_cache_key.
 	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders)

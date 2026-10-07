@@ -93,6 +93,8 @@ func (provider *Provider) TextCompletionStream(_ *schemas.BifrostContext, _ sche
 
 // ChatCompletion performs a chat completion request to the Apmix API.
 func (provider *Provider) ChatCompletion(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostChatRequest) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	return openai.HandleOpenAIChatCompletionRequest(
 		ctx,
 		provider.client,
@@ -112,6 +114,8 @@ func (provider *Provider) ChatCompletion(ctx *schemas.BifrostContext, key schema
 
 // ChatCompletionStream performs a streaming chat completion request to the Apmix API.
 func (provider *Provider) ChatCompletionStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostChatRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	return openai.HandleOpenAIChatCompletionStreaming(
 		ctx,
 		provider.streamingClient,
@@ -137,6 +141,8 @@ func (provider *Provider) ChatCompletionStream(ctx *schemas.BifrostContext, post
 
 // Responses performs a responses request to the Apmix API.
 func (provider *Provider) Responses(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostResponsesRequest) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	chatResponse, err := provider.ChatCompletion(ctx, key, request.ToChatRequest())
 	if err != nil {
 		return nil, err
@@ -146,6 +152,8 @@ func (provider *Provider) Responses(ctx *schemas.BifrostContext, key schemas.Key
 
 // ResponsesStream performs a streaming responses request to the Apmix API.
 func (provider *Provider) ResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostResponsesRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	ctx.SetValue(schemas.BifrostContextKeyIsResponsesToChatCompletionFallback, true)
 	return provider.ChatCompletionStream(
 		ctx,

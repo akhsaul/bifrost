@@ -455,9 +455,27 @@ func makeRequestWithDoFunc(ctx context.Context, do func() error) (time.Duration,
 // MakeRequestWithContext makes a request with a context and returns the latency, error, and a
 // wait function. The wait function MUST be called (typically via defer) before releasing the
 // request or response objects. On the normal path it is a no-op. On the context-cancellation
+// compressRequestIfNeeded compresses the request body if the provider opted in via context.
+func compressRequestIfNeeded(ctx context.Context, req *fasthttp.Request) {
+	if useGzip, _ := ctx.Value(schemas.BifrostContextKeyUseCompressGzip).(bool); useGzip {
+		body := req.Body()
+		if len(body) > 0 {
+			var b bytes.Buffer
+			gz := gzip.NewWriter(&b)
+			gz.Write(body)
+			gz.Close()
+			req.SetBody(b.Bytes())
+			req.Header.Set("Content-Encoding", "gzip")
+		}
+	}
+}
+
+// MakeRequestWithContext executes a request with the given context. If the context
+// expires, it abandons the connection rather than blocking the caller. On the happy
 // path it blocks until the background client.Do goroutine finishes, preventing a data race
 // between the still-running goroutine and the caller's release of req/resp.
 func MakeRequestWithContext(ctx context.Context, client *fasthttp.Client, req *fasthttp.Request, resp *fasthttp.Response) (time.Duration, *schemas.BifrostError, func()) {
+	compressRequestIfNeeded(ctx, req)
 	SnapshotOutgoingHeaders(ctx, req)
 	// Bound to the goroutine that runs client.Do: the binding must outlive a
 	// ctx-cancelled return of makeRequestWithDoFunc and be gone before the
@@ -473,6 +491,7 @@ func MakeRequestWithContext(ctx context.Context, client *fasthttp.Client, req *f
 // MakeRequestWithContextFollowRedirects is like MakeRequestWithContext but follows up to
 // maxRedirects HTTP redirects automatically (equivalent to curl's -L flag).
 func MakeRequestWithContextFollowRedirects(ctx context.Context, client *fasthttp.Client, req *fasthttp.Request, resp *fasthttp.Response, maxRedirects int) (time.Duration, *schemas.BifrostError, func()) {
+	compressRequestIfNeeded(ctx, req)
 	SnapshotOutgoingHeaders(ctx, req)
 	unbind := bindRequestContext(req, ctx)
 	latency, bifrostErr, wait := makeRequestWithDoFunc(ctx, func() error {
@@ -502,6 +521,7 @@ func MakeRequestWithContextFollowRedirects(ctx context.Context, client *fasthttp
 // Returns client.Do's error untouched so callers keep their own error
 // classification and latency bookkeeping.
 func DoStreamingRequest(ctx context.Context, client *fasthttp.Client, req *fasthttp.Request, resp *fasthttp.Response) error {
+	compressRequestIfNeeded(ctx, req)
 	SnapshotOutgoingHeaders(ctx, req)
 	unbind := bindRequestContext(req, ctx)
 	startTime := time.Now()

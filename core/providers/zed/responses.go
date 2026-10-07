@@ -13,6 +13,8 @@ import (
 // google models the request converts to chat (ResponsesRequest -> ChatRequest,
 // the same fallback cline/modal use) and the chat result converts back.
 func (provider *ZedProvider) Responses(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostResponsesRequest) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	if request == nil {
 		return nil, providerUtils.NewBifrostOperationError("responses request is nil", nil)
 	}
@@ -47,6 +49,8 @@ func (provider *ZedProvider) Responses(ctx *schemas.BifrostContext, key schemas.
 // /completions. Non-OpenAI models stream through the chat path with the
 // Responses-to-Chat fallback flag set, matching cline/modal behavior.
 func (provider *ZedProvider) ResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostResponsesRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
+	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	if request == nil {
 		return nil, providerUtils.NewBifrostOperationError("responses stream request is nil", nil)
 	}
