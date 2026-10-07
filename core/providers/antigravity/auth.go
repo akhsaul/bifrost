@@ -3,6 +3,7 @@ package antigravity
 import (
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"math"
@@ -70,6 +71,95 @@ type CachedToken struct {
 	AccessToken string
 	ExpiresAt   time.Time
 	ProjectID   string
+}
+
+
+var UseNewOAuthMethod = true
+
+func generateCodeVerifier() string {
+	b := make([]byte, 32)
+	rand.Read(b)
+	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+func generateCodeChallenge(verifier string) string {
+	hash := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(hash[:])
+}
+
+// FetchUserQuotaSummary queries the user quota.
+func FetchUserQuotaSummary(
+	ctx *schemas.BifrostContext,
+	client *fasthttp.Client,
+	accessToken string,
+	projectID string,
+	profile string,
+	logger schemas.Logger,
+) error {
+	targetURL := strings.TrimRight(DefaultRuntimeBaseURL, "/") + RetrieveUserQuotaSummaryPath
+
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseRequest(req)
+	defer fasthttp.ReleaseResponse(resp)
+
+	bodyBytes, _ := sonic.Marshal(map[string]interface{}{
+		"project": projectID,
+	})
+
+	req.Header.SetMethod(http.MethodPost)
+	req.SetRequestURI(targetURL)
+	req.Header.SetContentType("application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer " + accessToken)
+	req.Header.Set("User-Agent", GetUserAgent(profile))
+	req.SetBody(bodyBytes)
+
+	var err error
+	if client != nil {
+		err = client.Do(req, resp)
+	} else {
+		err = fasthttp.Do(req, resp)
+	}
+
+	if err != nil {
+		return fmt.Errorf("user quota network error: %w", err)
+	}
+
+	if resp.StatusCode() != fasthttp.StatusOK {
+		return fmt.Errorf("user quota returned status %d: %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	return nil
+}
+
+// CompleteLoginFlow runs identity, project ID, and quota checks. Returns error if any fail.
+func CompleteLoginFlow(
+	ctx *schemas.BifrostContext,
+	client *fasthttp.Client,
+	creds *AntigravityCredentials,
+	accessToken string,
+	logger schemas.Logger,
+) error {
+	userInfo, err := FetchGoogleUserInfo(ctx, client, accessToken, logger)
+	if err != nil || userInfo == nil {
+		return fmt.Errorf("failed to fetch user info: %v", err)
+	}
+	creds.Email = userInfo.Email
+	creds.Name = userInfo.Name
+
+	projectID, err := EnsureProjectID(ctx, client, accessToken, DefaultRuntimeBaseURL, creds.ClientProfile, logger)
+	if err != nil || projectID == "" {
+		return fmt.Errorf("failed to discover project ID: %v", err)
+	}
+	creds.ProjectID = projectID
+
+	err = FetchUserQuotaSummary(ctx, client, accessToken, projectID, creds.ClientProfile, logger)
+	if err != nil {
+		return fmt.Errorf("failed to fetch user quota: %v", err)
+	}
+
+	return nil
 }
 
 var (
@@ -451,7 +541,7 @@ func EnsureProjectID(
 }
 
 // BuildAntigravityAuthURL generates the Google OAuth authorization URL for Antigravity.
-func BuildAntigravityAuthURL(redirectURI, state string) string {
+func BuildAntigravityAuthURL(redirectURI, state string) (string, string) {
 	if strings.TrimSpace(redirectURI) == "" {
 		redirectURI = DefaultAntigravityRedirectURI
 	}
@@ -464,19 +554,32 @@ func BuildAntigravityAuthURL(redirectURI, state string) string {
 	if redirectURI != "" {
 		params.Set("redirect_uri", redirectURI)
 	}
-	params.Set("scope", strings.Join([]string{
+	
+	scopes := []string{
 		"https://www.googleapis.com/auth/cloud-platform",
 		"https://www.googleapis.com/auth/userinfo.email",
 		"https://www.googleapis.com/auth/userinfo.profile",
 		"https://www.googleapis.com/auth/cclog",
 		"https://www.googleapis.com/auth/experimentsandconfigs",
-	}, " "))
+	}
+	
+	var verifier string
+	if UseNewOAuthMethod {
+		scopes = append(scopes, "https://www.googleapis.com/auth/aicode", "openid")
+		verifier = generateCodeVerifier()
+		challenge := generateCodeChallenge(verifier)
+		params.Set("code_challenge", challenge)
+		params.Set("code_challenge_method", "S256")
+	}
+	
+	params.Set("scope", strings.Join(scopes, " "))
+	
 	if state != "" {
 		params.Set("state", state)
 	}
 	params.Set("access_type", "offline")
 	params.Set("prompt", "consent")
-	return GoogleOAuthAuthURL + "?" + params.Encode()
+	return GoogleOAuthAuthURL + "?" + params.Encode(), verifier
 }
 
 // ExchangeAuthCode exchanges a Google OAuth authorization code for tokens and auto-discovers the Cloud Code project ID.
@@ -487,6 +590,7 @@ func ExchangeAuthCode(
 	redirectURI string,
 	clientID string,
 	clientSecret string,
+	codeVerifier string,
 	logger schemas.Logger,
 ) (*AntigravityCredentials, error) {
 	if strings.TrimSpace(redirectURI) == "" {
@@ -512,6 +616,9 @@ func ExchangeAuthCode(
 	}
 	form.Set("client_id", clientID)
 	form.Set("client_secret", clientSecret)
+	if UseNewOAuthMethod && codeVerifier != "" {
+		form.Set("code_verifier", codeVerifier)
+	}
 
 	req.Header.SetMethod(http.MethodPost)
 	req.SetRequestURI(GoogleOAuthTokenURL)
@@ -559,15 +666,13 @@ func ExchangeAuthCode(
 		ClientProfile: DefaultClientProfile,
 	}
 
-	// Auto-discover Project ID and fetch userinfo using the newly exchanged access token
+	// Validate login strictly: must get info, project, and quota
 	if tokResp.AccessToken != "" {
-		if projectID, err := EnsureProjectID(ctx, client, tokResp.AccessToken, DefaultRuntimeBaseURL, DefaultClientProfile, logger); err == nil && projectID != "" {
-			creds.ProjectID = projectID
+		if err := CompleteLoginFlow(ctx, client, creds, tokResp.AccessToken, logger); err != nil {
+			return nil, fmt.Errorf("login validation failed: %w", err)
 		}
-		if userInfo, err := FetchGoogleUserInfo(ctx, client, tokResp.AccessToken, logger); err == nil && userInfo != nil {
-			creds.Email = userInfo.Email
-			creds.Name = userInfo.Name
-		}
+	} else {
+		return nil, fmt.Errorf("token exchange returned empty access token")
 	}
 
 	return creds, nil

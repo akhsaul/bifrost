@@ -1790,10 +1790,13 @@ func (h *ProviderHandler) getAntigravityAuthURL(ctx *fasthttp.RequestCtx) {
 	redirectURI := strings.TrimSpace(string(ctx.QueryArgs().Peek("redirect_uri")))
 	state := strings.TrimSpace(string(ctx.QueryArgs().Peek("state")))
 
-	authURL := antigravity.BuildAntigravityAuthURL(redirectURI, state)
+	authURL, codeVerifier := antigravity.BuildAntigravityAuthURL(redirectURI, state)
 	resp := map[string]string{
 		"auth_url":  authURL,
 		"client_id": antigravity.GetAntigravityClientID(),
+	}
+	if codeVerifier != "" {
+		resp["code_verifier"] = codeVerifier
 	}
 	data, err := sonic.Marshal(resp)
 	if err != nil {
@@ -1810,6 +1813,7 @@ type exchangeAntigravityCodePayload struct {
 	RedirectURI  string `json:"redirect_uri"`
 	ClientID     string `json:"client_id,omitempty"`
 	ClientSecret string `json:"client_secret,omitempty"`
+	CodeVerifier string `json:"code_verifier,omitempty"`
 }
 
 // exchangeAntigravityAuthCode handles POST /api/providers/antigravity/oauth/exchange
@@ -1833,6 +1837,7 @@ func (h *ProviderHandler) exchangeAntigravityAuthCode(ctx *fasthttp.RequestCtx) 
 		payload.RedirectURI,
 		payload.ClientID,
 		payload.ClientSecret,
+		payload.CodeVerifier,
 		nil,
 	)
 	if err != nil {
