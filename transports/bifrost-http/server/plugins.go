@@ -186,6 +186,8 @@ func loadBuiltinPlugin(ctx context.Context, name string, pluginConfig any, bifro
 				cbConfig = parsed
 			}
 		}
+		// Enforce always enabled
+		cbConfig.Enabled = true
 		return circuitbreaker.New(*cbConfig, nil)
 
 
@@ -376,18 +378,15 @@ func (s *BifrostHTTPServer) loadBuiltinPlugins(ctx context.Context) error {
 	}
 	s.Config.SetPluginOrderInfo(maxim.PluginName, builtinPlacement, schemas.Ptr(9))
 
-	// 5a. Circuit Breaker (default-on in OSS). Runs right before or equal to adaptive routing (order 5), so that
+	// 5a. Circuit Breaker (Always On). Runs right before or equal to adaptive routing (order 5), so that
 	// any rate-limited keys are filtered out via KeyPoolFilter before adaptive routing sorts them.
 	circuitbreakerConfig := s.getPluginConfig(circuitbreaker.PluginName)
 	var cbPluginConfig any
 	if circuitbreakerConfig != nil {
 		cbPluginConfig = circuitbreakerConfig.Config
 	}
-	if circuitbreakerConfig == nil || circuitbreakerConfig.Enabled {
-		s.registerPluginWithStatus(ctx, circuitbreaker.PluginName, nil, cbPluginConfig, false)
-	} else {
-		s.markPluginDisabled(circuitbreaker.PluginName)
-	}
+	// Enforce always registered
+	s.registerPluginWithStatus(ctx, circuitbreaker.PluginName, nil, cbPluginConfig, false)
 	s.Config.SetPluginOrderInfo(circuitbreaker.PluginName, builtinPlacement, schemas.Ptr(5))
 
 	// 5. Adaptive Routing (default-on in OSS). Runs BEFORE the routing plugin so its
