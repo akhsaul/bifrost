@@ -75,7 +75,7 @@ func (p *Plugin) PreLLMHook(_ *schemas.BifrostContext, req *schemas.BifrostReque
 
 // PostLLMHook inspects errors after LLM execution and trips the circuit breaker on quota/rate-limits.
 func (p *Plugin) PostLLMHook(ctx *schemas.BifrostContext, resp *schemas.BifrostResponse, bifrostErr *schemas.BifrostError) (*schemas.BifrostResponse, *schemas.BifrostError, error) {
-	if !p.config.Enabled || bifrostErr == nil {
+	if bifrostErr == nil {
 		return resp, bifrostErr, nil
 	}
 
@@ -192,7 +192,7 @@ func (p *Plugin) SyncModelQuota(ctx *schemas.BifrostContext, prov schemas.Provid
 // KeyPoolFilter returns a KeyPoolFilter function that filters out tripped keys for the requested model.
 func (p *Plugin) KeyPoolFilter() schemas.KeyPoolFilter {
 	return func(ctx *schemas.BifrostContext, provider schemas.ModelProvider, model string, keys []schemas.Key) ([]schemas.Key, error) {
-		if !p.config.Enabled || len(keys) == 0 {
+		if len(keys) == 0 {
 			return keys, nil
 		}
 

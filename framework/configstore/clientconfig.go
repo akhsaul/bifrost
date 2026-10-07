@@ -14,6 +14,7 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/maximhq/bifrost/framework/configstore/tables"
+	"github.com/maximhq/bifrost/plugins/circuitbreaker"
 )
 
 type EnvKeyType string
@@ -121,6 +122,7 @@ type ClientConfig struct {
 	ConfigHash                            string                                `json:"-"`                                           // Config hash for reconciliation (not serialized)
 	DumpErrorsInConsoleLogs               bool                                  `json:"dump_errors_in_console_logs"`                 // Dump error details in console logs
 	WebhookConfig                         *tables.WebhookConfig                 `json:"webhook_config,omitempty"`                    // Global webhook delivery settings; nil means all defaults
+	CircuitBreaker                        *circuitbreaker.Config                `json:"circuit_breaker,omitempty"`                   // Circuit breaker configuration
 }
 
 // IsMCPOAuthDiscoveryEnabled reports whether the well-known OAuth discovery

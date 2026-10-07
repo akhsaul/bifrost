@@ -24,8 +24,6 @@ type KeyModelConfig struct {
 
 // Config defines the configuration for the Circuit Breaker plugin.
 type Config struct {
-	// Enabled determines whether the circuit breaker plugin is active.
-	Enabled bool `json:"enabled"`
 	// DefaultCooldown is the fallback cooldown duration (e.g. 5 hours) if no error-specified reset
 	// time or specific key/model cooldown is matched.
 	DefaultCooldown schemas.Duration `json:"default_cooldown"`

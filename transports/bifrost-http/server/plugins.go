@@ -186,8 +186,6 @@ func loadBuiltinPlugin(ctx context.Context, name string, pluginConfig any, bifro
 				cbConfig = parsed
 			}
 		}
-		// Enforce always enabled
-		cbConfig.Enabled = true
 		return circuitbreaker.New(*cbConfig, nil)
 
 
@@ -380,10 +378,9 @@ func (s *BifrostHTTPServer) loadBuiltinPlugins(ctx context.Context) error {
 
 	// 5a. Circuit Breaker (Always On). Runs right before or equal to adaptive routing (order 5), so that
 	// any rate-limited keys are filtered out via KeyPoolFilter before adaptive routing sorts them.
-	circuitbreakerConfig := s.getPluginConfig(circuitbreaker.PluginName)
 	var cbPluginConfig any
-	if circuitbreakerConfig != nil {
-		cbPluginConfig = circuitbreakerConfig.Config
+	if s.Config.ClientConfig.CircuitBreaker != nil {
+		cbPluginConfig = s.Config.ClientConfig.CircuitBreaker
 	}
 	// Enforce always registered
 	s.registerPluginWithStatus(ctx, circuitbreaker.PluginName, nil, cbPluginConfig, false)
