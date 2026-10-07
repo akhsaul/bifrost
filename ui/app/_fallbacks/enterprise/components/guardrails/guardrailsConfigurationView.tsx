@@ -34,6 +34,32 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { lazy, Suspense } from "react";
+import { RuleGroupType } from "react-querybuilder";
+import { CELBuilderMode } from "@/components/ui/custom/celBuilder";
+import { isValidRuleGroupType } from "@/lib/utils/routingRuleGroupQuery";
+
+const CELRuleBuilderLazy = lazy(() =>
+	import("./celRuleBuilderGuardrails").then((mod) => ({
+		default: mod.CELRuleBuilder,
+	})),
+);
+const CELRuleBuilder = (props: React.ComponentProps<typeof CELRuleBuilderLazy>) => (
+	<Suspense fallback={<div className="text-sm text-gray-500">Loading CEL builder...</div>}>
+		<CELRuleBuilderLazy {...props} />
+	</Suspense>
+);
+
+const defaultQuery: RuleGroupType = {
+	combinator: "and",
+	rules: [],
+};
+
+function initialConditionMode(rule?: GuardrailRule | null): CELBuilderMode {
+	if (!rule) return "builder";
+	return rule.cel_expression?.trim() ? "cel" : "builder";
+}
+
 
 function parseConfig(raw: unknown): GuardrailsPluginConfig {
 	if (!raw || typeof raw !== "object") return defaultGuardrailsConfig();
@@ -58,29 +84,19 @@ export default function GuardrailsConfigurationView() {
 	const { data: plugin, isLoading } = useGetPluginQuery(GUARDRAILS_PLUGIN_NAME);
 	const [updatePlugin, { isLoading: isSaving }] = useUpdatePluginMutation();
 	const [rules, setRules] = useState<GuardrailRule[]>([]);
-	const [pluginEnabled, setPluginEnabled] = useState(false);
+
 	const [sheet, setSheet] = useState<RuleSheetState>({ open: false, rule: null });
 	const [search, setSearch] = useState("");
 
 	useEffect(() => {
 		const cfg = parseConfig(plugin?.config);
 		setRules(cfg.guardrail_rules);
-		setPluginEnabled(Boolean(plugin?.enabled));
+
 	}, [plugin]);
 
 	const providers = parseConfig(plugin?.config).guardrail_providers;
 
-	const handleTogglePlugin = async (newVal: boolean) => {
-		setPluginEnabled(newVal);
-		try {
-			const cfg = parseConfig(plugin?.config);
-			await updatePlugin({ name: GUARDRAILS_PLUGIN_NAME, data: { enabled: newVal, config: cfg } }).unwrap();
-			toast.success(`Guardrails plugin ${newVal ? "enabled" : "disabled"}`);
-		} catch (error) {
-			setPluginEnabled(!newVal);
-			toast.error(getErrorMessage(error));
-		}
-	};
+
 
 	const handleSheetSave = async (saved: GuardrailRule) => {
 		const isNew = !rules.some((r) => r.id === saved.id);
@@ -89,7 +105,7 @@ export default function GuardrailsConfigurationView() {
 			const cfg = parseConfig(plugin?.config);
 			await updatePlugin({
 				name: GUARDRAILS_PLUGIN_NAME,
-				data: { enabled: pluginEnabled, config: { ...cfg, guardrail_rules: next } satisfies GuardrailsPluginConfig },
+				data: { enabled: true, config: { ...cfg, guardrail_rules: next } satisfies GuardrailsPluginConfig },
 			}).unwrap();
 			setRules(next);
 			setSheet({ open: false, rule: null });
@@ -105,7 +121,7 @@ export default function GuardrailsConfigurationView() {
 			const cfg = parseConfig(plugin?.config);
 			await updatePlugin({
 				name: GUARDRAILS_PLUGIN_NAME,
-				data: { enabled: pluginEnabled, config: { ...cfg, guardrail_rules: next } satisfies GuardrailsPluginConfig },
+				data: { enabled: true, config: { ...cfg, guardrail_rules: next } satisfies GuardrailsPluginConfig },
 			}).unwrap();
 			setRules(next);
 			toast.success("Guardrail rule deleted");
@@ -120,7 +136,7 @@ export default function GuardrailsConfigurationView() {
 			const cfg = parseConfig(plugin?.config);
 			await updatePlugin({
 				name: GUARDRAILS_PLUGIN_NAME,
-				data: { enabled: pluginEnabled, config: { ...cfg, guardrail_rules: next } satisfies GuardrailsPluginConfig },
+				data: { enabled: true, config: { ...cfg, guardrail_rules: next } satisfies GuardrailsPluginConfig },
 			}).unwrap();
 			setRules(next);
 		} catch (error) {
@@ -166,10 +182,7 @@ export default function GuardrailsConfigurationView() {
 					<p className="text-muted-foreground text-sm">Configure guardrail rules to control when to execute guardrails.</p>
 				</div>
 				<div className="flex items-center gap-3">
-					<div className="flex items-center gap-2">
-						<Switch checked={pluginEnabled} onCheckedChange={handleTogglePlugin} data-testid="guardrails-rules-plugin-enabled-switch" />
-						<Label className="text-xs">Plugin enabled</Label>
-					</div>
+
 					<Button onClick={handleCreate} data-testid="guardrails-rule-add">
 						<Plus className="mr-1.5 h-4 w-4" /> Add Rule
 					</Button>
@@ -315,6 +328,10 @@ interface RuleSheetProps {
 
 function RuleSheet({ open, onOpenChange, rule, providers, onSave, isSaving }: RuleSheetProps) {
 	const [formState, setFormState] = useState<GuardrailRule | null>(null);
+	const [query, setQuery] = useState<RuleGroupType>(defaultQuery);
+	const [conditionMode, setConditionMode] = useState<CELBuilderMode>("builder");
+	const [builderKey, setBuilderKey] = useState(0);
+	const [celError, setCelError] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (rule) {
@@ -322,7 +339,26 @@ function RuleSheet({ open, onOpenChange, rule, providers, onSave, isSaving }: Ru
 		}
 	}, [rule]);
 
+	useEffect(() => {
+		if (open) {
+			setConditionMode(initialConditionMode(rule));
+			setQuery(defaultQuery);
+			setBuilderKey((k) => k + 1);
+		}
+	}, [open, rule]);
+
+	const handleQueryChange = (celExpression: string, newQuery: RuleGroupType) => {
+		setQuery(newQuery);
+		setFormState((prev) => prev ? { ...prev, cel_expression: celExpression } : null);
+		setCelError(null);
+	};
+
+	const handleModeChange = (mode: CELBuilderMode) => {
+		setConditionMode(mode);
+	};
+
 	if (!formState) return null;
+
 
 	const isEdit = rule && rule.name !== "";
 

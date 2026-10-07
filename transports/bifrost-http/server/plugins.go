@@ -176,12 +176,15 @@ func loadBuiltinPlugin(ctx context.Context, name string, pluginConfig any, bifro
 		return adaptiverouting.New(adaptiveCfg, nil, bifrostConfig.ModelCatalog, bifrostConfig.ConfigStore)
 
 	case circuitbreaker.PluginName:
-		cbConfig, err := MarshalPluginConfig[circuitbreaker.Config](pluginConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal circuit breaker plugin config: %w", err)
-		}
-		if cbConfig == nil {
-			cbConfig = &circuitbreaker.Config{}
+		cbConfig := &circuitbreaker.Config{}
+		if pluginConfig != nil {
+			parsed, err := MarshalPluginConfig[circuitbreaker.Config](pluginConfig)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal circuit breaker plugin config: %w", err)
+			}
+			if parsed != nil {
+				cbConfig = parsed
+			}
 		}
 		return circuitbreaker.New(*cbConfig, nil)
 

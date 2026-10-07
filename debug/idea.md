@@ -6,6 +6,7 @@
 3. guardrails use typesafe/Jev (an AI model with endpoint /decisions) can be used to detect secret, AI can see which secret related to context. Need to do more test to know how accurate the model find a secret without giving more examples. As i know AI need more examples to make it more accurate, otherwise it will be false positive.
 4. provider antigravity, zed.dev and openrouter has a lot metadata for their models but unfortunately the metadata is not already converted to bifrost metadata (bifrost datasheet). maybe we don't have to add feature in bifrost, let bifrost use their format (datasheet bifrost) and make datasheet_editor to support converter from specific provider into bifrost metadata.
 5. (NEED TO INVESTIGATE), does bifrost can auto-convert metadata like (thinking level, reasoning disabled/enabled, topP, topK, etc) from other format request into requested format request by provider ? for example: if client send a request using openai-format + using model gemini + contains metadata, does bifrost can auto-convert the metadata into google-format ?
+6. alternative doppler (maybe bitwarden) to make vault provider?
 
 
 # idea that maybe will not implemented because too many conflict with other features
@@ -18,19 +19,23 @@
 
 
 # already implemented and already tested with live test:
-- google_search (native grounding search from gemini), supported provider: gemini/aistudio, antigravity.
-- custom provider: antigravity, b.ai, bitdeer, byteplus, cline, inferx, longcat, modal, morphllm, neuralwatt, opencode-zen-free, tokenrouter, tokenharbor, vyceai.
 - guardrails using regex, betterleaks.
 - guardrails apply to tool_calls result, tool_calls turn from AI, user message.
 - guardrails actions: redact.
 - guardrails redaction strategy: replace.
 - guardrails redaction mode: reversible.
-- add new provider with prefix "-free" for free version: opencode-free. use case: some provider need special headers or format for body request, so it should not merge with original provider to prevent conflict.
-- adaptive routing: EWMA, Group EWMA and priority order, also already registered on routing rules.
-- doppler as a vault provider.
-- logging body request (body content) only when error.
+- extra detection: 
 - model pricing and model parameters resolver can resolve provider name "$provider-free" into "$provider", so provider "opencode-zen-free" can reuse same datasheet from provider "opencode-zen".
-- agent setup, user can configure their agent (opencode, codex, etc) to use specific model/provider/virtual key.
+- agent setup: user can configure their agent (opencode, codex, etc) to use specific model/provider/virtual key.
+- adaptive routing: EWMA, Group EWMA and priority order, also already registered on routing rules.
+- circuit breaker:.
+- vault: a vault to store credentials like api-key, refresh-token, etc, doppler as a vault provider.
+- logging body request (a raw-request) only when error.
+- google_search (native grounding search from gemini), supported provider: gemini/aistudio, antigravity.
+- custom provider can use compression gzip (using `use-compress-gzip=true`) which reduce network bandwitdh.
+- custom provider using oauth: antigravity, zed.dev, cline.
+- custom provider using keyless: opencode-zen-free.
+- custom provider: b.ai, bitdeer, byteplus, inferx, longcat, modal, morphllm, neuralwatt, tokenrouter, apmix, tokenharbor, vyceai.
 ## looks like using fake model AI route
 - seekai.cc
 - inference.dahl.global
@@ -40,6 +45,7 @@
 - gorouter.app
 ## web chat AI, so we can't send `tools:[]`
 - aisure.uk
+
 
 # already implemented and but NOT tested with live test (only unit test or static test):
 - guardrails by AI judge
