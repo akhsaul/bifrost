@@ -37,7 +37,7 @@ export const baseGuardrailsFields: CELFieldDefinition[] = [
 		defaultOperator: "=",
 	},
 	{
-		name: "params",
+		name: "query",
 		label: "Query Parameter",
 		placeholder: "e.g., api_key, user_id",
 		inputType: "keyValue",

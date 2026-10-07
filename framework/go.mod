@@ -171,4 +171,3 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-require github.com/maximhq/bifrost/plugins/guardrails v0.0.0-00010101000000-000000000000

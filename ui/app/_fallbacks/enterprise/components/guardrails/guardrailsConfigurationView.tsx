@@ -333,8 +333,8 @@ function RuleSheet({ open, onOpenChange, rule, providers, onSave, isSaving }: Ru
 	}, [providersList]);
 
 	const availableModels = useMemo(() => {
-		if (!modelConfigs) return [];
-		return modelConfigs.map((m) => m.name);
+		if (!modelConfigs?.model_configs) return [];
+		return modelConfigs.model_configs.map((m) => m.model_name);
 	}, [modelConfigs]);
 
 	useEffect(() => {
