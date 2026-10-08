@@ -9,9 +9,6 @@ import (
 	"testing"
 	"time"
 
-	bifrost "github.com/maximhq/bifrost/core"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/fasthttp/router"
 	"github.com/stretchr/testify/require"
 

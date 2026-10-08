@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -1041,5 +1042,249 @@ func TestAntigravityProvider_ChatCompletion_Non401DoesNotInvalidate(t *testing.T
 	tokenCacheMu.RUnlock()
 	if cachedToken == nil || cachedToken.AccessToken != "good-token" {
 		t.Errorf("expected cached token to remain 'good-token', got %+v", cachedToken)
+	}
+}
+
+func TestBuildAntigravityAuthURL_Legacy(t *testing.T) {
+	authURL := BuildAntigravityAuthURL("", "test-state")
+	u, err := url.Parse(authURL)
+	if err != nil {
+		t.Fatalf("failed to parse auth URL: %v", err)
+	}
+	q := u.Query()
+	if q.Get("response_type") != "code" {
+		t.Errorf("expected response_type=code, got %s", q.Get("response_type"))
+	}
+	if q.Get("client_id") != GetAntigravityClientID() {
+		t.Errorf("expected client_id=%s, got %s", GetAntigravityClientID(), q.Get("client_id"))
+	}
+	if q.Get("redirect_uri") != DefaultAntigravityRedirectURI {
+		t.Errorf("expected redirect_uri=%s, got %s", DefaultAntigravityRedirectURI, q.Get("redirect_uri"))
+	}
+	if q.Get("code_challenge") != "" {
+		t.Errorf("legacy auth URL should not have code_challenge, got %s", q.Get("code_challenge"))
+	}
+	if q.Get("state") != "test-state" {
+		t.Errorf("expected state=test-state, got %s", q.Get("state"))
+	}
+}
+
+func TestBuildAntigravityAuthURL_PKCE(t *testing.T) {
+	authURL, verifier, state := BuildAntigravityAuthURLPKCE("", "")
+	if verifier == "" {
+		t.Fatal("expected non-empty code_verifier")
+	}
+	if len(verifier) < 43 {
+		t.Errorf("expected code_verifier length >= 43, got %d", len(verifier))
+	}
+	if state == "" {
+		t.Fatal("expected non-empty auto-generated state")
+	}
+
+	u, err := url.Parse(authURL)
+	if err != nil {
+		t.Fatalf("failed to parse auth URL: %v", err)
+	}
+	q := u.Query()
+	if q.Get("response_type") != "code" {
+		t.Errorf("expected response_type=code, got %s", q.Get("response_type"))
+	}
+	if q.Get("client_id") != GetAntigravityClientID() {
+		t.Errorf("expected client_id=%s, got %s", GetAntigravityClientID(), q.Get("client_id"))
+	}
+	if q.Get("redirect_uri") != NewAntigravityRedirectURI {
+		t.Errorf("expected redirect_uri=%s, got %s", NewAntigravityRedirectURI, q.Get("redirect_uri"))
+	}
+	if q.Get("code_challenge_method") != "S256" {
+		t.Errorf("expected code_challenge_method=S256, got %s", q.Get("code_challenge_method"))
+	}
+	if q.Get("code_challenge") == "" {
+		t.Error("expected non-empty code_challenge")
+	}
+	if q.Get("state") != state {
+		t.Errorf("expected state=%s, got %s", state, q.Get("state"))
+	}
+	if !strings.Contains(q.Get("scope"), "https://www.googleapis.com/auth/aicode") {
+		t.Errorf("expected scope to contain aicode, got %s", q.Get("scope"))
+	}
+	if !strings.Contains(q.Get("scope"), "openid") {
+		t.Errorf("expected scope to contain openid, got %s", q.Get("scope"))
+	}
+}
+
+func TestPKCEVerifierCache(t *testing.T) {
+	StorePendingCodeVerifier("test-state-1", "test-verifier-1")
+
+	if got := GetLatestCodeVerifier(); got != "test-verifier-1" {
+		t.Errorf("expected latest verifier 'test-verifier-1', got %s", got)
+	}
+
+	if got := GetPendingCodeVerifier("test-state-1"); got != "test-verifier-1" {
+		t.Errorf("expected pending verifier 'test-verifier-1', got %s", got)
+	}
+
+	// Should be consumed
+	if got := GetPendingCodeVerifier("test-state-1"); got != "" {
+		t.Errorf("expected empty verifier after consumption, got %s", got)
+	}
+}
+
+func TestExchangeAuthCode_Legacy(t *testing.T) {
+	var capturedCodeVerifier string
+	var capturedGrantType string
+	var capturedRedirectURI string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "token") {
+			_ = r.ParseForm()
+			capturedCodeVerifier = r.Form.Get("code_verifier")
+			capturedGrantType = r.Form.Get("grant_type")
+			capturedRedirectURI = r.Form.Get("redirect_uri")
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+				"access_token": "mock-access-token",
+				"refresh_token": "mock-refresh-token",
+				"expires_in": 3600,
+				"token_type": "Bearer"
+			}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	origTokenURL := tokenEndpointURL
+	tokenEndpointURL = server.URL + "/token"
+	defer func() { tokenEndpointURL = origTokenURL }()
+
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	client := &fasthttp.Client{}
+
+	creds, err := ExchangeAuthCode(ctx, client, "legacy-code", "", "legacy-client-id", "legacy-client-secret", nil)
+	if err != nil {
+		t.Fatalf("legacy exchange failed: %v", err)
+	}
+	if creds.RefreshToken != "mock-refresh-token" {
+		t.Errorf("expected refresh token 'mock-refresh-token', got %s", creds.RefreshToken)
+	}
+	if capturedCodeVerifier != "" {
+		t.Errorf("expected no code_verifier for legacy exchange, got '%s'", capturedCodeVerifier)
+	}
+	if capturedGrantType != "authorization_code" {
+		t.Errorf("expected grant_type 'authorization_code', got '%s'", capturedGrantType)
+	}
+	if capturedRedirectURI != DefaultAntigravityRedirectURI {
+		t.Errorf("expected default redirect URI '%s', got '%s'", DefaultAntigravityRedirectURI, capturedRedirectURI)
+	}
+}
+
+func TestExchangeAuthCode_PKCE(t *testing.T) {
+	var capturedCodeVerifier string
+	var capturedGrantType string
+	var capturedRedirectURI string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "token") {
+			_ = r.ParseForm()
+			capturedCodeVerifier = r.Form.Get("code_verifier")
+			capturedGrantType = r.Form.Get("grant_type")
+			capturedRedirectURI = r.Form.Get("redirect_uri")
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+				"access_token": "mock-access-token",
+				"refresh_token": "mock-refresh-token",
+				"expires_in": 3600,
+				"token_type": "Bearer"
+			}`))
+			return
+		}
+		if strings.Contains(r.URL.Path, "userinfo") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+				"id": "12345",
+				"email": "test@example.com",
+				"verified_email": true,
+				"name": "Test User"
+			}`))
+			return
+		}
+		if strings.Contains(r.URL.Path, "loadCodeAssist") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+				"cloudAICompanionProject": "test-project-pkce"
+			}`))
+			return
+		}
+		if strings.Contains(r.URL.Path, "retrieveUserQuotaSummary") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+				"groups": []
+			}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	origTokenURL := tokenEndpointURL
+	tokenEndpointURL = server.URL + "/token"
+	defer func() { tokenEndpointURL = origTokenURL }()
+
+	// Test with explicit code_verifier
+	form := url.Values{}
+	form.Set("grant_type", "authorization_code")
+	form.Set("code", "test-auth-code")
+	form.Set("code_verifier", "my-pkce-verifier-12345")
+	form.Set("redirect_uri", NewAntigravityRedirectURI)
+
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseRequest(req)
+	defer fasthttp.ReleaseResponse(resp)
+
+	req.Header.SetMethod(http.MethodPost)
+	req.SetRequestURI(tokenEndpointURL)
+	req.Header.SetContentType("application/x-www-form-urlencoded")
+	form.Set("client_id", "my-client-id")
+	req.SetBodyString(form.Encode())
+
+	client := &fasthttp.Client{}
+	err := client.Do(req, resp)
+	if err != nil {
+		t.Fatalf("token exchange test failed: %v", err)
+	}
+	if capturedCodeVerifier != "my-pkce-verifier-12345" {
+		t.Errorf("expected captured code_verifier 'my-pkce-verifier-12345', got '%s'", capturedCodeVerifier)
+	}
+	if capturedGrantType != "authorization_code" {
+		t.Errorf("expected captured grant_type 'authorization_code', got '%s'", capturedGrantType)
+	}
+	if capturedRedirectURI != NewAntigravityRedirectURI {
+		t.Errorf("expected redirect URI '%s', got '%s'", NewAntigravityRedirectURI, capturedRedirectURI)
+	}
+}
+
+func TestExchangeAuthCodePKCE_MissingVerifierError(t *testing.T) {
+	// Clear any cached verifier
+	pendingVerifiersMu.Lock()
+	pendingVerifiers = make(map[string]pendingVerifierEntry)
+	latestVerifier = ""
+	latestVerifierAt = time.Time{}
+	pendingVerifiersMu.Unlock()
+
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	_, err := ExchangeAuthCodePKCE(ctx, nil, "code-without-verifier", NewAntigravityRedirectURI, "client-id", "", "", nil)
+	if err == nil {
+		t.Fatal("expected error when code_verifier is missing in ExchangeAuthCodePKCE, got nil")
+	}
+	if !strings.Contains(err.Error(), "PKCE code_verifier is required") {
+		t.Errorf("expected 'PKCE code_verifier is required' error, got %v", err)
 	}
 }

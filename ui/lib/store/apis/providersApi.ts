@@ -191,6 +191,8 @@ export interface ListBaseModelsResponse {
 export interface AntigravityAuthUrlResponse {
 	auth_url: string;
 	client_id: string;
+	code_verifier?: string;
+	state?: string;
 }
 
 export interface AntigravityExchangeRequest {
@@ -198,6 +200,8 @@ export interface AntigravityExchangeRequest {
 	redirect_uri?: string;
 	client_id?: string;
 	client_secret?: string;
+	code_verifier?: string;
+	state?: string;
 }
 
 export interface AntigravityExchangeResponse {

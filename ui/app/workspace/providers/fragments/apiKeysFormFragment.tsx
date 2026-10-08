@@ -205,12 +205,14 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 
 	// Auth type state for Antigravity: 'oauth' or 'manual'
 	const [antigravityAuthType, setAntigravityAuthType] = useState<"oauth" | "manual">("oauth");
-	// Pinned loopback redirect: the shared Google OAuth client only accepts
-	// http://localhost:8085, so auth-url generation and code exchange must use
-	// the same URI regardless of which port Bifrost itself serves on.
-	const ANTIGRAVITY_REDIRECT_URI = "http://localhost:8085";
+	// Pinned OAuth redirect: Google Antigravity OAuth client is registered with
+	// https://antigravity.google/oauth-callback, so auth-url generation and code
+	// exchange must use this URI.
+	const ANTIGRAVITY_REDIRECT_URI = "https://antigravity.google/oauth-callback";
 	const [manualCode, setManualCode] = useState("");
-	const [manualRedirectUri, setManualRedirectUri] = useState<string>("http://localhost:8085");
+	const [manualRedirectUri, setManualRedirectUri] = useState<string>("https://antigravity.google/oauth-callback");
+	const [antigravityCodeVerifier, setAntigravityCodeVerifier] = useState<string>("");
+	const [antigravityOAuthState, setAntigravityOAuthState] = useState<string>("");
 	const [hasCopiedLink, setHasCopiedLink] = useState(false);
 	const [isCopyingUrl, setIsCopyingUrl] = useState(false);
 	const [authError, setAuthError] = useState<string | null>(null);
@@ -277,6 +279,19 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			const res = await getAuthUrl({ redirect_uri: ANTIGRAVITY_REDIRECT_URI }).unwrap();
 			if (!res.auth_url) throw new Error("No authorization URL returned");
 
+			if (res.code_verifier) {
+				setAntigravityCodeVerifier(res.code_verifier);
+				try {
+					sessionStorage.setItem("antigravity_code_verifier", res.code_verifier);
+				} catch {}
+			}
+			if (res.state) {
+				setAntigravityOAuthState(res.state);
+				try {
+					sessionStorage.setItem("antigravity_oauth_state", res.state);
+				} catch {}
+			}
+
 			await navigator.clipboard.writeText(res.auth_url);
 			setManualRedirectUri(ANTIGRAVITY_REDIRECT_URI);
 			setHasCopiedLink(true);
@@ -297,6 +312,19 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			const res = await getAuthUrl({ redirect_uri: ANTIGRAVITY_REDIRECT_URI }).unwrap();
 			if (!res.auth_url) throw new Error("No authorization URL returned");
 
+			if (res.code_verifier) {
+				setAntigravityCodeVerifier(res.code_verifier);
+				try {
+					sessionStorage.setItem("antigravity_code_verifier", res.code_verifier);
+				} catch {}
+			}
+			if (res.state) {
+				setAntigravityOAuthState(res.state);
+				try {
+					sessionStorage.setItem("antigravity_oauth_state", res.state);
+				} catch {}
+			}
+
 			await navigator.clipboard.writeText(res.auth_url);
 			setManualRedirectUri(ANTIGRAVITY_REDIRECT_URI);
 			setHasCopiedLink(true);
@@ -310,13 +338,28 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 		}
 	};
 
-	const completeExchange = async (code: string, redirectUri?: string) => {
+	const completeExchange = async (code: string, redirectUri?: string, stateParam?: string) => {
 		setAuthError(null);
 		try {
 			const uri = redirectUri || ANTIGRAVITY_REDIRECT_URI;
+			let verifier = antigravityCodeVerifier;
+			if (!verifier && typeof window !== "undefined") {
+				try {
+					verifier = sessionStorage.getItem("antigravity_code_verifier") || "";
+				} catch {}
+			}
+			let stateVal = stateParam || antigravityOAuthState;
+			if (!stateVal && typeof window !== "undefined") {
+				try {
+					stateVal = sessionStorage.getItem("antigravity_oauth_state") || "";
+				} catch {}
+			}
+
 			const res = await exchangeCode({
 				code: code.trim(),
 				redirect_uri: uri,
+				code_verifier: verifier || undefined,
+				state: stateVal || undefined,
 			}).unwrap();
 
 			form.setValue("key.value", { value: "", ref: "" }, { shouldDirty: true, shouldValidate: true });
@@ -332,6 +375,14 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			toast.success(res.email ? `Connected as ${res.email}!` : "Antigravity Google OAuth connected successfully!");
 			setManualCode("");
 			setAntigravityAuthStarted(false);
+			setAntigravityCodeVerifier("");
+			setAntigravityOAuthState("");
+			if (typeof window !== "undefined") {
+				try {
+					sessionStorage.removeItem("antigravity_code_verifier");
+					sessionStorage.removeItem("antigravity_oauth_state");
+				} catch {}
+			}
 		} catch (err: unknown) {
 			setAuthError(getErrorMessage(err));
 		}
@@ -2509,7 +2560,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 													</Button>
 												</TooltipTrigger>
 												<TooltipContent className="max-w-xs">
-													<p>Copy a fresh Google OAuth URL (redirecting to localhost:8085) to open in your local browser.</p>
+													<p>Copy a fresh Google OAuth URL (redirecting to antigravity.google/oauth-callback) to open in your local browser.</p>
 												</TooltipContent>
 											</Tooltip>
 										</TooltipProvider>
@@ -2560,7 +2611,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 										<div>
 											<div className="text-sm font-semibold">Connect with Google (OAuth)</div>
 											<p className="text-muted-foreground text-xs">
-												Approve in your browser, then paste the redirect URL below. No manual key needed.
+												Approve in your browser, then paste the redirect URL or code below. No manual key needed.
 											</p>
 										</div>
 										<Button type="button" variant="outline" size="sm" data-testid="antigravity-oauth-waiting-btn" disabled>
@@ -2588,8 +2639,8 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 													</TooltipTrigger>
 													<TooltipContent className="max-w-xs">
 														<p>
-															Popup sign-in is not supported: the shared Google OAuth client only accepts the loopback redirect{" "}
-															<span className="font-mono">http://localhost:8085</span>, which the popup cannot capture. Use Copy link below.
+															Popup sign-in is not supported: the shared Google OAuth client uses the callback{" "}
+															<span className="font-mono">https://antigravity.google/oauth-callback</span>, which the popup cannot capture. Use Copy link below.
 														</p>
 													</TooltipContent>
 												</Tooltip>
@@ -2615,21 +2666,23 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 										</div>
 										<div className="flex gap-2">
 											<Input
-												placeholder="4/0A... or http://localhost:8085/?code=..."
+												placeholder="4/0A... or https://antigravity.google/oauth-callback?code=..."
 												value={manualCode}
 												onChange={(e) => {
-													const val = e.target.value;
+													const val = e.target.value.trim();
 													if (val.includes("code=")) {
 														try {
-															const urlObj = new URL(val.startsWith("http") ? val : `http://localhost:8085/${val}`);
+															const urlObj = new URL(val.startsWith("http") ? val : `https://antigravity.google/oauth-callback?${val}`);
 															const c = urlObj.searchParams.get("code");
 															if (c) {
 																setManualCode(c);
+																const s = urlObj.searchParams.get("state");
+																if (s) {
+																	setAntigravityOAuthState(s);
+																}
 																const detectedRedirect = urlObj.origin + (urlObj.pathname === "/" ? "" : urlObj.pathname);
-																if (detectedRedirect && detectedRedirect !== "http://localhost") {
+																if (detectedRedirect) {
 																	setManualRedirectUri(detectedRedirect);
-																} else if (urlObj.origin) {
-																	setManualRedirectUri(urlObj.origin);
 																}
 																return;
 															}
@@ -2643,7 +2696,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 												type="button"
 												variant="secondary"
 												size="sm"
-												onClick={() => completeExchange(manualCode, manualRedirectUri || ANTIGRAVITY_REDIRECT_URI)}
+												onClick={() => completeExchange(manualCode, manualRedirectUri || ANTIGRAVITY_REDIRECT_URI, antigravityOAuthState)}
 												disabled={!manualCode.trim() || isExchanging}
 											>
 												{isExchanging ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Exchange"}

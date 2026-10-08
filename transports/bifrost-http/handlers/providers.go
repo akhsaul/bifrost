@@ -1789,15 +1789,26 @@ func providerDialTargetChanged(old *schemas.NetworkConfig, next schemas.NetworkC
 func (h *ProviderHandler) getAntigravityAuthURL(ctx *fasthttp.RequestCtx) {
 	redirectURI := strings.TrimSpace(string(ctx.QueryArgs().Peek("redirect_uri")))
 	state := strings.TrimSpace(string(ctx.QueryArgs().Peek("state")))
+	mode := strings.TrimSpace(string(ctx.QueryArgs().Peek("mode")))
 
-	authURL, codeVerifier := antigravity.BuildAntigravityAuthURL(redirectURI, state)
 	resp := map[string]string{
-		"auth_url":  authURL,
 		"client_id": antigravity.GetAntigravityClientID(),
 	}
-	if codeVerifier != "" {
-		resp["code_verifier"] = codeVerifier
+
+	if mode == "legacy" {
+		authURL := antigravity.BuildAntigravityAuthURL(redirectURI, state)
+		resp["auth_url"] = authURL
+	} else {
+		authURL, codeVerifier, stateVal := antigravity.BuildAntigravityAuthURLPKCE(redirectURI, state)
+		resp["auth_url"] = authURL
+		if codeVerifier != "" {
+			resp["code_verifier"] = codeVerifier
+		}
+		if stateVal != "" {
+			resp["state"] = stateVal
+		}
 	}
+
 	data, err := sonic.Marshal(resp)
 	if err != nil {
 		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
@@ -1814,6 +1825,8 @@ type exchangeAntigravityCodePayload struct {
 	ClientID     string `json:"client_id,omitempty"`
 	ClientSecret string `json:"client_secret,omitempty"`
 	CodeVerifier string `json:"code_verifier,omitempty"`
+	State        string `json:"state,omitempty"`
+	Mode         string `json:"mode,omitempty"`
 }
 
 // exchangeAntigravityAuthCode handles POST /api/providers/antigravity/oauth/exchange
@@ -1830,16 +1843,39 @@ func (h *ProviderHandler) exchangeAntigravityAuthCode(ctx *fasthttp.RequestCtx) 
 		return
 	}
 
-	creds, err := antigravity.ExchangeAuthCode(
-		nil,
-		nil,
-		payload.Code,
-		payload.RedirectURI,
-		payload.ClientID,
-		payload.ClientSecret,
-		payload.CodeVerifier,
-		nil,
-	)
+	var creds *antigravity.AntigravityCredentials
+	var err error
+
+	if payload.Mode == "legacy" {
+		creds, err = antigravity.ExchangeAuthCode(
+			nil,
+			nil,
+			payload.Code,
+			payload.RedirectURI,
+			payload.ClientID,
+			payload.ClientSecret,
+			nil,
+		)
+	} else {
+		verifier := strings.TrimSpace(payload.CodeVerifier)
+		if verifier == "" && payload.State != "" {
+			verifier = antigravity.GetPendingCodeVerifier(payload.State)
+		}
+		if verifier == "" {
+			verifier = antigravity.GetLatestCodeVerifier()
+		}
+
+		creds, err = antigravity.ExchangeAuthCodePKCE(
+			nil,
+			nil,
+			payload.Code,
+			payload.RedirectURI,
+			payload.ClientID,
+			payload.ClientSecret,
+			verifier,
+			nil,
+		)
+	}
 	if err != nil {
 		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Failed to exchange auth code: %v", err))
 		return

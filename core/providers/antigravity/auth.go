@@ -43,8 +43,11 @@ const (
 	DefaultOS            = "darwin"
 	DefaultArch          = "arm64"
 
-	// DefaultAntigravityRedirectURI is the default loopback redirect URI for Google Antigravity / Cloud Code OAuth.
+	// DefaultAntigravityRedirectURI is the default loopback redirect URI for Google Antigravity / Cloud Code OAuth (legacy method).
 	DefaultAntigravityRedirectURI = "http://localhost:8085"
+
+	// NewAntigravityRedirectURI is the official OAuth callback URI for the new Antigravity PKCE method.
+	NewAntigravityRedirectURI = "https://antigravity.google/oauth-callback"
 )
 
 // GetAntigravityClientID returns the Google OAuth client ID from environment variables (ANTIGRAVITY_CLIENT_ID or ANTIGRAVITY_OAUTH_CLIENT_ID).
@@ -75,6 +78,79 @@ type CachedToken struct {
 
 
 var UseNewOAuthMethod = true
+
+var (
+	pendingVerifiersMu sync.RWMutex
+	pendingVerifiers   = make(map[string]pendingVerifierEntry)
+	latestVerifier     string
+	latestVerifierAt   time.Time
+)
+
+type pendingVerifierEntry struct {
+	verifier  string
+	createdAt time.Time
+}
+
+func generateRandomState() string {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b)
+}
+
+// StorePendingCodeVerifier records a pending PKCE verifier by state and as the latest verifier.
+func StorePendingCodeVerifier(state, verifier string) {
+	if verifier == "" {
+		return
+	}
+	pendingVerifiersMu.Lock()
+	defer pendingVerifiersMu.Unlock()
+
+	now := time.Now()
+	for k, v := range pendingVerifiers {
+		if now.Sub(v.createdAt) > 30*time.Minute {
+			delete(pendingVerifiers, k)
+		}
+	}
+
+	if state != "" {
+		pendingVerifiers[state] = pendingVerifierEntry{
+			verifier:  verifier,
+			createdAt: now,
+		}
+	}
+	latestVerifier = verifier
+	latestVerifierAt = now
+}
+
+// GetPendingCodeVerifier retrieves and removes a stored PKCE verifier associated with state.
+func GetPendingCodeVerifier(state string) string {
+	pendingVerifiersMu.Lock()
+	defer pendingVerifiersMu.Unlock()
+
+	if state != "" {
+		if entry, ok := pendingVerifiers[state]; ok {
+			if time.Since(entry.createdAt) <= 30*time.Minute {
+				delete(pendingVerifiers, state)
+				return entry.verifier
+			}
+			delete(pendingVerifiers, state)
+		}
+	}
+	return ""
+}
+
+// GetLatestCodeVerifier returns the most recently generated PKCE verifier within 30 minutes.
+func GetLatestCodeVerifier() string {
+	pendingVerifiersMu.RLock()
+	defer pendingVerifiersMu.RUnlock()
+
+	if latestVerifier != "" && time.Since(latestVerifierAt) <= 30*time.Minute {
+		return latestVerifier
+	}
+	return ""
+}
 
 func generateCodeVerifier() string {
 	b := make([]byte, 32)
@@ -540,10 +616,39 @@ func EnsureProjectID(
 	return "", fmt.Errorf("no project ID found in loadCodeAssist response: %s", string(resp.Body()))
 }
 
-// BuildAntigravityAuthURL generates the Google OAuth authorization URL for Antigravity.
-func BuildAntigravityAuthURL(redirectURI, state string) (string, string) {
+// BuildAntigravityAuthURL generates the Google OAuth authorization URL for Antigravity (legacy method).
+func BuildAntigravityAuthURL(redirectURI, state string) string {
 	if strings.TrimSpace(redirectURI) == "" {
 		redirectURI = DefaultAntigravityRedirectURI
+	}
+	params := url.Values{}
+	clientID := GetAntigravityClientID()
+	if clientID != "" {
+		params.Set("client_id", clientID)
+	}
+	params.Set("response_type", "code")
+	if redirectURI != "" {
+		params.Set("redirect_uri", redirectURI)
+	}
+	params.Set("scope", strings.Join([]string{
+		"https://www.googleapis.com/auth/cloud-platform",
+		"https://www.googleapis.com/auth/userinfo.email",
+		"https://www.googleapis.com/auth/userinfo.profile",
+		"https://www.googleapis.com/auth/cclog",
+		"https://www.googleapis.com/auth/experimentsandconfigs",
+	}, " "))
+	if state != "" {
+		params.Set("state", state)
+	}
+	params.Set("access_type", "offline")
+	params.Set("prompt", "consent")
+	return GoogleOAuthAuthURL + "?" + params.Encode()
+}
+
+// BuildAntigravityAuthURLPKCE generates the Google OAuth authorization URL for the new Antigravity PKCE flow.
+func BuildAntigravityAuthURLPKCE(redirectURI, state string) (string, string, string) {
+	if strings.TrimSpace(redirectURI) == "" {
+		redirectURI = NewAntigravityRedirectURI
 	}
 	params := url.Values{}
 	clientID := GetAntigravityClientID()
@@ -561,28 +666,28 @@ func BuildAntigravityAuthURL(redirectURI, state string) (string, string) {
 		"https://www.googleapis.com/auth/userinfo.profile",
 		"https://www.googleapis.com/auth/cclog",
 		"https://www.googleapis.com/auth/experimentsandconfigs",
+		"https://www.googleapis.com/auth/aicode",
+		"openid",
 	}
 	
-	var verifier string
-	if UseNewOAuthMethod {
-		scopes = append(scopes, "https://www.googleapis.com/auth/aicode", "openid")
-		verifier = generateCodeVerifier()
-		challenge := generateCodeChallenge(verifier)
-		params.Set("code_challenge", challenge)
-		params.Set("code_challenge_method", "S256")
+	if state == "" {
+		state = generateRandomState()
 	}
+	params.Set("state", state)
+
+	verifier := generateCodeVerifier()
+	challenge := generateCodeChallenge(verifier)
+	params.Set("code_challenge", challenge)
+	params.Set("code_challenge_method", "S256")
+	StorePendingCodeVerifier(state, verifier)
 	
 	params.Set("scope", strings.Join(scopes, " "))
-	
-	if state != "" {
-		params.Set("state", state)
-	}
 	params.Set("access_type", "offline")
 	params.Set("prompt", "consent")
-	return GoogleOAuthAuthURL + "?" + params.Encode(), verifier
+	return GoogleOAuthAuthURL + "?" + params.Encode(), verifier, state
 }
 
-// ExchangeAuthCode exchanges a Google OAuth authorization code for tokens and auto-discovers the Cloud Code project ID.
+// ExchangeAuthCode exchanges a Google OAuth authorization code for tokens (legacy method, no PKCE).
 func ExchangeAuthCode(
 	ctx *schemas.BifrostContext,
 	client *fasthttp.Client,
@@ -590,7 +695,6 @@ func ExchangeAuthCode(
 	redirectURI string,
 	clientID string,
 	clientSecret string,
-	codeVerifier string,
 	logger schemas.Logger,
 ) (*AntigravityCredentials, error) {
 	if strings.TrimSpace(redirectURI) == "" {
@@ -614,14 +718,125 @@ func ExchangeAuthCode(
 	if redirectURI != "" {
 		form.Set("redirect_uri", strings.TrimSpace(redirectURI))
 	}
-	form.Set("client_id", clientID)
-	form.Set("client_secret", clientSecret)
-	if UseNewOAuthMethod && codeVerifier != "" {
-		form.Set("code_verifier", codeVerifier)
+	if clientID != "" {
+		form.Set("client_id", clientID)
+	}
+	if clientSecret != "" {
+		form.Set("client_secret", clientSecret)
 	}
 
 	req.Header.SetMethod(http.MethodPost)
-	req.SetRequestURI(GoogleOAuthTokenURL)
+	req.SetRequestURI(tokenEndpointURL)
+	req.Header.SetContentType("application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", GetUserAgent(DefaultClientProfile))
+	req.SetBodyString(form.Encode())
+
+	var err error
+	if client != nil {
+		err = client.Do(req, resp)
+	} else {
+		err = fasthttp.Do(req, resp)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("network error during auth code exchange: %w", err)
+	}
+
+	if resp.StatusCode() != fasthttp.StatusOK {
+		return nil, fmt.Errorf("token exchange returned status %d: %s", resp.StatusCode(), string(resp.Body()))
+	}
+
+	var tokResp struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		ExpiresIn    int    `json:"expires_in"`
+		TokenType    string `json:"token_type"`
+		Error        string `json:"error,omitempty"`
+		ErrorDesc    string `json:"error_description,omitempty"`
+	}
+	if err := sonic.Unmarshal(resp.Body(), &tokResp); err != nil {
+		return nil, fmt.Errorf("failed to decode token exchange response: %w", err)
+	}
+
+	if tokResp.Error != "" {
+		return nil, fmt.Errorf("token exchange error: %s (%s)", tokResp.Error, tokResp.ErrorDesc)
+	}
+
+	creds := &AntigravityCredentials{
+		AccessToken:   tokResp.AccessToken,
+		RefreshToken:  tokResp.RefreshToken,
+		ClientID:      clientID,
+		ClientSecret:  clientSecret,
+		ClientProfile: DefaultClientProfile,
+	}
+
+	// Auto-discover Project ID and fetch userinfo using the newly exchanged access token
+	if tokResp.AccessToken != "" {
+		if projectID, err := EnsureProjectID(ctx, client, tokResp.AccessToken, DefaultRuntimeBaseURL, DefaultClientProfile, logger); err == nil && projectID != "" {
+			creds.ProjectID = projectID
+		}
+		if userInfo, err := FetchGoogleUserInfo(ctx, client, tokResp.AccessToken, logger); err == nil && userInfo != nil {
+			creds.Email = userInfo.Email
+			creds.Name = userInfo.Name
+		}
+	} else {
+		return nil, fmt.Errorf("token exchange returned empty access token")
+	}
+
+	return creds, nil
+}
+
+// ExchangeAuthCodePKCE exchanges a Google OAuth authorization code using the new PKCE flow with strict validation.
+func ExchangeAuthCodePKCE(
+	ctx *schemas.BifrostContext,
+	client *fasthttp.Client,
+	code string,
+	redirectURI string,
+	clientID string,
+	clientSecret string,
+	codeVerifier string,
+	logger schemas.Logger,
+) (*AntigravityCredentials, error) {
+	if strings.TrimSpace(redirectURI) == "" {
+		redirectURI = NewAntigravityRedirectURI
+	}
+	if clientID == "" {
+		clientID = GetAntigravityClientID()
+	}
+	if clientSecret == "" {
+		clientSecret = GetAntigravityClientSecret()
+	}
+
+	codeVerifier = strings.TrimSpace(codeVerifier)
+	if codeVerifier == "" {
+		codeVerifier = GetLatestCodeVerifier()
+	}
+	if codeVerifier == "" {
+		return nil, fmt.Errorf("PKCE code_verifier is required for Antigravity OAuth code exchange. Please re-authenticate to obtain a fresh authorization URL")
+	}
+
+	req := fasthttp.AcquireRequest()
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseRequest(req)
+	defer fasthttp.ReleaseResponse(resp)
+
+	form := url.Values{}
+	form.Set("grant_type", "authorization_code")
+	form.Set("code", strings.TrimSpace(code))
+	if redirectURI != "" {
+		form.Set("redirect_uri", strings.TrimSpace(redirectURI))
+	}
+	if clientID != "" {
+		form.Set("client_id", clientID)
+	}
+	if clientSecret != "" {
+		form.Set("client_secret", clientSecret)
+	}
+	form.Set("code_verifier", codeVerifier)
+
+	req.Header.SetMethod(http.MethodPost)
+	req.SetRequestURI(tokenEndpointURL)
 	req.Header.SetContentType("application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", GetUserAgent(DefaultClientProfile))
