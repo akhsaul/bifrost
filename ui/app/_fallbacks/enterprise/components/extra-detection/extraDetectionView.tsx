@@ -99,7 +99,6 @@ export default function ExtraDetectionView() {
 	const { data: plugin, isLoading } = useGetPluginQuery(EXTRA_DETECTION_PLUGIN_NAME);
 	const [updatePlugin, { isLoading: isSaving }] = useUpdatePluginMutation();
 	const [rules, setRules] = useState<ExtraDetectionRule[]>([]);
-	const [pluginEnabled, setPluginEnabled] = useState(false);
 	const [estimateTokens, setEstimateTokens] = useState(true);
 	const [tokenCounting, setTokenCounting] = useState(() => normalizeExtraDetectionTokenCounting(undefined));
 	const [sheet, setSheet] = useState<RuleSheetState>({ open: false, rule: null });
@@ -111,12 +110,10 @@ export default function ExtraDetectionView() {
 		setRules(cfg.rules);
 		setEstimateTokens(cfg.estimate_tokens);
 		setTokenCounting(normalizeExtraDetectionTokenCounting(cfg.token_counting));
-		setPluginEnabled(Boolean(plugin?.enabled));
 	}, [plugin]);
 
 	const persist = async (next: {
 		rules?: ExtraDetectionRule[];
-		enabled?: boolean;
 		estimate_tokens?: boolean;
 		token_counting?: ExtraDetectionTokenCounting;
 	}) => {
@@ -124,10 +121,9 @@ export default function ExtraDetectionView() {
 		await updatePlugin({
 			name: EXTRA_DETECTION_PLUGIN_NAME,
 			data: {
-				enabled: next.enabled ?? pluginEnabled,
+				enabled: true,
 				config: {
 					...cfg,
-					enabled: next.enabled ?? pluginEnabled,
 					estimate_tokens: next.estimate_tokens ?? estimateTokens,
 					token_header: cfg.token_header,
 					token_counting: next.token_counting ?? tokenCounting,
@@ -135,17 +131,6 @@ export default function ExtraDetectionView() {
 				} satisfies ExtraDetectionPluginConfig,
 			},
 		}).unwrap();
-	};
-
-	const handleTogglePlugin = async (newVal: boolean) => {
-		setPluginEnabled(newVal);
-		try {
-			await persist({ enabled: newVal });
-			toast.success(`Extra detection plugin ${newVal ? "enabled" : "disabled"}`);
-		} catch (error) {
-			setPluginEnabled(!newVal);
-			toast.error(getErrorMessage(error));
-		}
 	};
 
 	const handleToggleEstimate = async (newVal: boolean) => {
@@ -288,10 +273,6 @@ export default function ExtraDetectionView() {
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
-					<div className="flex items-center gap-2">
-						<Switch checked={pluginEnabled} onCheckedChange={handleTogglePlugin} data-testid="extra-detection-plugin-enabled-switch" />
-						<Label className="text-xs">Plugin enabled</Label>
-					</div>
 					<Button onClick={handleCreate} data-testid="extra-detection-rule-add">
 						<Plus className="mr-1.5 h-4 w-4" /> Add Rule
 					</Button>

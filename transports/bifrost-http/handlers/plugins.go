@@ -262,6 +262,17 @@ func (h *PluginsHandler) getPlugin(ctx *fasthttp.RequestCtx) {
 	plugin, err := h.configStore.GetPlugin(ctx, name)
 	if err != nil {
 		if errors.Is(err, configstore.ErrNotFound) {
+			if lib.IsBuiltinPlugin(name) {
+				SendJSON(ctx, PluginResponse{
+					Name:       name,
+					ActualName: name,
+					Enabled:    false,
+					Config:     map[string]any{},
+					IsCustom:   false,
+					Status:     h.pluginsLoader.GetPluginStatus(ctx)[name],
+				})
+				return
+			}
 			SendError(ctx, fasthttp.StatusNotFound, "Plugin not found")
 			return
 		}

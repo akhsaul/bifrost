@@ -193,9 +193,13 @@ func loadBuiltinPlugin(ctx context.Context, name string, pluginConfig any, bifro
 		return modelcatalogresolver.Init(bifrostConfig.ModelCatalog, logger)
 
 	case guardrails.PluginName:
-		guardrailsConfig, err := MarshalPluginConfig[guardrails.Config](pluginConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal guardrails plugin config: %w", err)
+		var guardrailsConfig *guardrails.Config
+		if pluginConfig != nil {
+			var err error
+			guardrailsConfig, err = MarshalPluginConfig[guardrails.Config](pluginConfig)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal guardrails plugin config: %w", err)
+			}
 		}
 		if guardrailsConfig == nil {
 			guardrailsConfig = &guardrails.Config{}
@@ -203,9 +207,15 @@ func loadBuiltinPlugin(ctx context.Context, name string, pluginConfig any, bifro
 		return guardrails.Init(guardrailsConfig, logger)
 
 	case extradetection.PluginName:
-		extraDetectionConfig, err := MarshalPluginConfig[extradetection.Config](pluginConfig)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal extra-detection plugin config: %w", err)
+		var extraDetectionConfig *extradetection.Config
+		if pluginConfig != nil {
+			var err error
+			extraDetectionConfig, err = MarshalPluginConfig[extradetection.Config](pluginConfig)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal extra-detection plugin config: %w", err)
+			}
+		} else {
+			extraDetectionConfig = &extradetection.Config{}
 		}
 		return extradetection.Init(extraDetectionConfig, logger)
 
@@ -314,14 +324,13 @@ func (s *BifrostHTTPServer) loadBuiltinPlugins(ctx context.Context) error {
 	// stable registration order: order 4 ties with governance (registered
 	// earlier), so extra-detection runs right after governance and before
 	// adaptive routing (order 5) and routing (order 6), without renumbering
-	// them. Opt-in: only registered when an enabled "extra-detection" plugin
-	// entry exists in config.json / DB, mirroring the guardrails pattern.
+	// them. It is permanently registered and cannot be disabled.
 	extraDetectionConfig := s.getPluginConfig(extradetection.PluginName)
-	if extraDetectionConfig != nil && extraDetectionConfig.Enabled {
-		s.registerPluginWithStatus(ctx, extradetection.PluginName, nil, extraDetectionConfig.Config, false)
-	} else {
-		s.markPluginDisabled(extradetection.PluginName)
+	var extraPluginConfig any
+	if extraDetectionConfig != nil {
+		extraPluginConfig = extraDetectionConfig.Config
 	}
+	s.registerPluginWithStatus(ctx, extradetection.PluginName, nil, extraPluginConfig, false)
 	s.Config.SetPluginOrderInfo(extradetection.PluginName, builtinPlacement, schemas.Ptr(4))
 
 	// 5. Routing rules. Runs after governance so rules evaluate against a fully stamped
