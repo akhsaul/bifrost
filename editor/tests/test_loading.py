@@ -1,8 +1,8 @@
-"""Tests for file loading: the three Load buttons, progress, and cancellation.
+"""Tests for file loading: the Load Data dialog, progress, and cancellation.
 
 The editor deliberately does not auto-discover files, so these pin that the
-starting state is empty, that a partial load does not fire, and that cancelling
-leaves nothing half-loaded.
+starting state is empty, that the dialog requires both originals, and that
+cancelling leaves nothing half-loaded.
 """
 
 from __future__ import annotations
@@ -273,35 +273,25 @@ def test_starts_with_nothing_loaded(window):
     assert "Custom" in window.path_label.text()
 
 
-def test_three_load_buttons_exist(window):
-    assert window.btn_load_params.text() == "Load Parameters…"
-    assert window.btn_load_pricing.text() == "Load Pricing…"
-    assert window.btn_load_custom.text() == "Load Custom…"
-    # Each button says which file it wants, in text and in a tooltip.
-    for button, expected in (
-        (window.btn_load_params, "model_parameters.json"),
-        (window.btn_load_pricing, "model_pricing.json"),
-        (window.btn_load_custom, "custom_model_metadata.json"),
-    ):
-        assert expected in button.toolTip()
+def test_load_data_button_exists(window):
+    assert window.btn_load_data.text() == "Load Data…"
+    tooltip = window.btn_load_data.toolTip()
+    assert "model_parameters.json" in tooltip
+    assert "model_pricing.json" in tooltip
 
 
 def test_actions_start_disabled(window):
     assert window.btn_merge.isEnabled() is False
-    assert window.btn_save_output.isEnabled() is False
-    assert window.btn_save_custom.isEnabled() is False
+    assert window.btn_save_to.isEnabled() is False
 
 
 def test_partial_selection_does_not_load(window, monkeypatch):
     """Choosing only the parameters file must not start a load.
 
-    A missing file raises a modal dialog, so stub it out; the dialog's own
-    contents are asserted in test_adding.py.
+    The Load Data dialog itself requires both files, so a partial state can
+    only arise programmatically (e.g. CLI args with one missing) -- the
+    window must still refuse to start the worker.
     """
-    from PySide6.QtWidgets import QMessageBox
-
-    monkeypatch.setattr(QMessageBox, "information", staticmethod(lambda *a, **k: QMessageBox.Ok))
-
     params = PARAMS if PARAMS.exists() else PARAMS_BEAUTY
     if not params.exists():
         pytest.skip("datasheet files not present")

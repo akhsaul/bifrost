@@ -232,12 +232,21 @@ class MergeWorker(QRunnable):
 
 
 class SaveWorker(QRunnable):
-    """Write both merged output files off-thread, then re-read to verify.
+    """Write merged output files off-thread, then re-read to verify.
 
     Takes the resolved paths rather than a directory, because the directory alone
     no longer determines the filenames: on a collision the user may have chosen
     numbered ones. Re-deriving the name here would silently write somewhere other
     than where the dialog said.
+
+    Keys are always the canonical :data:`output.OUTPUT_FILENAMES` labels and
+    values are the actual filesystem targets (which is how a numbered
+    ``model_parameters_1.json`` already travelled here). Either key may be
+    absent: Save To lets the user fill only one of the two merged paths, so a
+    single-file write is a normal case, not an error. Every write is sorted
+    and beautified (``indent=2``, ``sort_keys=True``): the GUI always produces
+    stable, diffable output, and the differing compact/upstream format stays a
+    CLI choice.
     """
 
     def __init__(
@@ -246,8 +255,8 @@ class SaveWorker(QRunnable):
         output_dir: str | Path | None = None,
         *,
         paths: dict[str, Path] | None = None,
-        indent: int | None = None,
-        sort_keys: bool = False,
+        indent: int | None = 2,
+        sort_keys: bool = True,
     ) -> None:
         super().__init__()
         self.signals = _Signals()
@@ -265,27 +274,76 @@ class SaveWorker(QRunnable):
     @Slot()
     def run(self) -> None:
         try:
-            params_out = self._paths[PARAMETERS_FILENAME]
-            pricing_out = self._paths[PRICING_FILENAME]
-            write_json_atomic(self._result.parameters, params_out, indent=self._indent,
-                              sort_keys=self._sort_keys)
-            write_json_atomic(self._result.pricing, pricing_out, indent=self._indent,
-                              sort_keys=self._sort_keys)
+            for name in OUTPUT_FILENAMES:
+                if name not in self._paths:
+                    continue
+                target = self._paths[name]
+                payload = (self._result.parameters if name == PARAMETERS_FILENAME
+                           else self._result.pricing)
+                write_json_atomic(payload, target, indent=self._indent,
+                                  sort_keys=self._sort_keys)
             problems: list[str] = []
-            for path, expected, label in (
-                (params_out, self._result.parameters, PARAMETERS_FILENAME),
-                (pricing_out, self._result.pricing, PRICING_FILENAME),
-            ):
+            for name in OUTPUT_FILENAMES:
+                if name not in self._paths:
+                    continue
+                path = self._paths[name]
+                expected = (self._result.parameters if name == PARAMETERS_FILENAME
+                            else self._result.pricing)
                 try:
                     actual = load_dataset(path).data
                 except Exception as exc:
-                    problems.append(f"{label} could not be re-read: {exc}")
+                    problems.append(f"{name} could not be re-read: {exc}")
                     continue
                 if len(actual) != len(expected):
-                    problems.append(f"{label}: wrote {len(actual)} models, expected {len(expected)}")
+                    problems.append(f"{name}: wrote {len(actual)} models, expected {len(expected)}")
             _emit(
                 self.signals.finished,
-                {"parameters": str(params_out), "pricing": str(pricing_out), "problems": problems},
+                {
+                    "parameters": (str(self._paths[PARAMETERS_FILENAME])
+                                   if PARAMETERS_FILENAME in self._paths else None),
+                    "pricing": (str(self._paths[PRICING_FILENAME])
+                                if PRICING_FILENAME in self._paths else None),
+                    "problems": problems,
+                },
+            )
+        except Exception as exc:
+            _emit(self.signals.failed, str(exc))
+        finally:
+            _release(self)
+
+
+class SaveCustomWorker(QRunnable):
+    """Write the custom overlay off-thread, sorted and beautified.
+
+    The overlay holds only what the user changed -- the point of the file --
+    so unlike :class:`SaveWorker` there is no re-read count check: an empty
+    overlay legitimately writes ``{}``.
+    """
+
+    def __init__(
+        self,
+        overlay: dict[str, dict[str, Any]],
+        path: str | Path,
+        *,
+        indent: int | None = 2,
+        sort_keys: bool = True,
+    ) -> None:
+        super().__init__()
+        self.signals = _Signals()
+        self._overlay = overlay
+        self._path = Path(path)
+        self._indent = indent
+        self._sort_keys = sort_keys
+        _keep_alive(self)
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            write_json_atomic(self._overlay, self._path, indent=self._indent,
+                              sort_keys=self._sort_keys)
+            _emit(
+                self.signals.finished,
+                {"custom": str(self._path), "problems": []},
             )
         except Exception as exc:
             _emit(self.signals.failed, str(exc))

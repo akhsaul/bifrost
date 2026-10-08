@@ -733,7 +733,7 @@ def test_window_import_applies_to_overlay(gui_app, monkeypatch, tmp_path):
     assert "opencode-zen/big-pickle" in window.overlay
     assert window.overlay["opencode-zen/big-pickle"]["parameters"]["supports_reasoning"] is True
     assert window.dirty is True
-    assert "Save Custom" in window.status_label.text()
+    assert "Save To" in window.status_label.text()
 
 
 def test_window_import_cancel_leaves_overlay_untouched(gui_app, monkeypatch, tmp_path):

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QSettings, Qt, QThreadPool, QTimer, Signal
+from PySide6.QtCore import QSettings, Qt, QThreadPool, QTimer
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -33,7 +33,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..dataset import write_json_atomic
 from ..fields import is_cost_field
 from ..merge import (
     PARAM_ID_FIELD as PARAMS_ID_FIELD,
@@ -48,7 +47,22 @@ from ..merge import (
 from ..validate import validate_overlay
 from ..zed_import import apply_import, import_zed_models
 from ..opencode_import import apply_opencode_import, import_opencode_models
-from .adddialogs import AddFieldDialog, AddModelDialog, OpencodeImportDialog, ZedImportDialog, ask_output_policy
+from .adddialogs import (
+    AddFieldDialog,
+    AddModelDialog,
+    DEFAULT_CUSTOM_OUTPUT,
+    DEFAULT_PARAMETERS_OUTPUT,
+    DEFAULT_PRICING_OUTPUT,
+    LoadDataDialog,
+    OpencodeImportDialog,
+    SAVE_ACTION_CUSTOM,
+    SAVE_ACTION_OUTPUT,
+    SaveConflictDialog,
+    SaveToDialog,
+    ZedImportDialog,
+    build_conflict_item,
+    first_free_path,
+)
 from .fieldeditor import FieldRow
 from .models import (
     ChangeListModel,
@@ -57,7 +71,14 @@ from .models import (
     ParamDescriptorModel,
     build_rows,
 )
-from .workers import BUILD_STEP, TOTAL_STEPS, LoadWorker, MergeWorker, SaveWorker
+from .workers import (
+    BUILD_STEP,
+    TOTAL_STEPS,
+    LoadWorker,
+    MergeWorker,
+    SaveCustomWorker,
+    SaveWorker,
+)
 
 # Re-exported from datasheet_editor.output so the filenames, the collision rules
 # and the save path cannot drift apart: three copies of these two strings is two
@@ -85,6 +106,9 @@ class MainWindow(QMainWindow):
         self.dirty = False
         self._loading = False
         self._load_worker: LoadWorker | None = None
+        #: Open the Save To dialog as soon as a merge triggered from it
+        #: finishes. Plain Merge & Preview runs leave this False.
+        self._open_save_after_merge = False
         #: What each field means and what shape its value takes, built by the load
         #: worker. Feeds the Add Field dialog's descriptions and typed inputs.
         self.param_catalog = None
@@ -154,32 +178,16 @@ class MainWindow(QMainWindow):
         self.path_label = QLabel()
         bar.addWidget(self.path_label, 1)
 
-        # One button per file rather than a single "Load…". Each names the file
-        # it wants, so it is obvious which of the three is still missing and the
-        # merge cannot be started with the wrong one.
-        self.btn_load_params = QPushButton("Load Parameters…")
-        self.btn_load_params.setToolTip(
-            f"Choose {PARAMETERS_FILENAME} — capability metadata and the "
-            "model_parameters form descriptors"
+        # One dialog for all three inputs: parameters and pricing are always
+        # needed together, so choosing them one button at a time only produced
+        # a "still missing" modal after the first pick.
+        self.btn_load_data = QPushButton("Load Data…")
+        self.btn_load_data.setToolTip(
+            f"Choose {PARAMETERS_FILENAME} and {PRICING_FILENAME} (required) "
+            "plus the custom overlay (optional) in one dialog"
         )
-        self.btn_load_params.clicked.connect(self._on_load_parameters)
-        bar.addWidget(self.btn_load_params)
-
-        self.btn_load_pricing = QPushButton("Load Pricing…")
-        self.btn_load_pricing.setToolTip(
-            f"Choose {PRICING_FILENAME} — cost fields, also read by Bifrost's "
-            "capability lookup"
-        )
-        self.btn_load_pricing.clicked.connect(self._on_load_pricing)
-        bar.addWidget(self.btn_load_pricing)
-
-        self.btn_load_custom = QPushButton("Load Custom…")
-        self.btn_load_custom.setToolTip(
-            "Choose custom_model_metadata.json — your overlay of edits. "
-            "Optional; skip it to start from a clean slate."
-        )
-        self.btn_load_custom.clicked.connect(self._on_load_custom)
-        bar.addWidget(self.btn_load_custom)
+        self.btn_load_data.clicked.connect(self._on_load_data)
+        bar.addWidget(self.btn_load_data)
 
         self.btn_add_model = QPushButton("Add Model…")
         self.btn_add_model.setToolTip(
@@ -208,15 +216,14 @@ class MainWindow(QMainWindow):
         self.btn_merge.setEnabled(False)
         bar.addWidget(self.btn_merge)
 
-        self.btn_save_output = QPushButton("Save Output…")
-        self.btn_save_output.clicked.connect(self._on_save_output)
-        self.btn_save_output.setEnabled(False)
-        bar.addWidget(self.btn_save_output)
-
-        self.btn_save_custom = QPushButton("Save Custom")
-        self.btn_save_custom.clicked.connect(self._on_save_custom)
-        self.btn_save_custom.setEnabled(False)
-        bar.addWidget(self.btn_save_custom)
+        self.btn_save_to = QPushButton("Save To…")
+        self.btn_save_to.setToolTip(
+            "Name the merged parameters/pricing files and the custom overlay, "
+            "then write them sorted and beautified"
+        )
+        self.btn_save_to.clicked.connect(self._on_save_to)
+        self.btn_save_to.setEnabled(False)
+        bar.addWidget(self.btn_save_to)
 
         return bar
 
@@ -225,8 +232,8 @@ class MainWindow(QMainWindow):
 
         The file is parsed by the same pure importer the CLI uses, so the two
         front-ends cannot disagree. Nothing touches the overlay until the
-        confirm dialog is accepted; after that Save Custom is still needed,
-        like every other overlay edit.
+        confirm dialog is accepted; after that Save To… (Save Custom) is still
+        needed, like every other overlay edit.
         """
         chosen, _ = QFileDialog.getOpenFileName(
             self,
@@ -268,8 +275,7 @@ class MainWindow(QMainWindow):
             self.overlay, result,
             overwrite_existing=dialog.overwrite_existing(),
         )
-        self.dirty = True
-        self.btn_save_custom.setEnabled(True)
+        self._mark_overlay_dirty()
         self._refresh_rows()
         added, overwritten = len(result.added), len(result.overwritten)
         parts = []
@@ -278,7 +284,7 @@ class MainWindow(QMainWindow):
         if overwritten:
             parts.append(f"{overwritten} overwritten")
         self.status_label.setText(
-            f"zed import: {', '.join(parts)}. Save Custom to keep it."
+            f"zed import: {', '.join(parts)}. Save To… (Save Custom) to keep it."
         )
 
     def _on_import_opencode(self) -> None:
@@ -286,8 +292,8 @@ class MainWindow(QMainWindow):
 
         The file is parsed by the same pure importer the CLI uses, so the two
         front-ends cannot disagree. Nothing touches the overlay until the
-        confirm dialog is accepted; after that Save Custom is still needed,
-        like every other overlay edit.
+        confirm dialog is accepted; after that Save To… (Save Custom) is still
+        needed, like every other overlay edit.
         """
         chosen, _ = QFileDialog.getOpenFileName(
             self,
@@ -329,8 +335,7 @@ class MainWindow(QMainWindow):
             self.overlay, result,
             overwrite_existing=dialog.overwrite_existing(),
         )
-        self.dirty = True
-        self.btn_save_custom.setEnabled(True)
+        self._mark_overlay_dirty()
         self._refresh_rows()
         added, overwritten = len(result.added), len(result.overwritten)
         parts = []
@@ -341,7 +346,7 @@ class MainWindow(QMainWindow):
         if result.warnings:
             parts.append(f"{len(result.warnings)} tier(s) dropped")
         self.status_label.setText(
-            f"opencode import: {', '.join(parts)}. Save Custom to keep it."
+            f"opencode import: {', '.join(parts)}. Save To… (Save Custom) to keep it."
         )
 
     def _build_filterbar(self) -> QHBoxLayout:
@@ -591,40 +596,25 @@ class MainWindow(QMainWindow):
         """Explain what to load first, instead of opening any file on our own."""
         self._update_path_label()
         self.status_label.setText(
-            f"Choose {PARAMETERS_FILENAME} and {PRICING_FILENAME} with the two "
-            "Load buttons above. Custom overlay is optional."
+            f"Press Load Data… and choose {PARAMETERS_FILENAME} and "
+            f"{PRICING_FILENAME}. Custom overlay is optional."
         )
 
-    def _on_load_parameters(self) -> None:
-        chosen, _ = QFileDialog.getOpenFileName(
-            self, f"Select {PARAMETERS_FILENAME}", self._browse_dir(), "JSON files (*.json)"
+    def _on_load_data(self) -> None:
+        dialog = LoadDataDialog(
+            parameters=str(self.parameters_path) if self.parameters_path else "",
+            pricing=str(self.pricing_path) if self.pricing_path else "",
+            custom=str(self.custom_path) if self.custom_path else "",
+            browse_dir=self._browse_dir(),
+            parent=self,
         )
-        if not chosen:
+        if dialog.exec() != QDialog.Accepted:
             return
-        self.parameters_path = Path(chosen)
-        self._update_path_label()
-        self._start_load()
-
-    def _on_load_pricing(self) -> None:
-        chosen, _ = QFileDialog.getOpenFileName(
-            self, f"Select {PRICING_FILENAME}", self._browse_dir(), "JSON files (*.json)"
-        )
-        if not chosen:
-            return
-        self.pricing_path = Path(chosen)
-        self._update_path_label()
-        self._start_load()
-
-    def _on_load_custom(self) -> None:
-        chosen, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select custom_model_metadata.json (optional)",
-            self._browse_dir(),
-            "JSON files (*.json)",
-        )
-        if not chosen:
-            return
-        self.custom_path = Path(chosen)
+        chosen = dialog.values()
+        assert chosen["parameters"] is not None and chosen["pricing"] is not None
+        self.parameters_path = chosen["parameters"]
+        self.pricing_path = chosen["pricing"]
+        self.custom_path = chosen["custom"]
         self._update_path_label()
         self._start_load()
 
@@ -635,21 +625,21 @@ class MainWindow(QMainWindow):
         return str(self.settings.value("last_dir", str(Path.cwd())))
 
     def _start_load(self) -> None:
-        """Load if both originals are chosen; otherwise say what is missing."""
-        missing = [
-            name
-            for name, path in (
-                (PARAMETERS_FILENAME, self.parameters_path),
-                (PRICING_FILENAME, self.pricing_path),
-            )
-            if path is None
-        ]
-        if missing:
+        """Load once both originals are chosen; the dialog enforces that."""
+        if self.parameters_path is None or self.pricing_path is None:
+            # Unreachable through the Load Data dialog, which requires both,
+            # but load_paths() (CLI args) can still land here with one missing.
             self._update_path_label()
             self.btn_merge.setEnabled(False)
-            # A status-bar line is easy to miss, and the result of clicking one
-            # Load button and seeing nothing happen looks broken. Say it plainly.
-            self._warn_incomplete_load(missing)
+            missing = [
+                name
+                for name, path in (
+                    (PARAMETERS_FILENAME, self.parameters_path),
+                    (PRICING_FILENAME, self.pricing_path),
+                )
+                if path is None
+            ]
+            self.status_label.setText("Waiting for " + " and ".join(missing))
             return
 
         self._remember_dir()
@@ -662,33 +652,6 @@ class MainWindow(QMainWindow):
         worker.signals.failed.connect(lambda msg: self._on_failed("load", msg))
         worker.signals.cancelled.connect(self._on_load_cancelled)
         self.pool.start(worker)
-
-    def _warn_incomplete_load(self, missing: list[str]) -> None:
-        """Explain that both originals are required before anything can display."""
-        chosen = [
-            name
-            for name, path in (
-                (PARAMETERS_FILENAME, self.parameters_path),
-                (PRICING_FILENAME, self.pricing_path),
-            )
-            if path is not None
-        ]
-        lines = [
-            "Bifrost's datasheet editor needs both files before it can show anything.",
-            "",
-            f"Chosen so far : {', '.join(chosen) if chosen else 'none'}",
-            f"Still needed  : {', '.join(missing)}",
-            "",
-            "This is not just a convenience: model_parameters.json holds the capability "
-            "metadata and parameter forms, while model_pricing.json holds the cost fields "
-            "and is also what Bifrost's GetCapabilityEntry reads. The editor lists both "
-            "side by side and reports where they disagree, so it needs both.",
-            "",
-            f"Press \"Load Parameters…\" and \"Load Pricing…\" to choose the missing "
-            f"{'file' if len(missing) == 1 else 'files'}.",
-        ]
-        QMessageBox.information(self, "Choose both files to load", "\n".join(lines))
-        self.status_label.setText("Waiting for " + " and ".join(missing))
 
     def _remember_dir(self) -> None:
         for path in (self.parameters_path, self.pricing_path):
@@ -826,9 +789,7 @@ class MainWindow(QMainWindow):
         self._loading = busy
         self.progress.setVisible(busy)
         for button in (
-            self.btn_load_params,
-            self.btn_load_pricing,
-            self.btn_load_custom,
+            self.btn_load_data,
             self.btn_import_zed,
             self.btn_import_opencode,
         ):
@@ -841,8 +802,7 @@ class MainWindow(QMainWindow):
         self.btn_add_param_field.setEnabled(not busy and selected)
         self.btn_add_pricing_field.setEnabled(not busy and selected)
         self.btn_merge.setEnabled(not busy and has_data)
-        self.btn_save_output.setEnabled(not busy and self.merge_result is not None)
-        self.btn_save_custom.setEnabled(not busy and bool(self.dirty or self.overlay))
+        self.btn_save_to.setEnabled(not busy and has_data)
         if busy:
             self.status_label.setText(message)
 
@@ -972,7 +932,7 @@ class MainWindow(QMainWindow):
             if not names:
                 label = QLabel(f"no {section} fields for this model" if base_entry else
                                f"new {section} entry — add fields below" if section == "parameters"
-                               else "no pricing entry (add one via Save Custom, or use CLI)")
+                               else "no pricing entry (add one via Save To… (Save Custom), or use CLI)")
                 label.setStyleSheet("color:#64748b;font-style:italic;")
                 form.addRow(label)
                 continue
@@ -1022,8 +982,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             "Nothing loaded yet",
-            "Load both datasheets first — press \"Load Parameters…\" and "
-            "\"Load Pricing…\".",
+            "Load both datasheets first — press \"Load Data…\".",
         )
         return False
 
@@ -1043,13 +1002,12 @@ class MainWindow(QMainWindow):
         values = dialog.values()
         model_id = values["id"]
         self.overlay[model_id] = values["sections"]
-        self.dirty = True
         self._refresh_rows()
         self._select_model(model_id)
         self._rebuild_field_panes(model_id)
-        self.btn_save_custom.setEnabled(True)
+        self._mark_overlay_dirty()
         self.status_label.setText(
-            f"Added {model_id} to the custom overlay. Save Custom to keep it."
+            f"Added {model_id} to the custom overlay. Save To… (Save Custom) to keep it."
         )
 
     def _on_add_field(self, section: str) -> None:
@@ -1096,11 +1054,10 @@ class MainWindow(QMainWindow):
         else:
             self.overlay.setdefault(model_id, {}).setdefault(section, {})[name] = value
             described = f"{model_id}.{section}.{name}"
-        self.dirty = True
+        self._mark_overlay_dirty()
         self._mark_row(model_id)
         self._rebuild_field_panes(model_id)
-        self.btn_save_custom.setEnabled(True)
-        self.status_label.setText(f"Added {described}. Save Custom to keep it.")
+        self.status_label.setText(f"Added {described}. Save To… (Save Custom) to keep it.")
 
     def _populate_rows(self, rows: list[dict[str, Any]]) -> None:
         """Replace the model list, facets and filters in one pass.
@@ -1129,8 +1086,7 @@ class MainWindow(QMainWindow):
     def _on_field_edit(self, model_id: str, section: str, name: str, value: Any) -> None:
         entry = self.overlay.setdefault(model_id, {})
         entry.setdefault(section, {})[name] = value
-        self.dirty = True
-        self.btn_save_custom.setEnabled(True)
+        self._mark_overlay_dirty()
         self._mark_row(model_id)
 
     def _on_field_revert(self, model_id: str, section: str, name: str) -> None:
@@ -1142,9 +1098,25 @@ class MainWindow(QMainWindow):
                 entry.pop(section, None)
         if entry and not entry:
             self.overlay.pop(model_id, None)
-        self.dirty = True
+        self._mark_overlay_dirty()
         self._mark_row(model_id)
         self._rebuild_field_panes(model_id)
+
+    def _mark_custom_saved(self, path: Path) -> None:
+        """Record a custom-overlay write: clear dirty and refresh the labels."""
+        self.custom_path = path
+        self.dirty = False
+        self._remember_custom_dir(path)
+        self._update_path_label()
+
+    def _mark_overlay_dirty(self) -> None:
+        """Record an overlay edit. Saving goes through Save To…, so the only
+        state to track is the dirty flag -- there is no save button to arm."""
+        self.dirty = True
+
+    def _remember_custom_dir(self, path: Path) -> None:
+        self.settings.setValue("last_dir", str(path.parent))
+        self.output_dir = path.parent
 
     def _mark_row(self, model_id: str) -> None:
         row_index = self.model_list.row_for_id(model_id)
@@ -1245,7 +1217,7 @@ class MainWindow(QMainWindow):
             return
         _delete_param(self, model_id, param_id)
         self.status_label.setText(
-            f"Removed {param_id} from the custom overlay. Save Custom to keep it."
+            f"Removed {param_id} from the custom overlay. Save To… (Save Custom) to keep it."
         )
         self._update_delete_param_enabled()
 
@@ -1272,7 +1244,7 @@ class MainWindow(QMainWindow):
         self.status_label.setText(
             f"{model_id}.parameters.{PARAMS_FIELD}[id={param_id}].{key} = "
             f"{_short_json(value)}"
-            + (". Save Custom to keep it." if kept else " (matches the original, nothing to keep).")
+            + (". Save To… (Save Custom) to keep it." if kept else " (matches the original, nothing to keep).")
         )
 
     # ------------------------------------------------------------- actions -- #
@@ -1308,72 +1280,171 @@ class MainWindow(QMainWindow):
             f"{counts.get('added', 0):,} fields added · "
             f"{counts.get('overridden', 0):,} overridden"
         )
-        self.btn_save_output.setEnabled(True)
+        if self._open_save_after_merge:
+            # Save To was pressed before a preview existed: the merge it
+            # triggered just finished, so open the dialog now rather than
+            # leaving the user to press the button again.
+            self._open_save_after_merge = False
+            self._open_save_to()
 
-    def _on_save_custom(self) -> None:
-        if not self.custom_path:
-            path, _ = QFileDialog.getSaveFileName(
-                self, "Save custom overlay", "custom_model_metadata.json", "JSON files (*.json)"
-            )
-            if not path:
-                return
-            self.custom_path = Path(path)
-        write_json_atomic(self.overlay, self.custom_path, indent=2)
-        self.dirty = False
-        self.btn_save_custom.setEnabled(False)
-        self._update_path_label()
-        self.status_label.setText(f"wrote {self.custom_path} ({len(self.overlay)} model entries)")
+    def _default_save_targets(self) -> dict[str, Path]:
+        """Prefilled Save To paths: workdir plus the dash-form default names."""
+        workdir = Path(str(self.settings.value("last_dir", str(Path.cwd()))))
+        return {
+            "parameters": workdir / DEFAULT_PARAMETERS_OUTPUT,
+            "pricing": workdir / DEFAULT_PRICING_OUTPUT,
+            "custom": workdir / DEFAULT_CUSTOM_OUTPUT,
+        }
 
-    def _on_save_output(self) -> None:
+    def _on_save_to(self) -> None:
+        """Open Save To; pressing it counts as having seen the preview.
+
+        When no merge has run yet, trigger one first and open the dialog when
+        it finishes -- the per-path counts need merged numbers, and a save
+        without them would write files the preview never showed.
+        """
+        if not self._require_loaded():
+            return
         if self.merge_result is None:
+            validation = validate_overlay(self.overlay, self.parameters, self.pricing)
+            if not validation.ok:
+                QMessageBox.warning(
+                    self,
+                    "Overlay has errors",
+                    f"{len(validation.errors())} error(s):\n\n{validation.render(limit=20)}",
+                )
+                return
+            self._open_save_after_merge = True
+            self._set_busy(True, "merging…")
+            worker = MergeWorker(self.parameters, self.pricing, self.overlay,
+                                 param_array_mode=ParamArrayMode.MERGE,
+                                 pricing_fields=PricingFieldPolicy.PRESERVE)
+            worker.signals.finished.connect(self._on_merged)
+            worker.signals.failed.connect(lambda msg: self._on_failed("merge", msg))
+            self.pool.start(worker)
             return
-        directory = QFileDialog.getExistingDirectory(self, "Choose output directory", str(self.output_dir))
-        if not directory:
-            return
-        self.output_dir = Path(directory)
+        self._open_save_to()
 
-        # An input is not a valid output target, even with Overwrite chosen: the
-        # merge read that file moments ago, so replacing it is not repeatable and
-        # the originals are the only copy. The CLI refuses the same case via
-        # --force, and the two front-ends must not disagree about it. Checked
-        # before the dialog so the user is not asked a question whose every answer
-        # is refused.
-        clash = self._output_targets_an_input()
+    def _open_save_to(self) -> None:
+        assert self.merge_result is not None
+        defaults = self._default_save_targets()
+        dialog = SaveToDialog(
+            parameters_path=str(defaults["parameters"]),
+            pricing_path=str(defaults["pricing"]),
+            custom_path=str(defaults["custom"]),
+            parameters_count=len(self.merge_result.parameters),
+            pricing_count=len(self.merge_result.pricing),
+            custom_count=len(self.overlay),
+            parent=self,
+        )
+        if dialog.exec() != QDialog.Accepted:
+            self.status_label.setText("save cancelled — output files left as they were")
+            return
+        action = dialog.action()
+        targets = dialog.values()
+        if action == SAVE_ACTION_OUTPUT:
+            self._save_merged_output(
+                {k: v for k, v in targets.items() if k in ("parameters", "pricing") and v is not None}
+            )
+        elif action == SAVE_ACTION_CUSTOM:
+            custom = targets.get("custom")
+            assert custom is not None
+            self._save_custom_overlay(custom)
+
+    def _save_merged_output(self, targets: dict[str, Path]) -> None:
+        """Write the filled merged file(s), asking about collisions first."""
+        if not targets:
+            return
+        clash = self._save_targets_an_input(targets)
         if clash is not None:
             QMessageBox.warning(
                 self,
                 "That is the file you loaded",
-                f"{clash.name} in this folder is the {clash.stem.replace('_', ' ')} file "
-                "this session was loaded from. Writing the merged result there would "
-                "replace the original, and the merge has already read it — the run "
-                "could not be repeated.\n\nChoose a different output folder, or use "
-                "Add Number to write beside it.",
+                f"{clash.name} is a file this session was loaded from. Writing "
+                "the merged result there would replace the original, and the "
+                "merge has already read it — the run could not be repeated.\n\n"
+                "Choose a different name.",
             )
             self.status_label.setText(f"refused to overwrite the input {clash.name}")
             return
+        conflicts = [
+            build_conflict_item(
+                role, path,
+                len(self.merge_result.parameters if role == "parameters"
+                    else self.merge_result.pricing),
+            )
+            for role, path in targets.items() if path.exists()
+        ]
+        if conflicts:
+            # Asked before the write starts, not after: a collision has to be
+            # settled on the main thread, and the dialog can be cancelled, so it
+            # cannot live inside the worker.
+            from ..output import ADD_NUMBER
 
-        # Asked before the write starts, not after: a collision has to be settled
-        # on the main thread, and the dialog can be cancelled, so it cannot live
-        # inside the worker.
-        policy, paths = ask_output_policy(self.output_dir, self)
-        if policy is None:
-            self.status_label.setText("save cancelled — output files left as they were")
-            return
-
+            dialog = SaveConflictDialog(conflicts, self)
+            if dialog.exec() != QDialog.Accepted:
+                self.status_label.setText("save cancelled — output files left as they were")
+                return
+            if dialog.policy() == ADD_NUMBER:
+                targets = {
+                    role: first_free_path(path) if path.exists() else path
+                    for role, path in targets.items()
+                }
+        paths = {
+            (PARAMETERS_FILENAME if role == "parameters" else PRICING_FILENAME): path
+            for role, path in targets.items()
+        }
+        self._remember_save_dir(paths)
         self._set_busy(True, "writing merged files…")
         worker = SaveWorker(self.merge_result, paths=paths)
         worker.signals.finished.connect(self._on_saved)
         worker.signals.failed.connect(lambda msg: self._on_failed("save", msg))
         self.pool.start(worker)
 
-    def _output_targets_an_input(self) -> Path | None:
-        """An output path that is also one of the files this session loaded."""
-        wanted = {
-            PARAMETERS_FILENAME: (self.parameters_path, self.custom_path),
-            PRICING_FILENAME: (self.pricing_path, self.custom_path),
-        }
-        for name, sources in wanted.items():
-            target = self.output_dir / name
+    def _save_custom_overlay(self, path: Path) -> None:
+        """Write the overlay only (what the user changed), sorted + beautified."""
+        clash = self._save_targets_an_input({"custom": path})
+        if clash is not None:
+            QMessageBox.warning(
+                self,
+                "That is the file you loaded",
+                f"{clash.name} is a file this session was loaded from. "
+                "Overwriting an input with the overlay would mix the two "
+                "roles.\n\nChoose a different name.",
+            )
+            self.status_label.setText(f"refused to overwrite the input {clash.name}")
+            return
+        if path.exists():
+            from ..output import ADD_NUMBER
+
+            dialog = SaveConflictDialog(
+                [build_conflict_item("custom", path, len(self.overlay))], self
+            )
+            if dialog.exec() != QDialog.Accepted:
+                self.status_label.setText("save cancelled — output files left as they were")
+                return
+            if dialog.policy() == ADD_NUMBER:
+                path = first_free_path(path)
+        self._remember_save_dir({"custom.json": path})
+        self._set_busy(True, "writing custom overlay…")
+        worker = SaveCustomWorker(self.overlay, path)
+        worker.signals.finished.connect(self._on_custom_saved)
+        worker.signals.failed.connect(lambda msg: self._on_failed("save", msg))
+        self.pool.start(worker)
+
+    def _save_targets_an_input(self, targets: dict[str, Path]) -> Path | None:
+        """A save target that is also one of the files this session loaded.
+
+        An input is not a valid output target, even with Overwrite chosen: the
+        merge read that file moments ago, so replacing it is not repeatable and
+        the originals are the only copy. The CLI refuses the same case via
+        --force, and the two front-ends must not disagree about it. Checked
+        before the conflict dialog so the user is not asked a question whose
+        every answer is refused. The loaded custom overlay is exempt: saving
+        the overlay back to where it came from is the normal round-trip.
+        """
+        sources = [self.parameters_path, self.pricing_path]
+        for target in targets.values():
             if not target.exists():
                 continue
             try:
@@ -1385,6 +1456,12 @@ class MainWindow(QMainWindow):
                     return target
         return None
 
+    def _remember_save_dir(self, paths: dict[str, Path]) -> None:
+        for path in paths.values():
+            self.settings.setValue("last_dir", str(path.parent))
+            self.output_dir = path.parent
+            break
+
     def _on_saved(self, payload: dict[str, Any]) -> None:
         self._set_busy(False)
         problems = payload["problems"]
@@ -1392,9 +1469,22 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Post-write check failed", "\n".join(problems))
             self.status_label.setText("save completed with verification problems")
             return
+        written = [v for v in (payload.get("parameters"), payload.get("pricing")) if v]
         self.status_label.setText(
-            f"wrote {payload['parameters']} and {payload['pricing']} "
+            f"wrote {' and '.join(written)} "
             f"({self.merge_result.summary().get('changed_models', 0):,} models differ from the originals)"
+        )
+
+    def _on_custom_saved(self, payload: dict[str, Any]) -> None:
+        self._set_busy(False)
+        problems = payload["problems"]
+        if problems:
+            QMessageBox.critical(self, "Post-write check failed", "\n".join(problems))
+            self.status_label.setText("save completed with verification problems")
+            return
+        self._mark_custom_saved(Path(payload["custom"]))
+        self.status_label.setText(
+            f"wrote {payload['custom']} ({len(self.overlay)} custom entries, sorted)"
         )
 
     def closeEvent(self, event: Any) -> None:  # noqa: N802
@@ -1402,14 +1492,13 @@ class MainWindow(QMainWindow):
             answer = QMessageBox.question(
                 self,
                 "Unsaved custom overlay",
-                "The custom overlay has unsaved changes. Close anyway?",
-                QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel,
+                "The custom overlay has unsaved changes. Save it via Save To… first, "
+                "or close without saving?",
+                QMessageBox.Discard | QMessageBox.Cancel,
             )
             if answer == QMessageBox.Cancel:
                 event.ignore()
                 return
-            if answer == QMessageBox.Save:
-                self._on_save_custom()
         event.accept()
 
 
@@ -1480,8 +1569,7 @@ def _set_param_field(window: "MainWindow", model_id: str, param_id: str, key: st
             array.remove(entry)
         if not array:
             section.pop(PARAMS_FIELD, None)
-        window.dirty = True
-        window.btn_save_custom.setEnabled(True)
+        window._mark_overlay_dirty()
         window._mark_row(model_id)
         _refresh_param_table(window, model_id)
         return
@@ -1490,8 +1578,7 @@ def _set_param_field(window: "MainWindow", model_id: str, param_id: str, key: st
         entry = {PARAMS_ID_FIELD: param_id}
         array.append(entry)
     entry[key] = value
-    window.dirty = True
-    window.btn_save_custom.setEnabled(True)
+    window._mark_overlay_dirty()
     window._mark_row(model_id)
     _refresh_param_table(window, model_id)
 
@@ -1538,8 +1625,7 @@ def _delete_param(window: "MainWindow", model_id: str, param_id: str) -> None:
     if not entry:
         window.overlay.pop(model_id, None)
 
-    window.dirty = True
-    window.btn_save_custom.setEnabled(True)
+    window._mark_overlay_dirty()
     window._mark_row(model_id)
     _refresh_param_table(window, model_id)
 

@@ -382,57 +382,80 @@ def test_window_passes_the_catalog_to_the_dialog(app, monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# both-files-required dialog
+# Load Data dialog validation
 # --------------------------------------------------------------------------- #
 
 
-def _capture_information(monkeypatch):
-    captured: dict = {}
+def test_load_dialog_requires_the_parameters_file(app, tmp_path):
+    from PySide6.QtWidgets import QDialogButtonBox
 
-    def fake(parent, title, text, *args, **kwargs):
-        captured["title"] = title
-        captured["text"] = text
-        return QMessageBox.Ok
+    from datasheet_editor.gui.adddialogs import LoadDataDialog
 
-    monkeypatch.setattr(QMessageBox, "information", staticmethod(fake))
-    return captured
+    pricing = tmp_path / "model_pricing.json"
+    pricing.write_text("{}")
+    dialog = LoadDataDialog(parameters="", pricing=str(pricing))
+    assert dialog._buttons.button(QDialogButtonBox.Ok).isEnabled() is False
+    assert "parameters" in dialog.error_label.text().lower()
 
 
-def test_choosing_only_parameters_shows_a_dialog(app, monkeypatch):
+def test_load_dialog_requires_the_pricing_file(app, tmp_path):
+    from PySide6.QtWidgets import QDialogButtonBox
+
+    from datasheet_editor.gui.adddialogs import LoadDataDialog
+
+    params = tmp_path / "model_parameters.json"
+    params.write_text("{}")
+    dialog = LoadDataDialog(parameters=str(params), pricing="")
+    assert dialog._buttons.button(QDialogButtonBox.Ok).isEnabled() is False
+    assert "pricing" in dialog.error_label.text().lower()
+
+
+def test_load_dialog_rejects_a_missing_custom_file(app, tmp_path):
+    from PySide6.QtWidgets import QDialogButtonBox
+
+    from datasheet_editor.gui.adddialogs import LoadDataDialog
+
+    params = tmp_path / "model_parameters.json"
+    params.write_text("{}")
+    pricing = tmp_path / "model_pricing.json"
+    pricing.write_text("{}")
+    dialog = LoadDataDialog(
+        parameters=str(params), pricing=str(pricing),
+        custom=str(tmp_path / "nope.json"),
+    )
+    assert dialog._buttons.button(QDialogButtonBox.Ok).isEnabled() is False
+    assert "not found" in dialog.error_label.text()
+
+
+def test_load_dialog_accepts_both_originals_without_custom(app, tmp_path):
+    from PySide6.QtWidgets import QDialogButtonBox
+
+    from datasheet_editor.gui.adddialogs import LoadDataDialog
+
+    params = tmp_path / "model_parameters.json"
+    params.write_text("{}")
+    pricing = tmp_path / "model_pricing.json"
+    pricing.write_text("{}")
+    dialog = LoadDataDialog(parameters=str(params), pricing=str(pricing))
+    assert dialog._buttons.button(QDialogButtonBox.Ok).isEnabled() is True
+    assert dialog.error_label.text() == ""
+    assert dialog.values() == {
+        "parameters": params,
+        "pricing": pricing,
+        "custom": None,
+    }
+
+
+def test_partial_state_does_not_start_a_load(app):
+    # The dialog enforces both-files, so a partial state only arises
+    # programmatically -- the window must still refuse the worker.
     from datasheet_editor.gui.main_window import MainWindow
 
-    captured = _capture_information(monkeypatch)
     window = MainWindow()
     window.parameters_path = __import__("pathlib").Path("tools/model_parameters.json")
     window._update_path_label()
     window._start_load()
 
-    assert "title" in captured
-    assert "model_pricing.json" in captured["text"]
     assert window.model_list.rowCount() == 0
-
-
-def test_choosing_only_pricing_shows_a_dialog(app, monkeypatch):
-    from datasheet_editor.gui.main_window import MainWindow
-
-    captured = _capture_information(monkeypatch)
-    window = MainWindow()
-    window.pricing_path = __import__("pathlib").Path("tools/model_pricing.json")
-    window._update_path_label()
-    window._start_load()
-
-    assert "model_parameters.json" in captured["text"]
-
-
-def test_incomplete_dialog_explains_why_both_are_needed(app, monkeypatch):
-    from datasheet_editor.gui.main_window import MainWindow
-
-    captured = _capture_information(monkeypatch)
-    window = MainWindow()
-    window.parameters_path = __import__("pathlib").Path("tools/model_parameters.json")
-    window._update_path_label()
-    window._start_load()
-
-    text = captured["text"]
-    assert "GetCapabilityEntry" in text  # the actual reason
-    assert "Load Pricing" in text  # and what to press
+    assert "model_pricing.json" in window.status_label.text()
+    assert window._progress_dialog is None

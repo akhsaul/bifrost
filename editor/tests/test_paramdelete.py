@@ -161,7 +161,6 @@ def test_deleting_marks_the_work_unsaved(added):
     added.dirty = False
     added._on_delete_param()
     assert added.dirty is True
-    assert added.btn_save_custom.isEnabled() is True
 
 
 def test_deleting_keeps_the_other_descriptors_overrides_intact(added):

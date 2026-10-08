@@ -57,10 +57,11 @@ Exit code is `3`, distinct from `1` (validation) and `2` (usage), so a wrapper
 can tell "retry with a flag" from "you called me wrong". The check runs *before*
 the merge, so a refusal costs nothing instead of loading 20MB first.
 
-In the GUI, **Save Output…** shows the same question as a dialog with
-**Overwrite** and **Add Number** buttons, listing the size and modification time
-of what would be lost. Cancel is the default button, so a stray Return cannot
-destroy a file. Escape and Cancel both write nothing.
+In the GUI, **Save To…** shows the same question per file as a dialog with
+**Overwrite** and **Add Number** buttons, listing the new-vs-old model counts
+plus the size and modification time of what would be lost. A file that is not
+a datasheet shows size and mtime only. Cancel is the default button, so a
+stray Return cannot destroy a file. Escape and Cancel both write nothing.
 
 Two details:
 
@@ -114,7 +115,7 @@ placement rule. Fields with no datasheet counterpart (`display_name`,
 Entries already in the custom file are skipped and reported; `--overwrite-existing`
 replaces them, `--dry-run` reports without writing. The GUI has the same flow
 behind the **Import Zed…** button (file picker → confirm dialog with
-overwrite checkbox → apply, then Save Custom as usual).
+overwrite checkbox → apply, then Save To… (Save Custom) as usual).
 
 ### Importing Opencode models
 
@@ -154,7 +155,7 @@ omitted.
 Entries already in the custom file are skipped and reported; `--overwrite-existing`
 replaces them, `--dry-run` reports without writing. The GUI has the same flow
 behind the **Import Opencode…** button (file picker → confirm dialog with
-overwrite checkbox and tier-drop warnings → apply, then Save Custom as usual).
+overwrite checkbox and tier-drop warnings → apply, then Save To… (Save Custom) as usual).
 
 ## The custom overlay
 
@@ -331,14 +332,17 @@ picking a winner.
   --custom              custom_model_metadata.json
 ```
 
-With no arguments nothing is opened. Three buttons load the three files, each
-labelled with what it wants:
+With no arguments nothing is opened. One **Load Data…** button opens a dialog
+for all three input files at once:
 
-| Button | File | Needed |
+| Field | File | Needed |
 |---|---|---|
-| **Load Parameters…** | `model_parameters.json` | required |
-| **Load Pricing…** | `model_pricing.json` | required |
-| **Load Custom…** | `custom_model_metadata.json` | optional |
+| Parameters file | `model_parameters.json` | required |
+| Pricing file | `model_pricing.json` | required |
+| Custom metadata | `custom_model_metadata.json` | optional |
+
+Load is disabled until both required files exist; custom may be left empty to
+start from a clean slate.
 
 The toolbar states which are chosen and which are still missing, in red. Files
 are never auto-discovered: a working directory here routinely holds several
@@ -434,16 +438,27 @@ misleading half-view, not a convenient shortcut.
   - A `sort()` was forced after every load, but `build_rows` already emits models
     in ascending ID order, so it was a second full re-mapping for an identical
     result. Column sorting still works when a header is clicked.
-- **Merge**, **Save Output**, and **Save Custom** stay disabled until there is
+- **Merge & Preview** and **Save To…** stay disabled until there is
   actually data, not merely until paths have been chosen. A cancelled load
   leaves both paths set and nothing loaded, and must not leave Merge clickable.
-- Merging writes nowhere until you choose an output directory, and the written
-  files are re-read and verified before the status bar reports success.
-- **Save Output…** asks before replacing or numbering — see
-  [Output names that are already taken](#output-names-that-are-already-taken).
-  The dialog shows what would be lost, and **Cancel** is the default button. It
-  also refuses, outright, to write over the file this session was loaded from,
-  which the CLI needs `--force` for and the GUI offers no way to bypass.
+- Pressing **Save To…** counts as having seen the preview: if no merge has run
+  yet, one runs first and the dialog opens when it finishes, so the per-path
+  counts are always merged numbers. The dialog prefills three output paths in
+  the workdir — `model-parameters.json`, `model-pricing.json`,
+  `custom-metadata.json` (dash form, deliberately not the canonical underscore
+  names Bifrost reads) — each with its model/entry count underneath. All three
+  are optional but must end in `.json`; with every path empty only Cancel
+  works. **Save Output** writes the filled merged file(s) — either one alone
+  is fine — and **Save Custom** writes just the overlay. Both are sorted and
+  beautified (`indent=2`, `sort_keys=True`).
+- An existing target opens a conflict dialog showing new-vs-old model counts
+  (plus size and last-modified for both sides) with **Overwrite**, **Add
+  Number**, and **Cancel**. Numbering is per file, not as a pair, and a file
+  that is not a datasheet shows size and mtime only. Like the CLI's
+  `--overwrite`, this still refuses, outright, to write over a file this
+  session was loaded from (saving the custom overlay back to its own loaded
+  path is the one exempt round-trip).
+  The dialog shows what would be lost, and **Cancel** is the default button.
 
 ## Tests
 

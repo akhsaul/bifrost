@@ -33,20 +33,24 @@ the two apart.
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
     QGroupBox,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
-    QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
@@ -58,11 +62,23 @@ from PySide6.QtWidgets import (
 from ..fields import KNOWN_MODES
 from ..fieldinfo import DescriptorInfo, FieldInfo, ParameterCatalog
 from ..merge import PARAMS_FIELD, check_field_placement
-from ..output import ADD_NUMBER, OVERWRITE, OutputConflict
+from ..output import ADD_NUMBER, MAX_NUMBERED_SUFFIX, OVERWRITE, OutputConflict, numbered_name
 
 #: Which kind of thing the field dialog is writing.
 TARGET_FIELD = "field"
 TARGET_DESCRIPTOR = "descriptor"
+
+#: Default output filenames prefilling the Save To dialog (dash form, written
+#: into the current workdir). Deliberately distinct from the canonical
+#: underscore names the CLI and Bifrost read, so a default save never silently
+#: poses as a canonical datasheet.
+DEFAULT_PARAMETERS_OUTPUT = "model-parameters.json"
+DEFAULT_PRICING_OUTPUT = "model-pricing.json"
+DEFAULT_CUSTOM_OUTPUT = "custom-metadata.json"
+
+#: Which save button closed the Save To dialog.
+SAVE_ACTION_OUTPUT = "output"
+SAVE_ACTION_CUSTOM = "custom"
 
 
 class OutputConflictDialog(QDialog):
@@ -198,7 +214,7 @@ class ZedImportDialog(QDialog):
         note = QLabel(
             "New entries are appended as zed/<id>. Existing ones are left "
             "untouched unless overwrite is ticked. Nothing is written until "
-            "you press Import, and Save Custom is still needed afterwards."
+            "you press Import, and Save To… (Save Custom) is still needed afterwards."
         )
         note.setWordWrap(True)
         note.setStyleSheet("color:#475569;")
@@ -284,8 +300,8 @@ class OpencodeImportDialog(QDialog):
         note = QLabel(
             "New entries are appended as opencode-zen/<id> or opencode-go/<id>. "
             "Existing ones are left untouched unless overwrite is ticked. Nothing "
-            "is written until you press Import, and Save Custom is still needed "
-            "afterwards."
+            "is written until you press Import, and Save To… (Save Custom) is "
+            "still needed afterwards."
         )
         note.setWordWrap(True)
         note.setStyleSheet("color:#475569;")
@@ -358,6 +374,566 @@ def ask_output_policy(
         policy = dialog.policy()
         assert policy is not None  # accept() only runs through the two handlers
         return policy, plan_output(output_dir, **{policy: True})
+
+
+# --------------------------------------------------------------------------- #
+# Load Data / Save To
+# --------------------------------------------------------------------------- #
+
+
+def _is_json_path(text: str) -> bool:
+    """A filled path must name a ``.json`` file (case-insensitive)."""
+    return text.strip().lower().endswith(".json")
+
+
+def _format_size(num_bytes: int) -> str:
+    if num_bytes >= 1024 * 1024:
+        return f"{num_bytes / (1024 * 1024):.1f} MB"
+    return f"{num_bytes:,} B"
+
+
+def _format_mtime(timestamp: float) -> str:
+    from datetime import datetime
+
+    return f"{datetime.fromtimestamp(timestamp):%Y-%m-%d %H:%M}"
+
+
+def _inspect_datasheet_file(path: Path) -> tuple[bool, int | None]:
+    """``(is_datasheet, model_count)`` for an existing file.
+
+    A datasheet here is a JSON object whose values are all objects (the
+    parameters/pricing files and the custom overlay all share that shape).
+    Anything else -- a list, a scalar, an object with scalar values, or
+    unparseable content -- is reported as not-a-datasheet with no count, and
+    the caller shows size + mtime only.
+    """
+    try:
+        with path.open(encoding="utf-8") as fh:
+            raw = json.load(fh)
+    except (OSError, ValueError):
+        return False, None
+    if not isinstance(raw, dict):
+        return False, None
+    if all(isinstance(value, dict) for value in raw.values()):
+        return True, len(raw)
+    return False, None
+
+
+def first_free_path(path: str | Path) -> Path:
+    """Numbered sibling of *path* that does not exist yet, per file.
+
+    Unlike :func:`output.plan_output` -- which numbers the parameters/pricing
+    pair together -- each Save To target is numbered on its own: a conflicting
+    ``model-pricing.json`` becomes ``model-pricing_1.json`` while a
+    non-conflicting sibling keeps its chosen name.
+    """
+    target = Path(path)
+    if not target.exists():
+        return target
+    for number in range(1, MAX_NUMBERED_SUFFIX + 1):
+        candidate = target.parent / numbered_name(target.name, number)
+        if not candidate.exists():
+            return candidate
+    raise ValueError(f"no free numbered name beside {target}")
+
+
+@dataclass
+class ConflictItem:
+    """One existing file a save is about to replace, for the conflict dialog."""
+
+    role: str
+    path: Path
+    new_count: int | None
+    old_count: int | None
+    old_is_datasheet: bool
+    size: int | None
+    mtime: float | None
+
+
+def build_conflict_item(role: str, path: str | Path, new_count: int | None) -> ConflictItem:
+    """Describe an existing *path* next to the *new_count* about to replace it."""
+    target = Path(path)
+    size: int | None = None
+    mtime: float | None = None
+    try:
+        stat = target.stat()
+        size, mtime = stat.st_size, stat.st_mtime
+    except OSError:
+        pass
+    old_is_datasheet, old_count = _inspect_datasheet_file(target)
+    return ConflictItem(
+        role=role,
+        path=target,
+        new_count=new_count,
+        old_count=old_count,
+        old_is_datasheet=old_is_datasheet,
+        size=size,
+        mtime=mtime,
+    )
+
+
+def _conflict_line(item: ConflictItem) -> str:
+    """Two-line new-vs-old summary for one conflicting file."""
+    new_part = (
+        f"{item.new_count:,} model(s)" if item.new_count is not None
+        else "unknown size"
+    )
+    if item.old_is_datasheet:
+        old_part = f"{item.old_count:,} model(s)"
+    else:
+        old_part = "not a datasheet file"
+    meta = ""
+    if item.size is not None and item.mtime is not None:
+        meta = f" · {_format_size(item.size)}, modified {_format_mtime(item.mtime)}"
+    elif item.size is not None:
+        meta = f" · {_format_size(item.size)}"
+    return (
+        f"{item.path.name}\n"
+        f"    New:  {new_part} · will be written now\n"
+        f"    Old:  {old_part}{meta}"
+    )
+
+
+class _PathRow(QWidget):
+    """A labelled path input: line edit plus Browse, with a count line below."""
+
+    def __init__(
+        self,
+        label: str,
+        initial: str,
+        browse_title: str,
+        count_text: str,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+
+        form = QFormLayout()
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        self.edit = QLineEdit()
+        self.edit.setText(initial)
+        self.edit.setMinimumWidth(320)
+        browse = QPushButton("Browse…")
+        browse.clicked.connect(lambda: self._browse(browse_title))
+        row_layout.addWidget(self.edit, 1)
+        row_layout.addWidget(browse)
+        form.addRow(label, row)
+        layout.addLayout(form)
+
+        self.count_label = QLabel(count_text)
+        self.count_label.setStyleSheet("color:#475569;")
+        self.count_label.setWordWrap(True)
+        layout.addWidget(self.count_label)
+
+        self.extra_button: QPushButton | None = None
+
+    def _browse(self, title: str) -> None:
+        start = self.edit.text().strip() or str(Path.cwd())
+        chosen, _ = QFileDialog.getSaveFileName(
+            self, title, start, "JSON files (*.json)"
+        )
+        if chosen:
+            self.edit.setText(chosen)
+
+    def set_extra_button(self, text: str, tooltip: str, on_click: Any) -> QPushButton:
+        """Append a small button (e.g. Clear) under the row; only one is kept."""
+        button = QPushButton(text)
+        button.setToolTip(tooltip)
+        button.clicked.connect(on_click)
+        self.extra_button = button
+        layout = self.layout()
+        assert layout is not None
+        layout.addWidget(button, 0, Qt.AlignLeft)  # type: ignore[attr-defined]
+        return button
+
+
+class LoadDataDialog(QDialog):
+    """Choose the three input files in one place.
+
+    Parameters and pricing are required -- the editor lists both side by side
+    and reports where they disagree, so one file alone would be a misleading
+    half-view. Custom metadata is optional; leave it empty to start clean.
+    """
+
+    def __init__(
+        self,
+        *,
+        parameters: str = "",
+        pricing: str = "",
+        custom: str = "",
+        browse_dir: str = "",
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Load Data")
+        self.setMinimumWidth(600)
+        self._browse_dir = browse_dir or str(Path.cwd())
+
+        layout = QVBoxLayout(self)
+        intro = QLabel(
+            "Choose the datasheets to edit. Parameters holds the capability "
+            "metadata and parameter forms, pricing holds the cost fields and is "
+            "what Bifrost's GetCapabilityEntry reads -- both are needed before "
+            "anything can display."
+        )
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+
+        self.params_row = _PathRow(
+            "Parameters file (required)", parameters, "Select model_parameters file",
+            "Capability metadata and the model_parameters form descriptors.",
+        )
+        self.pricing_row = _PathRow(
+            "Pricing file (required)", pricing, "Select model_pricing file",
+            "Cost fields, also read by Bifrost's capability lookup.",
+        )
+        self.custom_row = _PathRow(
+            "Custom metadata (optional)", custom, "Select custom metadata file",
+            "Your overlay of edits. Leave empty to start from a clean slate.",
+        )
+        for row in (self.params_row, self.pricing_row, self.custom_row):
+            # Rebind the browse buttons to the *open* dialog: _PathRow browses
+            # with a save dialog by default, which would suggest creating files.
+            for button in row.findChildren(QPushButton):
+                if button.text() == "Browse…":
+                    button.clicked.disconnect()
+                    button.clicked.connect(
+                        lambda _=False, r=row: self._browse_open(r)
+                    )
+            layout.addWidget(row)
+        self.custom_row.set_extra_button(
+            "Clear", "Leave the custom overlay empty",
+            lambda: self.custom_edit.setText(""),
+        )
+
+        self.error_label = QLabel("")
+        self.error_label.setWordWrap(True)
+        self.error_label.setStyleSheet("color:#b91c1c;")
+        layout.addWidget(self.error_label)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Ok).setText("&Load")
+        buttons.accepted.connect(self._accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        self._buttons = buttons
+
+        for row in (self.params_row, self.pricing_row, self.custom_row):
+            row.edit.textChanged.connect(lambda _=None: self._validate())
+        self._validate()
+
+    @property
+    def params_edit(self) -> QLineEdit:
+        return self.params_row.edit
+
+    @property
+    def pricing_edit(self) -> QLineEdit:
+        return self.pricing_row.edit
+
+    @property
+    def custom_edit(self) -> QLineEdit:
+        return self.custom_row.edit
+
+    def _browse_open(self, row: _PathRow) -> None:
+        start = row.edit.text().strip() or self._browse_dir
+        chosen, _ = QFileDialog.getOpenFileName(
+            self, "Select JSON file", start, "JSON files (*.json)"
+        )
+        if chosen:
+            row.edit.setText(chosen)
+
+    def _validate(self) -> None:
+        params = self.params_edit.text().strip()
+        pricing = self.pricing_edit.text().strip()
+        custom = self.custom_edit.text().strip()
+        error = ""
+        if not params:
+            error = "A parameters file is required."
+        elif not Path(params).exists():
+            error = f"Parameters file not found: {params}"
+        elif not pricing:
+            error = "A pricing file is required."
+        elif not Path(pricing).exists():
+            error = f"Pricing file not found: {pricing}"
+        elif custom and not Path(custom).exists():
+            error = f"Custom file not found: {custom}"
+        self.error_label.setText(error)
+        ok = self._buttons.button(QDialogButtonBox.Ok)
+        if ok is not None:
+            ok.setEnabled(not error)
+
+    def _accept(self) -> None:
+        self._validate()
+        if self.error_label.text():
+            return
+        super().accept()
+
+    def values(self) -> dict[str, Path | None]:
+        """``{"parameters": ..., "pricing": ..., "custom": ...}`` (custom None when empty)."""
+        custom = self.custom_edit.text().strip()
+        return {
+            "parameters": Path(self.params_edit.text().strip()),
+            "pricing": Path(self.pricing_edit.text().strip()),
+            "custom": Path(custom) if custom else None,
+        }
+
+
+class SaveToDialog(QDialog):
+    """Choose where the merged files and the custom overlay go.
+
+    All three paths are optional and must name ``.json`` files, but at least
+    one must be filled -- otherwise both save buttons stay disabled and only
+    Cancel works. The counts below each path say how much data would be
+    written: merged models for parameters/pricing, overlay entries for custom.
+    """
+
+    def __init__(
+        self,
+        *,
+        parameters_path: str = "",
+        pricing_path: str = "",
+        custom_path: str = "",
+        parameters_count: int = 0,
+        pricing_count: int = 0,
+        custom_count: int = 0,
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Save To")
+        self.setMinimumWidth(620)
+        self._action: str | None = None
+
+        layout = QVBoxLayout(self)
+        intro = QLabel(
+            "Name each file freely, but keep the .json extension. "
+            "Only filled paths are written -- Save Output writes the merged "
+            "parameters/pricing files, Save Custom writes just your overlay. "
+            "Both are sorted and beautified."
+        )
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+
+        self.params_row = _PathRow(
+            "Parameters output (optional)", parameters_path,
+            "Save merged parameters as",
+            f"{parameters_count:,} models will be written",
+        )
+        self.pricing_row = _PathRow(
+            "Pricing output (optional)", pricing_path,
+            "Save merged pricing as",
+            f"{pricing_count:,} models will be written",
+        )
+        self.custom_row = _PathRow(
+            "Custom overlay output (optional)", custom_path,
+            "Save custom overlay as",
+            f"{custom_count:,} custom entries will be written",
+        )
+        layout.addWidget(self.params_row)
+        layout.addWidget(self.pricing_row)
+        layout.addWidget(self.custom_row)
+
+        self.error_label = QLabel("")
+        self.error_label.setWordWrap(True)
+        self.error_label.setStyleSheet("color:#b91c1c;")
+        layout.addWidget(self.error_label)
+
+        buttons = QDialogButtonBox()
+        self.btn_save_output = QPushButton("Save &Output")
+        self.btn_save_output.setToolTip("Write the filled merged file(s), sorted and beautified")
+        self.btn_save_custom = QPushButton("Save &Custom")
+        self.btn_save_custom.setToolTip("Write the custom overlay only, sorted and beautified")
+        cancel = buttons.addButton(QDialogButtonBox.Cancel)
+        buttons.addButton(self.btn_save_output, QDialogButtonBox.AcceptRole)
+        buttons.addButton(self.btn_save_custom, QDialogButtonBox.AcceptRole)
+        self.btn_save_output.clicked.connect(self._accept_output)
+        self.btn_save_custom.clicked.connect(self._accept_custom)
+        cancel.clicked.connect(self.reject)
+        # Cancel is the default so a stray Return cannot start a write.
+        cancel.setDefault(True)
+        layout.addWidget(buttons)
+        self._buttons = buttons
+
+        for row in (self.params_row, self.pricing_row, self.custom_row):
+            row.edit.textChanged.connect(lambda _=None: self._validate())
+        self._validate()
+
+    @property
+    def params_edit(self) -> QLineEdit:
+        return self.params_row.edit
+
+    @property
+    def pricing_edit(self) -> QLineEdit:
+        return self.pricing_row.edit
+
+    @property
+    def custom_edit(self) -> QLineEdit:
+        return self.custom_row.edit
+
+    def _validate(self) -> None:
+        params = self.params_edit.text().strip()
+        pricing = self.pricing_edit.text().strip()
+        custom = self.custom_edit.text().strip()
+        error = ""
+        for label, value in (
+            ("Parameters output", params),
+            ("Pricing output", pricing),
+            ("Custom output", custom),
+        ):
+            if value and not _is_json_path(value):
+                error = f"{label} must be a .json file: {value}"
+                break
+        if not error and not (params or pricing or custom):
+            error = "Fill at least one output path, or Cancel."
+        self.error_label.setText(error)
+        has_error = bool(error)
+        self.btn_save_output.setEnabled(
+            not has_error and bool(params or pricing)
+        )
+        self.btn_save_custom.setEnabled(not has_error and bool(custom))
+
+    def _accept_output(self) -> None:
+        self._validate()
+        if self.error_label.text() or not (
+            self.params_edit.text().strip() or self.pricing_edit.text().strip()
+        ):
+            return
+        self._action = SAVE_ACTION_OUTPUT
+        self.accept()
+
+    def _accept_custom(self) -> None:
+        self._validate()
+        if self.error_label.text() or not self.custom_edit.text().strip():
+            return
+        self._action = SAVE_ACTION_CUSTOM
+        self.accept()
+
+    def action(self) -> str | None:
+        """``SAVE_ACTION_OUTPUT``, ``SAVE_ACTION_CUSTOM``, or None if cancelled."""
+        return self._action
+
+    def values(self) -> dict[str, Path | None]:
+        """``{"parameters": ..., "pricing": ..., "custom": ...}`` (None when empty)."""
+        out: dict[str, Path | None] = {}
+        for key, edit in (
+            ("parameters", self.params_edit),
+            ("pricing", self.pricing_edit),
+            ("custom", self.custom_edit),
+        ):
+            text = edit.text().strip()
+            out[key] = Path(text) if text else None
+        return out
+
+
+class SaveConflictDialog(QDialog):
+    """Confirm replacing existing files, per file, with new-vs-old evidence.
+
+    Each conflicting file shows what would be written (new model count) next
+    to what is there now (old model count when the file is a datasheet, plus
+    size and last-modified in both cases). A file that is not a datasheet --
+    any JSON that is not an object of objects -- shows size and mtime only, so
+    an unrelated ``notes.json`` is never mistaken for model data.
+
+    Three answers: overwrite the files in place, keep them and write numbered
+    siblings beside them (per file, not as a pair), or cancel and write
+    nothing. Cancel is the default.
+    """
+
+    def __init__(self, items: list[ConflictItem], parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Files already exist")
+        self.setModal(True)
+        self.setMinimumWidth(560)
+        self._policy: str | None = None
+        self._items = list(items)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+
+        plural = len(items) > 1
+        headline = QLabel(
+            f"{'These files' if plural else 'This file'} already "
+            f"{'exist' if plural else 'exists'} -- what should happen to "
+            f"{'them' if plural else 'it'}?"
+        )
+        headline.setWordWrap(True)
+        layout.addWidget(headline)
+
+        listing = QGroupBox()
+        listing_layout = QVBoxLayout(listing)
+        detail = QPlainTextEdit()
+        detail.setReadOnly(True)
+        detail.setMaximumHeight(240)
+        detail.setPlainText("\n\n".join(_conflict_line(item) for item in items))
+        detail.setStyleSheet("font-family: monospace;")
+        listing_layout.addWidget(detail)
+        try:
+            numbered = ", ".join(
+                first_free_path(item.path).name for item in items
+            )
+            keep = QLabel(f"  keeping them writes:  {numbered}")
+            keep.setStyleSheet("color:#475569; font-family: monospace;")
+            keep.setWordWrap(True)
+            listing_layout.addWidget(keep)
+        except ValueError:
+            pass
+        layout.addWidget(listing)
+
+        note = QLabel(
+            "Numbering applies per file: only the conflicting names move, "
+            "the rest keep the names you chose."
+        )
+        note.setWordWrap(True)
+        note.setStyleSheet("color:#475569;")
+        layout.addWidget(note)
+
+        buttons = QDialogButtonBox()
+        self.btn_overwrite = QPushButton("&Overwrite")
+        self.btn_overwrite.setToolTip("Replace the existing file(s) with what would be written")
+        self.btn_add_number = QPushButton("Add &Number")
+        self.btn_add_number.setToolTip("Keep the existing file(s) and write numbered ones beside them")
+        cancel = buttons.addButton(QDialogButtonBox.Cancel)
+        buttons.addButton(self.btn_overwrite, QDialogButtonBox.AcceptRole)
+        buttons.addButton(self.btn_add_number, QDialogButtonBox.AcceptRole)
+        self.btn_overwrite.clicked.connect(self.accept_overwrite)
+        self.btn_add_number.clicked.connect(self.accept_add_number)
+        cancel.clicked.connect(self.reject)
+        cancel.setDefault(True)
+        layout.addWidget(buttons)
+
+    def policy(self) -> str | None:
+        """``OVERWRITE``, ``ADD_NUMBER``, or None if the user backed out."""
+        return self._policy
+
+    def accept_overwrite(self) -> None:  # noqa: N802
+        self._policy = OVERWRITE
+        self.accept()
+
+    def accept_add_number(self) -> None:  # noqa: N802
+        self._policy = ADD_NUMBER
+        self.accept()
+
+    def resolved_paths(self, targets: dict[str, Path]) -> dict[str, Path]:
+        """Targets with conflicts moved to their numbered siblings.
+
+        Only meaningful after :meth:`accept_add_number`; anything else returns
+        the targets unchanged.
+        """
+        if self._policy != ADD_NUMBER:
+            return dict(targets)
+        conflicted = {item.path.resolve() if item.path.exists() else item.path
+                      for item in self._items}
+        resolved: dict[str, Path] = {}
+        for role, target in targets.items():
+            try:
+                key = target.resolve() if target.exists() else target
+            except OSError:
+                key = target
+            resolved[role] = first_free_path(target) if key in conflicted else target
+        return resolved
 
 
 class AddModelDialog(QDialog):
@@ -554,7 +1130,6 @@ def _caption(text: str) -> QLabel:
 
 
 # Qt enum aliases, resolved once so the module reads without dotted names.
-from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtWidgets import QFrame  # noqa: E402
 
 _ITEM_CHECKABLE = Qt.ItemFlag.ItemIsUserCheckable

@@ -424,7 +424,7 @@ def test_window_import_applies_to_overlay(gui_app, monkeypatch, tmp_path):
     assert "zed/gpt-5-nano" in window.overlay
     assert window.overlay["zed/gpt-5-nano"]["parameters"]["supports_reasoning"] is False
     assert window.dirty is True
-    assert "Save Custom" in window.status_label.text()
+    assert "Save To" in window.status_label.text()
 
 
 def test_window_import_cancel_leaves_overlay_untouched(gui_app, monkeypatch, tmp_path):
