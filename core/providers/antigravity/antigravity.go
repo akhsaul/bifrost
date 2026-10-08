@@ -281,7 +281,6 @@ func (provider *AntigravityProvider) ChatCompletion(
 	request *schemas.BifrostChatRequest,
 ) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
 	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
-	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	accessToken, projectID, authErr := GetAccessTokenAndProject(ctx, provider.client, key, provider.networkConfig.BaseURL, provider.logger)
 	if authErr != nil {
 		return nil, authErr
@@ -347,7 +346,6 @@ func (provider *AntigravityProvider) ChatCompletionStream(
 	key schemas.Key,
 	request *schemas.BifrostChatRequest,
 ) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
-	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	accessToken, projectID, authErr := GetAccessTokenAndProject(ctx, provider.client, key, provider.networkConfig.BaseURL, provider.logger)
 	if authErr != nil {
@@ -419,7 +417,6 @@ func (provider *AntigravityProvider) Responses(
 	request *schemas.BifrostResponsesRequest,
 ) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
 	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
-	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	accessToken, projectID, authErr := GetAccessTokenAndProject(ctx, provider.client, key, provider.networkConfig.BaseURL, provider.logger)
 	if authErr != nil {
 		return nil, authErr
@@ -488,7 +485,6 @@ func (provider *AntigravityProvider) ResponsesStream(
 	key schemas.Key,
 	request *schemas.BifrostResponsesRequest,
 ) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
-	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	ctx.SetValue(schemas.BifrostContextKeyIsResponsesToChatCompletionFallback, true)
 

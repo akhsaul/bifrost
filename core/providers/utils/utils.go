@@ -458,6 +458,9 @@ func makeRequestWithDoFunc(ctx context.Context, do func() error) (time.Duration,
 // compressRequestIfNeeded compresses the request body if the provider opted in via context.
 func compressRequestIfNeeded(ctx context.Context, req *fasthttp.Request) {
 	if useGzip, _ := ctx.Value(schemas.BifrostContextKeyUseCompressGzip).(bool); useGzip {
+		if bytes.Equal(req.Header.Peek("Content-Encoding"), []byte("gzip")) {
+			return
+		}
 		body := req.Body()
 		if len(body) > 0 {
 			var b bytes.Buffer

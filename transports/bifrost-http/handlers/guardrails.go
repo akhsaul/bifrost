@@ -13,11 +13,12 @@ import (
 )
 
 type GuardrailsHandler struct {
-	config *lib.Config
+	config        *lib.Config
+	pluginsLoader PluginsLoader
 }
 
-func NewGuardrailsHandler(config *lib.Config) *GuardrailsHandler {
-	return &GuardrailsHandler{config: config}
+func NewGuardrailsHandler(config *lib.Config, pluginsLoader PluginsLoader) *GuardrailsHandler {
+	return &GuardrailsHandler{config: config, pluginsLoader: pluginsLoader}
 }
 
 func (h *GuardrailsHandler) RegisterRoutes(r *router.Router, middlewares ...schemas.BifrostHTTPMiddleware) {
@@ -67,12 +68,18 @@ func (h *GuardrailsHandler) updateGuardrailsConfig(ctx *fasthttp.RequestCtx) {
 	h.config.GuardrailsConfig = &newConfig
 	h.config.Mu.Unlock()
 
-	// Trigger dynamic plugin reload
-	plugin, err := guardrails.Init(&newConfig, logger)
-	if err != nil {
-		logger.Error("failed to init guardrails plugin after config update: %v", err)
+	// Trigger dynamic plugin reload across HTTP transport and Bifrost core
+	if h.pluginsLoader != nil {
+		if err := h.pluginsLoader.ReloadPlugin(ctx, guardrails.PluginName, nil, &newConfig, nil, nil); err != nil {
+			logger.Error("failed to reload guardrails plugin: %v", err)
+		}
 	} else {
-		h.config.ReloadPlugin(plugin)
+		plugin, err := guardrails.Init(&newConfig, logger)
+		if err != nil {
+			logger.Error("failed to init guardrails plugin after config update: %v", err)
+		} else {
+			h.config.ReloadPlugin(plugin)
+		}
 	}
 
 	SendJSON(ctx, map[string]bool{"success": true})

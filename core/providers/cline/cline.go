@@ -114,7 +114,6 @@ func (provider *ClineProvider) doChatCompletion(ctx *schemas.BifrostContext, aut
 // ChatCompletion performs a chat completion request to the Cline API.
 func (provider *ClineProvider) ChatCompletion(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostChatRequest) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
 	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
-	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	authValue, isOAuth, bErr := provider.resolveAuth(ctx, key)
 	if bErr != nil {
 		return nil, bErr
@@ -161,7 +160,6 @@ func (provider *ClineProvider) doChatCompletionStream(ctx *schemas.BifrostContex
 // Cline streams standard OpenAI SSE, so no response handler is needed.
 func (provider *ClineProvider) ChatCompletionStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostChatRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
 	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
-	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	authValue, isOAuth, bErr := provider.resolveAuth(ctx, key)
 	if bErr != nil {
 		return nil, bErr
@@ -182,7 +180,6 @@ func (provider *ClineProvider) ChatCompletionStream(ctx *schemas.BifrostContext,
 // is the only shape that works.
 func (provider *ClineProvider) Responses(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostResponsesRequest) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
 	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
-	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	chatResponse, err := provider.ChatCompletion(ctx, key, request.ToChatRequest())
 	if err != nil {
 		return nil, err
@@ -192,7 +189,6 @@ func (provider *ClineProvider) Responses(ctx *schemas.BifrostContext, key schema
 
 // ResponsesStream performs a streaming responses request by converting through chat completions.
 func (provider *ClineProvider) ResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostResponsesRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
-	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	ctx.SetValue(schemas.BifrostContextKeyIsResponsesToChatCompletionFallback, true)
 	return provider.ChatCompletionStream(

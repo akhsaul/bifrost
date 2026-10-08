@@ -108,7 +108,6 @@ func (p *baiProvider) TextCompletionStream(ctx *schemas.BifrostContext, postHook
 // ChatCompletion performs a chat completion request to the B.ai API.
 func (p *baiProvider) ChatCompletion(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostChatRequest) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
 	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
-	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	return openai.HandleOpenAIChatCompletionRequest(
 		ctx,
 		p.client,
@@ -128,7 +127,6 @@ func (p *baiProvider) ChatCompletion(ctx *schemas.BifrostContext, key schemas.Ke
 
 // ChatCompletionStream performs a streaming chat completion request to the B.ai API.
 func (p *baiProvider) ChatCompletionStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostChatRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
-	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	return openai.HandleOpenAIChatCompletionStreaming(
 		ctx,
@@ -156,7 +154,6 @@ func (p *baiProvider) ChatCompletionStream(ctx *schemas.BifrostContext, postHook
 // Responses performs a responses request to the B.ai API.
 func (p *baiProvider) Responses(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostResponsesRequest) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
 	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
-	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	return openai.HandleOpenAIResponsesRequest(
 		ctx,
 		p.client,
@@ -176,7 +173,6 @@ func (p *baiProvider) Responses(ctx *schemas.BifrostContext, key schemas.Key, re
 
 // ResponsesStream performs a streaming responses request to the B.ai API.
 func (p *baiProvider) ResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostResponsesRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
-	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	return openai.HandleOpenAIResponsesStreaming(
 		ctx,

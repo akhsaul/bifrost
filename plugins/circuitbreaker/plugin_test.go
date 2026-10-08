@@ -12,7 +12,6 @@ import (
 
 func TestCircuitBreaker_BasicTripAndFilter(t *testing.T) {
 	config := Config{
-		Enabled:         true,
 		DefaultCooldown: schemas.Duration(5 * time.Hour),
 	}
 	plugin, err := New(config, nil)
@@ -66,7 +65,6 @@ func TestCircuitBreaker_BasicTripAndFilter(t *testing.T) {
 
 func TestCircuitBreaker_DynamicCooldownParsing(t *testing.T) {
 	config := Config{
-		Enabled:         true,
 		DefaultCooldown: schemas.Duration(5 * time.Hour),
 	}
 	plugin, err := New(config, nil)
@@ -105,7 +103,6 @@ func TestCircuitBreaker_DynamicCooldownParsing(t *testing.T) {
 
 func TestCircuitBreaker_StaticKeyModelConfig(t *testing.T) {
 	config := Config{
-		Enabled:         true,
 		DefaultCooldown: schemas.Duration(5 * time.Hour),
 		KeyConfigs: []KeyModelConfig{
 			{
@@ -177,7 +174,6 @@ func TestCircuitBreaker_ISOAndRawSecondsParsing(t *testing.T) {
 
 func TestCircuitBreaker_CustomPatternAndManualReset(t *testing.T) {
 	config := Config{
-		Enabled:         true,
 		DefaultCooldown: schemas.Duration(5 * time.Hour),
 		ErrorPatterns:   []string{`custom_subscription_exhausted`},
 	}
@@ -234,7 +230,6 @@ func (m *mockQuotaProvider) GetModelsQuota(_ *schemas.BifrostContext, key schema
 
 func TestCircuitBreaker_SyncQuota(t *testing.T) {
 	config := Config{
-		Enabled:         true,
 		DefaultCooldown: schemas.Duration(5 * time.Hour),
 	}
 	plugin, err := New(config, nil)

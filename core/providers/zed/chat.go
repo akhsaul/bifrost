@@ -13,8 +13,6 @@ import (
 // ChatCompletion performs a chat completion request to Zed's /completions.
 // Zed only streams, so the NDJSON stream is accumulated into one response.
 func (provider *ZedProvider) ChatCompletion(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostChatRequest) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
-	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
-	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	if request == nil {
 		return nil, providerUtils.NewBifrostOperationError("chat completion request is nil", nil)
 	}
@@ -71,8 +69,6 @@ func (provider *ZedProvider) buildChatEnvelope(ctx *schemas.BifrostContext, key 
 // /completions. Each NDJSON event converts through the inner family's
 // streaming converter and is forwarded as a Bifrost chat chunk.
 func (provider *ZedProvider) ChatCompletionStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostChatRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
-	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
-	ctx.SetValue(schemas.BifrostContextKeyUseCompressGzip, true)
 	if request == nil {
 		return nil, providerUtils.NewBifrostOperationError("chat completion stream request is nil", nil)
 	}
