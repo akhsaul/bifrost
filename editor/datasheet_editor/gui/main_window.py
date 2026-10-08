@@ -47,7 +47,8 @@ from ..merge import (
 )
 from ..validate import validate_overlay
 from ..zed_import import apply_import, import_zed_models
-from .adddialogs import AddFieldDialog, AddModelDialog, ZedImportDialog, ask_output_policy
+from ..opencode_import import apply_opencode_import, import_opencode_models
+from .adddialogs import AddFieldDialog, AddModelDialog, OpencodeImportDialog, ZedImportDialog, ask_output_policy
 from .fieldeditor import FieldRow
 from .models import (
     ChangeListModel,
@@ -194,6 +195,14 @@ class MainWindow(QMainWindow):
         self.btn_import_zed.clicked.connect(self._on_import_zed)
         bar.addWidget(self.btn_import_zed)
 
+        self.btn_import_opencode = QPushButton("Import Opencode…")
+        self.btn_import_opencode.setToolTip(
+            "Convert an Opencode catalog file into opencode-zen/<id> and "
+            "opencode-go/<id> overlay entries"
+        )
+        self.btn_import_opencode.clicked.connect(self._on_import_opencode)
+        bar.addWidget(self.btn_import_opencode)
+
         self.btn_merge = QPushButton("Merge & Preview")
         self.btn_merge.clicked.connect(self._on_merge)
         self.btn_merge.setEnabled(False)
@@ -270,6 +279,69 @@ class MainWindow(QMainWindow):
             parts.append(f"{overwritten} overwritten")
         self.status_label.setText(
             f"zed import: {', '.join(parts)}. Save Custom to keep it."
+        )
+
+    def _on_import_opencode(self) -> None:
+        """Import an Opencode catalog file into the overlay.
+
+        The file is parsed by the same pure importer the CLI uses, so the two
+        front-ends cannot disagree. Nothing touches the overlay until the
+        confirm dialog is accepted; after that Save Custom is still needed,
+        like every other overlay edit.
+        """
+        chosen, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Opencode models file",
+            self._browse_dir(),
+            "JSON files (*.json)",
+        )
+        if not chosen:
+            return
+        try:
+            with open(chosen, encoding="utf-8") as fh:
+                opencode_data = json.load(fh)
+        except (OSError, json.JSONDecodeError) as exc:
+            QMessageBox.critical(self, "Import failed", f"Could not read {chosen}:\n{exc}")
+            return
+        try:
+            from ..opencode_import import OpencodeImportError
+
+            preview = import_opencode_models(opencode_data, self.overlay)
+        except OpencodeImportError as exc:
+            QMessageBox.critical(self, "Import failed", str(exc))
+            return
+        if not preview.added and not preview.skipped:
+            QMessageBox.information(self, "Import Opencode models", "The file holds no models.")
+            return
+        dialog = OpencodeImportDialog(
+            Path(chosen).name, preview.added, preview.skipped, preview.warnings, self
+        )
+        from PySide6.QtWidgets import QDialog
+
+        if dialog.exec() != QDialog.Accepted:
+            self.status_label.setText("opencode import cancelled — overlay left as it was")
+            return
+        result = import_opencode_models(
+            opencode_data, self.overlay,
+            overwrite_existing=dialog.overwrite_existing(),
+        )
+        apply_opencode_import(
+            self.overlay, result,
+            overwrite_existing=dialog.overwrite_existing(),
+        )
+        self.dirty = True
+        self.btn_save_custom.setEnabled(True)
+        self._refresh_rows()
+        added, overwritten = len(result.added), len(result.overwritten)
+        parts = []
+        if added:
+            parts.append(f"{added} added")
+        if overwritten:
+            parts.append(f"{overwritten} overwritten")
+        if result.warnings:
+            parts.append(f"{len(result.warnings)} tier(s) dropped")
+        self.status_label.setText(
+            f"opencode import: {', '.join(parts)}. Save Custom to keep it."
         )
 
     def _build_filterbar(self) -> QHBoxLayout:
@@ -758,12 +830,14 @@ class MainWindow(QMainWindow):
             self.btn_load_pricing,
             self.btn_load_custom,
             self.btn_import_zed,
+            self.btn_import_opencode,
         ):
             button.setEnabled(not busy)
         has_data = bool(self.model_list.rowCount())
         selected = bool(self._selected_model())
         self.btn_add_model.setEnabled(not busy and has_data)
         self.btn_import_zed.setEnabled(not busy)
+        self.btn_import_opencode.setEnabled(not busy)
         self.btn_add_param_field.setEnabled(not busy and selected)
         self.btn_add_pricing_field.setEnabled(not busy and selected)
         self.btn_merge.setEnabled(not busy and has_data)

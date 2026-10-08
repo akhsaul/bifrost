@@ -30,6 +30,11 @@ from .zed_import import (
     apply_import,
     import_zed_models,
 )
+from .opencode_import import (
+    OpencodeImportError,
+    apply_opencode_import,
+    import_opencode_models,
+)
 from .output import (
     OUTPUT_FILENAMES,
     PARAMETERS_FILENAME,
@@ -380,6 +385,80 @@ def cmd_import_zed(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def _load_opencode_models(path: Path) -> Any:
+    try:
+        with path.open(encoding="utf-8") as fh:
+            return json.load(fh)
+    except json.JSONDecodeError as exc:
+        raise MergeError(f"{path} is not valid JSON: {exc}") from exc
+
+
+def cmd_import_opencode(args: argparse.Namespace) -> int:
+    from .dataset import write_json_atomic as _write_atomic
+
+    opencode_path = Path(args.opencode_models)
+    custom_path = Path(args.custom)
+    try:
+        opencode_data = _load_opencode_models(opencode_path)
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+
+    overlay: dict[str, dict[str, Any]] = {}
+    if custom_path.exists():
+        overlay = _load_overlay(custom_path)
+
+    try:
+        result = import_opencode_models(
+            opencode_data, overlay, overwrite_existing=args.overwrite_existing
+        )
+    except OpencodeImportError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_VALIDATION
+
+    converted = len(result.added) + len(result.overwritten)
+    if converted or result.warnings:
+        _report_opencode_result(result, converted=converted)
+    if not converted:
+        print(f"no changes: all {len(result.skipped)} opencode model(s) already in {custom_path}")
+        return EXIT_OK
+
+    apply_opencode_import(overlay, result, overwrite_existing=args.overwrite_existing)
+
+    if args.dry_run:
+        print(f"\ndry run: would write {custom_path}")
+        return EXIT_OK
+
+    _write_atomic(overlay, custom_path, indent=2)
+    print(f"-> {custom_path}")
+    return EXIT_OK
+
+
+def _report_opencode_result(result: Any, *, converted: int) -> None:
+    for key in result.added:
+        print(f"  + {key}")
+    for key in result.overwritten:
+        print(f"  ~ {key} (overwritten)")
+    if result.skipped:
+        print(f"skipped {len(result.skipped)} existing (re-run with --overwrite-existing to replace):")
+        for key in result.skipped:
+            print(f"    {key}")
+    if result.warnings:
+        print(f"dropped {len(result.warnings)} tier(s) with no datasheet counterpart:")
+        for warning in result.warnings:
+            print(f"    ! {warning}")
+    if converted:
+        from .format import explain
+
+        shown = 0
+        for key in result.added + result.overwritten:
+            pricing = result.entries[key]["pricing"]
+            for name in ("input_cost_per_token", "output_cost_per_token"):
+                if name in pricing and shown < 5:
+                    print(f"  e.g. {key}.{name} = {explain(name, pricing[name])}")
+                    shown += 1
+
+
 def cmd_info(args: argparse.Namespace) -> int:
     from .fields import pricing_read_set
     from .validate import summarize_unknown_pricing_fields
@@ -513,6 +592,25 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_zed.add_argument("--dry-run", action="store_true", help="report without writing")
     p_zed.set_defaults(func=cmd_import_zed)
+
+    p_opencode = sub.add_parser(
+        "import-opencode",
+        help="convert an Opencode catalog file into opencode-zen/<id> and opencode-go/<id> overlay entries",
+    )
+    p_opencode.add_argument(
+        "--opencode-models", required=True,
+        help="path to the Opencode models JSON file ({\"opencode\": {\"models\": {...}}, ...})",
+    )
+    p_opencode.add_argument(
+        "--custom", required=True,
+        help="path to custom_model_metadata.json (created if missing; updated in place)",
+    )
+    p_opencode.add_argument(
+        "--overwrite-existing", action="store_true",
+        help="replace opencode entries already in the custom file; without it they are skipped",
+    )
+    p_opencode.add_argument("--dry-run", action="store_true", help="report without writing")
+    p_opencode.set_defaults(func=cmd_import_opencode)
 
     p_gui = sub.add_parser("gui", help="launch the Qt editor")
     p_gui.add_argument("--original-parameters")

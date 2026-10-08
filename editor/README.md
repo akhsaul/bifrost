@@ -80,6 +80,7 @@ Two details:
 | `validate` | check an overlay; exits `1` on errors |
 | `info` | summarize a datasheet file |
 | `import-zed` | convert a Zed `/models` file into `zed/<id>` overlay entries |
+| `import-opencode` | convert an Opencode catalog file into `opencode-zen/<id>` + `opencode-go/<id>` overlay entries |
 | `gui` | launch the Qt editor |
 
 Useful flags: `--dry-run` (report without writing), `--report <path>` (full
@@ -114,6 +115,46 @@ Entries already in the custom file are skipped and reported; `--overwrite-existi
 replaces them, `--dry-run` reports without writing. The GUI has the same flow
 behind the **Import Zed…** button (file picker → confirm dialog with
 overwrite checkbox → apply, then Save Custom as usual).
+
+### Importing Opencode models
+
+```bash
+.venv/bin/python -m datasheet_editor import-opencode \
+  --opencode-models path/to/opencode-zen-models.json \
+  --custom custom_model_metadata.json
+```
+
+Converts the `opencode` and `opencode-go` slices of an Opencode catalog file
+(`{"opencode": {"models": {...}, "npm": ...}, "opencode-go": {...}, ...}`)
+into `opencode-zen/<id>` and `opencode-go/<id>` overlay entries. The other
+slices in the file are discarded. Every capability value comes from that file
+— nothing is guessed and no base-provider data is mixed in.
+
+The overlay `provider` is the Bifrost provider serving the model (`opencode-zen`
+for the `opencode` slice, `opencode-go` for `opencode-go`), which is what the
+capability lookup matches on. The same id in both slices stays two rows (their
+prices differ), and free-tier models (`*-free`) are filed under the base
+provider like every other row — Bifrost folds the `-free` runtime suffix away
+on lookup.
+
+Per model, the endpoint comes from `provider.npm` (model-level, else the
+slice-level default): `google` → `/v1/models/<id>`, `anthropic` →
+`/v1/messages`, `openai-compatible` → `/v1/chat/completions`, `openai` →
+`/v1/responses`. Unknown npm values are rejected, never guessed. Prices are
+quoted in $/1M tokens upstream and converted to Bifrost's $/token
+(`0.8` → `8e-07`); free-tier zeros are written explicitly. The effort default
+is the smallest level (first in file order, kept verbatim); a `none` level
+sets `supports_none_reasoning_effort` instead of becoming the default.
+`tiers` of context size 200000/272000 map to the matching `..._above_...`
+fields; other tier sizes are dropped with a warning, and `context_over_200k`
+is ignored (it mirrors the 200000 tier). Fields with no datasheet counterpart
+(`description`, `family`, `limit.input`, audio/video/pdf modalities, ...) are
+omitted.
+
+Entries already in the custom file are skipped and reported; `--overwrite-existing`
+replaces them, `--dry-run` reports without writing. The GUI has the same flow
+behind the **Import Opencode…** button (file picker → confirm dialog with
+overwrite checkbox and tier-drop warnings → apply, then Save Custom as usual).
 
 ## The custom overlay
 
@@ -446,13 +487,15 @@ editor/
 │   ├── dataset.py       # load/save, key order, atomic writes
 │   ├── merge.py         # the merge engine (pure, no Qt, no IO)
 │   ├── zed_import.py    # Zed /models → overlay entries (pure, no Qt, no IO)
+│   ├── opencode_import.py  # Opencode catalog → opencode-zen/go entries (pure)
 │   ├── validate.py      # errors, warnings, conflict detection
-│   ├── cli.py           # merge/diff/validate/info/import-zed/gui subcommands
+│   ├── cli.py           # merge/diff/validate/info/import-zed/import-opencode/gui subcommands
 │   └── gui/              # models, workers, typed field editor, add dialogs
 ├── tools/gen_pricing_fields.py
 ├── tools/gen_param_fields.py
 └── tests/
-    └── test_zed_import.py  # importer mapping + CLI + GUI wiring
+    ├── test_zed_import.py  # importer mapping + CLI + GUI wiring
+    └── test_opencode_import.py  # Opencode importer mapping + CLI + GUI wiring
 ```
 
 `merge.py` is deliberately free of Qt and IO so the GUI and CLI cannot drift
