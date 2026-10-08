@@ -63,6 +63,13 @@ func toInnerOpenAIRequest(ctx *schemas.BifrostContext, request *schemas.BifrostR
 	if inner == nil {
 		return nil, providerUtils.NewBifrostOperationError(schemas.ErrRequestBodyConversion, errNilOpenAIRequest)
 	}
+	// Zed's live captures for non-reasoning models (e.g. gpt-5-nano) carry
+	// no "reasoning" key at all (debug/zed-dev/req-*.json). If the caller
+	// supplied no usable effort, drop the object instead of emitting
+	// {"effort":null,"summary":null} or {"effort":"none",...}.
+	if !hasUsableZedReasoningEffort(request) {
+		inner.Reasoning = nil
+	}
 	inner.Model = request.Model
 	inner.Stream = schemas.Ptr(true)
 	if threadID != "" {
@@ -277,6 +284,26 @@ func ensureZedResponsesSystemPrompt(request *schemas.BifrostResponsesRequest) {
 			}},
 		},
 	}}, request.Input...)
+}
+
+// hasUsableZedReasoningEffort reports whether a Responses request carries an
+// explicit reasoning intent worth sending to Zed's inner open_ai family:
+// a non-empty, non-"none" effort, or (Anthropic-style) a bare max_tokens
+// budget the OpenAI converter estimates an effort from. Anything else would
+// serialize as {"effort":null,...} or {"effort":"none",...}, while Zed's own
+// captures omit the key entirely.
+func hasUsableZedReasoningEffort(request *schemas.BifrostResponsesRequest) bool {
+	if request == nil || request.Params == nil || request.Params.Reasoning == nil {
+		return false
+	}
+	reasoning := request.Params.Reasoning
+	if reasoning.Effort != nil && *reasoning.Effort != "" && *reasoning.Effort != schemas.ReasoningEffortNone {
+		return true
+	}
+	if reasoning.Effort == nil && reasoning.MaxTokens != nil {
+		return true
+	}
+	return false
 }
 
 // toGeminiResourceName maps a Bifrost model id to the Gemini resource name

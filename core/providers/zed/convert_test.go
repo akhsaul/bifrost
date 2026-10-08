@@ -463,6 +463,93 @@ func jsonString(t *testing.T, v interface{}) string {
 	return string(raw)
 }
 
+// TestOpenAIInnerOmitsReasoningWithoutEffort pins the live Zed wire shape:
+// captures for non-reasoning models (debug/zed-dev/req-*-gpt-5-nano*.json)
+// carry no "reasoning" key at all. An absent, empty, or "none" effort must
+// omit the key instead of emitting {"effort":null,...} or
+// {"effort":"none",...}; a real effort must survive untouched.
+func TestOpenAIInnerOmitsReasoningWithoutEffort(t *testing.T) {
+	provider := zedTestProvider(t)
+
+	responsesReq := func(model string, reasoning *schemas.ResponsesParametersReasoning) *schemas.BifrostResponsesRequest {
+		return &schemas.BifrostResponsesRequest{
+			Provider: schemas.Zed,
+			Model:    model,
+			Input: []schemas.ResponsesMessage{
+				{
+					Type: schemas.Ptr(schemas.ResponsesMessageTypeMessage),
+					Role: ptrRole(schemas.ResponsesInputMessageRoleUser),
+					Content: &schemas.ResponsesMessageContent{
+						ContentBlocks: []schemas.ResponsesMessageContentBlock{{Type: "input_text", Text: schemas.Ptr("hello")}},
+					},
+				},
+			},
+			Params: &schemas.ResponsesParameters{Reasoning: reasoning},
+		}
+	}
+	innerOf := func(t *testing.T, req *schemas.BifrostResponsesRequest) map[string]interface{} {
+		t.Helper()
+		env := provider.BuildResponsesEnvelopeForTest(testCtx(), req)
+		if env == nil {
+			t.Fatal("nil envelope")
+		}
+		raw, _ := json.Marshal(env.ProviderRequest)
+		var inner map[string]interface{}
+		if err := json.Unmarshal(raw, &inner); err != nil {
+			t.Fatal(err)
+		}
+		return inner
+	}
+
+	for name, req := range map[string]*schemas.BifrostResponsesRequest{
+		"nil reasoning":   responsesReq("gpt-5-nano", nil),
+		"empty reasoning": responsesReq("gpt-5-nano", &schemas.ResponsesParametersReasoning{}),
+		"effort none":     responsesReq("gpt-5-nano", &schemas.ResponsesParametersReasoning{Effort: schemas.Ptr("none")}),
+	} {
+		if _, ok := innerOf(t, req)["reasoning"]; ok {
+			t.Errorf("%s: wire must not carry a reasoning key", name)
+		}
+	}
+
+	// A real effort on a model that accepts it must keep the key with both
+	// fields intact (gpt-5.4 natively accepts xhigh).
+	keep := innerOf(t, responsesReq("gpt-5.4", &schemas.ResponsesParametersReasoning{
+		Effort:  schemas.Ptr("xhigh"),
+		Summary: schemas.Ptr("auto"),
+	}))
+	reasoning, ok := keep["reasoning"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("reasoning = %v, want the key present for effort xhigh", keep["reasoning"])
+	}
+	if reasoning["effort"] != "xhigh" {
+		t.Errorf("reasoning.effort = %v, want xhigh", reasoning["effort"])
+	}
+	if reasoning["summary"] != "auto" {
+		t.Errorf("reasoning.summary = %v, want auto", reasoning["summary"])
+	}
+
+	// The Chat path funnels through the same converter: a chat request with
+	// no reasoning must also omit the key on the open_ai inner wire.
+	chatEnv := provider.BuildEnvelopeForTest(testCtx(), &schemas.BifrostChatRequest{
+		Provider: schemas.Zed,
+		Model:    "gpt-5-nano",
+		Input: []schemas.ChatMessage{
+			{Role: schemas.ChatMessageRoleUser, Content: &schemas.ChatMessageContent{ContentStr: schemas.Ptr("hello")}},
+		},
+	}, zed.ZedInnerOpenAI)
+	if chatEnv == nil {
+		t.Fatal("nil chat envelope")
+	}
+	raw, _ := json.Marshal(chatEnv.ProviderRequest)
+	var chatInner map[string]interface{}
+	if err := json.Unmarshal(raw, &chatInner); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := chatInner["reasoning"]; ok {
+		t.Errorf("chat wire must not carry a reasoning key without effort, got %v", chatInner["reasoning"])
+	}
+}
+
 func ptrRole(r schemas.ResponsesMessageRoleType) *schemas.ResponsesMessageRoleType {
 	return &r
 }
