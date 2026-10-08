@@ -98,6 +98,8 @@ Note for all format AI request:
 - maybe `prompt_id` is a last user message id, it's not verified yet, prompt_id always change every turn and i don't know does the id refer to User-prompt or it can be refer to AI-message or Tool-result or request-id (a request-id is not same as session id).
 - `prompt_cache_key` always has same value like `thread_id`
 - looks like `prompt_cache_key` only available in openai-format AI request
+- if a model has empty array of `supported_effort_levels` then it will be omitted (the AI request doesn't have effort level) even the client send effort level.
+- bifrost has mechanism to convert effort level to `supported_effort_levels`, but in consequence we have to update datasheet model-parameters from bifrost because bifrost always use that datasheet rather data from ListModels (/models).
 
 
 ----
