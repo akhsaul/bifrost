@@ -54,3 +54,9 @@
 - guardrails redaction strategy: mask, hash.
 - guardrails redaction mode: permanent.
 
+
+bifrost do upsert when updating datasheet model-parameters dan model-pricing:
+- if a model is deprecated/deleted on new datasheet then old database still show orphan model.
+- if new datasheet doesn't have `key` and old datasheet has same `key` with their value then bifrost still show `key` with old value (coming from old datasheet).
+- if new datasheet has `key` but the value is nil/null/empty and old datasheet has same `key` with their value then bifrost show an empty value for that `key` (coming from new datasheet).
+

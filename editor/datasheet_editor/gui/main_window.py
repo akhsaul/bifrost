@@ -47,6 +47,7 @@ from ..merge import (
 from ..validate import validate_overlay
 from ..zed_import import apply_import, import_zed_models
 from ..opencode_import import apply_opencode_import, import_opencode_models
+from ..antigravity_import import apply_antigravity_import, import_antigravity_models
 from .adddialogs import (
     AddFieldDialog,
     AddModelDialog,
@@ -55,6 +56,7 @@ from .adddialogs import (
     DEFAULT_PRICING_OUTPUT,
     LoadDataDialog,
     OpencodeImportDialog,
+    AntigravityImportDialog,
     SAVE_ACTION_CUSTOM,
     SAVE_ACTION_OUTPUT,
     SaveConflictDialog,
@@ -211,6 +213,14 @@ class MainWindow(QMainWindow):
         self.btn_import_opencode.clicked.connect(self._on_import_opencode)
         bar.addWidget(self.btn_import_opencode)
 
+        self.btn_import_antigravity = QPushButton("Import Antigravity…")
+        self.btn_import_antigravity.setToolTip(
+            "Convert an Antigravity fetchAvailableModels file into "
+            "antigravity/<id> overlay entries"
+        )
+        self.btn_import_antigravity.clicked.connect(self._on_import_antigravity)
+        bar.addWidget(self.btn_import_antigravity)
+
         self.btn_merge = QPushButton("Merge & Preview")
         self.btn_merge.clicked.connect(self._on_merge)
         self.btn_merge.setEnabled(False)
@@ -347,6 +357,68 @@ class MainWindow(QMainWindow):
             parts.append(f"{len(result.warnings)} tier(s) dropped")
         self.status_label.setText(
             f"opencode import: {', '.join(parts)}. Save To… (Save Custom) to keep it."
+        )
+
+    def _on_import_antigravity(self) -> None:
+        """Import an Antigravity fetchAvailableModels file into the overlay.
+
+        The file is parsed by the same pure importer the CLI uses, so the two
+        front-ends cannot disagree. Nothing touches the overlay until the
+        confirm dialog is accepted; after that Save To… (Save Custom) is still
+        needed, like every other overlay edit.
+        """
+        chosen, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Antigravity models file",
+            self._browse_dir(),
+            "JSON files (*.json)",
+        )
+        if not chosen:
+            return
+        try:
+            with open(chosen, encoding="utf-8") as fh:
+                agy_data = json.load(fh)
+        except (OSError, json.JSONDecodeError) as exc:
+            QMessageBox.critical(self, "Import failed", f"Could not read {chosen}:\n{exc}")
+            return
+        try:
+            from ..antigravity_import import AntigravityImportError
+
+            preview = import_antigravity_models(agy_data, self.overlay)
+        except AntigravityImportError as exc:
+            QMessageBox.critical(self, "Import failed", str(exc))
+            return
+        if not preview.added and not preview.skipped and not preview.warnings:
+            QMessageBox.information(self, "Import Antigravity models", "The file holds no models.")
+            return
+        dialog = AntigravityImportDialog(
+            Path(chosen).name, preview.added, preview.skipped, preview.warnings, self
+        )
+        from PySide6.QtWidgets import QDialog
+
+        if dialog.exec() != QDialog.Accepted:
+            self.status_label.setText("antigravity import cancelled — overlay left as it was")
+            return
+        result = import_antigravity_models(
+            agy_data, self.overlay,
+            overwrite_existing=dialog.overwrite_existing(),
+        )
+        apply_antigravity_import(
+            self.overlay, result,
+            overwrite_existing=dialog.overwrite_existing(),
+        )
+        self._mark_overlay_dirty()
+        self._refresh_rows()
+        added, overwritten = len(result.added), len(result.overwritten)
+        parts = []
+        if added:
+            parts.append(f"{added} added")
+        if overwritten:
+            parts.append(f"{overwritten} overwritten")
+        if result.warnings:
+            parts.append(f"{len(result.warnings)} excluded")
+        self.status_label.setText(
+            f"antigravity import: {', '.join(parts)}. Save To… (Save Custom) to keep it."
         )
 
     def _build_filterbar(self) -> QHBoxLayout:
@@ -792,6 +864,7 @@ class MainWindow(QMainWindow):
             self.btn_load_data,
             self.btn_import_zed,
             self.btn_import_opencode,
+            self.btn_import_antigravity,
         ):
             button.setEnabled(not busy)
         has_data = bool(self.model_list.rowCount())
@@ -801,6 +874,7 @@ class MainWindow(QMainWindow):
         self.btn_import_opencode.setEnabled(not busy)
         self.btn_add_param_field.setEnabled(not busy and selected)
         self.btn_add_pricing_field.setEnabled(not busy and selected)
+        self.btn_import_antigravity.setEnabled(not busy)
         self.btn_merge.setEnabled(not busy and has_data)
         self.btn_save_to.setEnabled(not busy and has_data)
         if busy:

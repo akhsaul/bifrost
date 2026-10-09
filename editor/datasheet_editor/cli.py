@@ -35,6 +35,11 @@ from .opencode_import import (
     apply_opencode_import,
     import_opencode_models,
 )
+from .antigravity_import import (
+    AntigravityImportError,
+    apply_antigravity_import,
+    import_antigravity_models,
+)
 from .output import (
     OUTPUT_FILENAMES,
     PARAMETERS_FILENAME,
@@ -459,6 +464,70 @@ def _report_opencode_result(result: Any, *, converted: int) -> None:
                     shown += 1
 
 
+def _load_agy_models(path: Path) -> Any:
+    try:
+        with path.open(encoding="utf-8") as fh:
+            return json.load(fh)
+    except json.JSONDecodeError as exc:
+        raise MergeError(f"{path} is not valid JSON: {exc}") from exc
+
+
+def cmd_import_antigravity(args: argparse.Namespace) -> int:
+    from .dataset import write_json_atomic as _write_atomic
+
+    agy_path = Path(args.agy_models)
+    custom_path = Path(args.custom)
+    try:
+        agy_data = _load_agy_models(agy_path)
+    except FileNotFoundError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+
+    overlay: dict[str, dict[str, Any]] = {}
+    if custom_path.exists():
+        overlay = _load_overlay(custom_path)
+
+    try:
+        result = import_antigravity_models(
+            agy_data, overlay, overwrite_existing=args.overwrite_existing
+        )
+    except AntigravityImportError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_VALIDATION
+
+    converted = len(result.added) + len(result.overwritten)
+    if converted or result.warnings:
+        _report_antigravity_result(result, converted=converted)
+    if not converted:
+        print(f"no changes: all {len(result.skipped)} antigravity model(s) already in {custom_path}")
+        return EXIT_OK
+
+    apply_antigravity_import(overlay, result, overwrite_existing=args.overwrite_existing)
+
+    if args.dry_run:
+        print(f"\ndry run: would write {custom_path}")
+        return EXIT_OK
+
+    _write_atomic(overlay, custom_path, indent=2)
+    print(f"-> {custom_path}")
+    return EXIT_OK
+
+
+def _report_antigravity_result(result: Any, *, converted: int) -> None:
+    for key in result.added:
+        print(f"  + {key}")
+    for key in result.overwritten:
+        print(f"  ~ {key} (overwritten)")
+    if result.skipped:
+        print(f"skipped {len(result.skipped)} existing (re-run with --overwrite-existing to replace):")
+        for key in result.skipped:
+            print(f"    {key}")
+    if result.warnings:
+        print(f"excluded {len(result.warnings)} model(s):")
+        for warning in result.warnings:
+            print(f"    ! {warning}")
+
+
 def cmd_info(args: argparse.Namespace) -> int:
     from .fields import pricing_read_set
     from .validate import summarize_unknown_pricing_fields
@@ -611,6 +680,25 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_opencode.add_argument("--dry-run", action="store_true", help="report without writing")
     p_opencode.set_defaults(func=cmd_import_opencode)
+
+    p_antigravity = sub.add_parser(
+        "import-antigravity",
+        help="convert an Antigravity fetchAvailableModels file into antigravity/<id> overlay entries",
+    )
+    p_antigravity.add_argument(
+        "--agy-models", required=True,
+        help="path to the Antigravity fetchAvailableModels JSON file ({\"models\": {...}, ...})",
+    )
+    p_antigravity.add_argument(
+        "--custom", required=True,
+        help="path to custom_model_metadata.json (created if missing; updated in place)",
+    )
+    p_antigravity.add_argument(
+        "--overwrite-existing", action="store_true",
+        help="replace antigravity/* entries already in the custom file; without it they are skipped",
+    )
+    p_antigravity.add_argument("--dry-run", action="store_true", help="report without writing")
+    p_antigravity.set_defaults(func=cmd_import_antigravity)
 
     p_gui = sub.add_parser("gui", help="launch the Qt editor")
     p_gui.add_argument("--original-parameters")

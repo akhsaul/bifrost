@@ -39,6 +39,7 @@ CAPABILITY_IDENTITY_FIELDS: frozenset[str] = frozenset(
         "base_model",
         # capability
         "context_length",
+        "max_tokens",
         "max_input_tokens",
         "max_output_tokens",
         "is_deprecated",
