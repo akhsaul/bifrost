@@ -146,6 +146,17 @@ interface MultiSelectProps
 	hideSelectAll?: boolean;
 
 	/**
+	 * If true, hides the in-trigger "clear all" (X) button.
+	 * The trigger sits next to the selected badges, so that button is one
+	 * misclick away from wiping the whole selection — prefer an explicit
+	 * external clear button beside the control (routing-rule TargetRow
+	 * pattern: `flex gap-1.5` row, outline square button, rendered only
+	 * when a value is set, with its own aria-label + data-testid).
+	 * Optional, defaults to false.
+	 */
+	hideClear?: boolean;
+
+	/**
 	 * If true, shows search functionality in the popover.
 	 * If false, hides the search input completely.
 	 * Optional, defaults to true.
@@ -294,6 +305,7 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 			asChild = false,
 			className,
 			hideSelectAll = false,
+			hideClear = false,
 			searchable = true,
 			emptyIndicator,
 			autoSize = false,
@@ -547,13 +559,6 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 			setIsPopoverOpen((prev) => !prev);
 		};
 
-		const clearExtraOptions = () => {
-			if (disabled) return;
-			const newSelectedValues = selectedValues.slice(0, responsiveSettings.maxCount);
-			setSelectedValues(newSelectedValues);
-			onValueChange(newSelectedValues);
-		};
-
 		const toggleAll = () => {
 			if (disabled) return;
 			const allOptions = getAllOptions().filter((option) => !option.disabled);
@@ -783,40 +788,34 @@ export const MultiSelect = React.forwardRef<MultiSelectRef, MultiSelectProps>(
 													multiSelectVariants({ variant }),
 													responsiveSettings.compactMode && "px-1.5 py-0.5 text-xs",
 													singleLine && "flex-shrink-0 whitespace-nowrap",
-													"[&>svg]:pointer-events-auto",
 												)}
 											>
 												{`+ ${selectedValues.length - responsiveSettings.maxCount} more`}
-												<XCircle
-													className={cn("ml-2 h-4 w-4 cursor-pointer", responsiveSettings.compactMode && "ml-1 h-3 w-3")}
-													onClick={(event) => {
-														event.stopPropagation();
-														clearExtraOptions();
-													}}
-												/>
 											</Badge>
 										)}
 									</div>
 									<div className="flex items-center justify-between">
-										<div
-											role="button"
-											tabIndex={0}
-											onClick={(event) => {
-												event.stopPropagation();
-												handleClear();
-											}}
-											onKeyDown={(event) => {
-												if (event.key === "Enter" || event.key === " ") {
-													event.preventDefault();
+										{!hideClear && (
+											<div
+												role="button"
+												tabIndex={0}
+												onClick={(event) => {
 													event.stopPropagation();
 													handleClear();
-												}
-											}}
-											aria-label={`Clear all ${selectedValues.length} selected options`}
-											className="text-muted-foreground hover:text-foreground mx-2 flex h-4 w-4 cursor-pointer items-center justify-center rounded-sm focus:outline-none"
-										>
-											<XIcon className="h-4 w-4" />
-										</div>
+												}}
+												onKeyDown={(event) => {
+													if (event.key === "Enter" || event.key === " ") {
+														event.preventDefault();
+														event.stopPropagation();
+														handleClear();
+													}
+												}}
+												aria-label={`Clear all ${selectedValues.length} selected options`}
+												className="text-muted-foreground hover:text-foreground mx-2 flex h-4 w-4 cursor-pointer items-center justify-center rounded-sm focus:outline-none"
+											>
+												<XIcon className="h-4 w-4" />
+											</div>
+										)}
 										<Separator orientation="vertical" className="flex h-full min-h-6" />
 										<ChevronDown className="text-foreground/30 mx-2 h-4 cursor-pointer" aria-hidden="true" />
 									</div>

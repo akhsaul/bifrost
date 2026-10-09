@@ -9,9 +9,6 @@ function opencodeModels(extra = {}) {
 			metadata: {
 				limitContext: "200000",
 				limitOutput: "32000",
-				tools: true,
-				inputModalities: ["text", "image"],
-				outputModalities: ["text"],
 				variantEfforts: ["low", "medium", "high"],
 			},
 			costPerToken: { input: 0.000002, output: 0.00001 },
@@ -22,9 +19,6 @@ function opencodeModels(extra = {}) {
 			metadata: {
 				limitContext: "1000000",
 				limitOutput: "128000",
-				tools: true,
-				inputModalities: ["text"],
-				outputModalities: ["text"],
 				variantEfforts: [],
 			},
 		},
@@ -72,7 +66,7 @@ describe("extractReasoningEfforts", () => {
 });
 
 describe("buildAgentConfig", () => {
-	it("builds an opencode v2 provider block with capabilities/limit/per-1M cost/variants and {env:} auth only with a VK", () => {
+	it("builds an opencode v2 provider block with limit/per-1M cost/variants and {env:} auth only with a VK", () => {
 		const withVk = buildAgentConfig("opencode", baseInput({ virtualKeyName: "evaluate-test-route" }));
 		expect(withVk.config).toContain("{env:BIFROST_API_KEY}");
 		expect(withVk.config).toContain('"baseURL": "http://127.0.0.1:8080/v1"');
@@ -82,7 +76,7 @@ describe("buildAgentConfig", () => {
 		expect(withVk.config).toContain("evaluate-test-route");
 		expect(withVk.config).toContain('"context": 200000');
 		expect(withVk.config).toContain('"output": 32000');
-		expect(withVk.config).toContain('"tools": true');
+		expect(withVk.config).not.toContain("capabilities");
 		// Per-token 0.000002 input → per-1M 2.
 		expect(withVk.config).toContain('"input": 2');
 		expect(withVk.config).toContain('"reasoningEffort": "medium"');
@@ -105,7 +99,7 @@ describe("buildAgentConfig", () => {
 				models: [
 					{
 						id: "bad/model",
-						metadata: { limitContext: "", limitOutput: "", tools: true, inputModalities: [], outputModalities: [], variantEfforts: [] },
+						metadata: { limitContext: "", limitOutput: "", variantEfforts: [] },
 					},
 				],
 			}),

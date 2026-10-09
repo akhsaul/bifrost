@@ -22,7 +22,7 @@ import {
 import { useGetRoutingRulesQuery } from "@/lib/store/apis/routingRulesApi";
 import type { VirtualKey } from "@/lib/types/governance";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
-import { Check, Copy, Download, KeyRound } from "lucide-react";
+import { Check, Copy, Download, KeyRound, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { buildAgentConfig, type AgentConfigInput, type AgentOpencodeModelInput } from "./agentConfigBuilders";
@@ -49,9 +49,6 @@ function defaultBaseUrl(): string {
 	if (typeof window !== "undefined" && window.location.origin) return window.location.origin.replace(/\/+$/, "");
 	return "";
 }
-
-/** Opencode modalities enum (v2 docs). Datasheet values outside this set are kept as-is. */
-const OPENCODE_MODALITIES = ["text", "audio", "image", "video", "pdf"];
 
 // ── Virtual-key allowlist helpers ──────────────────────────────────────
 // From the agent's point of view a virtual key IS the api key: when one is
@@ -195,12 +192,11 @@ export default function AgentSetupView() {
 		{ skip: !hasAccess || (!!virtualKeyId && !selectedVk) },
 	);
 
-	// Datasheet snapshot per direct model: limits, modalities, per-token costs.
+	// Datasheet snapshot per direct model: limits, per-token costs.
 	const datasheetByModel = useMemo(() => {
 		const map = new Map<string, NonNullable<ModelSelectionItem["datasheet"]>>();
 		for (const m of detailsData?.models ?? []) {
 			const key = `${m.provider}/${m.name}`;
-			const arch = m.architecture;
 			// Operator precedence trap (fixed): `a ?? b !== undefined` parses as
 			// `a ?? (b !== undefined)`, so a missing max_input_tokens with a
 			// present context_length produced `true` instead of the number.
@@ -208,8 +204,6 @@ export default function AgentSetupView() {
 			map.set(key, {
 				...(context !== undefined ? { context } : {}),
 				...(m.max_output_tokens !== undefined ? { output: m.max_output_tokens } : {}),
-				...(arch?.input_modalities ? { inputModalities: arch.input_modalities } : {}),
-				...(arch?.output_modalities ? { outputModalities: arch.output_modalities } : {}),
 				...((m.input_cost_per_token ?? m.output_cost_per_token ?? m.cache_read_input_token_cost ?? m.cache_creation_input_token_cost) !==
 				undefined
 					? {
@@ -322,9 +316,6 @@ export default function AgentSetupView() {
 			return {
 				limitContext: ds?.context !== undefined ? String(ds.context) : "",
 				limitOutput: ds?.output !== undefined ? String(ds.output) : "",
-				tools: true,
-				inputModalities: ds?.inputModalities ?? [],
-				outputModalities: ds?.outputModalities ?? [],
 				variantEfforts: item.kind === "direct" ? (effortsByModel[item.id] ?? DEFAULT_REASONING_EFFORTS) : DEFAULT_REASONING_EFFORTS,
 			};
 		},
@@ -332,7 +323,7 @@ export default function AgentSetupView() {
 	);
 
 	// Initialize metadata for new selections; datasheet-backed fields
-	// (limits, modalities) refresh until the user edits them — the server
+	// (limits) refresh until the user edits them — the server
 	// row can land after the prefill ran, so only user-touched entries win.
 	useEffect(() => {
 		setMetadata((prev) => {
@@ -352,9 +343,6 @@ export default function AgentSetupView() {
 				const merged: AgentModelMetadata = {
 					limitContext: touched?.has("limitContext") ? existing.limitContext : fresh.limitContext,
 					limitOutput: touched?.has("limitOutput") ? existing.limitOutput : fresh.limitOutput,
-					tools: touched?.has("tools") ? existing.tools : fresh.tools,
-					inputModalities: touched?.has("inputModalities") ? existing.inputModalities : fresh.inputModalities,
-					outputModalities: touched?.has("outputModalities") ? existing.outputModalities : fresh.outputModalities,
 					variantEfforts: variantsTouched.current.has(key) ? existing.variantEfforts : fresh.variantEfforts,
 				};
 				if (JSON.stringify(existing) !== JSON.stringify(merged)) {
@@ -630,33 +618,67 @@ export default function AgentSetupView() {
 				<div className="text-sm font-medium">Providers → models (pick providers first, then their models)</div>
 				<div className="flex flex-col gap-1.5">
 					<Label>Providers</Label>
-					<MultiSelect
-						options={providerOptions}
-						defaultValue={selectedProviders}
-						resetOnDefaultValueChange
-						onValueChange={(values) => setSelectedProviders(values)}
-						placeholder={selectedVk ? "Select allowed providers" : "Select providers"}
-						emptyIndicator={selectedVk ? "No allowed providers for this key." : "No providers found."}
-						maxCount={3}
-						data-testid="agent-setup-provider-select"
-					/>
+					<div className="flex gap-1.5">
+						<MultiSelect
+							options={providerOptions}
+							defaultValue={selectedProviders}
+							resetOnDefaultValueChange
+							onValueChange={(values) => setSelectedProviders(values)}
+							placeholder={selectedVk ? "Select allowed providers" : "Select providers"}
+							emptyIndicator={selectedVk ? "No allowed providers for this key." : "No providers found."}
+							maxCount={3}
+							hideClear
+							className="min-w-0 flex-1"
+							data-testid="agent-setup-provider-select"
+						/>
+						{selectedProviders.length > 0 && (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() => setSelectedProviders([])}
+								className="h-9 w-9 shrink-0 p-0"
+								aria-label="Clear providers"
+								data-testid="agent-setup-provider-clear"
+							>
+								<X className="h-3.5 w-3.5" />
+							</Button>
+						)}
+					</div>
 					{selectedVk && providerOptions.length === 0 && (
 						<p className="text-muted-foreground text-xs">This key allows no providers — nothing below can be generated for it.</p>
 					)}
 				</div>
 				<div className="flex flex-col gap-1.5">
 					<Label>Models</Label>
-					<MultiSelect
-						options={modelOptions}
-						defaultValue={selectedDirectIds}
-						resetOnDefaultValueChange
-						onValueChange={(values) => setSelectedDirectIds(values)}
-						placeholder={isFetchingModels ? "Loading models…" : selectedProviders.length > 0 ? "Select models" : "Pick providers first"}
-						emptyIndicator={selectedProviders.length > 0 ? "No allowed models for these providers." : "Pick at least one provider above."}
-						maxCount={3}
-						data-testid="agent-setup-model-select"
-						disabled={selectedProviders.length === 0}
-					/>
+					<div className="flex gap-1.5">
+						<MultiSelect
+							options={modelOptions}
+							defaultValue={selectedDirectIds}
+							resetOnDefaultValueChange
+							onValueChange={(values) => setSelectedDirectIds(values)}
+							placeholder={isFetchingModels ? "Loading models…" : selectedProviders.length > 0 ? "Select models" : "Pick providers first"}
+							emptyIndicator={selectedProviders.length > 0 ? "No allowed models for these providers." : "Pick at least one provider above."}
+							maxCount={3}
+							hideClear
+							className="min-w-0 flex-1"
+							data-testid="agent-setup-model-select"
+							disabled={selectedProviders.length === 0}
+						/>
+						{selectedDirectIds.length > 0 && (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() => setSelectedDirectIds([])}
+								className="h-9 w-9 shrink-0 p-0"
+								aria-label="Clear models"
+								data-testid="agent-setup-model-clear"
+							>
+								<X className="h-3.5 w-3.5" />
+							</Button>
+						)}
+					</div>
 					<p className="text-muted-foreground text-xs">
 						{isFetchingModels
 							? "Loading…"
@@ -673,16 +695,33 @@ export default function AgentSetupView() {
 				<div className="text-sm font-medium">Routing rules (optional, independent of providers)</div>
 				<div className="flex flex-col gap-1.5">
 					<Label>Rule triggers</Label>
-					<MultiSelect
-						options={ruleOptions}
-						defaultValue={selectedRuleIds}
-						resetOnDefaultValueChange
-						onValueChange={(values) => setSelectedRuleIds(values)}
-						placeholder={ruleOptions.length > 0 ? "Select rule triggers" : "No triggerable rules"}
-						emptyIndicator="No triggerable rules match."
-						maxCount={3}
-						data-testid="agent-setup-rule-select"
-					/>
+					<div className="flex gap-1.5">
+						<MultiSelect
+							options={ruleOptions}
+							defaultValue={selectedRuleIds}
+							resetOnDefaultValueChange
+							onValueChange={(values) => setSelectedRuleIds(values)}
+							placeholder={ruleOptions.length > 0 ? "Select rule triggers" : "No triggerable rules"}
+							emptyIndicator="No triggerable rules match."
+							maxCount={3}
+							hideClear
+							className="min-w-0 flex-1"
+							data-testid="agent-setup-rule-select"
+						/>
+						{selectedRuleIds.length > 0 && (
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								onClick={() => setSelectedRuleIds([])}
+								className="h-9 w-9 shrink-0 p-0"
+								aria-label="Clear rule triggers"
+								data-testid="agent-setup-rule-clear"
+							>
+								<X className="h-3.5 w-3.5" />
+							</Button>
+						)}
+					</div>
 					<p className="text-muted-foreground text-xs">
 						{ruleOptions.length} triggerable rules · each fires via its <code className="font-mono">model == &quot;trigger&quot;</code> CEL
 						and notes its targets. Not affected by the provider picker.
@@ -736,36 +775,7 @@ export default function AgentSetupView() {
 											data-testid={`agent-setup-meta-${item.id}-limit-output`}
 										/>
 									</div>
-									<div className="flex flex-col gap-1.5">
-										<Label>capabilities.input (comma-separated)</Label>
-										<ModalityInput
-											committed={meta.inputModalities.join(", ")}
-											onCommit={(raw) => updateMetadata(key, { inputModalities: splitModalities(raw) })}
-											testId={`agent-setup-meta-${item.id}-input`}
-											placeholder="text, image"
-										/>
-										<p className="text-muted-foreground text-[11px]">Known values: {OPENCODE_MODALITIES.join(", ")}</p>
-									</div>
-									<div className="flex flex-col gap-1.5">
-										<Label>capabilities.output (comma-separated)</Label>
-										<ModalityInput
-											committed={meta.outputModalities.join(", ")}
-											onCommit={(raw) => updateMetadata(key, { outputModalities: splitModalities(raw) })}
-											testId={`agent-setup-meta-${item.id}-output`}
-											placeholder="text"
-										/>
-									</div>
 								</div>
-								<label className="flex cursor-pointer items-center gap-2 text-sm">
-									<Checkbox
-										checked={meta.tools}
-										onCheckedChange={(v) => updateMetadata(key, { tools: v === true })}
-										data-testid={`agent-setup-meta-${item.id}-tools`}
-									/>
-									<span>
-										capabilities.tools <span className="text-muted-foreground">(tool calling; uncheck to disable)</span>
-									</span>
-								</label>
 								<div className="flex flex-col gap-1.5">
 									<Label>
 										variants reasoning efforts{" "}
@@ -1070,51 +1080,6 @@ export default function AgentSetupView() {
 }
 
 /**
- * Free-text input for comma-separated modalities. The parent stores the
- * parsed array, so binding the raw keystrokes to it would normalize away
- * intermediate states (a just-typed comma or space vanishes on the next
- * render). Instead the draft lives here while focused and is committed
- * (parsed) on blur; external prefill updates flow through while unfocused.
- */
-function ModalityInput({
-	committed,
-	onCommit,
-	testId,
-	placeholder,
-}: {
-	committed: string;
-	onCommit: (raw: string) => void;
-	testId: string;
-	placeholder: string;
-}) {
-	const [draft, setDraft] = useState(committed);
-	const [focused, setFocused] = useState(false);
-	useEffect(() => {
-		if (!focused) setDraft(committed);
-	}, [committed, focused]);
-	return (
-		<Input
-			value={focused ? draft : committed}
-			onFocus={() => {
-				setDraft(committed);
-				setFocused(true);
-			}}
-			onChange={(e) => setDraft(e.target.value)}
-			onBlur={() => {
-				setFocused(false);
-				onCommit(draft);
-			}}
-			onKeyDown={(e) => {
-				if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-			}}
-			placeholder={placeholder}
-			className="font-mono"
-			data-testid={testId}
-		/>
-	);
-}
-
-/**
  * Claude tier model select with a readable minimum width. Radix Select's
  * trigger is `w-fit`, so short values collapse it and long
  * `provider/model` names get cut — the user had to pick the longest model
@@ -1174,14 +1139,6 @@ function ClaudeTierSelect({
 /** Stable key for per-entry metadata state (direct and rule ids live in different namespaces). */
 function selectionKey(item: ModelSelectionItem): string {
 	return item.kind === "rule" ? `rule:${item.ruleId}` : `direct:${item.id}`;
-}
-
-/** Parse a comma-separated modalities input into a clean list. */
-function splitModalities(raw: string): string[] {
-	return raw
-		.split(",")
-		.map((s) => s.trim().toLowerCase())
-		.filter(Boolean);
 }
 
 /** Format a per-token cost as a per-1M figure for display. */

@@ -74,13 +74,16 @@ function perMillion(perToken: number | undefined): number | undefined {
 // One Bifrost provider entry under `providers`; every selected model (direct
 // or rule trigger) becomes a key under `models`. Auth only exists with a VK:
 // env-var indirection via `env` + {env:} so no literal secret lands in the
-// file. Per-model v2 keys only: `limit`, `capabilities`, `cost` (per-1M),
+// file. Per-model v2 keys only: `limit`, `cost` (per-1M),
 // `variants` (checked reasoning efforts only; omitted when empty).
+// NOTE: `capabilities` is intentionally omitted — the v2 docs describe
+// `capabilities { tools, input, output }` but the published JSON schema at
+// https://opencode.ai/config.json is still v1 (`tool_call`, `modalities`,
+// no `capabilities`), so emit nothing until opencode ships a v2 schema.
 
 interface OpencodeModelBlock {
 	name: string;
 	limit: { context: number; output: number };
-	capabilities: { tools: boolean; input?: string[]; output?: string[] };
 	cost?: { input?: number; output?: number; cache_read?: number; cache_write?: number };
 	variants?: { id: string; settings: { reasoningEffort: string } }[];
 }
@@ -93,11 +96,6 @@ function buildOpencodeModelBlock(item: AgentOpencodeModelInput): OpencodeModelBl
 	const block: OpencodeModelBlock = {
 		name: item.id,
 		limit: { context, output },
-		capabilities: {
-			tools: item.metadata.tools,
-			...(item.metadata.inputModalities.length > 0 ? { input: item.metadata.inputModalities } : {}),
-			...(item.metadata.outputModalities.length > 0 ? { output: item.metadata.outputModalities } : {}),
-		},
 	};
 	const cost = {
 		...(perMillion(item.costPerToken?.input) !== undefined ? { input: perMillion(item.costPerToken?.input) as number } : {}),

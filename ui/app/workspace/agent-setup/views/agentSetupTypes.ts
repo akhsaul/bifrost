@@ -17,11 +17,13 @@
  * filled by datasheet" — datasheet value lands in the input, empty input
  * when the datasheet has nothing). Per-agent sources of truth:
  *  - opencode v2 docs (https://opencode.ai/v2/docs/models): per-model
- *    `capabilities { tools, input, output }`, `limit { context, output }`,
- *    `cost` per-1M tokens, `variants [{ id, settings: { reasoningEffort } }]`.
- *    NOTE: https://opencode.ai/config.json still describes the v1 schema
- *    (`provider` singular, `tool_call`, `modalities`); the v2 docs shape is
- *    what current opencode loads, so builders emit v2.
+ *    `limit { context, output }`, `cost` per-1M tokens,
+ *    `variants [{ id, settings: { reasoningEffort } }]`.
+ *    NOTE: `capabilities { tools, input, output }` from the v2 docs is
+ *    intentionally omitted — https://opencode.ai/config.json still
+ *    describes the v1 schema (`provider` singular, `tool_call`,
+ *    `modalities`, no `capabilities`), so the two are inconsistent and
+ *    nothing is emitted until opencode ships a v2 JSON schema.
  *  - codex config reference: `[model_providers.<id>]` + top-level globals
  *    `model_context_window`, `model_max_output_tokens`, `model_reasoning_effort`.
  *  - claude code gateway docs: settings.json `env` fragment carries
@@ -107,12 +109,6 @@ export interface AgentModelMetadata {
 	limitContext: string;
 	/** opencode `limit.output` ← datasheet max_output_tokens; rule entries start empty. */
 	limitOutput: string;
-	/** opencode `capabilities.tools`; always true, user can disable. */
-	tools: boolean;
-	/** opencode `capabilities.input`; datasheet-prefilled, editable. */
-	inputModalities: string[];
-	/** opencode `capabilities.output`; datasheet-prefilled, editable. */
-	outputModalities: string[];
 	/** opencode `variants` reasoning efforts; datasheet options else DEFAULT_REASONING_EFFORTS, checklist. */
 	variantEfforts: string[];
 }
@@ -120,9 +116,6 @@ export interface AgentModelMetadata {
 export const EMPTY_AGENT_METADATA: AgentModelMetadata = {
 	limitContext: "",
 	limitOutput: "",
-	tools: true,
-	inputModalities: [],
-	outputModalities: [],
 	variantEfforts: [],
 };
 
@@ -146,8 +139,6 @@ export interface ModelSelectionItem {
 		context?: number;
 		/** max_output_tokens. */
 		output?: number;
-		inputModalities?: string[];
-		outputModalities?: string[];
 		/** Per-token costs; opencode wants per-1M so the builder multiplies by 1e6. */
 		costPerToken?: { input?: number; output?: number; cacheRead?: number; cacheWrite?: number };
 		/** Reasoning-effort option values from model_parameters (id matching /reasoning.*effort/i). */
