@@ -82,6 +82,7 @@ Two details:
 | `info` | summarize a datasheet file |
 | `import-zed` | convert a Zed `/models` file into `zed/<id>` overlay entries |
 | `import-opencode` | convert an Opencode catalog file into `opencode-zen/<id>` + `opencode-go/<id>` overlay entries |
+| `import-antigravity` | convert an Antigravity `fetchAvailableModels` file into `antigravity/<id>` overlay entries |
 | `gui` | launch the Qt editor |
 
 Useful flags: `--dry-run` (report without writing), `--report <path>` (full
@@ -109,7 +110,9 @@ an explicit empty ladder and no `reasoning_effort` descriptor, so the prompt
 playground offers no effort control for them. Effort values keep their Zed
 casing (Gemini's `MINIMAL`/`LOW`/...) as-is. The `pricing` section carries identity + token limits
 only; capability flags live in `parameters`, following the merge engine's own
-placement rule. Fields with no datasheet counterpart (`display_name`,
+placement rule. `max_token_count` is also written as `context_length`
+(the same value as `max_input_tokens`), and `max_tokens` is
+`max_input_tokens + max_output_tokens`. Fields with no datasheet counterpart (`display_name`,
 `is_latest`, `supports_max_mode`, `is_disabled`, ...) are omitted.
 
 Entries already in the custom file are skipped and reported; `--overwrite-existing`
@@ -148,7 +151,9 @@ is the smallest level (first in file order, kept verbatim); a `none` level
 sets `supports_none_reasoning_effort` instead of becoming the default.
 `tiers` of context size 200000/272000 map to the matching `..._above_...`
 fields; other tier sizes are dropped with a warning, and `context_over_200k`
-is ignored (it mirrors the 200000 tier). Fields with no datasheet counterpart
+is ignored (it mirrors the 200000 tier). `limit.context` is also written
+as `context_length` (the same value as `max_input_tokens`), and `max_tokens`
+is `max_input_tokens + max_output_tokens`. Fields with no datasheet counterpart
 (`description`, `family`, `limit.input`, audio/video/pdf modalities, ...) are
 omitted.
 
@@ -156,6 +161,48 @@ Entries already in the custom file are skipped and reported; `--overwrite-existi
 replaces them, `--dry-run` reports without writing. The GUI has the same flow
 behind the **Import Opencode…** button (file picker → confirm dialog with
 overwrite checkbox and tier-drop warnings → apply, then Save To… (Save Custom) as usual).
+
+### Importing Antigravity models
+
+```bash
+.venv/bin/python -m datasheet_editor import-antigravity \
+  --agy-models path/to/agy-models.json \
+  --custom custom_model_metadata.json
+```
+
+Converts an Antigravity `POST v1internal:fetchAvailableModels` capture
+(`{"models": {...}, "agentModelSorts": [...], ...}`) into
+`antigravity/<id>` overlay entries. Only the ids referenced by the six
+user-facing lists are converted — `agentModelSorts`, `commandModelIds`,
+`imageGenerationModelIds`, `mqueryModelIds`, `webSearchModelIds`,
+`commitMessageModelIds` — and any model with `isInternal: true` is excluded
+with a warning. The other lists in the capture (`tabModelIds`,
+`deprecatedModelIds`, ...) are discarded, not guessed at.
+
+The overlay `provider` is always `antigravity` (the Bifrost provider serving
+the model, which is what the capability lookup matches on); the inner
+`modelProvider`/`apiProvider` fields are upstream routing metadata and are
+never written. Mode comes from the source list: `imageGenerationModelIds` →
+`image_generation`, everything else → `chat`. An id listed with two
+disagreeing modes is an error. Token limits are optional (some capture rows
+carry none); capability flags are written explicitly only when the capture
+reports them. `thinkingBudget: -1` becomes
+`supports_dynamic_reasoning_budget`; `supportsImages`/`supportsThinking`/
+`supportsAdaptiveThinking` map to `supports_vision`/`supports_reasoning`/
+`supports_adaptive_thinking`; `minThinkingBudget`/`thinkingBudget` map to
+`reasoning_budget.min`/`max`. `supported_endpoints` is always
+`["/v1internal:generateContent"]`. `maxTokens` is also written as
+`context_length` (the same value as `max_input_tokens`), and `max_tokens` is
+`max_input_tokens + max_output_tokens` when both limits are present
+(falling back to `maxTokens` alone when the output limit is absent). The
+capture carries no prices, so the
+`pricing` section holds only identity + token limits; capability flags live
+in `parameters`, following the merge engine's own placement rule.
+
+Entries already in the custom file are skipped and reported; `--overwrite-existing`
+replaces them, `--dry-run` reports without writing. The GUI has the same flow
+behind the **Import Antigravity…** button (file picker → confirm dialog with
+overwrite checkbox and exclusion warnings → apply, then Save To… (Save Custom) as usual).
 
 ## The custom overlay
 
@@ -503,14 +550,16 @@ editor/
 │   ├── merge.py         # the merge engine (pure, no Qt, no IO)
 │   ├── zed_import.py    # Zed /models → overlay entries (pure, no Qt, no IO)
 │   ├── opencode_import.py  # Opencode catalog → opencode-zen/go entries (pure)
+│   ├── antigravity_import.py  # Antigravity fetchAvailableModels → antigravity/<id> (pure)
 │   ├── validate.py      # errors, warnings, conflict detection
-│   ├── cli.py           # merge/diff/validate/info/import-zed/import-opencode/gui subcommands
+│   ├── cli.py           # merge/diff/validate/info/import-*/gui subcommands
 │   └── gui/              # models, workers, typed field editor, add dialogs
 ├── tools/gen_pricing_fields.py
 ├── tools/gen_param_fields.py
 └── tests/
     ├── test_zed_import.py  # importer mapping + CLI + GUI wiring
-    └── test_opencode_import.py  # Opencode importer mapping + CLI + GUI wiring
+    ├── test_opencode_import.py  # Opencode importer mapping + CLI + GUI wiring
+    └── test_antigravity_import.py  # Antigravity importer mapping + CLI + GUI wiring
 ```
 
 `merge.py` is deliberately free of Qt and IO so the GUI and CLI cannot drift

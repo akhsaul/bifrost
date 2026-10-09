@@ -19,7 +19,10 @@ Mapping (Zed field -> overlay field):
 - ``id`` -> overlay key ``zed/<id>``. The prefix is hardcoded so an imported
   model can never collide with a base-provider row.
 - ``max_token_count`` / ``max_output_tokens`` -> ``max_input_tokens`` /
-  ``max_output_tokens`` (in both sections).
+  ``max_output_tokens`` (in both sections). ``max_token_count`` is also
+  written as ``context_length`` (same value as ``max_input_tokens``), and
+  ``max_tokens`` is ``max_input_tokens + max_output_tokens`` (the full
+  context + output window).
 - ``supports_tools`` -> ``supports_function_calling`` + ``supports_tool_choice``.
 - ``supports_parallel_tool_calls`` -> ``supports_parallel_function_calling``
   (explicit both ways: several Gemini rows report ``false``).
@@ -182,6 +185,9 @@ def zed_model_to_entry(model: dict[str, Any]) -> dict[str, Any]:
         "provider": ZED_PROVIDER,
         "max_input_tokens": model["max_token_count"],
         "max_output_tokens": model["max_output_tokens"],
+        "context_length": model["max_token_count"],
+        # ``max_tokens`` is the full window: input + output.
+        "max_tokens": model["max_token_count"] + model["max_output_tokens"],
         "supports_function_calling": tools,
         "supports_tool_choice": tools,
         "supports_parallel_function_calling": bool(model.get("supports_parallel_tool_calls")),
@@ -212,6 +218,8 @@ def zed_model_to_entry(model: dict[str, Any]) -> dict[str, Any]:
         "provider": ZED_PROVIDER,
         "max_input_tokens": model["max_token_count"],
         "max_output_tokens": model["max_output_tokens"],
+        "context_length": model["max_token_count"],
+        "max_tokens": model["max_token_count"] + model["max_output_tokens"],
     }
 
     return {"parameters": parameters, "pricing": pricing}

@@ -44,8 +44,10 @@ Mapping (Opencode field -> overlay field):
 
 - ``id`` -> overlay key ``<provider>/<id>``.
 - ``limit.context`` / ``limit.output`` -> ``max_input_tokens`` /
-  ``max_output_tokens`` (in both sections). ``limit.input`` has no counterpart
-  and is omitted.
+  ``max_output_tokens`` (in both sections). ``limit.context`` is also
+  written as ``context_length`` (same value as ``max_input_tokens``), and
+  ``max_tokens`` is ``max_input_tokens + max_output_tokens``.
+  ``limit.input`` has no counterpart and is omitted.
 - ``provider.npm`` -> ``supported_endpoints`` (parameters only), per above.
 - ``tool_call`` -> ``supports_function_calling`` + ``supports_tool_choice``.
 - ``modalities.input`` containing ``image`` -> ``supports_vision`` (explicit
@@ -486,6 +488,9 @@ def opencode_model_to_entry(
         "provider": provider,
         "max_input_tokens": max_input,
         "max_output_tokens": max_output,
+        "context_length": max_input,
+        # ``max_tokens`` is the full window: input + output.
+        "max_tokens": max_input + max_output,
         "supported_endpoints": [endpoint],
         "supports_function_calling": tools,
         "supports_tool_choice": tools,
@@ -505,6 +510,8 @@ def opencode_model_to_entry(
         "provider": provider,
         "max_input_tokens": max_input,
         "max_output_tokens": max_output,
+        "context_length": max_input,
+        "max_tokens": max_input + max_output,
     }
     if model.get("status") == "deprecated":
         pricing["is_deprecated"] = True

@@ -152,6 +152,9 @@ def test_anthropic_maps_thinking_and_effort():
     assert params["mode"] == "chat"
     assert params["max_input_tokens"] == 1000000
     assert params["max_output_tokens"] == 128000
+    assert params["context_length"] == 1000000
+    # max_tokens is the full window: input + output.
+    assert params["max_tokens"] == 1000000 + 128000
     assert params["supports_reasoning"] is True
     assert params["supports_reasoning_effort"] is True
     assert params["reasoning_effort_levels"] == ["low", "medium", "high", "xhigh", "max"]
@@ -220,6 +223,8 @@ def test_pricing_section_carries_identity_and_limits_only():
         "provider": "zed",
         "max_input_tokens": 1000000,
         "max_output_tokens": 128000,
+        "context_length": 1000000,
+        "max_tokens": 1000000 + 128000,
     }
 
 

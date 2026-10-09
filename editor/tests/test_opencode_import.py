@@ -289,6 +289,9 @@ def test_anthropic_maps_costs_per_token_with_cache_and_deprecated():
     assert params["mode"] == "chat"
     assert params["max_input_tokens"] == 200000
     assert params["max_output_tokens"] == 8192
+    assert params["context_length"] == 200000
+    # max_tokens is the full window: input + output.
+    assert params["max_tokens"] == 200000 + 8192
     assert params["supports_reasoning"] is False
     assert params["supports_reasoning_effort"] is False
     assert params["reasoning_effort_levels"] == []
@@ -304,6 +307,8 @@ def test_anthropic_maps_costs_per_token_with_cache_and_deprecated():
     assert pricing["cache_creation_input_token_cost"] == 1e-06
     assert pricing["is_deprecated"] is True
     assert pricing["max_input_tokens"] == 200000
+    assert pricing["context_length"] == 200000
+    assert pricing["max_tokens"] == 200000 + 8192
 
 
 def test_effort_default_is_the_smallest_level_and_kept_verbatim():
@@ -485,7 +490,8 @@ def test_pricing_carries_no_capability_flags_or_descriptors():
     assert "supported_endpoints" not in pricing
     assert "supports_reasoning" not in pricing
     assert set(pricing) <= {
-        "mode", "provider", "max_input_tokens", "max_output_tokens",
+        "mode", "provider", "max_input_tokens", "max_output_tokens", "max_tokens",
+        "context_length",
         "is_deprecated", "input_cost_per_token", "output_cost_per_token",
         "cache_read_input_token_cost", "cache_creation_input_token_cost",
         "input_cost_per_audio_token",
