@@ -23,6 +23,7 @@ func (stubConfigManager) ValidateSetupToken(string) bool                        
 func (stubConfigManager) ReloadClientConfigFromConfigStore(context.Context) error         { return nil }
 func (stubConfigManager) UpdateSyncConfig(context.Context) error                          { return nil }
 func (stubConfigManager) ForceReloadPricing(context.Context) error                        { return nil }
+func (stubConfigManager) RebuildPricing(context.Context) error                            { return nil }
 func (stubConfigManager) UpdateDropExcessRequests(context.Context, bool)                  {}
 func (stubConfigManager) UpdateMCPToolManagerConfig(context.Context, int, int, string, bool) error {
 	return nil

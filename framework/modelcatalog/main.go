@@ -414,6 +414,39 @@ func (mc *ModelCatalog) ForceReloadPricing(ctx context.Context) error {
 	return nil
 }
 
+// RebuildPricing deletes every pricing and model parameter row in the
+// database and re-seeds both tables from the configured datasheets. Unlike
+// ForceReloadPricing (upsert-only, orphan rows survive), the catalog after a
+// rebuild reflects exactly what the datasheets contain.
+//
+// The datasheet store fetches and validates both feeds before deleting
+// anything, and the delete + seed runs in a single transaction. Pricing
+// overrides are never deleted — they are reloaded after the rebuild.
+func (mc *ModelCatalog) RebuildPricing(ctx context.Context) error {
+	timeout := datasheet.DefaultPricingTimeout
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	if err := mc.datasheet.RebuildFromURL(ctx); err != nil {
+		return fmt.Errorf("failed to rebuild pricing data: %w", err)
+	}
+	if err := mc.datasheet.LoadOverridesFromStore(ctx); err != nil {
+		return fmt.Errorf("failed to load pricing overrides: %w", err)
+	}
+
+	if mc.afterSyncHook != nil {
+		mc.afterSyncHook(ctx)
+	}
+
+	if mc.syncTicker != nil {
+		mc.syncTicker.Reset(mc.datasheet.SyncInterval())
+	}
+	return nil
+}
+
 func (mc *ModelCatalog) Cleanup() error {
 	// Drop the process-global resolver first: it closes over mc, and capability
 	// lookups would otherwise keep running against a torn-down catalog. With no

@@ -3329,6 +3329,17 @@ func (s *RDBConfigStore) UpsertModelParametersBatch(ctx context.Context, params 
 	return db.Transaction(upsert)
 }
 
+// DeleteModelParameters deletes all model parameters records from the database.
+func (s *RDBConfigStore) DeleteModelParameters(ctx context.Context, tx ...*gorm.DB) error {
+	var txDB *gorm.DB
+	if len(tx) > 0 {
+		txDB = tx[0]
+	} else {
+		txDB = s.DB()
+	}
+	return txDB.WithContext(ctx).Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&tables.TableModelParameters{}).Error
+}
+
 // PLUGINS METHODS
 
 func (s *RDBConfigStore) GetPlugins(ctx context.Context) ([]*tables.TablePlugin, error) {

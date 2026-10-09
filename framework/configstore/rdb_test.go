@@ -3556,6 +3556,36 @@ func TestUpsertModelParametersBatch_SQLite(t *testing.T) {
 	assert.Len(t, got, 3)
 }
 
+// TestDeleteModelParameters_SQLite guards the catalog-rebuild delete path:
+// DeleteModelParameters must remove every model parameters row while leaving
+// the pricing table untouched.
+func TestDeleteModelParameters_SQLite(t *testing.T) {
+	s := setupRDBTestStore(t)
+	require.NoError(t, s.DB().AutoMigrate(&tables.TableModelParameters{}, &tables.TableModelPricing{}))
+
+	ctx := context.Background()
+	require.NoError(t, s.UpsertModelParametersBatch(ctx, []tables.TableModelParameters{
+		{Model: "model-a", Data: `{"max_output_tokens":100}`},
+		{Model: "model-b", Data: `{"max_output_tokens":200}`},
+	}))
+	require.NoError(t, s.UpsertModelPricesBatch(ctx, []tables.TableModelPricing{
+		{Model: "model-a", Provider: "openai", Mode: "chat"},
+	}))
+
+	require.NoError(t, s.DeleteModelParameters(ctx))
+
+	got, err := s.GetModelParameters(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, got)
+
+	prices, err := s.GetModelPrices(ctx)
+	require.NoError(t, err)
+	assert.Len(t, prices, 1)
+
+	// Deleting from an empty table is a no-op, not an error.
+	require.NoError(t, s.DeleteModelParameters(ctx))
+}
+
 func testWebhookEndpoint(name string) *tables.TableWebhookEndpoint {
 	return &tables.TableWebhookEndpoint{
 		Name:   name,

@@ -1441,6 +1441,10 @@ func (m *MockConfigStore) UpsertModelParametersBatch(ctx context.Context, params
 	return nil
 }
 
+func (m *MockConfigStore) DeleteModelParameters(ctx context.Context, tx ...*gorm.DB) error {
+	return nil
+}
+
 // Provider methods
 func (m *MockConfigStore) GetProvider(ctx context.Context, provider schemas.ModelProvider) (*tables.TableProvider, error) {
 	return nil, nil

@@ -499,3 +499,22 @@ func TestUpdateProxyConfig_InterceptionGuardWhenAuthBypassed(t *testing.T) {
 		})
 	}
 }
+
+// TestRebuildPricing_HandlerWiring pins the rebuild endpoint behavior: 503
+// without a config store, 200 delegating to the config manager otherwise.
+func TestRebuildPricing_HandlerWiring(t *testing.T) {
+	SetLogger(&mockLogger{})
+
+	noStore := &ConfigHandler{store: &lib.Config{}, configManager: stubConfigManager{}}
+	ctx := newTestRequestCtx("")
+	noStore.rebuildPricing(ctx)
+	require.Equal(t, fasthttp.StatusServiceUnavailable, ctx.Response.StatusCode())
+
+	store := newRealOAuth2Store(t)
+	cfg := newTestOAuth2Config(store, configtables.MCPServerAuthModeHeaders, false)
+	h := &ConfigHandler{store: cfg, configManager: stubConfigManager{}}
+	ctx = newTestRequestCtx("")
+	h.rebuildPricing(ctx)
+	require.Equal(t, fasthttp.StatusOK, ctx.Response.StatusCode(), "body=%s", ctx.Response.Body())
+	assert.Contains(t, string(ctx.Response.Body()), "rebuilt successfully")
+}

@@ -44,6 +44,10 @@ export class ConfigSettingsPage extends BasePage {
   readonly pricingConfigView: Locator
   readonly pricingDatasheetUrlInput: Locator
   readonly pricingForceSyncBtn: Locator
+  readonly pricingRebuildBtn: Locator
+  readonly pricingRebuildConfirmDialog: Locator
+  readonly pricingRebuildConfirmBtn: Locator
+  readonly pricingRebuildCancelBtn: Locator
   readonly pricingSaveBtn: Locator
 
   constructor(page: Page) {
@@ -82,6 +86,10 @@ export class ConfigSettingsPage extends BasePage {
     this.pricingConfigView = page.getByTestId('pricing-config-view')
     this.pricingDatasheetUrlInput = page.getByTestId('pricing-datasheet-url-input')
     this.pricingForceSyncBtn = page.getByTestId('pricing-force-sync-btn')
+    this.pricingRebuildBtn = page.getByTestId('pricing-rebuild-btn')
+    this.pricingRebuildConfirmDialog = page.getByTestId('pricing-rebuild-confirm-dialog')
+    this.pricingRebuildConfirmBtn = page.getByTestId('pricing-rebuild-confirm')
+    this.pricingRebuildCancelBtn = page.getByTestId('pricing-rebuild-cancel')
     this.pricingSaveBtn = page.getByTestId('pricing-save-btn')
   }
 
@@ -381,6 +389,13 @@ export class ConfigSettingsPage extends BasePage {
 
   async triggerForceSync(): Promise<void> {
     await this.pricingForceSyncBtn.click()
+    await this.waitForSuccessToast()
+  }
+
+  async triggerRebuild(): Promise<void> {
+    await this.pricingRebuildBtn.click()
+    await this.pricingRebuildConfirmDialog.waitFor({ state: 'visible' })
+    await this.pricingRebuildConfirmBtn.click()
     await this.waitForSuccessToast()
   }
 

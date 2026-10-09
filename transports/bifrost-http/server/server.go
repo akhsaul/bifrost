@@ -85,6 +85,7 @@ type ServerCallbacks interface {
 	// Pricing related callbacks
 	UpdateSyncConfig(ctx context.Context) error
 	ForceReloadPricing(ctx context.Context) error
+	RebuildPricing(ctx context.Context) error
 	UpsertPricingOverride(ctx context.Context, override *tables.TablePricingOverride) error
 	DeletePricingOverride(ctx context.Context, id string) error
 	// UpsertModelPricingAttributes writes the additional_attributes JSON on
@@ -2055,6 +2056,20 @@ func (s *BifrostHTTPServer) ForceReloadPricing(ctx context.Context) error {
 	if s.Config.ModelCatalog != nil {
 		if err := s.Config.ModelCatalog.ForceReloadPricing(ctx); err != nil {
 			return fmt.Errorf("failed to force reload pricing: %w", err)
+		}
+	}
+	return nil
+}
+
+// RebuildPricing deletes all pricing and model parameter rows and re-seeds
+// them from the configured datasheets, then resets the sync timer.
+func (s *BifrostHTTPServer) RebuildPricing(ctx context.Context) error {
+	if s.Config == nil {
+		return fmt.Errorf("server config not initialized")
+	}
+	if s.Config.ModelCatalog != nil {
+		if err := s.Config.ModelCatalog.RebuildPricing(ctx); err != nil {
+			return fmt.Errorf("failed to rebuild pricing: %w", err)
 		}
 	}
 	return nil

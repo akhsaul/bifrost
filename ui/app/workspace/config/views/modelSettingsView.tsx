@@ -1,8 +1,24 @@
 import PageTitle from "@/components/pageTitle";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alertDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getErrorMessage, useForcePricingSyncMutation, useGetCoreConfigQuery, useUpdateCoreConfigMutation } from "@/lib/store";
+import {
+	getErrorMessage,
+	useForcePricingSyncMutation,
+	useGetCoreConfigQuery,
+	useRebuildPricingMutation,
+	useUpdateCoreConfigMutation,
+} from "@/lib/store";
 import {
 	DEFAULT_LIVE_MODELS_SYNC_INTERVAL,
 	DefaultCoreConfig,
@@ -10,7 +26,7 @@ import {
 	MIN_LIVE_MODELS_SYNC_INTERVAL,
 } from "@/lib/types/config";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -43,6 +59,8 @@ export default function ModelSettingsView() {
 	const clientConfig = bifrostConfig?.client_config;
 	const [updateCoreConfig, { isLoading }] = useUpdateCoreConfigMutation();
 	const [forcePricingSync, { isLoading: isForceSyncing }] = useForcePricingSyncMutation();
+	const [rebuildPricing, { isLoading: isRebuilding }] = useRebuildPricingMutation();
+	const [rebuildConfirmOpen, setRebuildConfirmOpen] = useState(false);
 
 	const {
 		register,
@@ -127,6 +145,17 @@ export default function ModelSettingsView() {
 			toast.success("Pricing synced successfully.");
 		} catch (error) {
 			toast.error(getErrorMessage(error));
+		}
+	};
+
+	const handleConfirmRebuild = async () => {
+		try {
+			await rebuildPricing().unwrap();
+			toast.success("Pricing catalog rebuilt successfully.");
+		} catch (error) {
+			toast.error(getErrorMessage(error));
+		} finally {
+			setRebuildConfirmOpen(false);
 		}
 	};
 
@@ -286,11 +315,39 @@ export default function ModelSettingsView() {
 					>
 						{isForceSyncing ? "Syncing..." : "Force Sync Now"}
 					</Button>
+					<Button
+						variant="outline"
+						type="button"
+						onClick={() => setRebuildConfirmOpen(true)}
+						disabled={isRebuilding || isLoading || hasChanges || !hasSettingsUpdateAccess}
+						data-testid="pricing-rebuild-btn"
+					>
+						{isRebuilding ? "Rebuilding..." : "Rebuild"}
+					</Button>
 					<Button type="submit" disabled={!hasChanges || isLoading || !hasSettingsUpdateAccess} data-testid="model-settings-save-btn">
 						{isLoading ? "Saving..." : "Save Changes"}
 					</Button>
 				</div>
 			</form>
+
+			<AlertDialog open={rebuildConfirmOpen} onOpenChange={setRebuildConfirmOpen}>
+				<AlertDialogContent data-testid="pricing-rebuild-confirm-dialog">
+					<AlertDialogHeader>
+						<AlertDialogTitle>Rebuild pricing catalog?</AlertDialogTitle>
+						<AlertDialogDescription>
+							This will delete all pricing and model parameter rows in the database and re-seed them from the configured datasheets. The
+							catalog shown afterwards will reflect exactly what the datasheets contain. Custom pricing overrides are not affected. This
+							cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel data-testid="pricing-rebuild-cancel">Cancel</AlertDialogCancel>
+						<AlertDialogAction onClick={handleConfirmRebuild} disabled={isRebuilding} data-testid="pricing-rebuild-confirm">
+							{isRebuilding ? "Rebuilding..." : "Rebuild"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	);
 }

@@ -165,6 +165,16 @@ export const configApi = baseApi.injectEndpoints({
 			invalidatesTags: ["Config"],
 		}),
 
+		// Rebuild the pricing catalog: delete all pricing and model parameter
+		// rows, then re-seed them from the configured datasheets
+		rebuildPricing: builder.mutation<null, void>({
+			query: () => ({
+				url: "/pricing/rebuild",
+				method: "POST",
+			}),
+			invalidatesTags: ["Config"],
+		}),
+
 		// Merge-patch the ClientConfig.metadata UI/admin preferences blob.
 		// Pass {key: null} to remove a key.
 		updateClientMetadata: builder.mutation<{ success: boolean }, Record<string, unknown>>({
@@ -227,6 +237,7 @@ export const {
 	useUpdateCoreConfigMutation,
 	useUpdateProxyConfigMutation,
 	useForcePricingSyncMutation,
+	useRebuildPricingMutation,
 	useUpdateClientMetadataMutation,
 	useLazyGetCoreConfigQuery,
 	useGetLatestReleaseQuery,

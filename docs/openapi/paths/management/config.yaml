@@ -220,3 +220,39 @@ force-sync-pricing:
           application/json:
             schema:
               $ref: '../../schemas/inference/common.yaml#/BifrostError'
+
+rebuild-pricing:
+  post:
+    operationId: rebuildPricing
+    x-mint:
+      content: |
+        **Required Permissions**
+
+        | Permission | Granted via |
+        | --- | --- |
+        | `Settings:Create` | RBAC role or API key scope |
+
+        [How permissions work](/api/procuring-api-keys#required-permissions)
+    summary: Rebuild pricing catalog
+    description: |
+      Deletes all pricing and model parameter rows in the database and re-seeds them from the configured datasheets. Pricing overrides are not affected.
+    tags:
+      - Configuration
+    security:
+      - ManagementBearerAuth: []
+      - BasicAuth: []
+    responses:
+      '200':
+        description: Pricing catalog rebuilt successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../../schemas/management/common.yaml#/SuccessResponse'
+      '500':
+        $ref: '../../openapi.yaml#/components/responses/InternalError'
+      '503':
+        description: Config store not available
+        content:
+          application/json:
+            schema:
+              $ref: '../../schemas/inference/common.yaml#/BifrostError'

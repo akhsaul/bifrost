@@ -200,6 +200,7 @@ test.describe('Config Settings', () => {
       await expect(configSettingsPage.pricingConfigView).toBeVisible()
       await expect(configSettingsPage.pricingDatasheetUrlInput).toBeVisible()
       await expect(configSettingsPage.pricingForceSyncBtn).toBeVisible()
+      await expect(configSettingsPage.pricingRebuildBtn).toBeVisible()
       await expect(configSettingsPage.pricingSaveBtn).toBeVisible()
     })
 
@@ -225,6 +226,21 @@ test.describe('Config Settings', () => {
       }
 
       await configSettingsPage.triggerForceSync()
+      await configSettingsPage.dismissToasts()
+    })
+
+    test('should show rebuild confirmation and trigger rebuild', async ({ configSettingsPage }) => {
+      const isRebuildEnabled = await configSettingsPage.pricingRebuildBtn.isDisabled().then((d) => !d)
+      if (!isRebuildEnabled) {
+        test.skip(true, 'Rebuild button disabled (RBAC or unsaved changes)')
+        return
+      }
+
+      await configSettingsPage.pricingRebuildBtn.click()
+      await expect(configSettingsPage.pricingRebuildConfirmDialog).toBeVisible()
+      await expect(configSettingsPage.pricingRebuildConfirmDialog).toContainText(/delete all pricing and model parameter rows/i)
+      await configSettingsPage.pricingRebuildConfirmBtn.click()
+      await configSettingsPage.waitForSuccessToast()
       await configSettingsPage.dismissToasts()
     })
 

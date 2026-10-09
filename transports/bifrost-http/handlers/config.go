@@ -92,6 +92,7 @@ type ConfigManager interface {
 	ReloadClientConfigFromConfigStore(ctx context.Context) error
 	UpdateSyncConfig(ctx context.Context) error
 	ForceReloadPricing(ctx context.Context) error
+	RebuildPricing(ctx context.Context) error
 	UpdateDropExcessRequests(ctx context.Context, value bool)
 	UpdateMCPToolManagerConfig(ctx context.Context, maxAgentDepth int, toolExecutionTimeoutInSeconds int, codeModeBindingLevel string, disableAutoToolInject bool) error
 	ReloadPlugin(ctx context.Context, name string, path *string, pluginConfig any, placement *schemas.PluginPlacement, order *int) error
@@ -127,6 +128,7 @@ func (h *ConfigHandler) RegisterRoutes(r *router.Router, middlewares ...schemas.
 	r.GET("/api/proxy-config", lib.ChainMiddlewares(h.getProxyConfig, middlewares...))
 	r.PUT("/api/proxy-config", lib.ChainMiddlewares(h.updateProxyConfig, middlewares...))
 	r.POST("/api/pricing/force-sync", lib.ChainMiddlewares(h.forceSyncPricing, middlewares...))
+	r.POST("/api/pricing/rebuild", lib.ChainMiddlewares(h.rebuildPricing, middlewares...))
 }
 
 // getVersion handles GET /api/version - Get the current version
@@ -1745,6 +1747,27 @@ func (h *ConfigHandler) forceSyncPricing(ctx *fasthttp.RequestCtx) {
 	SendJSON(ctx, map[string]any{
 		"status":  "success",
 		"message": "pricing synced successfully",
+	})
+}
+
+// rebuildPricing deletes all pricing and model parameter rows and re-seeds
+// them from the configured datasheets, then resets the pricing sync timer
+func (h *ConfigHandler) rebuildPricing(ctx *fasthttp.RequestCtx) {
+	if h.store.ConfigStore == nil {
+		SendError(ctx, fasthttp.StatusServiceUnavailable, "config store not available")
+		return
+	}
+
+	if err := h.configManager.RebuildPricing(ctx); err != nil {
+		logger.Warn("failed to rebuild pricing catalog: %v", err)
+		SendError(ctx, fasthttp.StatusInternalServerError, fmt.Sprintf("failed to rebuild pricing catalog: %v", err))
+		return
+	}
+
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	SendJSON(ctx, map[string]any{
+		"status":  "success",
+		"message": "pricing catalog rebuilt successfully",
 	})
 }
 
