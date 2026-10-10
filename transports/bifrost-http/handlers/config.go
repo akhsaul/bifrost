@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,7 +22,11 @@ import (
 	"github.com/maximhq/bifrost/framework/configstore"
 	configstoreTables "github.com/maximhq/bifrost/framework/configstore/tables"
 	"github.com/maximhq/bifrost/framework/encrypt"
+	"github.com/maximhq/bifrost/framework/logstore"
 	"github.com/maximhq/bifrost/framework/modelcatalog"
+	"github.com/maximhq/bifrost/framework/objectstore"
+	"github.com/maximhq/bifrost/framework/vault"
+	"github.com/maximhq/bifrost/framework/vectorstore"
 	"github.com/maximhq/bifrost/plugins/compat"
 	"github.com/maximhq/bifrost/transports/bifrost-http/lib"
 	"github.com/valyala/fasthttp"
@@ -307,7 +312,7 @@ func (h *ConfigHandler) exportConfig(ctx *fasthttp.RequestCtx) {
 		formattedProviders := make(map[string]any)
 		for pName, pCfg := range providersConfig {
 			redacted := pCfg.Redacted()
-			formattedProviders[string(pName)] = formatExportProviderConfig(redacted)
+			formattedProviders[string(pName)] = formatExportProviderConfig(pName, redacted)
 		}
 		exportMap["providers"] = formattedProviders
 	}
@@ -391,27 +396,726 @@ func (h *ConfigHandler) exportConfig(ctx *fasthttp.RequestCtx) {
 		exportMap["plugins"] = pluginConfigs
 	}
 
-	// Storage configs if configured
-	if h.store.ConfigStore != nil {
+	// Storage configs. config_store comes from the preserved boot-time config
+	// (the DB cannot describe its own connection); vector/logs stores prefer
+	// the DB row with the boot-time file config as fallback.
+	if h.store.ConfigStoreConfig != nil {
+		exportMap["config_store"] = formatExportConfigStoreConfig(h.store.ConfigStoreConfig)
+	} else if h.store.ConfigStore != nil {
 		exportMap["config_store"] = map[string]any{
 			"enabled": true,
-		}
-		if vs, err := h.store.ConfigStore.GetVectorStoreConfig(ctx); err == nil && vs != nil {
-			exportMap["vector_store"] = vs
-		}
-		if ls, err := h.store.ConfigStore.GetLogsStoreConfig(ctx); err == nil && ls != nil {
-			exportMap["logs_store"] = ls
 		}
 	} else {
 		exportMap["config_store"] = map[string]any{
 			"enabled": false,
 		}
-		if h.store.LogsStoreConfig != nil {
-			exportMap["logs_store"] = h.store.LogsStoreConfig
+	}
+	var vs *vectorstore.Config
+	if h.store.ConfigStore != nil {
+		if cfg, err := h.store.ConfigStore.GetVectorStoreConfig(ctx); err == nil && cfg != nil {
+			vs = cfg
+		}
+	}
+	if vs == nil {
+		vs = h.store.VectorStoreConfig
+	}
+	if vs != nil {
+		if formatted := formatExportVectorStoreConfig(vs); formatted != nil {
+			exportMap["vector_store"] = formatted
+		}
+	}
+	var ls *logstore.Config
+	if h.store.ConfigStore != nil {
+		if cfg, err := h.store.ConfigStore.GetLogsStoreConfig(ctx); err == nil && cfg != nil {
+			ls = cfg
+		}
+	}
+	if ls == nil {
+		ls = h.store.LogsStoreConfig
+	}
+	if ls != nil {
+		if formatted := formatExportLogsStoreConfig(ls); formatted != nil {
+			exportMap["logs_store"] = formatted
 		}
 	}
 
+	stripExportConfigHash(exportMap)
 	SendJSON(ctx, exportMap)
+}
+
+// exportConfigSecretString renders a SecretVar as the string form config.json
+// accepts: the secret reference ("env.FOO"/"vault.path") when one exists,
+// otherwise the literal value. An empty result means "unset" and is omitted.
+func exportConfigSecretString(sv *schemas.SecretVar) string {
+	if sv == nil {
+		return ""
+	}
+	if sv.IsFromSecret() {
+		if ref := sv.GetRawRef(); ref != "" {
+			return ref
+		}
+		if sv.Val != "" {
+			if sv.IsRedacted() {
+				return "<redacted>"
+			}
+			return sv.Val
+		}
+		return ""
+	}
+	if sv.Val == "" {
+		return ""
+	}
+	if sv.IsRedacted() {
+		return "<redacted>"
+	}
+	return sv.Val
+}
+
+// exportConfigSecretValue renders a *SecretVar into the config.json string
+// form, returning (nil, false) when unset so the caller can omit the key.
+// A non-nil *SecretVar value always survives redaction as "<redacted>" or a
+// resolved literal — never as the {value,ref,type} object form.
+func exportConfigSecretValue(sv *schemas.SecretVar) (any, bool) {
+	if sv == nil {
+		return nil, false
+	}
+	if s := exportConfigSecretString(sv); s != "" {
+		return s, true
+	}
+	return nil, false
+}
+
+// exportConfigSecretStruct renders a SecretVar value (pointer or value) into
+// the config.json string form, returning (nil, false) when unset.
+func exportConfigSecretStruct(sv schemas.SecretVar) (any, bool) {
+	if s := exportConfigSecretString(&sv); s != "" {
+		return s, true
+	}
+	return nil, false
+}
+
+// exportConfigDuration renders a schemas.Duration as the Go duration string
+// config.json expects (e.g. "5s"), returning "" when unset.
+func exportConfigDuration(d schemas.Duration) string {
+	if time.Duration(d) == 0 {
+		return ""
+	}
+	return time.Duration(d).String()
+}
+
+// formatExportConfigStoreConfig renders the effective config-store connection
+// config.json expects: {enabled, type, config: {path | postgres fields}, vault_store?}.
+// The DB cannot describe its own connection, so this uses the boot-time config
+// preserved on h.store.ConfigStoreConfig (file section or generated default).
+func formatExportConfigStoreConfig(c *configstore.Config) map[string]any {
+	if c == nil {
+		return map[string]any{"enabled": true}
+	}
+	if !c.Enabled {
+		return map[string]any{"enabled": false}
+	}
+	out := map[string]any{"enabled": c.Enabled}
+	if c.Type != "" {
+		out["type"] = string(c.Type)
+	}
+	switch cfg := c.Config.(type) {
+	case *configstore.SQLiteConfig:
+		if cfg != nil && cfg.Path != "" {
+			out["config"] = map[string]any{"path": cfg.Path}
+		}
+	case configstore.SQLiteConfig:
+		if cfg.Path != "" {
+			out["config"] = map[string]any{"path": cfg.Path}
+		}
+	case *configstore.PostgresConfig:
+		if cfg != nil {
+			if formatted := formatExportPostgresConfig(cfg); len(formatted) > 0 {
+				out["config"] = formatted
+			}
+		}
+	case configstore.PostgresConfig:
+		if formatted := formatExportPostgresConfig(&cfg); len(formatted) > 0 {
+			out["config"] = formatted
+		}
+	default:
+		// Re-marshal unknown shapes so they round-trip as an object rather
+		// than being dropped silently. SecretVars inside still serialize as
+		// objects here — see formatExportVectorStoreConfig for why that path
+		// is handled field-by-field instead.
+		if c.Config != nil {
+			if raw, err := json.Marshal(c.Config); err == nil && len(raw) > 0 && string(raw) != "null" {
+				var decoded any
+				if err := json.Unmarshal(raw, &decoded); err == nil {
+					if m, ok := decoded.(map[string]any); ok && len(m) > 0 {
+						out["config"] = m
+					}
+				}
+			}
+		}
+	}
+	if c.VaultStore != nil && (c.VaultStore.Enabled || c.VaultStore.Type != "" || c.VaultStore.Doppler != nil) {
+		out["vault_store"] = formatExportVaultConfig(c.VaultStore)
+	}
+	return out
+}
+
+// formatExportPostgresConfig renders a postgres connection block as string
+// fields, matching transports/config.schema.json (host/port/user/db_name as
+// strings, password or password_command).
+func formatExportPostgresConfig(c *configstore.PostgresConfig) map[string]any {
+	if c == nil {
+		return nil
+	}
+	out := make(map[string]any)
+	if v, ok := exportConfigSecretValue(c.Host); ok {
+		out["host"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.Port); ok {
+		out["port"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.User); ok {
+		out["user"] = v
+	}
+	if c.PasswordCommand != nil {
+		pc := map[string]any{"command": c.PasswordCommand.Command}
+		if len(c.PasswordCommand.Args) > 0 {
+			pc["args"] = c.PasswordCommand.Args
+		}
+		if c.PasswordCommand.Timeout != "" {
+			pc["timeout"] = c.PasswordCommand.Timeout
+		}
+		if c.PasswordCommand.CacheTTL != "" {
+			pc["cache_ttl"] = c.PasswordCommand.CacheTTL
+		}
+		out["password_command"] = pc
+	} else if v, ok := exportConfigSecretValue(c.Password); ok {
+		out["password"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.DBName); ok {
+		out["db_name"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.SSLMode); ok {
+		out["ssl_mode"] = v
+	}
+	if c.MaxIdleConns > 0 {
+		out["max_idle_conns"] = c.MaxIdleConns
+	}
+	if c.MaxOpenConns > 0 {
+		out["max_open_conns"] = c.MaxOpenConns
+	}
+	if c.ConnMaxLifetime != "" {
+		out["conn_max_lifetime"] = c.ConnMaxLifetime
+	}
+	if c.ConnMaxIdleTime != "" {
+		out["conn_max_idle_time"] = c.ConnMaxIdleTime
+	}
+	// MatView fields are logstore-only; configstore.PostgresConfig has none.
+	return out
+}
+
+func formatExportVaultConfig(c *vault.Config) map[string]any {
+	if c == nil {
+		return nil
+	}
+	out := map[string]any{"enabled": c.Enabled}
+	if c.Type != "" {
+		out["type"] = string(c.Type)
+	}
+	if c.Prefix != "" {
+		out["prefix"] = c.Prefix
+	}
+	if c.AccessMode != "" {
+		out["access_mode"] = string(c.AccessMode)
+	}
+	if c.Doppler != nil {
+		d := make(map[string]any)
+		if v, ok := exportConfigSecretValue(c.Doppler.Token); ok {
+			d["token"] = v
+		}
+		if v, ok := exportConfigSecretValue(c.Doppler.Project); ok {
+			d["project"] = v
+		}
+		if v, ok := exportConfigSecretValue(c.Doppler.Config); ok {
+			d["config"] = v
+		}
+		if v, ok := exportConfigSecretValue(c.Doppler.BaseURL); ok {
+			d["base_url"] = v
+		}
+		if c.Doppler.TimeoutSec > 0 {
+			d["timeout_sec"] = c.Doppler.TimeoutSec
+		}
+		if len(d) > 0 {
+			out["doppler"] = d
+		}
+	}
+	if len(c.AWS) > 0 {
+		var decoded any
+		if err := json.Unmarshal(c.AWS, &decoded); err == nil {
+			out["aws"] = decoded
+		}
+	}
+	if len(c.GCP) > 0 {
+		var decoded any
+		if err := json.Unmarshal(c.GCP, &decoded); err == nil {
+			out["gcp"] = decoded
+		}
+	}
+	if len(c.HashiCorp) > 0 {
+		var decoded any
+		if err := json.Unmarshal(c.HashiCorp, &decoded); err == nil {
+			out["hashicorp"] = decoded
+		}
+	}
+	return out
+}
+
+// formatExportVectorStoreConfig renders the effective vector-store config as
+// {enabled, type, config} with SecretVars flattened to strings. A legacy
+// string-valued Config (pre-fix DB rows via the old GetVectorStoreConfig) is
+// decoded defensively instead of being emitted as a JSON string.
+func formatExportVectorStoreConfig(c *vectorstore.Config) map[string]any {
+	if c == nil {
+		return nil
+	}
+	out := map[string]any{"enabled": c.Enabled, "type": string(c.Type)}
+	cfg := c.Config
+	if s, ok := cfg.(string); ok {
+		var decoded any
+		if err := json.Unmarshal([]byte(s), &decoded); err == nil {
+			cfg = decoded
+		} else {
+			return out
+		}
+	}
+	switch backend := cfg.(type) {
+	case vectorstore.WeaviateConfig:
+		out["config"] = formatExportWeaviateConfig(&backend)
+	case *vectorstore.WeaviateConfig:
+		if backend != nil {
+			out["config"] = formatExportWeaviateConfig(backend)
+		}
+	case vectorstore.RedisConfig:
+		out["config"] = formatExportRedisConfig(&backend)
+	case *vectorstore.RedisConfig:
+		if backend != nil {
+			out["config"] = formatExportRedisConfig(backend)
+		}
+	case vectorstore.QdrantConfig:
+		out["config"] = formatExportQdrantConfig(&backend)
+	case *vectorstore.QdrantConfig:
+		if backend != nil {
+			out["config"] = formatExportQdrantConfig(backend)
+		}
+	case vectorstore.PineconeConfig:
+		out["config"] = formatExportPineconeConfig(&backend)
+	case *vectorstore.PineconeConfig:
+		if backend != nil {
+			out["config"] = formatExportPineconeConfig(backend)
+		}
+	case vectorstore.ChromemConfig:
+		if formatted := formatExportChromemConfig(&backend); len(formatted) > 0 {
+			out["config"] = formatted
+		}
+	case *vectorstore.ChromemConfig:
+		if backend != nil {
+			if formatted := formatExportChromemConfig(backend); len(formatted) > 0 {
+				out["config"] = formatted
+			}
+		}
+	case map[string]any:
+		if len(backend) > 0 {
+			out["config"] = backend
+		}
+	default:
+		if cfg != nil {
+			if raw, err := json.Marshal(cfg); err == nil && len(raw) > 0 && string(raw) != "null" {
+				var decoded any
+				if err := json.Unmarshal(raw, &decoded); err == nil {
+					if m, ok := decoded.(map[string]any); ok && len(m) > 0 {
+						out["config"] = m
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
+func formatExportWeaviateConfig(c *vectorstore.WeaviateConfig) map[string]any {
+	if c == nil {
+		return nil
+	}
+	out := make(map[string]any)
+	if c.Scheme != "" {
+		out["scheme"] = c.Scheme
+	}
+	if v, ok := exportConfigSecretValue(c.Host); ok {
+		out["host"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.APIKey); ok {
+		out["api_key"] = v
+	}
+	if c.GrpcConfig != nil {
+		g := make(map[string]any)
+		if v, ok := exportConfigSecretValue(c.GrpcConfig.Host); ok {
+			g["host"] = v
+		}
+		if c.GrpcConfig.Secured {
+			g["secured"] = true
+		}
+		if len(g) > 0 {
+			out["grpc_config"] = g
+		}
+	}
+	if len(c.Headers) > 0 {
+		out["headers"] = c.Headers
+	}
+	if s := exportConfigDuration(c.Timeout); s != "" {
+		out["timeout"] = s
+	}
+	return out
+}
+
+func formatExportRedisConfig(c *vectorstore.RedisConfig) map[string]any {
+	if c == nil {
+		return nil
+	}
+	out := make(map[string]any)
+	// db is *SecretVar but schema wants an integer; coerce numeric literals.
+	if c.Addr != nil {
+		if v, ok := exportConfigSecretValue(c.Addr); ok {
+			out["addr"] = v
+		}
+	}
+	if v, ok := exportConfigSecretValue(c.Username); ok {
+		out["username"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.Password); ok {
+		out["password"] = v
+	}
+	if c.DB != nil {
+		if s := exportConfigSecretString(c.DB); s != "" {
+			if n, err := strconv.Atoi(strings.TrimSpace(s)); err == nil {
+				out["db"] = n
+			} else {
+				out["db"] = s
+			}
+		}
+	}
+	setSecretBool := func(sv *schemas.SecretVar, key string) {
+		if sv == nil {
+			return
+		}
+		if s := exportConfigSecretString(sv); s != "" {
+			if b, err := strconv.ParseBool(strings.TrimSpace(s)); err == nil {
+				out[key] = b
+			} else {
+				out[key] = s
+			}
+		}
+	}
+	setSecretBool(c.UseTLS, "use_tls")
+	setSecretBool(c.InsecureSkipVerify, "insecure_skip_verify")
+	if v, ok := exportConfigSecretValue(c.CACertPEM); ok {
+		out["ca_cert_pem"] = v
+	}
+	setSecretBool(c.ClusterMode, "cluster_mode")
+	if c.PoolSize > 0 {
+		out["pool_size"] = c.PoolSize
+	}
+	if c.MaxActiveConns > 0 {
+		out["max_active_conns"] = c.MaxActiveConns
+	}
+	if c.MinIdleConns > 0 {
+		out["min_idle_conns"] = c.MinIdleConns
+	}
+	if c.MaxIdleConns > 0 {
+		out["max_idle_conns"] = c.MaxIdleConns
+	}
+	if s := exportConfigDuration(c.ConnMaxLifetime); s != "" {
+		out["conn_max_lifetime"] = s
+	}
+	if s := exportConfigDuration(c.ConnMaxIdleTime); s != "" {
+		out["conn_max_idle_time"] = s
+	}
+	if s := exportConfigDuration(c.DialTimeout); s != "" {
+		out["dial_timeout"] = s
+	}
+	if s := exportConfigDuration(c.ReadTimeout); s != "" {
+		out["read_timeout"] = s
+	}
+	if s := exportConfigDuration(c.WriteTimeout); s != "" {
+		out["write_timeout"] = s
+	}
+	if s := exportConfigDuration(c.ContextTimeout); s != "" {
+		out["context_timeout"] = s
+	}
+	return out
+}
+
+func formatExportQdrantConfig(c *vectorstore.QdrantConfig) map[string]any {
+	if c == nil {
+		return nil
+	}
+	out := make(map[string]any)
+	if v, ok := exportConfigSecretStruct(c.Host); ok {
+		out["host"] = v
+	}
+	// port is a SecretVar but schema wants an integer; coerce numeric literals.
+	if s := exportConfigSecretString(&c.Port); s != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(s)); err == nil {
+			out["port"] = n
+		} else {
+			out["port"] = s
+		}
+	}
+	if v, ok := exportConfigSecretStruct(c.APIKey); ok {
+		out["api_key"] = v
+	}
+	if s := exportConfigSecretString(&c.UseTLS); s != "" {
+		if b, err := strconv.ParseBool(strings.TrimSpace(s)); err == nil {
+			out["use_tls"] = b
+		} else {
+			out["use_tls"] = s
+		}
+	}
+	if s := exportConfigSecretString(&c.MaxRecvMsgSizeMB); s != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(s)); err == nil {
+			out["max_recv_msg_size_mb"] = n
+		} else {
+			out["max_recv_msg_size_mb"] = s
+		}
+	}
+	return out
+}
+
+func formatExportPineconeConfig(c *vectorstore.PineconeConfig) map[string]any {
+	if c == nil {
+		return nil
+	}
+	out := make(map[string]any)
+	if v, ok := exportConfigSecretStruct(c.APIKey); ok {
+		out["api_key"] = v
+	}
+	if v, ok := exportConfigSecretStruct(c.IndexHost); ok {
+		out["index_host"] = v
+	}
+	return out
+}
+
+func formatExportChromemConfig(c *vectorstore.ChromemConfig) map[string]any {
+	if c == nil {
+		return nil
+	}
+	out := make(map[string]any)
+	if strings.TrimSpace(c.Path) != "" {
+		out["path"] = c.Path
+	}
+	if c.Compress {
+		out["compress"] = true
+	}
+	return out
+}
+
+// formatExportLogsStoreConfig renders the effective logs-store config as
+// {enabled, type, retention_days?, config, writer?, object_storage?} with
+// SecretVars flattened to strings.
+func formatExportLogsStoreConfig(c *logstore.Config) map[string]any {
+	if c == nil {
+		return nil
+	}
+	out := map[string]any{"enabled": c.Enabled, "type": string(c.Type)}
+	if c.RetentionDays > 0 {
+		out["retention_days"] = c.RetentionDays
+	}
+	switch cfg := c.Config.(type) {
+	case *logstore.SQLiteConfig:
+		if cfg != nil && cfg.Path != "" {
+			out["config"] = map[string]any{"path": cfg.Path}
+		}
+	case logstore.SQLiteConfig:
+		if cfg.Path != "" {
+			out["config"] = map[string]any{"path": cfg.Path}
+		}
+	case *logstore.PostgresConfig:
+		if cfg != nil {
+			pg := formatExportPostgresConfig(&cfg.Config)
+			if s := cfg.MatViewRefreshInterval; s != "" {
+				pg["matview_refresh_interval"] = s
+			}
+			if s := cfg.MatViewRefreshTimeout; s != "" {
+				pg["matview_refresh_timeout"] = s
+			}
+			if len(pg) > 0 {
+				out["config"] = pg
+			}
+		}
+	case logstore.PostgresConfig:
+		pg := formatExportPostgresConfig(&cfg.Config)
+		if s := cfg.MatViewRefreshInterval; s != "" {
+			pg["matview_refresh_interval"] = s
+		}
+		if s := cfg.MatViewRefreshTimeout; s != "" {
+			pg["matview_refresh_timeout"] = s
+		}
+		if len(pg) > 0 {
+			out["config"] = pg
+		}
+	case *logstore.ClickHouseConfig:
+		if cfg != nil {
+			if formatted := formatExportClickHouseConfig(cfg); len(formatted) > 0 {
+				out["config"] = formatted
+			}
+		}
+	case logstore.ClickHouseConfig:
+		if formatted := formatExportClickHouseConfig(&cfg); len(formatted) > 0 {
+			out["config"] = formatted
+		}
+	default:
+		if c.Config != nil {
+			if raw, err := json.Marshal(c.Config); err == nil && len(raw) > 0 && string(raw) != "null" {
+				var decoded any
+				if err := json.Unmarshal(raw, &decoded); err == nil {
+					if m, ok := decoded.(map[string]any); ok && len(m) > 0 {
+						out["config"] = m
+					}
+				}
+			}
+		}
+	}
+	if c.Writer != nil {
+		w := make(map[string]any)
+		if c.Writer.MaxBatchSize > 0 {
+			w["max_batch_size"] = c.Writer.MaxBatchSize
+		}
+		if c.Writer.BatchInterval != "" {
+			w["batch_interval"] = c.Writer.BatchInterval
+		}
+		if c.Writer.MaxBatchBytes > 0 {
+			w["max_batch_bytes"] = c.Writer.MaxBatchBytes
+		}
+		if c.Writer.WriteQueueCapacity > 0 {
+			w["write_queue_capacity"] = c.Writer.WriteQueueCapacity
+		}
+		if c.Writer.DeferredUsageConcurrency > 0 {
+			w["deferred_usage_concurrency"] = c.Writer.DeferredUsageConcurrency
+		}
+		if len(w) > 0 {
+			out["writer"] = w
+		}
+	}
+	if c.ObjectStorage != nil {
+		if formatted := formatExportObjectStorageConfig(c.ObjectStorage); formatted != nil {
+			out["object_storage"] = formatted
+		}
+	}
+	if len(c.ObjectStorageExcludeFields) > 0 {
+		out["object_storage_exclude_fields"] = c.ObjectStorageExcludeFields
+	}
+	return out
+}
+
+func formatExportClickHouseConfig(c *logstore.ClickHouseConfig) map[string]any {
+	if c == nil {
+		return nil
+	}
+	out := make(map[string]any)
+	if v, ok := exportConfigSecretValue(c.Host); ok {
+		out["host"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.Port); ok {
+		out["port"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.Database); ok {
+		out["database"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.Username); ok {
+		out["username"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.Password); ok {
+		out["password"] = v
+	}
+	if c.Protocol != "" {
+		out["protocol"] = c.Protocol
+	}
+	if c.Secure {
+		out["secure"] = true
+	}
+	if c.DialTimeout > 0 {
+		out["dial_timeout"] = c.DialTimeout
+	}
+	if c.Cluster != "" {
+		out["cluster"] = c.Cluster
+	}
+	return out
+}
+
+func formatExportObjectStorageConfig(c *objectstore.Config) map[string]any {
+	if c == nil {
+		return nil
+	}
+	out := map[string]any{"type": string(c.Type)}
+	if v, ok := exportConfigSecretStruct(c.Bucket); ok {
+		out["bucket"] = v
+	}
+	if strings.TrimSpace(c.Prefix) != "" {
+		out["prefix"] = c.Prefix
+	}
+	if c.Compress {
+		out["compress"] = true
+	}
+	if v, ok := exportConfigSecretValue(c.Region); ok {
+		out["region"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.Endpoint); ok {
+		out["endpoint"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.AccessKeyID); ok {
+		out["access_key_id"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.SecretAccessKey); ok {
+		out["secret_access_key"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.SessionToken); ok {
+		out["session_token"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.RoleARN); ok {
+		out["role_arn"] = v
+	}
+	if c.ForcePathStyle {
+		out["force_path_style"] = true
+	}
+	if v, ok := exportConfigSecretValue(c.Credentials); ok {
+		out["credentials"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.CredentialsJSON); ok {
+		out["credentials_json"] = v
+	}
+	if v, ok := exportConfigSecretValue(c.ProjectID); ok {
+		out["project_id"] = v
+	}
+	return out
+}
+
+// stripExportConfigHash removes every "config_hash" key from an exported
+// config tree. Hashes are recomputed at load time and compared against the DB,
+// so they are noise in a generated file — and stale ones mislead.
+func stripExportConfigHash(v any) {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return
+	}
+	delete(m, "config_hash")
+	for _, child := range m {
+		switch c := child.(type) {
+		case map[string]any:
+			stripExportConfigHash(c)
+		case []any:
+			for _, item := range c {
+				stripExportConfigHash(item)
+			}
+		}
+	}
 }
 
 func formatExportClientConfig(c configstore.ClientConfig) map[string]any {
@@ -512,7 +1216,7 @@ func formatExportClientConfig(c configstore.ClientConfig) map[string]any {
 	return out
 }
 
-func formatExportProviderConfig(p *configstore.ProviderConfig) map[string]any {
+func formatExportProviderConfig(name schemas.ModelProvider, p *configstore.ProviderConfig) map[string]any {
 	if p == nil {
 		return nil
 	}
@@ -589,7 +1293,14 @@ func formatExportProviderConfig(p *configstore.ProviderConfig) map[string]any {
 	if p.ProxyConfig != nil {
 		out["proxy_config"] = p.ProxyConfig
 	}
-	out["custom_provider_config"] = formatExportCustomProviderConfig(p.CustomProviderConfig)
+	// custom_provider_config only exists for custom providers (names outside
+	// schemas.StandardProviders). Standard providers never carry it, even when
+	// a stale row has one attached.
+	if !bifrost.IsStandardProvider(name) && p.CustomProviderConfig != nil {
+		if formatted := formatExportCustomProviderConfig(p.CustomProviderConfig); len(formatted) > 0 {
+			out["custom_provider_config"] = formatted
+		}
+	}
 	if p.OpenAIConfig != nil {
 		out["openai_config"] = p.OpenAIConfig
 	}
@@ -703,30 +1414,35 @@ func formatExportFrameworkConfig(fc *configstoreTables.TableFrameworkConfig) map
 	} else {
 		pricing["live_models_sync_interval"] = 86400
 	}
-	if fc.ConfigHash != "" {
-		pricing["config_hash"] = fc.ConfigHash
-	}
-
 	return map[string]any{
 		"pricing": pricing,
 	}
 }
 
 func formatExportCustomProviderConfig(c *schemas.CustomProviderConfig) map[string]any {
+	if c == nil {
+		return nil
+	}
 	out := make(map[string]any)
-	if c != nil {
-		if c.BaseProviderType != "" {
-			out["base_provider_type"] = c.BaseProviderType
-		}
-		if c.IsKeyLess {
-			out["is_key_less"] = c.IsKeyLess
-		}
+	if c.BaseProviderType != "" {
+		out["base_provider_type"] = c.BaseProviderType
+	}
+	if c.IsKeyLess {
+		out["is_key_less"] = c.IsKeyLess
+	}
+	if c.DoesNotSendDoneMarker {
+		out["does_not_send_done_marker"] = c.DoesNotSendDoneMarker
+	}
+	if c.WaitForUsage {
+		out["wait_for_usage"] = c.WaitForUsage
+	}
+	// AllowedRequests nil means "all operations allowed" — omit the key rather
+	// than materializing every default.
+	if c.AllowedRequests != nil {
 		out["allowed_requests"] = formatExportAllowedRequests(c.AllowedRequests)
-		if len(c.RequestPathOverrides) > 0 {
-			out["request_path_overrides"] = c.RequestPathOverrides
-		}
-	} else {
-		out["allowed_requests"] = formatExportAllowedRequests(nil)
+	}
+	if len(c.RequestPathOverrides) > 0 {
+		out["request_path_overrides"] = c.RequestPathOverrides
 	}
 	return out
 }
@@ -813,6 +1529,7 @@ func formatExportAllowedRequests(ar *schemas.AllowedRequests) map[string]bool {
 		"compaction":              ar.Compaction,
 		"embedding":               ar.Embedding,
 		"rerank":                  ar.Rerank,
+		"decisions":               ar.Decision,
 		"ocr":                     ar.OCR,
 		"speech":                  ar.Speech,
 		"speech_stream":           ar.SpeechStream,
@@ -824,6 +1541,7 @@ func formatExportAllowedRequests(ar *schemas.AllowedRequests) map[string]bool {
 		"image_edit_stream":       ar.ImageEditStream,
 		"image_variation":         ar.ImageVariation,
 		"video_generation":        ar.VideoGeneration,
+		"video_edit":              ar.VideoEdit,
 		"video_retrieve":          ar.VideoRetrieve,
 		"video_download":          ar.VideoDownload,
 		"video_delete":            ar.VideoDelete,
@@ -887,26 +1605,461 @@ func formatExportGovernanceConfig(g *configstore.GovernanceConfig) map[string]an
 		out["auth_config"] = g.AuthConfig
 	}
 	if len(g.VirtualKeys) > 0 {
-		out["virtual_keys"] = g.VirtualKeys
+		vks := make([]any, 0, len(g.VirtualKeys))
+		for i := range g.VirtualKeys {
+			vks = append(vks, formatExportVirtualKey(&g.VirtualKeys[i]))
+		}
+		out["virtual_keys"] = vks
 	}
 	if len(g.Teams) > 0 {
-		out["teams"] = g.Teams
+		teams := make([]any, 0, len(g.Teams))
+		for i := range g.Teams {
+			teams = append(teams, formatExportTeam(&g.Teams[i]))
+		}
+		out["teams"] = teams
 	}
 	if len(g.Customers) > 0 {
-		out["customers"] = g.Customers
+		customers := make([]any, 0, len(g.Customers))
+		for i := range g.Customers {
+			customers = append(customers, formatExportCustomer(&g.Customers[i]))
+		}
+		out["customers"] = customers
 	}
 	if len(g.Budgets) > 0 {
-		out["budgets"] = g.Budgets
+		budgets := make([]any, 0, len(g.Budgets))
+		for i := range g.Budgets {
+			budgets = append(budgets, formatExportBudget(&g.Budgets[i]))
+		}
+		out["budgets"] = budgets
 	}
 	if len(g.RateLimits) > 0 {
-		out["rate_limits"] = g.RateLimits
+		limits := make([]any, 0, len(g.RateLimits))
+		for i := range g.RateLimits {
+			limits = append(limits, formatExportRateLimit(&g.RateLimits[i]))
+		}
+		out["rate_limits"] = limits
+	}
+	if len(g.ModelConfigs) > 0 {
+		mcs := make([]any, 0, len(g.ModelConfigs))
+		for i := range g.ModelConfigs {
+			mcs = append(mcs, formatExportModelConfig(&g.ModelConfigs[i]))
+		}
+		out["model_configs"] = mcs
+	}
+	if len(g.Providers) > 0 {
+		provs := make([]any, 0, len(g.Providers))
+		for i := range g.Providers {
+			provs = append(provs, formatExportGovernanceProvider(&g.Providers[i]))
+		}
+		out["providers"] = provs
 	}
 	if len(g.RoutingRules) > 0 {
-		out["routing_rules"] = g.RoutingRules
+		rules := make([]any, 0, len(g.RoutingRules))
+		for i := range g.RoutingRules {
+			rules = append(rules, formatExportRoutingRule(&g.RoutingRules[i]))
+		}
+		out["routing_rules"] = rules
+	}
+	if len(g.PricingOverrides) > 0 {
+		overrides := make([]any, 0, len(g.PricingOverrides))
+		for i := range g.PricingOverrides {
+			overrides = append(overrides, formatExportPricingOverride(&g.PricingOverrides[i]))
+		}
+		out["pricing_overrides"] = overrides
 	}
 	if g.ComplexityAnalyzerConfig != nil {
 		out["complexity_analyzer_config"] = g.ComplexityAnalyzerConfig
 	}
+	return out
+}
+
+// The formatExport* family below re-emits governance rows using only fields
+// transports/config.schema.json accepts. In particular they drop every
+// config_hash (recomputed at load), DB timestamps, usage counters, and
+// relation expansions — none of which belong in a generated file.
+
+func formatExportVirtualKey(vk *configstoreTables.TableVirtualKey) map[string]any {
+	if vk == nil {
+		return nil
+	}
+	out := map[string]any{"id": vk.ID, "name": vk.Name}
+	if vk.Description != "" {
+		out["description"] = vk.Description
+	}
+	if s := exportConfigSecretString(&vk.Value); s != "" {
+		out["value"] = s
+	}
+	if vk.IsActive != nil {
+		out["is_active"] = *vk.IsActive
+	}
+	if vk.ExpiresAt != nil && !vk.ExpiresAt.IsZero() {
+		out["expires_at"] = vk.ExpiresAt.UTC().Format(time.RFC3339)
+	}
+	if vk.CalendarAligned {
+		out["calendar_aligned"] = true
+	}
+	if vk.AllowAllProviders {
+		out["allow_all_providers"] = true
+	}
+	if vk.TeamID != nil && *vk.TeamID != "" {
+		out["team_id"] = *vk.TeamID
+	}
+	if vk.CustomerID != nil && *vk.CustomerID != "" {
+		out["customer_id"] = *vk.CustomerID
+	}
+	if vk.RateLimitID != nil && *vk.RateLimitID != "" {
+		out["rate_limit_id"] = *vk.RateLimitID
+	}
+	if len(vk.ProviderConfigs) > 0 {
+		pcs := make([]any, 0, len(vk.ProviderConfigs))
+		for i := range vk.ProviderConfigs {
+			pcs = append(pcs, formatExportVKProviderConfig(&vk.ProviderConfigs[i]))
+		}
+		out["provider_configs"] = pcs
+	}
+	if len(vk.MCPConfigs) > 0 {
+		mcs := make([]any, 0, len(vk.MCPConfigs))
+		for i := range vk.MCPConfigs {
+			mcs = append(mcs, formatExportVKMCPConfig(&vk.MCPConfigs[i]))
+		}
+		out["mcp_configs"] = mcs
+	}
+	return out
+}
+
+func formatExportVKProviderConfig(pc *configstoreTables.TableVirtualKeyProviderConfig) map[string]any {
+	if pc == nil {
+		return nil
+	}
+	out := map[string]any{"provider": pc.Provider}
+	if pc.Weight != nil {
+		out["weight"] = *pc.Weight
+	}
+	if len(pc.AllowedModels) > 0 {
+		out["allowed_models"] = []string(pc.AllowedModels)
+	}
+	if len(pc.BlacklistedModels) > 0 {
+		out["blacklisted_models"] = []string(pc.BlacklistedModels)
+	}
+	if pc.AllowAllKeys {
+		out["allow_all_keys"] = true
+	}
+	if pc.RateLimitID != nil && *pc.RateLimitID != "" {
+		out["rate_limit_id"] = *pc.RateLimitID
+	}
+	if keyIDs := pc.KeyIDs(); len(keyIDs) > 0 {
+		out["key_ids"] = append([]string(nil), keyIDs...)
+	}
+	return out
+}
+
+func formatExportVKMCPConfig(mc *configstoreTables.TableVirtualKeyMCPConfig) map[string]any {
+	if mc == nil {
+		return nil
+	}
+	out := make(map[string]any)
+	if mc.MCPClientName != "" {
+		out["mcp_client_name"] = mc.MCPClientName
+	} else if mc.MCPClientID != 0 {
+		out["mcp_client_id"] = mc.MCPClientID
+	}
+	if len(mc.ToolsToExecute) > 0 {
+		out["tools_to_execute"] = []string(mc.ToolsToExecute)
+	}
+	return out
+}
+
+func formatExportTeam(t *configstoreTables.TableTeam) map[string]any {
+	if t == nil {
+		return nil
+	}
+	out := map[string]any{"id": t.ID, "name": t.Name}
+	if t.SourceID != nil && *t.SourceID != "" {
+		out["source_id"] = *t.SourceID
+	}
+	if t.CustomerID != nil && *t.CustomerID != "" {
+		out["customer_id"] = *t.CustomerID
+	}
+	if t.RateLimitID != nil && *t.RateLimitID != "" {
+		out["rate_limit_id"] = *t.RateLimitID
+	}
+	if len(t.ParsedProfile) > 0 {
+		out["profile"] = t.ParsedProfile
+	}
+	if len(t.ParsedConfig) > 0 {
+		out["config"] = t.ParsedConfig
+	}
+	if len(t.ParsedClaims) > 0 {
+		out["claims"] = t.ParsedClaims
+	}
+	if t.CalendarAligned {
+		out["calendar_aligned"] = true
+	}
+	return out
+}
+
+func formatExportCustomer(c *configstoreTables.TableCustomer) map[string]any {
+	if c == nil {
+		return nil
+	}
+	out := map[string]any{"id": c.ID, "name": c.Name}
+	if len(c.Budgets) > 0 {
+		bs := make([]any, 0, len(c.Budgets))
+		for i := range c.Budgets {
+			bs = append(bs, formatExportBudget(&c.Budgets[i]))
+		}
+		out["budgets"] = bs
+	}
+	if c.BudgetID != nil && *c.BudgetID != "" {
+		out["budget_id"] = *c.BudgetID
+	}
+	if c.RateLimitID != nil && *c.RateLimitID != "" {
+		out["rate_limit_id"] = *c.RateLimitID
+	}
+	if c.CalendarAligned {
+		out["calendar_aligned"] = true
+	}
+	return out
+}
+
+func formatExportBudget(b *configstoreTables.TableBudget) map[string]any {
+	if b == nil {
+		return nil
+	}
+	out := map[string]any{"id": b.ID, "max_limit": b.MaxLimit, "reset_duration": b.ResetDuration}
+	if b.ResetConfig != nil {
+		if raw, err := json.Marshal(b.ResetConfig); err == nil {
+			var decoded any
+			if err := json.Unmarshal(raw, &decoded); err == nil {
+				if m, ok := decoded.(map[string]any); ok && len(m) > 0 {
+					out["reset_config"] = m
+				}
+			}
+		}
+	}
+	if b.CurrentUsage != 0 {
+		out["current_usage"] = b.CurrentUsage
+	}
+	if !b.LastReset.IsZero() {
+		out["last_reset"] = b.LastReset.UTC().Format(time.RFC3339)
+	}
+	if b.VirtualKeyID != nil && *b.VirtualKeyID != "" {
+		out["virtual_key_id"] = *b.VirtualKeyID
+	}
+	if b.ProviderConfigID != nil {
+		out["provider_config_id"] = *b.ProviderConfigID
+	}
+	if b.ModelConfigID != nil && *b.ModelConfigID != "" {
+		out["model_config_id"] = *b.ModelConfigID
+	}
+	if b.CustomerID != nil && *b.CustomerID != "" {
+		out["customer_id"] = *b.CustomerID
+	}
+	if b.TeamID != nil && *b.TeamID != "" {
+		out["team_id"] = *b.TeamID
+	}
+	if b.OverrideAmount != 0 {
+		out["override_amount"] = b.OverrideAmount
+	}
+	if b.OverrideMode != "" {
+		out["override_mode"] = string(b.OverrideMode)
+	}
+	if b.OverrideCyclesRemaining != 0 {
+		out["override_cycles_remaining"] = b.OverrideCyclesRemaining
+	}
+	if b.OverrideCyclesTotal != 0 {
+		out["override_cycles_total"] = b.OverrideCyclesTotal
+	}
+	if b.OverrideAnchorReset != nil && !b.OverrideAnchorReset.IsZero() {
+		out["override_anchor_reset"] = b.OverrideAnchorReset.UTC().Format(time.RFC3339)
+	}
+	return out
+}
+
+func formatExportRateLimit(rl *configstoreTables.TableRateLimit) map[string]any {
+	if rl == nil {
+		return nil
+	}
+	out := map[string]any{"id": rl.ID}
+	if rl.TokenMaxLimit != nil {
+		out["token_max_limit"] = *rl.TokenMaxLimit
+	}
+	if rl.TokenResetDuration != nil && *rl.TokenResetDuration != "" {
+		out["token_reset_duration"] = *rl.TokenResetDuration
+	}
+	if rl.TokenCurrentUsage != 0 {
+		out["token_current_usage"] = rl.TokenCurrentUsage
+	}
+	if !rl.TokenLastReset.IsZero() {
+		out["token_last_reset"] = rl.TokenLastReset.UTC().Format(time.RFC3339)
+	}
+	if rl.RequestMaxLimit != nil {
+		out["request_max_limit"] = *rl.RequestMaxLimit
+	}
+	if rl.RequestResetDuration != nil && *rl.RequestResetDuration != "" {
+		out["request_reset_duration"] = *rl.RequestResetDuration
+	}
+	if rl.RequestCurrentUsage != 0 {
+		out["request_current_usage"] = rl.RequestCurrentUsage
+	}
+	if !rl.RequestLastReset.IsZero() {
+		out["request_last_reset"] = rl.RequestLastReset.UTC().Format(time.RFC3339)
+	}
+	return out
+}
+
+func formatExportModelConfig(mc *configstoreTables.TableModelConfig) map[string]any {
+	if mc == nil {
+		return nil
+	}
+	out := map[string]any{"id": mc.ID, "model_name": mc.ModelName}
+	if mc.Provider != nil && *mc.Provider != "" {
+		out["provider"] = *mc.Provider
+	}
+	if mc.Scope != "" {
+		out["scope"] = mc.Scope
+	}
+	if mc.ScopeID != nil && *mc.ScopeID != "" {
+		out["scope_id"] = *mc.ScopeID
+	}
+	if mc.BudgetID != nil && *mc.BudgetID != "" {
+		out["budget_id"] = *mc.BudgetID
+	}
+	if len(mc.BudgetIDs) > 0 {
+		out["budget_ids"] = append([]string(nil), mc.BudgetIDs...)
+	}
+	if mc.RateLimitID != nil && *mc.RateLimitID != "" {
+		out["rate_limit_id"] = *mc.RateLimitID
+	}
+	return out
+}
+
+func formatExportGovernanceProvider(p *configstoreTables.TableProvider) map[string]any {
+	if p == nil {
+		return nil
+	}
+	out := map[string]any{"name": p.Name}
+	if p.ID != 0 {
+		out["id"] = p.ID
+	}
+	if p.Description != "" {
+		out["description"] = p.Description
+	}
+	if p.BudgetID != nil && *p.BudgetID != "" {
+		out["budget_id"] = *p.BudgetID
+	}
+	if p.RateLimitID != nil && *p.RateLimitID != "" {
+		out["rate_limit_id"] = *p.RateLimitID
+	}
+	if p.SendBackRawRequest {
+		out["send_back_raw_request"] = true
+	}
+	if p.SendBackRawResponse {
+		out["send_back_raw_response"] = true
+	}
+	if p.StoreRawRequestResponse {
+		out["store_raw_request_response"] = true
+	}
+	return out
+}
+
+func formatExportRoutingRule(r *configstoreTables.TableRoutingRule) map[string]any {
+	if r == nil {
+		return nil
+	}
+	out := map[string]any{"id": r.ID, "name": r.Name}
+	if r.Description != "" {
+		out["description"] = r.Description
+	}
+	if r.Enabled != nil {
+		out["enabled"] = *r.Enabled
+	} else {
+		out["enabled"] = true
+	}
+	if r.CelExpression != "" {
+		out["cel_expression"] = r.CelExpression
+	}
+	if r.Strategy != "" {
+		out["strategy"] = r.Strategy
+	}
+	if len(r.Targets) > 0 {
+		targets := make([]any, 0, len(r.Targets))
+		for i := range r.Targets {
+			t := map[string]any{"weight": r.Targets[i].Weight}
+			if r.Targets[i].Provider != nil && *r.Targets[i].Provider != "" {
+				t["provider"] = *r.Targets[i].Provider
+			}
+			if r.Targets[i].Model != nil && *r.Targets[i].Model != "" {
+				t["model"] = *r.Targets[i].Model
+			}
+			if r.Targets[i].Priority != nil {
+				t["priority"] = *r.Targets[i].Priority
+			}
+			targets = append(targets, t)
+		}
+		out["targets"] = targets
+	}
+	if len(r.ParsedFallbacks) > 0 {
+		out["fallbacks"] = r.ParsedFallbacks
+	}
+	if len(r.ParsedQuery) > 0 {
+		out["query"] = r.ParsedQuery
+	}
+	if r.Scope != "" {
+		out["scope"] = r.Scope
+	}
+	if r.ScopeID != nil && *r.ScopeID != "" {
+		out["scope_id"] = *r.ScopeID
+	}
+	if r.ChainRule {
+		out["chain_rule"] = true
+	}
+	if r.Priority != 0 {
+		out["priority"] = r.Priority
+	}
+	return out
+}
+
+func formatExportPricingOverride(po *configstoreTables.TablePricingOverride) map[string]any {
+	if po == nil {
+		return nil
+	}
+	out := map[string]any{"id": po.ID}
+	if po.Name != "" {
+		out["name"] = po.Name
+	}
+	if po.ScopeKind != "" {
+		out["scope_kind"] = po.ScopeKind
+	}
+	if po.VirtualKeyID != nil && *po.VirtualKeyID != "" {
+		out["virtual_key_id"] = *po.VirtualKeyID
+	}
+	if po.UserID != nil && *po.UserID != "" {
+		out["user_id"] = *po.UserID
+	}
+	if po.ProviderID != nil && *po.ProviderID != "" {
+		out["provider_id"] = *po.ProviderID
+	}
+	if po.ProviderKeyID != nil && *po.ProviderKeyID != "" {
+		out["provider_key_id"] = *po.ProviderKeyID
+	}
+	if po.MatchType != "" {
+		out["match_type"] = po.MatchType
+	}
+	if po.Pattern != "" {
+		out["pattern"] = po.Pattern
+	}
+	if len(po.RequestTypes) > 0 {
+		rt := make([]string, 0, len(po.RequestTypes))
+		for _, r := range po.RequestTypes {
+			rt = append(rt, string(r))
+		}
+		out["request_types"] = rt
+	}
+	if po.PricingPatchJSON != "" {
+		out["pricing_patch"] = po.PricingPatchJSON
+	}
+	// config_hash intentionally omitted: recomputed at load.
 	return out
 }
 

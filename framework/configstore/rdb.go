@@ -2736,11 +2736,55 @@ func (s *RDBConfigStore) GetVectorStoreConfig(ctx context.Context) (*vectorstore
 		}
 		return nil, err
 	}
-	return &vectorstore.Config{
+	cfg := &vectorstore.Config{
 		Enabled: vectorStoreTableConfig.Enabled,
-		Config:  vectorStoreTableConfig.Config,
 		Type:    vectorstore.VectorStoreType(vectorStoreTableConfig.Type),
-	}, nil
+	}
+	if vectorStoreTableConfig.Config == nil || *vectorStoreTableConfig.Config == "" {
+		return cfg, nil
+	}
+	// The Config column holds the backend-specific JSON blob (see
+	// UpdateVectorStoreConfig). Decode it into the typed backend struct so the
+	// caller gets an object, not a JSON string.
+	raw := json.RawMessage(*vectorStoreTableConfig.Config)
+	switch cfg.Type {
+	case vectorstore.VectorStoreTypeWeaviate:
+		var backend vectorstore.WeaviateConfig
+		if err := json.Unmarshal(raw, &backend); err != nil {
+			return nil, err
+		}
+		cfg.Config = backend
+	case vectorstore.VectorStoreTypeRedis:
+		var backend vectorstore.RedisConfig
+		if err := json.Unmarshal(raw, &backend); err != nil {
+			return nil, err
+		}
+		cfg.Config = backend
+	case vectorstore.VectorStoreTypeQdrant:
+		var backend vectorstore.QdrantConfig
+		if err := json.Unmarshal(raw, &backend); err != nil {
+			return nil, err
+		}
+		cfg.Config = backend
+	case vectorstore.VectorStoreTypePinecone:
+		var backend vectorstore.PineconeConfig
+		if err := json.Unmarshal(raw, &backend); err != nil {
+			return nil, err
+		}
+		cfg.Config = backend
+	case vectorstore.VectorStoreTypeChromem:
+		var backend vectorstore.ChromemConfig
+		// Chromem has no required fields, so a missing block is valid.
+		if len(raw) > 0 {
+			if err := json.Unmarshal(raw, &backend); err != nil {
+				return nil, err
+			}
+		}
+		cfg.Config = backend
+	default:
+		return nil, fmt.Errorf("unknown vector store type: %s", vectorStoreTableConfig.Type)
+	}
+	return cfg, nil
 }
 
 // UpdateVectorStoreConfig updates the vector store configuration in the database.

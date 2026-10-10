@@ -123,6 +123,9 @@ export default function ExportSettingsView() {
 								collapsibleBlocks: true,
 								lineNumbers: "on",
 								scrollBeyondLastLine: false,
+								showVerticalScrollbar: true,
+								showHorizontalScrollbar: true,
+								alwaysConsumeMouseWheel: true,
 							}}
 						/>
 					)}

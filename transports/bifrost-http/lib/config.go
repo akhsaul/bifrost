@@ -520,7 +520,7 @@ func (cd *ConfigData) UnmarshalJSON(data []byte) error {
 		VectorStoreConfig json.RawMessage                       `json:"vector_store,omitempty"`
 		ConfigStoreConfig json.RawMessage                       `json:"config_store,omitempty"`
 		LogsStoreConfig   json.RawMessage                       `json:"logs_store,omitempty"`
-	GuardrailsConfig  *guardrails.Config                    `json:"guardrails_config,omitempty"`
+		GuardrailsConfig  *guardrails.Config                    `json:"guardrails_config,omitempty"`
 		Plugins           []*schemas.PluginConfig               `json:"plugins,omitempty"`
 		WebSocket         *schemas.WebSocketConfig              `json:"websocket,omitempty"`
 		FeatureFlags      *FeatureFlagsFileConfig               `json:"feature_flags,omitempty"`
@@ -638,7 +638,15 @@ type Config struct {
 	LogsStore   logstore.LogStore
 	// LogsStoreConfig is the effective logs store configuration used to create LogsStore.
 	LogsStoreConfig *logstore.Config
-	ObjectStore     objectstore.ObjectStore
+	// ConfigStoreConfig is the effective config store configuration (from
+	// config.json, or the generated default SQLite when the section is absent).
+	// Preserved so GET /api/config/export can render the full block — the DB
+	// cannot describe its own connection.
+	ConfigStoreConfig *configstore.Config
+	// VectorStoreConfig is the effective vector store configuration from
+	// config.json. Preserved as a fallback for export when the DB has no row.
+	VectorStoreConfig *vectorstore.Config
+	ObjectStore       objectstore.ObjectStore
 
 	// oauth2SigningKey caches the immutable OAuth2 signing key used to sign and
 	// verify Bifrost-issued /mcp JWTs. The key is created once via an idempotent
@@ -1127,19 +1135,23 @@ func initStores(ctx context.Context, config *Config, configData *ConfigData, con
 		if err != nil {
 			return err
 		}
+		config.ConfigStoreConfig = configData.ConfigStoreConfig
 		logger.Info("config store initialized")
 	} else if configData.ConfigStoreConfig == nil {
-		// No config store section — create default SQLite store for persistence
-		config.ConfigStore, err = configstore.NewConfigStore(ctx, &configstore.Config{
+		// No config store section — create default SQLite store for persistence.
+		// Record the generated config so export can render the effective block.
+		defaultCfg := &configstore.Config{
 			Enabled: true,
 			Type:    configstore.ConfigStoreTypeSQLite,
 			Config: &configstore.SQLiteConfig{
 				Path: configDBPath,
 			},
-		}, logger)
+		}
+		config.ConfigStore, err = configstore.NewConfigStore(ctx, defaultCfg, logger)
 		if err != nil {
 			return fmt.Errorf("failed to initialize default config store: %w", err)
 		}
+		config.ConfigStoreConfig = defaultCfg
 		logger.Info("config store initialized (default SQLite)")
 	}
 	// else: ConfigStoreConfig is present but Enabled == false — leave ConfigStore nil
@@ -1232,6 +1244,7 @@ func initStores(ctx context.Context, config *Config, configData *ConfigData, con
 		if err != nil {
 			logger.Fatal("failed to connect to vector store: %v", err)
 		}
+		config.VectorStoreConfig = configData.VectorStoreConfig
 		if config.ConfigStore != nil {
 			if err = config.ConfigStore.UpdateVectorStoreConfig(ctx, configData.VectorStoreConfig); err != nil {
 				logger.Warn("failed to update vector store config: %v", err)
@@ -7874,12 +7887,12 @@ func (c *Config) GetVectorStoreConfigRedacted(ctx context.Context) (*vectorstore
 		return nil, nil
 	}
 	if vectorStoreConfig.Type == vectorstore.VectorStoreTypeWeaviate {
-		weaviateConfig, ok := vectorStoreConfig.Config.(*vectorstore.WeaviateConfig)
+		weaviateConfig, ok := vectorStoreConfig.Config.(vectorstore.WeaviateConfig)
 		if !ok {
 			return nil, fmt.Errorf("failed to cast vector store config to weaviate config")
 		}
 		// Create a copy to avoid modifying the original
-		redactedWeaviateConfig := *weaviateConfig
+		redactedWeaviateConfig := weaviateConfig
 		// Redact password if it exists
 		if redactedWeaviateConfig.APIKey != nil {
 			redactedWeaviateConfig.APIKey = redactedWeaviateConfig.APIKey.Redacted()
