@@ -9634,11 +9634,15 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_creation_input_token_cost": 1.375e-06,
+      "cache_read_input_token_cost": 1.1e-07,
       "context_length": 200000,
+      "input_cost_per_token": 1.1e-06,
       "max_input_tokens": 200000,
       "max_output_tokens": 64000,
       "max_tokens": 264000,
       "mode": "chat",
+      "output_cost_per_token": 5.5e-06,
       "provider": "zed"
     }
   },
@@ -9681,11 +9685,15 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_creation_input_token_cost": 4.125e-06,
+      "cache_read_input_token_cost": 3.3e-07,
       "context_length": 200000,
+      "input_cost_per_token": 3.3e-06,
       "max_input_tokens": 200000,
       "max_output_tokens": 8192,
       "max_tokens": 208192,
       "mode": "chat",
+      "output_cost_per_token": 1.65e-05,
       "provider": "zed"
     }
   },
@@ -9759,11 +9767,15 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_creation_input_token_cost": 4.125e-06,
+      "cache_read_input_token_cost": 3.3e-07,
       "context_length": 1000000,
+      "input_cost_per_token": 3.3e-06,
       "max_input_tokens": 1000000,
       "max_output_tokens": 64000,
       "max_tokens": 1064000,
       "mode": "chat",
+      "output_cost_per_token": 1.65e-05,
       "provider": "zed"
     }
   },
@@ -9842,11 +9854,15 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_creation_input_token_cost": 2.75e-06,
+      "cache_read_input_token_cost": 2.2e-07,
       "context_length": 1000000,
+      "input_cost_per_token": 2.2e-06,
       "max_input_tokens": 1000000,
       "max_output_tokens": 128000,
       "max_tokens": 1128000,
       "mode": "chat",
+      "output_cost_per_token": 1.1e-05,
       "provider": "zed"
     }
   },
@@ -9925,11 +9941,15 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_creation_input_token_cost": 2.75e-06,
+      "cache_read_input_token_cost": 2.2e-07,
       "context_length": 1000000,
+      "input_cost_per_token": 2.2e-06,
       "max_input_tokens": 1000000,
       "max_output_tokens": 128000,
       "max_tokens": 1128000,
       "mode": "chat",
+      "output_cost_per_token": 1.1e-05,
       "provider": "zed"
     }
   },
@@ -10004,10 +10024,12 @@
     },
     "pricing": {
       "context_length": 1048576,
+      "input_cost_per_token": 5.5e-07,
       "max_input_tokens": 1048576,
       "max_output_tokens": 65535,
       "max_tokens": 1114111,
       "mode": "chat",
+      "output_cost_per_token": 3.3e-06,
       "provider": "zed"
     }
   },
@@ -10077,10 +10099,12 @@
     },
     "pricing": {
       "context_length": 200000,
+      "input_cost_per_token": 2.2e-06,
       "max_input_tokens": 200000,
       "max_output_tokens": 65535,
       "max_tokens": 265535,
       "mode": "chat",
+      "output_cost_per_token": 1.32e-05,
       "provider": "zed"
     }
   },
@@ -10155,10 +10179,12 @@
     },
     "pricing": {
       "context_length": 1048576,
+      "input_cost_per_token": 1.65e-06,
       "max_input_tokens": 1048576,
       "max_output_tokens": 65535,
       "max_tokens": 1114111,
       "mode": "chat",
+      "output_cost_per_token": 9.9e-06,
       "provider": "zed"
     }
   },
@@ -10255,11 +10281,14 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_read_input_token_cost": 2.75e-08,
       "context_length": 400000,
+      "input_cost_per_token": 2.75e-07,
       "max_input_tokens": 400000,
       "max_output_tokens": 128000,
       "max_tokens": 528000,
       "mode": "chat",
+      "output_cost_per_token": 2.2e-06,
       "provider": "zed"
     }
   },
@@ -10283,11 +10312,14 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_read_input_token_cost": 5.5e-09,
       "context_length": 400000,
+      "input_cost_per_token": 5.5e-08,
       "max_input_tokens": 400000,
       "max_output_tokens": 128000,
       "max_tokens": 528000,
       "mode": "chat",
+      "output_cost_per_token": 4.4e-07,
       "provider": "zed"
     }
   },
@@ -10311,11 +10343,14 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_read_input_token_cost": 1.925e-07,
       "context_length": 400000,
+      "input_cost_per_token": 1.925e-06,
       "max_input_tokens": 400000,
       "max_output_tokens": 128000,
       "max_tokens": 528000,
       "mode": "chat",
+      "output_cost_per_token": 1.54e-05,
       "provider": "zed"
     }
   },
@@ -10389,11 +10424,14 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_read_input_token_cost": 1.925e-07,
       "context_length": 400000,
+      "input_cost_per_token": 1.925e-06,
       "max_input_tokens": 400000,
       "max_output_tokens": 128000,
       "max_tokens": 528000,
       "mode": "chat",
+      "output_cost_per_token": 1.54e-05,
       "provider": "zed"
     }
   },
@@ -10467,11 +10505,14 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_read_input_token_cost": 2.75e-07,
       "context_length": 400000,
+      "input_cost_per_token": 2.75e-06,
       "max_input_tokens": 400000,
       "max_output_tokens": 128000,
       "max_tokens": 528000,
       "mode": "chat",
+      "output_cost_per_token": 1.65e-05,
       "provider": "zed"
     }
   },
@@ -10545,11 +10586,14 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_read_input_token_cost": 5.5e-07,
       "context_length": 400000,
+      "input_cost_per_token": 5.5e-06,
       "max_input_tokens": 400000,
       "max_output_tokens": 128000,
       "max_tokens": 528000,
       "mode": "chat",
+      "output_cost_per_token": 3.3e-05,
       "provider": "zed"
     }
   },
@@ -10623,11 +10667,15 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_creation_input_token_cost": 2.75e-07,
+      "cache_read_input_token_cost": 2.2e-08,
       "context_length": 400000,
+      "input_cost_per_token": 2.2e-07,
       "max_input_tokens": 400000,
       "max_output_tokens": 128000,
       "max_tokens": 528000,
       "mode": "chat",
+      "output_cost_per_token": 1.32e-06,
       "provider": "zed"
     }
   },
@@ -10701,11 +10749,15 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_creation_input_token_cost": 5.5e-06,
+      "cache_read_input_token_cost": 4.4e-07,
       "context_length": 400000,
+      "input_cost_per_token": 4.4e-06,
       "max_input_tokens": 400000,
       "max_output_tokens": 128000,
       "max_tokens": 528000,
       "mode": "chat",
+      "output_cost_per_token": 2.2e-05,
       "provider": "zed"
     }
   },
@@ -10779,11 +10831,15 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_creation_input_token_cost": 2.75e-06,
+      "cache_read_input_token_cost": 2.2e-07,
       "context_length": 400000,
+      "input_cost_per_token": 2.2e-06,
       "max_input_tokens": 400000,
       "max_output_tokens": 128000,
       "max_tokens": 528000,
       "mode": "chat",
+      "output_cost_per_token": 1.32e-05,
       "provider": "zed"
     }
   },
@@ -10857,11 +10913,15 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_creation_input_token_cost": 1.375e-07,
+      "cache_read_input_token_cost": 1.1e-08,
       "context_length": 400000,
+      "input_cost_per_token": 1.1e-07,
       "max_input_tokens": 400000,
       "max_output_tokens": 128000,
       "max_tokens": 528000,
       "mode": "chat",
+      "output_cost_per_token": 5.5e-07,
       "provider": "zed"
     }
   },
@@ -10935,11 +10995,15 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_creation_input_token_cost": 2.75e-06,
+      "cache_read_input_token_cost": 2.2e-07,
       "context_length": 400000,
+      "input_cost_per_token": 2.2e-06,
       "max_input_tokens": 400000,
       "max_output_tokens": 128000,
       "max_tokens": 528000,
       "mode": "chat",
+      "output_cost_per_token": 1.1e-05,
       "provider": "zed"
     }
   },
@@ -11018,11 +11082,15 @@
       "supports_vision": true
     },
     "pricing": {
+      "cache_creation_input_token_cost": 2.75e-06,
+      "cache_read_input_token_cost": 1.1e-07,
       "context_length": 400000,
+      "input_cost_per_token": 2.2e-06,
       "max_input_tokens": 400000,
       "max_output_tokens": 128000,
       "max_tokens": 528000,
       "mode": "chat",
+      "output_cost_per_token": 1.1e-05,
       "provider": "zed"
     }
   }
