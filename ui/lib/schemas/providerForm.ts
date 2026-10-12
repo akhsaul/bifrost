@@ -219,6 +219,28 @@ const ZedLoginKeyConfigSchema = z
 	})
 	.optional();
 
+// Codex key config in the legacy plain-string key shape used by this file's
+// KeySchema. Mirrors cline_key_config above: static access token in `value`
+// is the other valid auth mode, so every field stays optional here — the
+// provider-level refine decides whether the block is a real credential.
+const CodexLoginKeyConfigSchema = z
+	.object({
+		client_id: z.string().optional(),
+		refresh_token: z.string().optional(),
+		access_token: z.string().optional(),
+		account_id: z.string().optional(),
+	})
+	.optional();
+
+// codexLoginKeyConfigComplete mirrors the helper in lib/types/schemas.ts over
+// the legacy plain-string key shape used by this file's KeySchema.
+const codexLoginKeyConfigComplete = (data: { refresh_token?: unknown } | undefined): boolean => {
+	if (!data || typeof data !== "object") return false;
+	const d = data as Record<string, unknown>;
+	const set = (v: unknown) => typeof v === "string" && v.trim() !== "";
+	return set(d.refresh_token);
+};
+
 // zedLoginKeyConfigComplete mirrors the helper in lib/types/schemas.ts over
 // the legacy plain-string key shape used by this file's KeySchema.
 const zedLoginKeyConfigComplete = (data: { user_id?: unknown; access_token?: unknown } | undefined): boolean => {
@@ -245,6 +267,7 @@ const KeySchema = z.object({
 	replicate_key_config: ReplicateKeyConfigSchema.optional(),
 	github_copilot_key_config: githubCopilotKeyConfigSchema.optional(),
 	cline_key_config: clineKeyConfigSchema.optional(),
+	codex_key_config: CodexLoginKeyConfigSchema,
 	antigravity_key_config: antigravityKeyConfigSchema.optional(),
 	zed_key_config: ZedLoginKeyConfigSchema,
 	use_for_batch_api: z.boolean().optional(),
@@ -359,6 +382,14 @@ export const ProviderFormSchema = z
 						ctx.addIssue({
 							code: z.ZodIssueCode.custom,
 							message: "Set a Cline API key, or fill in the OAuth refresh token",
+							path: ["keys", index, "value"],
+						});
+					}
+				} else if (effectiveProviderType === "codex") {
+					if (!key.value.trim() && !codexLoginKeyConfigComplete(key.codex_key_config)) {
+						ctx.addIssue({
+							code: z.ZodIssueCode.custom,
+							message: "Set a Codex access token, or fill in the OAuth refresh token",
 							path: ["keys", index, "value"],
 						});
 					}

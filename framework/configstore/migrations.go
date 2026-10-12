@@ -500,6 +500,8 @@ var configstoreMigrationSteps = []migrationStep{
 	{IDs: []string{"migrate_vk_standalone_limits_to_model_configs"}, run: migrationMigrateVKStandaloneLimitsToModelConfigs},
 	{IDs: []string{"add_ultrafast_above_272k_pricing_columns"}, run: migrationAddUltrafastAbove272kPricingColumns},
 	{IDs: []string{"add_priority_above_272k_cache_creation_pricing_column"}, run: migrationAddPriorityAbove272kCacheCreationPricingColumn},
+	{IDs: []string{"add_codex_key_config_columns"}, run: migrationAddCodexKeyConfigColumns},
+	{IDs: []string{"cleanup_antigravity_oauth_keys"}, run: migrationCleanupAntigravityOAuthKeys},
 }
 
 // videoResolutionPricingColumns are the resolution-banded video output rate columns.
@@ -13638,6 +13640,102 @@ func migrationAddClineKeyConfigColumns(ctx context.Context, db *gorm.DB, logger 
 // nothing to undo.
 func rollbackClineKeyConfigColumns(*gorm.DB) error {
 	return fmt.Errorf("add_cline_key_config_columns is non-rollbackable: dropping the cline_* columns would permanently delete every stored OAuth refresh token, which Cline cannot re-supply and must be re-obtained through the interactive WorkOS device flow; the columns are additive and older binaries safely ignore them")
+}
+
+// codexKeyConfigColumns are the Codex OAuth credential columns on the key table.
+var codexKeyConfigColumns = []string{
+	"codex_client_id",
+	"codex_refresh_token",
+	"codex_access_token",
+	"codex_account_id",
+}
+
+// migrationAddCodexKeyConfigColumns adds the Codex OAuth credential columns to the key
+// table. There is nothing to backfill: codex is a new provider, so no existing row
+// can carry these values.
+func migrationAddCodexKeyConfigColumns(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "add_codex_key_config_columns"
+	logger.Info("[configstore] starting migration %s", migrationName)
+	defer logger.Info("[configstore] finished migration %s", migrationName)
+
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: migrationName,
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+			for _, column := range codexKeyConfigColumns {
+				if err := addColumnIfNotExists(tx, logger, &tables.TableKey{}, column); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+		Rollback: rollbackCodexKeyConfigColumns,
+	}})
+
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error running %s migration: %w", migrationName, err)
+	}
+	return nil
+}
+
+// rollbackCodexKeyConfigColumns refuses rather than dropping, mirroring the
+// cline columns. A refresh token cannot be re-supplied by OpenAI: the
+// operator would have to redo the interactive PKCE flow for every key.
+// The columns are additive, so an older binary ignores them and there is
+// nothing to undo.
+func rollbackCodexKeyConfigColumns(*gorm.DB) error {
+	return fmt.Errorf("add_codex_key_config_columns is non-rollbackable: dropping the codex_* columns would permanently delete every stored OAuth refresh token, which OpenAI cannot re-supply and must be re-obtained through the interactive PKCE flow; the columns are additive and older binaries safely ignore them")
+}
+
+// migrationCleanupAntigravityOAuthKeys removes legacy duplicate value and access_token
+// storage for Antigravity OAuth keys (which only require refresh_token and project_id).
+func migrationCleanupAntigravityOAuthKeys(ctx context.Context, db *gorm.DB, logger schemas.Logger) error {
+	migrationName := "cleanup_antigravity_oauth_keys"
+	logger.Info("[configstore] starting migration %s", migrationName)
+	defer logger.Info("[configstore] finished migration %s", migrationName)
+
+	m := migrator.New(db, migrator.DefaultOptions, []*migrator.Migration{{
+		ID: migrationName,
+		Migrate: func(tx *gorm.DB) error {
+			tx = tx.WithContext(ctx)
+
+			var keys []tables.TableKey
+			if err := tx.Where("provider = ? AND antigravity_refresh_token IS NOT NULL AND antigravity_refresh_token != ''", string(schemas.Antigravity)).Find(&keys).Error; err != nil {
+				return fmt.Errorf("failed to query antigravity keys: %w", err)
+			}
+
+			// Access tokens used to live in their own column. Fresh databases never get it
+			// (the field is no longer mapped), so only touch it when it is actually present.
+			hasAccessTokenColumn := tx.Migrator().HasColumn(&tables.TableKey{}, "antigravity_access_token")
+
+			for _, k := range keys {
+				if schemas.VaultStoreWriteEnabled() {
+					base := schemas.VaultBasePath("config_keys", k.KeyID)
+					_ = schemas.VaultRemoveHook(ctx, base+"/value")
+					_ = schemas.VaultRemoveHook(ctx, base+"/antigravity_access_token")
+				}
+
+				updates := map[string]interface{}{
+					"value": schemas.NewSecretVar(""),
+				}
+				if hasAccessTokenColumn {
+					updates["antigravity_access_token"] = nil
+				}
+				if err := tx.Model(&tables.TableKey{}).Where("id = ?", k.ID).Updates(updates).Error; err != nil {
+					return fmt.Errorf("failed to clean up antigravity key %s: %w", k.KeyID, err)
+				}
+			}
+			return nil
+		},
+		Rollback: func(*gorm.DB) error {
+			return fmt.Errorf("cleanup_antigravity_oauth_keys is non-rollbackable: access tokens and duplicate values were removed by design and are reconstituted dynamically at runtime")
+		},
+	}})
+
+	if err := m.Migrate(); err != nil {
+		return fmt.Errorf("error running %s migration: %w", migrationName, err)
+	}
+	return nil
 }
 
 // migrationAddHiddenRequestTypesJSONColumn adds the hidden_request_types_json column to

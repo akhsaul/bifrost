@@ -680,6 +680,26 @@ func (h *ProviderHandler) mergeUpdatedKey(oldRawKey, updateKey schemas.Key) (sch
 			}
 		}
 	}
+	if mergedKey.CodexKeyConfig != nil {
+		var old *schemas.CodexKeyConfig
+		if oldRawKey.CodexKeyConfig != nil {
+			old = oldRawKey.CodexKeyConfig
+		}
+		for _, field := range []struct {
+			name    string
+			updated *schemas.SecretVar
+			stored  *schemas.SecretVar
+		}{
+			{"client_id", &mergedKey.CodexKeyConfig.ClientID, codexFieldOrNil(old, func(c *schemas.CodexKeyConfig) *schemas.SecretVar { return &c.ClientID })},
+			{"refresh_token", &mergedKey.CodexKeyConfig.RefreshToken, codexFieldOrNil(old, func(c *schemas.CodexKeyConfig) *schemas.SecretVar { return &c.RefreshToken })},
+			{"access_token", &mergedKey.CodexKeyConfig.AccessToken, codexFieldOrNil(old, func(c *schemas.CodexKeyConfig) *schemas.SecretVar { return &c.AccessToken })},
+		} {
+			if err := preserve(field.updated, field.stored, "codex_key_config."+field.name); err != nil {
+
+				return schemas.Key{}, err
+			}
+		}
+	}
 	if mergedKey.ZedKeyConfig != nil {
 		var old *schemas.ZedKeyConfig
 		if oldRawKey.ZedKeyConfig != nil {
@@ -813,6 +833,14 @@ func fieldOrNil(config *schemas.GithubCopilotKeyConfig, pick func(*schemas.Githu
 
 // clineFieldOrNil is fieldOrNil for Cline key configs.
 func clineFieldOrNil(config *schemas.ClineKeyConfig, pick func(*schemas.ClineKeyConfig) *schemas.SecretVar) *schemas.SecretVar {
+	if config == nil {
+		return nil
+	}
+	return pick(config)
+}
+
+// codexFieldOrNil is fieldOrNil for Codex key configs.
+func codexFieldOrNil(config *schemas.CodexKeyConfig, pick func(*schemas.CodexKeyConfig) *schemas.SecretVar) *schemas.SecretVar {
 	if config == nil {
 		return nil
 	}
@@ -997,6 +1025,20 @@ func validateProviderKeyURL(provider schemas.ModelProvider, key schemas.Key) err
 		}
 		if !key.ClineKeyConfig.RefreshToken.IsSet() {
 			return fmt.Errorf("cline_key_config.refresh_token is required for Cline keys")
+		}
+	case schemas.Codex:
+		// A static access token in value is a valid alternative to OAuth. But a
+		// supplied OAuth config is checked either way: a half-filled block sitting
+		// behind a token persists silently and only surfaces later, when the token
+		// is removed and the key falls back to credentials that were never valid.
+		if key.CodexKeyConfig == nil {
+			if key.Value.IsSet() {
+				return nil
+			}
+			return fmt.Errorf("codex_key_config is required for Codex keys without a value")
+		}
+		if !key.CodexKeyConfig.RefreshToken.IsSet() {
+			return fmt.Errorf("codex_key_config.refresh_token is required for Codex keys")
 		}
 	case schemas.Zed:
 		// A Zed key always carries zed_key_config: the user login cannot live

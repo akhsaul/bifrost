@@ -1106,3 +1106,63 @@ func TestValidateProviderKeyCline(t *testing.T) {
 		})
 	}
 }
+
+func TestMergeUpdatedKey_CodexKeyConfig(t *testing.T) {
+	h := &ProviderHandler{}
+	secret := func(v string) schemas.SecretVar { return *schemas.NewSecretVar(v) }
+
+	stored := schemas.Key{CodexKeyConfig: &schemas.CodexKeyConfig{
+		ClientID:     secret("app_EMoamEEZ73f0CkXaXp7hrann"),
+		RefreshToken: secret("refresh-token-value"),
+		AccessToken:  secret("access-token-value"),
+		AccountID:    secret("account-1"),
+	}}
+
+	t.Run("unmasked literals overwrite the stored values", func(t *testing.T) {
+		update := schemas.Key{CodexKeyConfig: &schemas.CodexKeyConfig{
+			RefreshToken: secret("rotated-refresh-token"),
+		}}
+		merged, err := h.mergeUpdatedKey(stored, update)
+		if err != nil {
+			t.Fatalf("mergeUpdatedKey returned error: %v", err)
+		}
+		cfg := merged.CodexKeyConfig
+		if cfg == nil {
+			t.Fatal("the Codex config was dropped by the merge")
+		}
+		if cfg.RefreshToken.GetValue() != "rotated-refresh-token" {
+			t.Errorf("refresh_token: got %q, want the rotated literal", cfg.RefreshToken.GetValue())
+		}
+	})
+}
+
+func TestValidateProviderKeyCodex(t *testing.T) {
+	secret := func(v string) schemas.SecretVar { return *schemas.NewSecretVar(v) }
+	for _, tc := range []struct {
+		name    string
+		key     schemas.Key
+		wantErr string
+	}{
+		{"static access token alone", schemas.Key{Value: secret("codex-token")}, ""},
+		{"oauth config with refresh token", schemas.Key{CodexKeyConfig: &schemas.CodexKeyConfig{
+			RefreshToken: secret("refresh-token-value"),
+		}}, ""},
+		{"neither value nor config", schemas.Key{}, "codex_key_config is required"},
+		{"config without refresh token", schemas.Key{CodexKeyConfig: &schemas.CodexKeyConfig{
+			ClientID: secret("app_EMoamEEZ73f0CkXaXp7hrann"),
+		}}, "codex_key_config.refresh_token is required"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateProviderKeyURL(schemas.Codex, tc.key)
+			if tc.wantErr == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("error = %v, want substring %q", err, tc.wantErr)
+			}
+		})
+	}
+}

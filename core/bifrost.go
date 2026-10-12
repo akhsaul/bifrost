@@ -31,6 +31,7 @@ import (
 	"github.com/maximhq/bifrost/core/providers/byteplus"
 	"github.com/maximhq/bifrost/core/providers/cerebras"
 	"github.com/maximhq/bifrost/core/providers/cline"
+	"github.com/maximhq/bifrost/core/providers/codex"
 	"github.com/maximhq/bifrost/core/providers/cohere"
 	"github.com/maximhq/bifrost/core/providers/databricks"
 	"github.com/maximhq/bifrost/core/providers/deepseek"
@@ -4665,6 +4666,8 @@ func (bifrost *Bifrost) createBaseProvider(providerKey schemas.ModelProvider, co
 		return cerebras.NewCerebrasProvider(config, bifrost.logger)
 	case schemas.Cline:
 		return cline.NewClineProvider(config, bifrost.logger)
+	case schemas.Codex:
+		return codex.NewCodexProvider(config, bifrost.logger)
 	case schemas.Zed:
 		return zedprovider.NewZedProvider(config, bifrost.logger)
 	case schemas.DeepSeek:

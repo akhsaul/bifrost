@@ -255,6 +255,27 @@ export interface ClineDevicePollResponse {
 	message?: string;
 }
 
+export interface CodexAuthUrlResponse {
+	auth_url: string;
+	code_verifier: string;
+	state: string;
+	client_id: string;
+}
+
+export interface CodexExchangeRequest {
+	code: string;
+	redirect_uri?: string;
+	client_id?: string;
+	code_verifier?: string;
+	state?: string;
+}
+
+export interface CodexExchangeResponse {
+	refresh_token: string;
+	account_id?: string;
+	email?: string;
+}
+
 type UpdateProviderMutationArg = UpdateProviderRequest & {
 	name: ModelProviderName;
 };
@@ -677,6 +698,22 @@ export const providersApi = baseApi.injectEndpoints({
 			}),
 		}),
 
+		// Codex OAuth (PKCE browser-login) endpoints
+		getCodexAuthUrl: builder.query<CodexAuthUrlResponse, { redirect_uri?: string; state?: string; client_id?: string } | void>({
+			query: (params) => ({
+				url: "/providers/codex/oauth/auth-url",
+				params: params || {},
+			}),
+		}),
+
+		exchangeCodexAuthCode: builder.mutation<CodexExchangeResponse, CodexExchangeRequest>({
+			query: (body) => ({
+				url: "/providers/codex/oauth/exchange",
+				method: "POST",
+				body,
+			}),
+		}),
+
 		startZedLoginFlow: builder.mutation<ZedLoginChallenge, { signin_base_url?: string; system_id?: string } | void>({
 			query: (body) => ({
 				url: "/providers/zed/oauth/device",
@@ -749,6 +786,9 @@ export const {
 	useExchangeAntigravityAuthCodeMutation,
 	useStartClineDeviceFlowMutation,
 	usePollClineDeviceAuthMutation,
+	useGetCodexAuthUrlQuery,
+	useLazyGetCodexAuthUrlQuery,
+	useExchangeCodexAuthCodeMutation,
 	useStartZedLoginFlowMutation,
 	usePollZedLoginAuthMutation,
 	useGetKeyQuotaQuery,

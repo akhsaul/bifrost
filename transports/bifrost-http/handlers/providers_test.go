@@ -2471,3 +2471,98 @@ func newClineWorkOSMock(t *testing.T) *httptest.Server {
 	t.Cleanup(server.Close)
 	return server
 }
+
+func TestGetCodexAuthURL_ReturnsChallenge(t *testing.T) {
+	var ctx fasthttp.RequestCtx
+	ctx.Request.Header.SetMethod("GET")
+
+	(&ProviderHandler{}).getCodexAuthURL(&ctx)
+
+	if ctx.Response.StatusCode() != 200 {
+		t.Fatalf("status = %d, body = %s", ctx.Response.StatusCode(), ctx.Response.Body())
+	}
+	var challenge struct {
+		AuthURL      string `json:"auth_url"`
+		CodeVerifier string `json:"code_verifier"`
+		State        string `json:"state"`
+		ClientID     string `json:"client_id"`
+	}
+	if err := sonic.Unmarshal(ctx.Response.Body(), &challenge); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(challenge.AuthURL, "https://auth.openai.com/oauth/authorize?") {
+		t.Errorf("auth_url = %q", challenge.AuthURL)
+	}
+	if challenge.CodeVerifier == "" || challenge.State == "" {
+		t.Error("verifier and state must be returned")
+	}
+	if challenge.ClientID != "app_EMoamEEZ73f0CkXaXp7hrann" {
+		t.Errorf("client = %q, want the built-in CLI client", challenge.ClientID)
+	}
+	if !strings.Contains(challenge.AuthURL, "prompt=login") {
+		t.Error("auth url must force prompt=login for multi-account isolation")
+	}
+}
+
+func TestExchangeCodexAuthCode_Statuses(t *testing.T) {
+	server := newCodexOAuthMock(t)
+	old := codexOAuthBase
+	codexOAuthBase = server.URL
+	defer func() { codexOAuthBase = old }()
+
+	h := &ProviderHandler{}
+	for _, tc := range []struct {
+		code       string
+		wantStatus int
+		wantField  string
+	}{
+		{"good-code", 200, `"refresh_token":"rt-new"`},
+		{"bad-code", 400, ""},
+	} {
+		var ctx fasthttp.RequestCtx
+		ctx.Request.Header.SetMethod("POST")
+		ctx.Request.SetBody([]byte(`{"code":"` + tc.code + `"}`))
+
+		h.exchangeCodexAuthCode(&ctx)
+
+		if ctx.Response.StatusCode() != tc.wantStatus {
+			t.Errorf("%s: status = %d, want %d (body %s)", tc.code, ctx.Response.StatusCode(), tc.wantStatus, ctx.Response.Body())
+		}
+		if tc.wantField != "" && !strings.Contains(string(ctx.Response.Body()), tc.wantField) {
+			t.Errorf("%s: body %s missing %s", tc.code, ctx.Response.Body(), tc.wantField)
+		}
+	}
+
+	// Missing code is a 400 without touching OpenAI.
+	var ctx fasthttp.RequestCtx
+	ctx.Request.Header.SetMethod("POST")
+	ctx.Request.SetBody([]byte(`{}`))
+	h.exchangeCodexAuthCode(&ctx)
+	if ctx.Response.StatusCode() != 400 {
+		t.Errorf("empty code: status = %d, want 400", ctx.Response.StatusCode())
+	}
+}
+
+// newCodexOAuthMock serves the token + accounts/check endpoints for the PKCE
+// exchange handler tests.
+func newCodexOAuthMock(t *testing.T) *httptest.Server {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/oauth/token", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = r.ParseForm()
+		if r.Form.Get("code") == "good-code" && r.Form.Get("code_verifier") != "" {
+			_, _ = w.Write([]byte(`{"access_token":"at-1","refresh_token":"rt-new","id_token":"","token_type":"Bearer","expires_in":86400}`))
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"message":"bad code","type":"invalid_request_error"}}`))
+	})
+	mux.HandleFunc("/wham/accounts/check", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"accounts":[{"id":"acct-1","plan_type":"plus"}],"default_account_id":"acct-1","account_ordering":["acct-1"]}`))
+	})
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	return server
+}

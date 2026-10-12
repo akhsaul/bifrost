@@ -94,6 +94,7 @@ const (
 	Antigravity     ModelProvider = "antigravity"
 	OpencodeZenFree ModelProvider = "opencode-zen-free"
 	Cline           ModelProvider = "cline"
+	Codex           ModelProvider = "codex"
 	Zed             ModelProvider = "zed"
 )
 
@@ -161,6 +162,7 @@ var StandardProviders = []ModelProvider{
 	Antigravity,
 	OpencodeZenFree,
 	Cline,
+	Codex,
 	Zed,
 }
 

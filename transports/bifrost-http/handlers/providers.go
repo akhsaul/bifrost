@@ -18,6 +18,7 @@ import (
 	bifrost "github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/providers/antigravity"
 	"github.com/maximhq/bifrost/core/providers/cline"
+	"github.com/maximhq/bifrost/core/providers/codex"
 	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
 	"github.com/maximhq/bifrost/core/providers/zed"
 	"github.com/maximhq/bifrost/core/schemas"
@@ -279,6 +280,9 @@ func (h *ProviderHandler) RegisterRoutes(r *router.Router, middlewares ...schema
 	// Zed browser-login helper endpoints
 	r.POST("/api/providers/zed/oauth/device", lib.ChainMiddlewares(h.startZedLoginFlow, middlewares...))
 	r.POST("/api/providers/zed/oauth/poll", lib.ChainMiddlewares(h.pollZedLoginFlow, middlewares...))
+	// Codex OAuth (PKCE browser-login) helper endpoints
+	r.GET("/api/providers/codex/oauth/auth-url", lib.ChainMiddlewares(h.getCodexAuthURL, middlewares...))
+	r.POST("/api/providers/codex/oauth/exchange", lib.ChainMiddlewares(h.exchangeCodexAuthCode, middlewares...))
 	// Quota Information endpoints
 	r.GET("/api/providers/{provider}/keys/{key_id}/quota", lib.ChainMiddlewares(h.getKeyQuota, middlewares...))
 	r.GET("/api/providers/{provider}/keys/{key_id}/models-quota", lib.ChainMiddlewares(h.getModelsQuota, middlewares...))
@@ -1902,6 +1906,104 @@ func (h *ProviderHandler) exchangeAntigravityAuthCode(ctx *fasthttp.RequestCtx) 
 
 type clineDevicePayload struct {
 	ClientID string `json:"client_id,omitempty"`
+}
+
+// codexOAuthBase overrides the Codex OAuth hosts for the browser-login
+// helpers. Empty means production (auth.openai.com + chatgpt.com). Tests
+// point it at a mock server.
+var codexOAuthBase = ""
+
+// getCodexAuthURL handles GET /api/providers/codex/oauth/auth-url. It builds
+// the OpenAI authorize URL for the Codex PKCE flow and returns the verifier
+// material the exchange must present: the verifier itself (the UI sends it
+// back explicitly) plus the state it is also stored under server-side.
+func (h *ProviderHandler) getCodexAuthURL(ctx *fasthttp.RequestCtx) {
+	redirectURI := strings.TrimSpace(string(ctx.QueryArgs().Peek("redirect_uri")))
+	state := strings.TrimSpace(string(ctx.QueryArgs().Peek("state")))
+	clientID := strings.TrimSpace(string(ctx.QueryArgs().Peek("client_id")))
+
+	authURL, verifier, stateOut, clientOut := codex.BuildCodexAuthURLPKCE(redirectURI, state, clientID)
+
+	data, err := sonic.Marshal(map[string]string{
+		"auth_url":      authURL,
+		"code_verifier": verifier,
+		"state":         stateOut,
+		"client_id":     clientOut,
+	})
+	if err != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
+}
+
+type exchangeCodexCodePayload struct {
+	Code         string `json:"code"`
+	RedirectURI  string `json:"redirect_uri,omitempty"`
+	ClientID     string `json:"client_id,omitempty"`
+	CodeVerifier string `json:"code_verifier,omitempty"`
+	State        string `json:"state,omitempty"`
+}
+
+// exchangeCodexAuthCode handles POST /api/providers/codex/oauth/exchange. It
+// trades a pasted authorization code (or full redirect URL) for the durable
+// OAuth credential: the refresh token the UI stores on the key, plus the
+// best-effort discovered workspace and account email. The verifier resolves
+// explicit > by-state > latest, mirroring antigravity.
+func (h *ProviderHandler) exchangeCodexAuthCode(ctx *fasthttp.RequestCtx) {
+	var payload exchangeCodexCodePayload
+	if err := sonic.Unmarshal(ctx.PostBody(), &payload); err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	payload.Code = strings.TrimSpace(payload.Code)
+	if payload.Code == "" {
+		SendError(ctx, fasthttp.StatusBadRequest, "Authorization code is required")
+		return
+	}
+
+	verifier := strings.TrimSpace(payload.CodeVerifier)
+	if verifier == "" && payload.State != "" {
+		verifier = codex.GetPendingCodexVerifier(payload.State)
+	}
+	if verifier == "" {
+		verifier = codex.GetLatestCodexVerifier()
+	}
+
+	result, err := codex.ExchangeAuthCodePKCE(
+		ctx,
+		nil,
+		payload.Code,
+		payload.RedirectURI,
+		payload.ClientID,
+		verifier,
+		codexOAuthBase,
+	)
+	if err != nil {
+		SendError(ctx, fasthttp.StatusBadRequest, fmt.Sprintf("Failed to exchange auth code: %v", err))
+		return
+	}
+
+	resp := map[string]string{
+		"refresh_token": result.RefreshToken,
+	}
+	if result.AccountID != "" {
+		resp["account_id"] = result.AccountID
+	}
+	if result.Email != "" {
+		resp["email"] = result.Email
+	}
+	data, marshalErr := sonic.Marshal(resp)
+	if marshalErr != nil {
+		SendError(ctx, fasthttp.StatusInternalServerError, "Failed to encode response")
+		return
+	}
+	ctx.SetContentType("application/json")
+	ctx.SetStatusCode(fasthttp.StatusOK)
+	ctx.SetBody(data)
 }
 
 // clineOAuthWorkOSBase overrides the WorkOS base URL for the Cline device

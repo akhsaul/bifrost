@@ -82,7 +82,7 @@ const ZedStreamEnded = "stream_ended"
 // ZedUsersMeResponse is the subset of GET /client/users/me Bifrost needs:
 // the default billing organization plus the human-readable username for the
 // OAuth key name. Observed shape (debug/zed-dev/resp-users-me.json):
-// {"user":{"id":678672,"username":"akhsaul",...},"default_organization_id":"org_..."}.
+// {"user":{"id":123456,"username":"akhsaul",...},"default_organization_id":"org_..."}.
 type ZedUsersMeResponse struct {
 	User struct {
 		Username string `json:"username"`

@@ -126,11 +126,11 @@ func TestStartLoginURLShape(t *testing.T) {
 // GET /client/users/me, and the poll result carries the username +
 // organization_id the key form needs to save safely.
 func TestVerifyLoginAgainstUsersMe(t *testing.T) {
-	const userID = "678672"
+	const userID = "123456"
 	const blob = `{"version":2,"id":"client_token_abc","token":"tok_xyz"}`
 	stub := zed.NewUsersMeStub(t,
 		userID+" "+blob,
-		`{"user":{"id":678672,"username":"akhsaul"},"default_organization_id":"org_01test"}`,
+		`{"user":{"id":123456,"username":"akhsaul"},"default_organization_id":"org_01test"}`,
 		200,
 	)
 	username, orgID, bErr := zed.VerifyLoginForTest(stub, "", userID, blob)
@@ -150,11 +150,11 @@ func TestVerifyLoginAgainstUsersMe(t *testing.T) {
 // would then try to save.
 func TestVerifyLoginRejectsBadCredentials(t *testing.T) {
 	stub := zed.NewUsersMeStub(t,
-		"678672 right-blob",
+		"123456 right-blob",
 		`{}`,
 		200,
 	)
-	_, _, bErr := zed.VerifyLoginForTest(stub, "", "678672", "wrong-blob")
+	_, _, bErr := zed.VerifyLoginForTest(stub, "", "123456", "wrong-blob")
 	if bErr == nil {
 		t.Fatal("VerifyLoginForTest with a rejected credential must return an error")
 	}

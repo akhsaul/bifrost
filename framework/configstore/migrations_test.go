@@ -3983,6 +3983,58 @@ func TestMigrationAddClineKeyConfigColumns_NonRollbackable(t *testing.T) {
 		"the refresh token must survive the refused rollback")
 }
 
+func TestMigrationAddCodexKeyConfigColumns_NonRollbackable(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	columns := []string{
+		"codex_client_id",
+		"codex_refresh_token",
+		"codex_access_token",
+		"codex_account_id",
+	}
+
+	require.NoError(t, db.AutoMigrate(&tables.TableKey{}))
+	for _, column := range columns {
+		require.NoError(t, db.Migrator().DropColumn(&tables.TableKey{}, column))
+	}
+
+	require.NoError(t, migrationAddCodexKeyConfigColumns(ctx, db, testMigrationLogger))
+	for _, column := range columns {
+		require.True(t, db.Migrator().HasColumn(&tables.TableKey{}, column),
+			"migration should have added %s", column)
+	}
+
+	// A key carrying OAuth credentials is exactly the state a rollback would destroy.
+	seed := &tables.TableKey{
+		Name:       "codex-rollback",
+		ProviderID: 1,
+		Provider:   "codex",
+		KeyID:      "codex-rollback-1",
+		CodexKeyConfig: &schemas.CodexKeyConfig{
+			RefreshToken: *schemas.NewSecretVar("refresh-token-value"),
+			AccountID:    *schemas.NewSecretVar("account-1"),
+		},
+	}
+	require.NoError(t, db.Create(seed).Error)
+
+	err := rollbackCodexKeyConfigColumns(db)
+	require.Error(t, err, "rollback must refuse: dropping the columns destroys refresh tokens OpenAI cannot re-supply")
+	assert.Contains(t, err.Error(), "non-rollbackable")
+	for _, column := range columns {
+		assert.True(t, db.Migrator().HasColumn(&tables.TableKey{}, column),
+			"a refused rollback must leave %s intact", column)
+	}
+
+	var got tables.TableKey
+	require.NoError(t, db.Where("key_id = ?", seed.KeyID).First(&got).Error)
+	require.NotNil(t, got.CodexKeyConfig)
+	assert.Equal(t, "refresh-token-value", got.CodexKeyConfig.RefreshToken.GetValue(),
+		"the refresh token must survive the refused rollback")
+	assert.Equal(t, "account-1", got.CodexKeyConfig.AccountID.GetValue(),
+		"the account id must survive the refused rollback")
+}
+
 // TestMigrationCleanupAntigravityOAuthKeys pins the cleanup that drops the legacy
 // duplicate value and the never-reused access_token from Antigravity OAuth keys,
 // leaving refresh_token and project_id as the only persisted credentials.

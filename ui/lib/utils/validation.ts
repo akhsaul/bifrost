@@ -631,6 +631,22 @@ export function hasClineOAuthRefresh(value: string | { value?: string; ref?: str
 	return !!value.value?.trim() || !!value.ref?.trim();
 }
 
+// hasCodexAccessToken reports whether a static Codex access token is present on a provider key.
+// Same two shapes as hasClineApiToken: bare string in the provider-level form,
+// SecretVar object in the per-key form.
+export function hasCodexAccessToken(value: string | { value?: string; ref?: string; type?: string } | null | undefined): boolean {
+	if (!value) return false;
+	if (typeof value === "string") return value.trim() !== "";
+	return !!value.value?.trim() || !!value.ref?.trim();
+}
+
+// hasCodexOAuthRefresh reports whether a Codex OAuth refresh token is present.
+export function hasCodexOAuthRefresh(value: string | { value?: string; ref?: string; type?: string } | null | undefined): boolean {
+	if (!value) return false;
+	if (typeof value === "string") return value.trim() !== "";
+	return !!value.value?.trim() || !!value.ref?.trim();
+}
+
 // hasZedCredentials reports whether a Zed user_id/access_token pair is present.
 export function hasZedCredentials(
 	userId: string | { value?: string; ref?: string; type?: string } | null | undefined,

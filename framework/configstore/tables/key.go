@@ -127,6 +127,12 @@ type TableKey struct {
 	ClineClientID     *schemas.SecretVar `gorm:"type:text" json:"cline_client_id,omitempty"`
 	ClineRefreshToken *schemas.SecretVar `gorm:"type:text" json:"cline_refresh_token,omitempty"`
 
+	// Codex config fields (embedded)
+	CodexClientID     *schemas.SecretVar `gorm:"type:text" json:"codex_client_id,omitempty"`
+	CodexRefreshToken *schemas.SecretVar `gorm:"type:text" json:"codex_refresh_token,omitempty"`
+	CodexAccessToken  *schemas.SecretVar `gorm:"type:text" json:"codex_access_token,omitempty"`
+	CodexAccountID    *schemas.SecretVar `gorm:"type:text" json:"codex_account_id,omitempty"`
+
 	// Modal config fields (embedded)
 	ModalModel         *string            `gorm:"type:varchar(255)" json:"modal_model,omitempty"`
 	ModalEndpointModel *string            `gorm:"type:varchar(255)" json:"modal_endpoint_model,omitempty"`
@@ -155,6 +161,7 @@ type TableKey struct {
 	DatabricksKeyConfig    *schemas.DatabricksKeyConfig    `gorm:"-" json:"databricks_key_config,omitempty"`
 	GithubCopilotKeyConfig *schemas.GithubCopilotKeyConfig `gorm:"-" json:"github_copilot_key_config,omitempty"`
 	ClineKeyConfig         *schemas.ClineKeyConfig         `gorm:"-" json:"cline_key_config,omitempty"`
+	CodexKeyConfig         *schemas.CodexKeyConfig         `gorm:"-" json:"codex_key_config,omitempty"`
 	ModalKeyConfig         *schemas.ModalKeyConfig         `gorm:"-" json:"modal_key_config,omitempty"`
 	ZedKeyConfig           *schemas.ZedKeyConfig           `gorm:"-" json:"zed_key_config,omitempty"`
 }
@@ -638,6 +645,37 @@ func (k *TableKey) BeforeSave(tx *gorm.DB) error {
 		k.ClineClientID = nil
 		k.ClineRefreshToken = nil
 	}
+	// Codex. Every SecretVar is value-copied before assignment, per the invariant
+	// above. The access token is rotated frequently and kept in memory only;
+	// do not persist it.
+	if k.CodexKeyConfig != nil {
+		if k.CodexKeyConfig.ClientID.IsSet() {
+			v := k.CodexKeyConfig.ClientID
+			k.CodexClientID = &v
+		} else {
+			k.CodexClientID = nil
+		}
+		if k.CodexKeyConfig.RefreshToken.IsSet() {
+			v := k.CodexKeyConfig.RefreshToken
+			k.CodexRefreshToken = &v
+		} else {
+			k.CodexRefreshToken = nil
+		}
+		// The access token is minted server-side and rotated on every refresh;
+		// persisting it would freeze a stale token across restarts.
+		k.CodexAccessToken = nil
+		if k.CodexKeyConfig.AccountID.IsSet() {
+			v := k.CodexKeyConfig.AccountID
+			k.CodexAccountID = &v
+		} else {
+			k.CodexAccountID = nil
+		}
+	} else {
+		k.CodexClientID = nil
+		k.CodexRefreshToken = nil
+		k.CodexAccessToken = nil
+		k.CodexAccountID = nil
+	}
 	// Modal. Model and endpoint_model are plain strings (identifiers, not
 	// secrets); username/region are SecretVars and value-copied per the
 	// invariant above.
@@ -875,6 +913,20 @@ func (k *TableKey) BeforeSave(tx *gorm.DB) error {
 		if err := encryptSecretVarPtr(&k.ClineRefreshToken); err != nil {
 			return fmt.Errorf("failed to encrypt cline refresh token: %w", err)
 		}
+		// Codex. The refresh token is the whole credential, so it must never
+		// sit in the database in plaintext when encryption is enabled.
+		if err := encryptSecretVarPtr(&k.CodexClientID); err != nil {
+			return fmt.Errorf("failed to encrypt codex client id: %w", err)
+		}
+		if err := encryptSecretVarPtr(&k.CodexRefreshToken); err != nil {
+			return fmt.Errorf("failed to encrypt codex refresh token: %w", err)
+		}
+		if err := encryptSecretVarPtr(&k.CodexAccessToken); err != nil {
+			return fmt.Errorf("failed to encrypt codex access token: %w", err)
+		}
+		if err := encryptSecretVarPtr(&k.CodexAccountID); err != nil {
+			return fmt.Errorf("failed to encrypt codex account id: %w", err)
+		}
 		// Modal. Username/region are proxy credentials; model/endpoint_model are
 		// plain identifiers and need no encryption.
 		if err := encryptSecretVarPtr(&k.ModalUsername); err != nil {
@@ -1061,6 +1113,19 @@ func (k *TableKey) AfterFind(tx *gorm.DB) error {
 		}
 		if err := decryptSecretVarPtr(&k.ClineRefreshToken); err != nil {
 			return fmt.Errorf("failed to decrypt cline refresh token: %w", err)
+		}
+		// Codex
+		if err := decryptSecretVarPtr(&k.CodexClientID); err != nil {
+			return fmt.Errorf("failed to decrypt codex client id: %w", err)
+		}
+		if err := decryptSecretVarPtr(&k.CodexRefreshToken); err != nil {
+			return fmt.Errorf("failed to decrypt codex refresh token: %w", err)
+		}
+		if err := decryptSecretVarPtr(&k.CodexAccessToken); err != nil {
+			return fmt.Errorf("failed to decrypt codex access token: %w", err)
+		}
+		if err := decryptSecretVarPtr(&k.CodexAccountID); err != nil {
+			return fmt.Errorf("failed to decrypt codex account id: %w", err)
 		}
 		// Modal
 		if err := decryptSecretVarPtr(&k.ModalUsername); err != nil {
@@ -1360,6 +1425,25 @@ func (k *TableKey) AfterFind(tx *gorm.DB) error {
 		k.ClineKeyConfig = config
 	} else {
 		k.ClineKeyConfig = nil
+	}
+	// Reconstruct Codex config if any field is present
+	if k.CodexClientID != nil || k.CodexRefreshToken != nil || k.CodexAccessToken != nil || k.CodexAccountID != nil {
+		config := &schemas.CodexKeyConfig{}
+		if k.CodexClientID != nil {
+			config.ClientID = *k.CodexClientID
+		}
+		if k.CodexRefreshToken != nil {
+			config.RefreshToken = *k.CodexRefreshToken
+		}
+		if k.CodexAccessToken != nil {
+			config.AccessToken = *k.CodexAccessToken
+		}
+		if k.CodexAccountID != nil {
+			config.AccountID = *k.CodexAccountID
+		}
+		k.CodexKeyConfig = config
+	} else {
+		k.CodexKeyConfig = nil
 	}
 	// Reconstruct Zed config if any field is present
 	if k.ZedUserID != nil || k.ZedAccessToken != nil || k.ZedSystemID != nil || k.ZedOrganizationID != nil {

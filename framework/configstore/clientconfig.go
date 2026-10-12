@@ -805,6 +805,17 @@ func (p *ProviderConfig) Redacted() *ProviderConfig {
 				RefreshToken: *key.ClineKeyConfig.RefreshToken.Redacted(),
 			}
 		}
+		if key.CodexKeyConfig != nil {
+			// The refresh token is the whole credential, so it is redacted
+			// like any other secret rather than surfaced in a config read.
+			// AccountID is an identifier surfaced as-is.
+			redactedConfig.Keys[i].CodexKeyConfig = &schemas.CodexKeyConfig{
+				ClientID:     *key.CodexKeyConfig.ClientID.Redacted(),
+				RefreshToken: *key.CodexKeyConfig.RefreshToken.Redacted(),
+				AccessToken:  *key.CodexKeyConfig.AccessToken.Redacted(),
+				AccountID:    key.CodexKeyConfig.AccountID,
+			}
+		}
 		if key.ModalKeyConfig != nil {
 			// Username/region are proxy credentials and redacted; model forms are
 			// plain identifiers and surfaced as-is.
@@ -1059,6 +1070,14 @@ func GenerateKeyHash(key schemas.Key) (string, error) {
 	// Hash ClineKeyConfig
 	if key.ClineKeyConfig != nil {
 		data, err := sonic.Marshal(key.ClineKeyConfig)
+		if err != nil {
+			return "", err
+		}
+		hash.Write(data)
+	}
+	// Hash CodexKeyConfig
+	if key.CodexKeyConfig != nil {
+		data, err := sonic.Marshal(key.CodexKeyConfig)
 		if err != nil {
 			return "", err
 		}

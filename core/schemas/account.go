@@ -152,6 +152,7 @@ type Key struct {
 	DatabricksKeyConfig    *DatabricksKeyConfig    `json:"databricks_key_config,omitempty"`     // Databricks-specific key configuration
 	GithubCopilotKeyConfig *GithubCopilotKeyConfig `json:"github_copilot_key_config,omitempty"` // GitHub Copilot-specific key configuration
 	ClineKeyConfig         *ClineKeyConfig         `json:"cline_key_config,omitempty"`          // Cline-specific key configuration (OAuth refresh token)
+	CodexKeyConfig         *CodexKeyConfig         `json:"codex_key_config,omitempty"`          // Codex-specific key configuration (OAuth refresh token)
 	ModalKeyConfig         *ModalKeyConfig         `json:"modal_key_config,omitempty"`          // Modal-specific key configuration (per-deployment username/region/model)
 	ZedKeyConfig           *ZedKeyConfig           `json:"zed_key_config,omitempty"`            // Zed-specific key configuration (user_id + access_token blob)
 	Enabled                *bool                   `json:"enabled,omitempty"`                   // Whether the key is active (default:true)
@@ -958,6 +959,24 @@ type ClineKeyConfig struct {
 	RefreshToken SecretVar `json:"refresh_token,omitempty"` // OAuth refresh token from the device flow (required in OAuth mode)
 }
 
+// CodexKeyConfig holds the OAuth material for Codex's PKCE auth.
+//
+// A Codex key works in two modes, checked in this order by the provider:
+//  1. Key.Value holds a static access token, sent verbatim as "Bearer <value>".
+//  2. CodexKeyConfig holds the refresh token from a one-time PKCE flow;
+//     Bifrost exchanges it at https://auth.openai.com/oauth/token for a
+//     short-lived access token, sent as "Bearer <access_token>".
+//
+// The workspace (chatgpt-account-id) binds per request: AccountID wins when
+// set, otherwise it is discovered once from
+// https://chatgpt.com/backend-api/wham/accounts/check and cached with the token.
+type CodexKeyConfig struct {
+	ClientID     SecretVar `json:"client_id,omitempty"`     // Codex client ID. Empty means the built-in Codex CLI client ID.
+	RefreshToken SecretVar `json:"refresh_token,omitempty"` // OAuth refresh token from the PKCE flow (required in OAuth mode)
+	AccessToken  SecretVar `json:"access_token,omitempty"`  // OAuth access token (optional, refreshed automatically if refresh_token is set)
+	AccountID    SecretVar `json:"account_id,omitempty"`    // ChatGPT account/workspace ID. Empty means auto-resolve from wham/accounts/check.
+}
+
 // ModalKeyConfig holds the per-deployment material for a Modal serverless endpoint.
 //
 // Each Modal deployment serves exactly one model on its own host:
@@ -987,7 +1006,7 @@ type ModalKeyConfig struct {
 // billing org; empty means auto-resolve from default_organization_id via
 // GET /client/users/me.
 type ZedKeyConfig struct {
-	UserID         SecretVar  `json:"user_id"`                   // Zed numeric user id, e.g. "678672" (required)
+	UserID         SecretVar  `json:"user_id"`                   // Zed numeric user id, e.g. "123456" (required)
 	AccessToken    SecretVar  `json:"access_token"`              // Raw access_token JSON blob from Zed login, verbatim (required)
 	SystemID       *SecretVar `json:"system_id,omitempty"`       // x-zed-system-id. Empty means DefaultZedSystemID.
 	OrganizationID *SecretVar `json:"organization_id,omitempty"` // Billing org. Empty means auto-resolve from default_organization_id.

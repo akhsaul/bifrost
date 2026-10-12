@@ -291,6 +291,22 @@ export const DefaultClineKeyConfig: ClineKeyConfig = {
 	refresh_token: { value: "", ref: "" },
 } as const satisfies Required<ClineKeyConfig>;
 
+// CodexKeyConfig matching Go's schemas.CodexKeyConfig
+export interface CodexKeyConfig {
+	client_id?: SecretVar;
+	refresh_token?: SecretVar;
+	access_token?: SecretVar;
+	account_id?: SecretVar;
+}
+
+// Default CodexKeyConfig
+export const DefaultCodexKeyConfig: CodexKeyConfig = {
+	client_id: { value: "", ref: "" },
+	refresh_token: { value: "", ref: "" },
+	access_token: { value: "", ref: "" },
+	account_id: { value: "", ref: "" },
+} as const satisfies Required<CodexKeyConfig>;
+
 // Key structure matching Go's schemas.Key
 export interface ModelProviderKey {
 	id: string;
@@ -316,6 +332,7 @@ export interface ModelProviderKey {
 	databricks_key_config?: DatabricksKeyConfig;
 	github_copilot_key_config?: GithubCopilotKeyConfig;
 	cline_key_config?: ClineKeyConfig;
+	codex_key_config?: CodexKeyConfig;
 	config_hash?: string; // Present when config is synced from config.json
 	status?: "unknown" | "success" | "list_models_failed";
 	description?: string;

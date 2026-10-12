@@ -1,0 +1,40 @@
+---
+title: "Codex"
+description: "Configure OpenAI Codex OAuth (ChatGPT session tokens on the Codex Responses API)"
+---
+
+Codex speaks the OpenAI Responses API natively over `https://chatgpt.com/backend-api/codex`: unary via `POST /responses`, streaming via the same endpoint with `stream:true`, and `GET /models` for discovery. Chat completions are served by converting through Responses. There is no API-key mode: the credential is a ChatGPT session from the Codex PKCE flow.
+
+```json
+{
+  "providers": {
+    "codex": {
+      "keys": [
+        {
+          "name": "codex-main",
+          "models": ["gpt-5.5", "gpt-5.6-luna"],
+          "codex_key_config": {
+            "refresh_token": "env.CODEX_REFRESH_TOKEN"
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+Field notes:
+
+- **Browser login (recommended)**: Providers → Codex → Authenticate opens the OpenAI authorize page. Approve, then paste the `http://localhost:1455/auth/callback?code=…` redirect (or the bare code) into the waiting box — Bifrost exchanges it for the refresh token, discovers the workspace, and fills the form. Works for remote Bifrosts too, since nothing listens on that port; the code is carried in the URL.
+- `refresh_token` is the OAuth refresh token from the PKCE login above (or a one-time manual PKCE flow). Required in OAuth mode.
+- `client_id` defaults to the built-in Codex CLI client (`app_EMoamEEZ73f0CkXaXp7hrann`) when empty.
+- `access_token` is minted automatically from the refresh token and kept in memory only — do not set it.
+- `account_id` is the ChatGPT workspace ID sent as `chatgpt-account-id`. Leave empty to auto-resolve from `wham/accounts/check` (the default account wins); set it to pin one workspace on multi-account credentials.
+- Alternatively, `value` holds a static ChatGPT session access token, sent verbatim — simpler for testing; it cannot be refreshed.
+
+Behavior notes:
+
+- Tokens rotate: every refresh returns a new refresh token, which Bifrost adopts for the next mint. A 401 on inference invalidates the cached access token and retries once with a freshly minted one.
+- Requests carry Codex client-identity headers (`user-agent: codex-tui/0.156.1 …`, `originator: codex-tui`, `version: 0.156.1`).
+- Unary Responses calls accumulate the SSE stream server-side (the endpoint is SSE-first). `store` defaults to `false`; `max_output_tokens`, `truncation`, `background`, `user`, `prompt_cache_retention` and `safety_identifier` are stripped (the endpoint answers each with 400 otherwise). System messages convert to `developer` in place to keep them in the cacheable prefix.
+- `ListModels` filters the catalog by the resolved account's `plan_type` against each model's `available_in_plans` on every call — only models the plan can serve are returned.

@@ -135,7 +135,7 @@ func providerRequiresKey(providerKey schemas.ModelProvider, customConfig *schema
 // Some providers like Vertex and Bedrock have their credentials in additional key configs.
 // Ollama and SGL are keyless (API Key is optional) but use per-key server URLs.
 func CanProviderKeyValueBeEmpty(providerKey schemas.ModelProvider) bool {
-	return providerKey == schemas.Vertex || providerKey == schemas.Bedrock || providerKey == schemas.BedrockMantle || providerKey == schemas.VLLM || providerKey == schemas.Azure || providerKey == schemas.Ollama || providerKey == schemas.SGL || providerKey == schemas.Databricks || providerKey == schemas.OpencodeZenFree || providerKey == schemas.Cline || providerKey == schemas.GithubCopilot || providerKey == schemas.Antigravity || providerKey == schemas.Zed
+	return providerKey == schemas.Vertex || providerKey == schemas.Bedrock || providerKey == schemas.BedrockMantle || providerKey == schemas.VLLM || providerKey == schemas.Azure || providerKey == schemas.Ollama || providerKey == schemas.SGL || providerKey == schemas.Databricks || providerKey == schemas.OpencodeZenFree || providerKey == schemas.Cline || providerKey == schemas.Codex || providerKey == schemas.GithubCopilot || providerKey == schemas.Antigravity || providerKey == schemas.Zed
 }
 
 // isKeySkippingAllowed gates SkipKeySelection on the provider this attempt resolved to. The flag
@@ -282,6 +282,16 @@ func validateKey(providerKey schemas.ModelProvider, key *schemas.Key) error {
 		}
 		if key.ClineKeyConfig == nil || strings.TrimSpace(key.ClineKeyConfig.RefreshToken.GetValue()) == "" {
 			return fmt.Errorf("cline_key_config.refresh_token is required when value is not set")
+		}
+	case schemas.Codex:
+		// Two auth modes, either is sufficient: a static access token in
+		// value, or an OAuth refresh token in codex_key_config (client_id,
+		// access_token and account_id are all optional).
+		if strings.TrimSpace(key.Value.GetValue()) != "" {
+			break
+		}
+		if key.CodexKeyConfig == nil || strings.TrimSpace(key.CodexKeyConfig.RefreshToken.GetValue()) == "" {
+			return fmt.Errorf("codex_key_config.refresh_token is required when value is not set")
 		}
 	case schemas.Modal:
 		// Each Modal key targets exactly one deployment: model is the identifier
