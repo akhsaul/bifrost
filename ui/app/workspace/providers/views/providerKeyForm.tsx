@@ -123,6 +123,18 @@ export default function ProviderKeyForm({ provider, keyId, onCancel, onSave }: P
 			const { _auth_type, ...rest } = key.antigravity_key_config;
 			key.antigravity_key_config = rest;
 		}
+		if (key.cline_key_config) {
+			const { _auth_type, ...rest } = key.cline_key_config;
+			key.cline_key_config = rest;
+		}
+		if (key.codex_key_config) {
+			const { _auth_type, ...rest } = key.codex_key_config;
+			key.codex_key_config = rest;
+		}
+		if (key.zed_key_config) {
+			const { _auth_type, ...rest } = key.zed_key_config;
+			key.zed_key_config = rest;
+		}
 		if (key.databricks_key_config) {
 			key.databricks_key_config = stripDatabricksAuthDiscriminator(key.databricks_key_config);
 		}

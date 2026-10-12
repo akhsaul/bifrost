@@ -17,6 +17,8 @@ import {
 	useStartClineDeviceFlowMutation,
 	usePollClineDeviceAuthMutation,
 	type ClineDeviceChallenge,
+	useLazyGetCodexAuthUrlQuery,
+	useExchangeCodexAuthCodeMutation,
 	useStartZedLoginFlowMutation,
 	usePollZedLoginAuthMutation,
 	type ZedLoginChallenge,
@@ -25,6 +27,8 @@ import {
 	hasAntigravityOAuthRefresh,
 	hasClineApiToken,
 	hasClineOAuthRefresh,
+	hasCodexAccessToken,
+	hasCodexOAuthRefresh,
 	hasCopilotApiToken,
 	hasZedCredentials,
 	isRedacted,
@@ -175,6 +179,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 	const isDatabricks = effectiveProvider === "databricks";
 	const isGithubCopilot = effectiveProvider === "github-copilot";
 	const isCline = effectiveProvider === "cline";
+	const isCodex = effectiveProvider === "codex";
 	const isZed = effectiveProvider === "zed";
 	const isModal = effectiveProvider === "modal";
 	// Reactive, so the App-credential labels stay truthful. Once a Copilot token is present
@@ -185,6 +190,8 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 	// the refresh token genuinely is optional, and vice versa.
 	const clineOAuthSuffix = hasClineApiToken(form.watch("key.value")) ? "(Optional)" : "(Required)";
 	const clineKeySuffix = hasClineOAuthRefresh(form.watch("key.cline_key_config.refresh_token")) ? "(Optional)" : "";
+	const codexOAuthSuffix = hasCodexAccessToken(form.watch("key.value")) ? "(Optional)" : "(Required)";
+	const codexKeySuffix = hasCodexOAuthRefresh(form.watch("key.codex_key_config.refresh_token")) ? "(Optional)" : "";
 	const isKeylessProvider = isOllama || isSGL;
 	const supportsBatchAPI = BATCH_SUPPORTED_PROVIDERS.includes(effectiveProvider);
 
@@ -205,6 +212,12 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 
 	// Auth type state for Antigravity: 'oauth' or 'manual'
 	const [antigravityAuthType, setAntigravityAuthType] = useState<"oauth" | "manual">("oauth");
+	// Auth type state for Cline: 'oauth' or 'manual'
+	const [clineAuthType, setClineAuthType] = useState<"oauth" | "manual">("oauth");
+	// Auth type state for Codex: 'oauth' or 'manual'
+	const [codexAuthType, setCodexAuthType] = useState<"oauth" | "manual">("oauth");
+	// Auth type state for Zed: 'oauth' or 'manual'
+	const [zedAuthType, setZedAuthType] = useState<"oauth" | "manual">("oauth");
 	// Pinned OAuth redirect: Google Antigravity OAuth client is registered with
 	// https://antigravity.google/oauth-callback, so auth-url generation and code
 	// exchange must use this URI.
@@ -248,6 +261,22 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 	const zedPollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 	const zedPollActive = useRef(false);
 
+	// Codex OAuth (PKCE browser-login) state. The backend only mints the
+	// authorize URL + PKCE verifier — every OpenAI call runs in the
+	// operator's browser (auth.openai.com is Cloudflare-gated for
+	// datacenters), and the operator pastes the localhost redirect (or bare
+	// code) back for Bifrost to exchange server-side. Manual paste stays
+	// available below for refresh tokens obtained elsewhere.
+	const [getCodexAuthUrl, { isLoading: isFetchingCodexUrl }] = useLazyGetCodexAuthUrlQuery();
+	const [exchangeCodexCode, { isLoading: isExchangingCodex }] = useExchangeCodexAuthCodeMutation();
+	const [codexOAuthStarted, setCodexOAuthStarted] = useState(false);
+	const [codexAuthError, setCodexAuthError] = useState<string | null>(null);
+	const [codexManualCode, setCodexManualCode] = useState("");
+	const [codexVerifier, setCodexVerifier] = useState("");
+	const [codexOAuthState, setCodexOAuthState] = useState("");
+	const [hasCopiedCodexLink, setHasCopiedCodexLink] = useState(false);
+	const [isCopyingCodexUrl, setIsCopyingCodexUrl] = useState(false);
+
 	// Detect Antigravity auth type
 	useEffect(() => {
 		if (form.formState.isDirty) return;
@@ -270,6 +299,75 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			}
 		}
 	}, [isAntigravity, form, form.formState.defaultValues]);
+
+	// Detect Cline auth type
+	useEffect(() => {
+		if (form.formState.isDirty) return;
+		if (isCline) {
+			const authType = form.getValues("key.cline_key_config._auth_type");
+			if (authType) {
+				setClineAuthType(authType);
+			} else {
+				const hasManualCreds = Boolean(
+					form.getValues("key.value")?.value ||
+					form.getValues("key.cline_key_config.client_id")?.value,
+				);
+				if (hasManualCreds) {
+					setClineAuthType("manual");
+					form.setValue("key.cline_key_config._auth_type", "manual");
+				} else {
+					setClineAuthType("oauth");
+					form.setValue("key.cline_key_config._auth_type", "oauth");
+				}
+			}
+		}
+	}, [isCline, form, form.formState.defaultValues]);
+
+	// Detect Codex auth type
+	useEffect(() => {
+		if (form.formState.isDirty) return;
+		if (isCodex) {
+			const authType = form.getValues("key.codex_key_config._auth_type");
+			if (authType) {
+				setCodexAuthType(authType);
+			} else {
+				const hasManualCreds = Boolean(
+					form.getValues("key.codex_key_config.client_id")?.value ||
+					form.getValues("key.codex_key_config.account_id")?.value,
+				);
+				if (hasManualCreds) {
+					setCodexAuthType("manual");
+					form.setValue("key.codex_key_config._auth_type", "manual");
+				} else {
+					setCodexAuthType("oauth");
+					form.setValue("key.codex_key_config._auth_type", "oauth");
+				}
+			}
+		}
+	}, [isCodex, form, form.formState.defaultValues]);
+
+	// Detect Zed auth type
+	useEffect(() => {
+		if (form.formState.isDirty) return;
+		if (isZed) {
+			const authType = form.getValues("key.zed_key_config._auth_type");
+			if (authType) {
+				setZedAuthType(authType);
+			} else {
+				const hasManualCreds = Boolean(
+					form.getValues("key.zed_key_config.system_id")?.value ||
+					form.getValues("key.zed_key_config.organization_id")?.value,
+				);
+				if (hasManualCreds) {
+					setZedAuthType("manual");
+					form.setValue("key.zed_key_config._auth_type", "manual");
+				} else {
+					setZedAuthType("oauth");
+					form.setValue("key.zed_key_config._auth_type", "oauth");
+				}
+			}
+		}
+	}, [isZed, form, form.formState.defaultValues]);
 
 	const handleGoogleLogin = async () => {
 		setAuthError(null);
@@ -362,16 +460,18 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 				state: stateVal || undefined,
 			}).unwrap();
 
-			form.setValue("key.value", { value: "", ref: "" }, { shouldDirty: true, shouldValidate: true });
 			form.setValue("key.antigravity_key_config.refresh_token", { value: res.refresh_token, ref: "" }, { shouldDirty: true });
 			if (res.project_id) {
 				form.setValue("key.antigravity_key_config.project_id", { value: res.project_id, ref: "" }, { shouldDirty: true });
 			}
+			form.setValue("key.value", { value: "", ref: "" }, { shouldDirty: true });
 			const currentName = form.getValues("key.name");
 			if (!currentName || currentName === "google-antigravity-auth" || currentName.startsWith("oauth-antigravity-")) {
 				const keyName = res.email ? `oauth-antigravity-${res.email}` : "oauth-antigravity-account";
-				form.setValue("key.name", keyName, { shouldDirty: true, shouldValidate: true });
+				form.setValue("key.name", keyName, { shouldDirty: true });
 			}
+			form.clearErrors("key.value");
+			await form.trigger();
 			toast.success(res.email ? `Connected as ${res.email}!` : "Antigravity Google OAuth connected successfully!");
 			setManualCode("");
 			setAntigravityAuthStarted(false);
@@ -385,6 +485,126 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			}
 		} catch (err: unknown) {
 			setAuthError(getErrorMessage(err));
+		}
+	};
+
+	const handleCodexLogin = async () => {
+		setCodexAuthError(null);
+		setCodexOAuthStarted(true);
+		setIsCopyingCodexUrl(true);
+		try {
+			const clientId = form.getValues("key.codex_key_config.client_id")?.value?.trim() || undefined;
+			const res = await getCodexAuthUrl(clientId ? { client_id: clientId } : undefined).unwrap();
+			if (!res.auth_url) throw new Error("No authorization URL returned");
+
+			if (res.code_verifier) {
+				setCodexVerifier(res.code_verifier);
+				try {
+					sessionStorage.setItem("codex_code_verifier", res.code_verifier);
+				} catch {}
+			}
+			if (res.state) {
+				setCodexOAuthState(res.state);
+				try {
+					sessionStorage.setItem("codex_oauth_state", res.state);
+				} catch {}
+			}
+
+			await navigator.clipboard.writeText(res.auth_url);
+			setHasCopiedCodexLink(true);
+			setTimeout(() => setHasCopiedCodexLink(false), 2500);
+			window.open(res.auth_url, "_blank", "noopener,noreferrer");
+			toast.success("Codex OAuth URL copied to clipboard! Approve in your browser, then paste the localhost redirect below.");
+		} catch (err: unknown) {
+			setCodexAuthError(getErrorMessage(err));
+			toast.error("Failed to generate Codex OAuth URL");
+		} finally {
+			setIsCopyingCodexUrl(false);
+		}
+	};
+
+	const handleCopyCodexLoginUrl = async () => {
+		setCodexAuthError(null);
+		setIsCopyingCodexUrl(true);
+		try {
+			const clientId = form.getValues("key.codex_key_config.client_id")?.value?.trim() || undefined;
+			const res = await getCodexAuthUrl(clientId ? { client_id: clientId } : undefined).unwrap();
+			if (!res.auth_url) throw new Error("No authorization URL returned");
+
+			if (res.code_verifier) {
+				setCodexVerifier(res.code_verifier);
+				try {
+					sessionStorage.setItem("codex_code_verifier", res.code_verifier);
+				} catch {}
+			}
+			if (res.state) {
+				setCodexOAuthState(res.state);
+				try {
+					sessionStorage.setItem("codex_oauth_state", res.state);
+				} catch {}
+			}
+
+			await navigator.clipboard.writeText(res.auth_url);
+			setHasCopiedCodexLink(true);
+			setTimeout(() => setHasCopiedCodexLink(false), 2500);
+			toast.success("Codex OAuth URL copied to clipboard! Approve in your browser, then paste the localhost redirect below.");
+		} catch (err: unknown) {
+			setCodexAuthError(getErrorMessage(err));
+			toast.error("Failed to copy Codex OAuth URL");
+		} finally {
+			setIsCopyingCodexUrl(false);
+		}
+	};
+
+	const completeCodexExchange = async (code: string, stateParam?: string) => {
+		setCodexAuthError(null);
+		try {
+			let verifier = codexVerifier;
+			if (!verifier && typeof window !== "undefined") {
+				try {
+					verifier = sessionStorage.getItem("codex_code_verifier") || "";
+				} catch {}
+			}
+			let stateVal = stateParam || codexOAuthState;
+			if (!stateVal && typeof window !== "undefined") {
+				try {
+					stateVal = sessionStorage.getItem("codex_oauth_state") || "";
+				} catch {}
+			}
+
+			const clientId = form.getValues("key.codex_key_config.client_id")?.value?.trim() || undefined;
+			const res = await exchangeCodexCode({
+				code: code.trim(),
+				code_verifier: verifier || undefined,
+				state: stateVal || undefined,
+				client_id: clientId,
+			}).unwrap();
+
+			form.setValue("key.codex_key_config.refresh_token", { value: res.refresh_token, ref: "" }, { shouldDirty: true });
+			if (res.account_id) {
+				form.setValue("key.codex_key_config.account_id", { value: res.account_id, ref: "" }, { shouldDirty: true });
+			}
+			form.setValue("key.value", { value: "", ref: "" }, { shouldDirty: true });
+			const currentName = form.getValues("key.name");
+			if (!currentName || currentName === "codex-auth" || currentName.startsWith("oauth-codex-")) {
+				const keyName = res.email ? `oauth-codex-${res.email}` : "oauth-codex-account";
+				form.setValue("key.name", keyName, { shouldDirty: true });
+			}
+			form.clearErrors("key.value");
+			await form.trigger();
+			toast.success(res.email ? `Connected as ${res.email}!` : "Codex OAuth connected successfully!");
+			setCodexManualCode("");
+			setCodexOAuthStarted(false);
+			setCodexVerifier("");
+			setCodexOAuthState("");
+			if (typeof window !== "undefined") {
+				try {
+					sessionStorage.removeItem("codex_code_verifier");
+					sessionStorage.removeItem("codex_oauth_state");
+				} catch {}
+			}
+		} catch (err: unknown) {
+			setCodexAuthError(getErrorMessage(err));
 		}
 	};
 
@@ -411,7 +631,8 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 		setClineError(null);
 		stopClinePolling();
 		try {
-			const challenge = await startClineDeviceFlow({}).unwrap();
+			const clientId = form.getValues("key.cline_key_config.client_id")?.value?.trim() || undefined;
+			const challenge = await startClineDeviceFlow(clientId ? { client_id: clientId } : {}).unwrap();
 			if (!challenge?.device_code || !challenge?.verification_uri_complete) {
 				throw new Error("No device challenge returned");
 			}
@@ -480,7 +701,8 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 		setZedError(null);
 		stopZedPolling();
 		try {
-			const challenge = await startZedLoginFlow({}).unwrap();
+			const systemId = form.getValues("key.zed_key_config.system_id")?.value?.trim() || undefined;
+			const challenge = await startZedLoginFlow(systemId ? { system_id: systemId } : {}).unwrap();
 			if (!challenge?.session_id || !challenge?.login_url) {
 				throw new Error("No login challenge returned");
 			}
@@ -747,15 +969,15 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 				/>
 			</div>
 			{/* Hide API Key field for providers with dedicated auth tabs */}
-			{!isAzure && !isBedrock && !isBedrockMantle && !isVertex && !isAntigravity && !isDatabricks && !isGithubCopilot && !isZed && (
+			{!isAzure && !isBedrock && !isBedrockMantle && !isVertex && !isAntigravity && !isDatabricks && !isGithubCopilot && !isZed && !isCline && !isCodex && (
 				<FormField
 					control={control}
 					name={`key.value`}
 					render={({ field }) => (
 						<FormItem>
 							<FormLabel>
-								{isGithubCopilot ? "Copilot API Token" : isCline ? "Cline API Key" : "API Key"}{" "}
-								{isVLLM || isGithubCopilot ? "(Optional)" : isCline ? clineKeySuffix : ""}
+								{isGithubCopilot ? "Copilot API Token" : isCline ? "Cline API Key" : isCodex ? "Codex Access Token" : "API Key"}{" "}
+								{isVLLM || isGithubCopilot ? "(Optional)" : isCline ? clineKeySuffix : isCodex ? codexKeySuffix : ""}
 							</FormLabel>
 							{isGithubCopilot && (
 								<FormDescription>
@@ -770,6 +992,12 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 									refresh token for short-lived access tokens automatically.
 								</FormDescription>
 							)}
+							{isCodex && (
+								<FormDescription>
+									A ChatGPT session access token, or leave blank to use OAuth below. OAuth needs no manual key: Bifrost exchanges the
+									refresh token for short-lived access tokens automatically.
+								</FormDescription>
+							)}
 							<FormControl>
 								<SecretVarInput
 									placeholder={
@@ -777,7 +1005,9 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 											? "Copilot API token, or leave blank to use a GitHub App"
 											: isCline
 												? "Cline API key, or leave blank to use OAuth"
-												: "API Key or env.MY_KEY"
+												: isCodex
+													? "Codex access token, or leave blank to use OAuth"
+													: "API Key or env.MY_KEY"
 									}
 									type="text"
 									{...field}
@@ -1607,118 +1837,156 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			)}
 			{isCline && (
 				<div className="space-y-4">
-					<Separator />
-					<div className="bg-muted/20 space-y-3 rounded-md border p-4">
-						<div className="flex items-center justify-between gap-2">
-							<div>
-								<div className="text-sm font-semibold">Connect with Cline (OAuth)</div>
-								<p className="text-muted-foreground text-xs">
-									Approve in your browser; Bifrost fills the refresh token in automatically. No manual key needed.
+					<Separator className="my-6" />
+					<div className="space-y-2">
+						<FormLabel>Authentication Method</FormLabel>
+						<Tabs
+							value={clineAuthType}
+							onValueChange={(v) => {
+								const t = v as "oauth" | "manual";
+								setClineAuthType(t);
+								form.setValue("key.cline_key_config._auth_type", t, { shouldDirty: true });
+							}}
+						>
+							<TabsList className="grid w-full grid-cols-2">
+								<TabsTrigger data-testid="apikey-cline-oauth-tab" value="oauth">
+									Cline OAuth (Recommended)
+								</TabsTrigger>
+								<TabsTrigger data-testid="apikey-cline-manual-tab" value="manual">
+									Manual Key
+								</TabsTrigger>
+							</TabsList>
+						</Tabs>
+					</div>
+
+					{clineAuthType === "oauth" ? (
+						<div className="bg-muted/20 space-y-3 rounded-md border p-4">
+							<div className="flex items-center justify-between gap-2">
+								<div>
+									<div className="text-sm font-semibold">Connect with Cline (OAuth)</div>
+									<p className="text-muted-foreground text-xs">
+										Approve in your browser; Bifrost fills the refresh token in automatically. No manual key needed.
+									</p>
+								</div>
+								<Button
+									type="button"
+									variant={clineChallenge || hasClineOAuthRefresh(form.watch("key.cline_key_config.refresh_token")) ? "outline" : "default"}
+									size="sm"
+									data-testid="cline-oauth-connect-btn"
+									onClick={handleClineConnect}
+									disabled={isStartingClineFlow || clinePolling}
+								>
+									{isStartingClineFlow || clinePolling ? (
+										<Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+									) : (
+										<RefreshCw className="mr-2 h-3.5 w-3.5" />
+									)}
+									{clinePolling
+										? "Waiting for approval…"
+										: hasClineOAuthRefresh(form.watch("key.cline_key_config.refresh_token"))
+											? "Reconnect"
+											: "Authenticate"}
+								</Button>
+							</div>
+							{clineError && <p className="text-destructive text-xs">{clineError}</p>}
+							{clineChallenge && (
+								<div className="space-y-2 rounded-md border p-3">
+									<div className="flex items-center justify-between gap-2">
+										<span className="text-xs font-medium">
+											User code:{" "}
+											<span data-testid="cline-oauth-user-code" className="font-mono text-sm">
+												{clineChallenge.user_code}
+											</span>
+										</span>
+										<span className="text-muted-foreground text-xs">expires in {clineExpiresLeft}s</span>
+									</div>
+									<div className="flex flex-wrap gap-2">
+										<Button type="button" variant="outline" size="sm" className="text-xs" asChild>
+											<a
+												href={clineChallenge.verification_uri_complete}
+												target="_blank"
+												rel="noopener noreferrer"
+												data-testid="cline-oauth-open-tab-btn"
+											>
+												Open approval tab
+											</a>
+										</Button>
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											className="text-xs"
+											data-testid="cline-oauth-copy-url-btn"
+											onClick={() => void handleClineCopy("url")}
+										>
+											{clineCopied === "url" ? <Check className="mr-2 h-3.5 w-3.5 text-green-600" /> : <Copy className="mr-2 h-3.5 w-3.5" />}
+											{clineCopied === "url" ? "Copied!" : "Copy URL"}
+										</Button>
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											className="text-xs"
+											data-testid="cline-oauth-copy-code-btn"
+											onClick={() => void handleClineCopy("code")}
+										>
+											{clineCopied === "code" ? <Check className="mr-2 h-3.5 w-3.5 text-green-600" /> : <Copy className="mr-2 h-3.5 w-3.5" />}
+											{clineCopied === "code" ? "Copied!" : "Copy code"}
+										</Button>
+									</div>
+									{clinePolling && <p className="text-muted-foreground text-xs">Checking approval every second…</p>}
+								</div>
+							)}
+						</div>
+					) : (
+						<div className="space-y-4">
+							<div className="bg-muted/50 flex items-start gap-2 rounded-md border p-3">
+								<Info className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+								<p className="text-muted-foreground text-sm">
+									Cline accepts either credential. Fill in <strong>one</strong> of the two. A <strong>static API key</strong> is
+									simpler for testing, or paste an <strong>OAuth refresh token</strong> from the WorkOS device flow.
 								</p>
 							</div>
-							<Button
-								type="button"
-								variant={clineChallenge || hasClineOAuthRefresh(form.watch("key.cline_key_config.refresh_token")) ? "outline" : "default"}
-								size="sm"
-								data-testid="cline-oauth-connect-btn"
-								onClick={handleClineConnect}
-								disabled={isStartingClineFlow || clinePolling}
-							>
-								{isStartingClineFlow || clinePolling ? (
-									<Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-								) : (
-									<RefreshCw className="mr-2 h-3.5 w-3.5" />
+							<FormField
+								control={control}
+								name="key.value"
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>API Key (Optional if refresh token is provided)</FormLabel>
+										<FormControl>
+											<SecretVarInput
+												data-testid="key-input-cline-api-key"
+												placeholder="api-key or env.CLINE_API_KEY"
+												type="text"
+												{...field}
+											/>
+										</FormControl>
+										<FormDescription>Static Cline API key for testing or direct usage.</FormDescription>
+										<FormMessage />
+									</FormItem>
 								)}
-								{clinePolling
-									? "Waiting for approval…"
-									: hasClineOAuthRefresh(form.watch("key.cline_key_config.refresh_token"))
-										? "Reconnect"
-										: "Authenticate"}
-							</Button>
+							/>
+							<FormField
+								control={control}
+								name="key.cline_key_config.refresh_token"
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Refresh Token {clineOAuthSuffix}</FormLabel>
+										<FormDescription>The OAuth refresh token from the WorkOS device flow.</FormDescription>
+										<FormControl>
+											<SecretVarInput
+												data-testid="key-input-cline-refresh-token"
+												placeholder="paste-refresh-token or env.CLINE_REFRESH_TOKEN"
+												{...field}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
 						</div>
-						{clineError && <p className="text-destructive text-xs">{clineError}</p>}
-						{clineChallenge && (
-							<div className="space-y-2 rounded-md border p-3">
-								<div className="flex items-center justify-between gap-2">
-									<span className="text-xs font-medium">
-										User code:{" "}
-										<span data-testid="cline-oauth-user-code" className="font-mono text-sm">
-											{clineChallenge.user_code}
-										</span>
-									</span>
-									<span className="text-muted-foreground text-xs">expires in {clineExpiresLeft}s</span>
-								</div>
-								<div className="flex flex-wrap gap-2">
-									<Button type="button" variant="outline" size="sm" className="text-xs" asChild>
-										<a
-											href={clineChallenge.verification_uri_complete}
-											target="_blank"
-											rel="noopener noreferrer"
-											data-testid="cline-oauth-open-tab-btn"
-										>
-											Open approval tab
-										</a>
-									</Button>
-									<Button
-										type="button"
-										variant="outline"
-										size="sm"
-										className="text-xs"
-										data-testid="cline-oauth-copy-url-btn"
-										onClick={() => void handleClineCopy("url")}
-									>
-										{clineCopied === "url" ? <Check className="mr-2 h-3.5 w-3.5 text-green-600" /> : <Copy className="mr-2 h-3.5 w-3.5" />}
-										{clineCopied === "url" ? "Copied!" : "Copy URL"}
-									</Button>
-									<Button
-										type="button"
-										variant="outline"
-										size="sm"
-										className="text-xs"
-										data-testid="cline-oauth-copy-code-btn"
-										onClick={() => void handleClineCopy("code")}
-									>
-										{clineCopied === "code" ? <Check className="mr-2 h-3.5 w-3.5 text-green-600" /> : <Copy className="mr-2 h-3.5 w-3.5" />}
-										{clineCopied === "code" ? "Copied!" : "Copy code"}
-									</Button>
-								</div>
-								{clinePolling && <p className="text-muted-foreground text-xs">Checking approval every second…</p>}
-							</div>
-						)}
-					</div>
-					<div className="bg-muted/50 flex items-start gap-2 rounded-md border p-3">
-						<Info className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
-						<p className="text-muted-foreground text-sm">
-							Cline accepts either credential. Fill in <strong>one</strong> of the two. <strong>OAuth</strong> is the option that needs no
-							manual key: complete the WorkOS device flow once and paste the refresh token here — Bifrost exchanges it for short-lived
-							access tokens automatically. A <strong>static API key</strong> in the field above is simpler for testing.
-						</p>
-					</div>
-					<div className="space-y-1.5">
-						<Label>OAuth Credentials</Label>
-						<p className="text-muted-foreground text-sm">
-							Leave these blank if you supplied a Cline API key above. Otherwise the refresh token is needed; the client ID defaults to the
-							built-in Cline client.
-						</p>
-					</div>
-					<FormField
-						control={control}
-						name="key.cline_key_config.refresh_token"
-						render={({ field }) => (
-							<FormItem>
-								<FormLabel>Refresh Token {clineOAuthSuffix}</FormLabel>
-								<FormDescription>The OAuth refresh token from the WorkOS device flow.</FormDescription>
-								<FormControl>
-									<SecretVarInput
-										data-testid="key-input-cline-refresh-token"
-										placeholder="paste-refresh-token or env.CLINE_REFRESH_TOKEN"
-										{...field}
-									/>
-								</FormControl>
-								<FormMessage />
-							</FormItem>
-						)}
-					/>
+					)}
+
 					<FormField
 						control={control}
 						name="key.cline_key_config.client_id"
@@ -1735,101 +2003,232 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 					/>
 				</div>
 			)}
-			{isZed && (
+			{isCodex && (
 				<div className="space-y-4">
-					<Separator />
-					<div className="bg-muted/20 space-y-3 rounded-md border p-4">
-						<div className="flex items-center justify-between gap-2">
-							<div>
-								<div className="text-sm font-semibold">Connect with Zed</div>
-								<p className="text-muted-foreground text-xs">
-									Approve in your browser; Bifrost fills the user ID and access token in automatically. No manual key needed.
-								</p>
-							</div>
-							<Button
-								type="button"
-								variant={
-									zedChallenge || hasZedCredentials(form.watch("key.zed_key_config.user_id"), form.watch("key.zed_key_config.access_token"))
-										? "outline"
-										: "default"
-								}
-								size="sm"
-								data-testid="zed-oauth-connect-btn"
-								onClick={handleZedConnect}
-								disabled={isStartingZedFlow || zedPolling}
-							>
-								{isStartingZedFlow || zedPolling ? (
-									<Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-								) : (
-									<RefreshCw className="mr-2 h-3.5 w-3.5" />
-								)}
-								{zedPolling
-									? "Waiting for approval…"
-									: hasZedCredentials(form.watch("key.zed_key_config.user_id"), form.watch("key.zed_key_config.access_token"))
-										? "Reconnect"
-										: "Authenticate"}
-							</Button>
-						</div>
-						{zedError && <p className="text-destructive text-xs">{zedError}</p>}
-						{zedChallenge && (
-							<div className="space-y-2 rounded-md border p-3">
-								<div className="flex items-center justify-between gap-2">
-									<span className="text-muted-foreground text-xs">
-										Sign in with Zed, then return here — the fields below fill in automatically.
-									</span>
-									<span className="text-muted-foreground text-xs">expires in {zedExpiresLeft}s</span>
+					<Separator className="my-6" />
+					<div className="space-y-2">
+						<FormLabel>Authentication Method</FormLabel>
+						<Tabs
+							value={codexAuthType}
+							onValueChange={(v) => {
+								const t = v as "oauth" | "manual";
+								setCodexAuthType(t);
+								form.setValue("key.codex_key_config._auth_type", t, { shouldDirty: true });
+							}}
+						>
+							<TabsList className="grid w-full grid-cols-2">
+								<TabsTrigger data-testid="apikey-codex-oauth-tab" value="oauth">
+									Codex OAuth (Recommended)
+								</TabsTrigger>
+								<TabsTrigger data-testid="apikey-codex-manual-tab" value="manual">
+									Manual Key
+								</TabsTrigger>
+							</TabsList>
+						</Tabs>
+					</div>
+
+					{codexAuthType === "oauth" ? (
+						<div className="bg-muted/20 space-y-4 rounded-md border p-4">
+							{Boolean(hasCodexOAuthRefresh(form.watch("key.codex_key_config.refresh_token")) || form.watch("key.value")?.value) ? (
+								<div className="flex flex-col gap-3">
+									<div className="flex items-center gap-3 rounded-md border border-green-200 bg-green-50 p-3 text-green-700 dark:border-green-800/40 dark:bg-green-950/40 dark:text-green-400">
+										<CheckCircle2 className="h-5 w-5 shrink-0" />
+										<div className="text-sm">
+											<div className="font-semibold">ChatGPT Account Connected</div>
+											<div className="mt-0.5 text-xs opacity-90">
+												{form.watch("key.codex_key_config.account_id")?.value ? (
+													<span>
+														Workspace ID:{" "}
+														<span className="font-mono font-medium">{form.watch("key.codex_key_config.account_id")?.value}</span>
+													</span>
+												) : (
+													"OAuth Refresh Token loaded and auto-refreshed"
+												)}
+											</div>
+										</div>
+									</div>
+									<div className="flex items-center gap-2">
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											className="text-xs"
+											onClick={() => {
+												setCodexOAuthStarted(false);
+												void handleCodexLogin();
+											}}
+											disabled={isFetchingCodexUrl || isExchangingCodex || isCopyingCodexUrl}
+										>
+											{isFetchingCodexUrl || isExchangingCodex || isCopyingCodexUrl ? (
+												<Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+											) : (
+												<RefreshCw className="mr-2 h-3.5 w-3.5" />
+											)}
+											Reconnect / Switch ChatGPT Account
+										</Button>
+										<TooltipProvider>
+											<Tooltip>
+												<TooltipTrigger asChild>
+													<Button
+														type="button"
+														variant="outline"
+														size="sm"
+														className="text-xs"
+														onClick={handleCopyCodexLoginUrl}
+														disabled={isFetchingCodexUrl || isExchangingCodex || isCopyingCodexUrl}
+													>
+														{isCopyingCodexUrl ? (
+															<Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+														) : hasCopiedCodexLink ? (
+															<Check className="mr-2 h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+														) : (
+															<Copy className="mr-2 h-3.5 w-3.5" />
+														)}
+														{hasCopiedCodexLink ? "Copied!" : "Copy Link"}
+													</Button>
+												</TooltipTrigger>
+												<TooltipContent className="max-w-xs">
+													<p>Copy a fresh Codex OAuth URL to open in your local browser.</p>
+												</TooltipContent>
+											</Tooltip>
+										</TooltipProvider>
+									</div>
 								</div>
-								<div className="flex flex-wrap gap-2">
-									<Button type="button" variant="outline" size="sm" className="text-xs" asChild>
-										<a href={zedChallenge.login_url} target="_blank" rel="noopener noreferrer" data-testid="zed-oauth-open-tab-btn">
-											Open login tab
-										</a>
-									</Button>
+							) : !codexOAuthStarted ? (
+								<div className="space-y-3">
+									<p className="text-muted-foreground text-sm">
+										Sign in with your ChatGPT account. Bifrost will automatically retrieve the OAuth tokens and discover your workspace.
+									</p>
 									<Button
 										type="button"
-										variant="outline"
-										size="sm"
-										className="text-xs"
-										data-testid="zed-oauth-copy-url-btn"
-										onClick={() => void handleZedCopy()}
+										variant="default"
+										data-testid="codex-oauth-login-btn"
+										className="flex w-full items-center justify-center gap-2"
+										onClick={() => void handleCodexLogin()}
+										disabled={isFetchingCodexUrl || isExchangingCodex || isCopyingCodexUrl}
 									>
-										{zedCopied ? <Check className="mr-2 h-3.5 w-3.5 text-green-600" /> : <Copy className="mr-2 h-3.5 w-3.5" />}
-										{zedCopied ? "Copied!" : "Copy URL"}
+										{isFetchingCodexUrl || isCopyingCodexUrl ? (
+											<Loader2 className="h-4 w-4 animate-spin" />
+										) : (
+											<RefreshCw className="h-4 w-4" />
+										)}
+										Authenticate
 									</Button>
 								</div>
-								{zedPolling && <p className="text-muted-foreground text-xs">Checking approval every second…</p>}
-								<p className="text-muted-foreground text-xs">
-									Remote Bifrost? The login tab only works on this machine — paste the user ID and access token below instead.
+							) : (
+								<div className="space-y-3">
+									<div className="flex items-center justify-between gap-2">
+										<div>
+											<div className="text-sm font-semibold">Connect with Codex (OAuth)</div>
+											<p className="text-muted-foreground text-xs">
+												Approve in your browser, then paste the localhost redirect URL or code below. No manual key needed.
+											</p>
+										</div>
+										<Button type="button" variant="outline" size="sm" data-testid="codex-oauth-waiting-btn" disabled>
+											<Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+											Waiting for authentication…
+										</Button>
+									</div>
+									<div className="space-y-2 rounded-md border p-3">
+										<div className="flex flex-wrap gap-2">
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												className="text-xs"
+												data-testid="codex-oauth-copy-link-btn"
+												onClick={() => void handleCopyCodexLoginUrl()}
+												disabled={isFetchingCodexUrl || isExchangingCodex || isCopyingCodexUrl}
+											>
+												{isCopyingCodexUrl ? (
+													<Loader2 className="h-4 w-4 animate-spin" />
+												) : hasCopiedCodexLink ? (
+													<Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+												) : (
+													<Copy className="h-4 w-4" />
+												)}
+												{hasCopiedCodexLink ? "Copied!" : "Copy link"}
+											</Button>
+										</div>
+										<div className="flex gap-2">
+											<Input
+												placeholder="ac_... or http://localhost:1455/auth/callback?code=..."
+												value={codexManualCode}
+												onChange={(e) => {
+													const val = e.target.value.trim();
+													if (val.includes("code=")) {
+														try {
+															const urlObj = new URL(val.startsWith("http") ? val : `http://localhost:1455/auth/callback?${val}`);
+															const c = urlObj.searchParams.get("code");
+															if (c) {
+																setCodexManualCode(c);
+																const s = urlObj.searchParams.get("state");
+																if (s) {
+																	setCodexOAuthState(s);
+																}
+																return;
+															}
+														} catch {}
+													}
+													setCodexManualCode(val);
+												}}
+												className="text-xs"
+											/>
+											<Button
+												type="button"
+												variant="secondary"
+												size="sm"
+												onClick={() => completeCodexExchange(codexManualCode, codexOAuthState)}
+												disabled={!codexManualCode.trim() || isExchangingCodex}
+											>
+												{isExchangingCodex ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Exchange"}
+											</Button>
+										</div>
+									</div>
+								</div>
+							)}
+
+							{codexAuthError && <p className="text-destructive mt-2 text-xs">{codexAuthError}</p>}
+						</div>
+					) : (
+						<div className="space-y-4">
+							<div className="bg-muted/50 flex items-start gap-2 rounded-md border p-3">
+								<Info className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+								<p className="text-muted-foreground text-sm">
+									Paste your Codex OAuth tokens below. The refresh token is required; the client ID defaults to
+									the built-in Codex CLI client, and the account ID defaults to auto-discovery.
 								</p>
 							</div>
-						)}
-					</div>
-					<div className="bg-muted/50 flex items-start gap-2 rounded-md border p-3">
-						<Info className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
-						<p className="text-muted-foreground text-sm">
-							Zed needs a <strong>user ID + access token</strong> pair. <strong>Browser login</strong> above fills both in automatically;{" "}
-							<strong>manual paste</strong> below works everywhere, including remote servers.
-						</p>
-					</div>
-					<div className="space-y-1.5">
-						<Label>Zed Credentials</Label>
-						<p className="text-muted-foreground text-sm">
-							Paste the values from your Zed login. The access token is the raw JSON blob (
-							<span className="font-mono">
-								{"{"}"version":2,…{"}"}
-							</span>
-							) — paste it verbatim, exactly as Zed issued it.
-						</p>
-					</div>
+							<FormField
+								control={control}
+								name="key.codex_key_config.refresh_token"
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Refresh Token {codexOAuthSuffix}</FormLabel>
+										<FormDescription>The OAuth refresh token from the Codex PKCE flow.</FormDescription>
+										<FormControl>
+											<SecretVarInput
+												data-testid="key-input-codex-refresh-token"
+												placeholder="paste-refresh-token or env.CODEX_REFRESH_TOKEN"
+												{...field}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+						</div>
+					)}
+
 					<FormField
 						control={control}
-						name="key.zed_key_config.user_id"
+						name="key.codex_key_config.client_id"
 						render={({ field }) => (
 							<FormItem>
-								<FormLabel>User ID (Required)</FormLabel>
-								<FormDescription>The numeric Zed user id, e.g. 678672.</FormDescription>
+								<FormLabel>Client ID (Optional)</FormLabel>
+								<FormDescription>Leave blank for the built-in Codex CLI client.</FormDescription>
 								<FormControl>
-									<SecretVarInput data-testid="key-input-zed-user-id" placeholder="678672 or env.ZED_USER_ID" {...field} />
+									<SecretVarInput data-testid="key-input-codex-client-id" placeholder="app_EMoamEEZ73f0CkXaXp7hrann" {...field} />
 								</FormControl>
 								<FormMessage />
 							</FormItem>
@@ -1837,28 +2236,170 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 					/>
 					<FormField
 						control={control}
-						name="key.zed_key_config.access_token"
+						name="key.codex_key_config.account_id"
 						render={({ field }) => (
 							<FormItem>
-								<FormLabel>Access Token (Required)</FormLabel>
-								<FormDescription>
-									The raw JSON blob from Zed login (
+								<FormLabel>Account ID (Optional)</FormLabel>
+								<FormDescription>ChatGPT workspace ID. Leave blank to auto-resolve from the account.</FormDescription>
+								<FormControl>
+									<SecretVarInput data-testid="key-input-codex-account-id" placeholder="1a3b5c7d-… or env.CODEX_ACCOUNT_ID" {...field} />
+								</FormControl>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+				</div>
+			)}
+			{isZed && (
+				<div className="space-y-4">
+					<Separator className="my-6" />
+					<div className="space-y-2">
+						<FormLabel>Authentication Method</FormLabel>
+						<Tabs
+							value={zedAuthType}
+							onValueChange={(v) => {
+								const t = v as "oauth" | "manual";
+								setZedAuthType(t);
+								form.setValue("key.zed_key_config._auth_type", t, { shouldDirty: true });
+							}}
+						>
+							<TabsList className="grid w-full grid-cols-2">
+								<TabsTrigger data-testid="apikey-zed-oauth-tab" value="oauth">
+									Zed OAuth (Recommended)
+								</TabsTrigger>
+								<TabsTrigger data-testid="apikey-zed-manual-tab" value="manual">
+									Manual Key
+								</TabsTrigger>
+							</TabsList>
+						</Tabs>
+					</div>
+
+					{zedAuthType === "oauth" ? (
+						<div className="bg-muted/20 space-y-3 rounded-md border p-4">
+							<div className="flex items-center justify-between gap-2">
+								<div>
+									<div className="text-sm font-semibold">Connect with Zed</div>
+									<p className="text-muted-foreground text-xs">
+										Approve in your browser; Bifrost fills the user ID and access token in automatically. No manual key needed.
+									</p>
+								</div>
+								<Button
+									type="button"
+									variant={
+										zedChallenge || hasZedCredentials(form.watch("key.zed_key_config.user_id"), form.watch("key.zed_key_config.access_token"))
+											? "outline"
+											: "default"
+									}
+									size="sm"
+									data-testid="zed-oauth-connect-btn"
+									onClick={handleZedConnect}
+									disabled={isStartingZedFlow || zedPolling}
+								>
+									{isStartingZedFlow || zedPolling ? (
+										<Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+									) : (
+										<RefreshCw className="mr-2 h-3.5 w-3.5" />
+									)}
+									{zedPolling
+										? "Waiting for approval…"
+										: hasZedCredentials(form.watch("key.zed_key_config.user_id"), form.watch("key.zed_key_config.access_token"))
+											? "Reconnect"
+											: "Authenticate"}
+								</Button>
+							</div>
+							{zedError && <p className="text-destructive text-xs">{zedError}</p>}
+							{zedChallenge && (
+								<div className="space-y-2 rounded-md border p-3">
+									<div className="flex items-center justify-between gap-2">
+										<span className="text-muted-foreground text-xs">
+											Sign in with Zed, then return here — the fields below fill in automatically.
+										</span>
+										<span className="text-muted-foreground text-xs">expires in {zedExpiresLeft}s</span>
+									</div>
+									<div className="flex flex-wrap gap-2">
+										<Button type="button" variant="outline" size="sm" className="text-xs" asChild>
+											<a href={zedChallenge.login_url} target="_blank" rel="noopener noreferrer" data-testid="zed-oauth-open-tab-btn">
+												Open login tab
+											</a>
+										</Button>
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											className="text-xs"
+											data-testid="zed-oauth-copy-url-btn"
+											onClick={() => void handleZedCopy()}
+										>
+											{zedCopied ? <Check className="mr-2 h-3.5 w-3.5 text-green-600" /> : <Copy className="mr-2 h-3.5 w-3.5" />}
+											{zedCopied ? "Copied!" : "Copy URL"}
+										</Button>
+									</div>
+									{zedPolling && <p className="text-muted-foreground text-xs">Checking approval every second…</p>}
+									<p className="text-muted-foreground text-xs">
+										Remote Bifrost? The login tab only works on this machine — paste the user ID and access token below instead.
+									</p>
+								</div>
+							)}
+						</div>
+					) : (
+						<div className="space-y-4">
+							<div className="bg-muted/50 flex items-start gap-2 rounded-md border p-3">
+								<Info className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+								<p className="text-muted-foreground text-sm">
+									Zed needs a <strong>user ID + access token</strong> pair. Paste the values from your Zed login below.
+								</p>
+							</div>
+							<div className="space-y-1.5">
+								<Label>Zed Credentials</Label>
+								<p className="text-muted-foreground text-sm">
+									Paste the values from your Zed login. The access token is the raw JSON blob (
 									<span className="font-mono">
 										{"{"}"version":2,…{"}"}
 									</span>
-									), pasted verbatim.
-								</FormDescription>
-								<FormControl>
-									<SecretVarInput
-										data-testid="key-input-zed-access-token"
-										placeholder='{"version":2,"id":"client_token_…","token":"…"} or env.ZED_ACCESS_TOKEN'
-										{...field}
-									/>
-								</FormControl>
-								<FormMessage />
-							</FormItem>
-						)}
-					/>
+									) — paste it verbatim, exactly as Zed issued it.
+								</p>
+							</div>
+							<FormField
+								control={control}
+								name="key.zed_key_config.user_id"
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>User ID (Required)</FormLabel>
+										<FormDescription>The numeric Zed user id, e.g. 123456.</FormDescription>
+										<FormControl>
+											<SecretVarInput data-testid="key-input-zed-user-id" placeholder="123456 or env.ZED_USER_ID" {...field} />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+							<FormField
+								control={control}
+								name="key.zed_key_config.access_token"
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Access Token (Required)</FormLabel>
+										<FormDescription>
+											The raw JSON blob from Zed login (
+											<span className="font-mono">
+												{"{"}"version":2,…{"}"}
+											</span>
+											), pasted verbatim.
+										</FormDescription>
+										<FormControl>
+											<SecretVarInput
+												data-testid="key-input-zed-access-token"
+												placeholder='{"version":2,"id":"client_token_…","token":"…"} or env.ZED_ACCESS_TOKEN'
+												{...field}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+						</div>
+					)}
+
 					<FormField
 						control={control}
 						name="key.zed_key_config.system_id"
@@ -1881,7 +2422,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 								<FormLabel>Organization ID (Optional)</FormLabel>
 								<FormDescription>Leave blank to use the default_organization_id from Zed.</FormDescription>
 								<FormControl>
-									<SecretVarInput data-testid="key-input-zed-organization-id" placeholder="org_01km1bf8f68enexw8gag4sv1zn" {...field} />
+									<SecretVarInput data-testid="key-input-zed-organization-id" placeholder="org_***" {...field} />
 								</FormControl>
 								<FormMessage />
 							</FormItem>
@@ -2560,7 +3101,9 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 													</Button>
 												</TooltipTrigger>
 												<TooltipContent className="max-w-xs">
-													<p>Copy a fresh Google OAuth URL (redirecting to antigravity.google/oauth-callback) to open in your local browser.</p>
+													<p>
+														Copy a fresh Google OAuth URL (redirecting to antigravity.google/oauth-callback) to open in your local browser.
+													</p>
 												</TooltipContent>
 											</Tooltip>
 										</TooltipProvider>
@@ -2640,7 +3183,8 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 													<TooltipContent className="max-w-xs">
 														<p>
 															Popup sign-in is not supported: the shared Google OAuth client uses the callback{" "}
-															<span className="font-mono">https://antigravity.google/oauth-callback</span>, which the popup cannot capture. Use Copy link below.
+															<span className="font-mono">https://antigravity.google/oauth-callback</span>, which the popup cannot capture.
+															Use Copy link below.
 														</p>
 													</TooltipContent>
 												</Tooltip>

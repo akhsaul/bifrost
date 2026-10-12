@@ -175,6 +175,20 @@ export const ProviderIcons = {
 			/>
 		);
 	},
+	codex: ({ size = "md", className = "" }: IconProps) => {
+		const resolvedSize = resolveSize(size);
+		return (
+			<img
+				src="/images/codex.png"
+				alt="codex"
+				width={resolvedSize}
+				height={resolvedSize}
+				loading="lazy"
+				decoding="async"
+				className={className}
+			/>
+		);
+	},
 
 	deepseek: ({ size = "md", className = "" }: IconProps) => {
 		const resolvedSize = resolveSize(size);
@@ -691,11 +705,15 @@ export const ProviderIcons = {
 	nebius: ({ className = "" }: IconProps) => {
 		return <img src="/images/nebius.webp" alt="nebius" width={14} height={14} loading="lazy" decoding="async" className={className} />;
 	},
-	zed: ({ size = "md", className = "" }: IconProps) => {
-		const resolvedSize = resolveSize(size);
+	zed: ({ className = "" }: IconProps) => {
 		return (
 			<span
-				style={{ width: resolvedSize, height: resolvedSize, display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}
+				style={{
+					display: "inline-flex",
+					alignItems: "center",
+					justifyContent: "center",
+					fontWeight: 700,
+				}}
 				className={className}
 				title="Zed"
 			>
@@ -923,7 +941,13 @@ export const ProviderIcons = {
 		return (
 			<svg width={resolvedSize} height={resolvedSize} viewBox="0 0 24 24" fill="none" className={className} aria-label="Apmix">
 				<title>Apmix</title>
-				<path d="M4 5h16v5H4zM4 14h7v5H4zM14 14h6v5h-6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+				<path
+					d="M4 5h16v5H4zM4 14h7v5H4zM14 14h6v5h-6z"
+					stroke="currentColor"
+					strokeWidth="2"
+					strokeLinecap="round"
+					strokeLinejoin="round"
+				/>
 			</svg>
 		);
 	},

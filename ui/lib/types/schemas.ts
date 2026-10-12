@@ -349,11 +349,44 @@ export const clineKeyConfigComplete = (data: { refresh_token?: unknown } | undef
 // the operator starts filling this block in, the refresh token becomes required.
 export const clineKeyConfigSchema = z
 	.object({
+		_auth_type: z.enum(["oauth", "manual"]).optional(),
 		client_id: secretVarSchema.optional(),
 		refresh_token: secretVarSchema.optional(),
 	})
 	.superRefine((data, ctx) => {
 		const started = isSecretVarSet(data.client_id) || isSecretVarSet(data.refresh_token);
+		if (!started) return;
+
+		if (!isSecretVarSet(data.refresh_token)) {
+			ctx.addIssue({ code: "custom", path: ["refresh_token"], message: "Required when using OAuth" });
+		}
+	});
+
+// codexKeyConfigComplete reports whether the OAuth refresh token is present. It is
+// the check the outer key schema uses to decide whether this block is a real credential.
+export const codexKeyConfigComplete = (data: { refresh_token?: unknown } | undefined): boolean => {
+	if (!data) return false;
+	const d = data as Record<string, { value?: string; ref?: string } | undefined>;
+	return isSecretVarSet(d.refresh_token);
+};
+
+// Codex key config schema. All fields are optional because the whole block is
+// optional: a static access token in `value` is the other valid auth mode. Once
+// the operator starts filling this block in, the refresh token becomes required.
+export const codexKeyConfigSchema = z
+	.object({
+		_auth_type: z.enum(["oauth", "manual"]).optional(),
+		client_id: secretVarSchema.optional(),
+		refresh_token: secretVarSchema.optional(),
+		access_token: secretVarSchema.optional(),
+		account_id: secretVarSchema.optional(),
+	})
+	.superRefine((data, ctx) => {
+		const started =
+			isSecretVarSet(data.client_id) ||
+			isSecretVarSet(data.refresh_token) ||
+			isSecretVarSet(data.access_token) ||
+			isSecretVarSet(data.account_id);
 		if (!started) return;
 
 		if (!isSecretVarSet(data.refresh_token)) {
@@ -377,6 +410,7 @@ export const zedKeyConfigComplete = (data: { user_id?: unknown; access_token?: u
 // block is validated as a unit by the outer key schema.
 export const zedKeyConfigSchema = z
 	.object({
+		_auth_type: z.enum(["oauth", "manual"]).optional(),
 		user_id: secretVarSchema.optional(),
 		access_token: secretVarSchema.optional(),
 		system_id: secretVarSchema.optional(),
@@ -563,6 +597,7 @@ export const modelProviderKeySchema = z
 		databricks_key_config: databricksKeyConfigSchema.optional(),
 		github_copilot_key_config: githubCopilotKeyConfigSchema.optional(),
 		cline_key_config: clineKeyConfigSchema.optional(),
+		codex_key_config: codexKeyConfigSchema.optional(),
 		zed_key_config: zedKeyConfigSchema.optional(),
 		modal_key_config: modalKeyConfigSchema.optional(),
 		use_for_batch_api: z.boolean().optional(),
@@ -602,6 +637,10 @@ export const modelProviderKeySchema = z
 			}
 			// Cline authenticates from its OAuth refresh token when no static API key is given.
 			if (clineKeyConfigComplete(data.cline_key_config)) {
+				return true;
+			}
+			// Codex authenticates from its OAuth refresh token when no static access token is given.
+			if (codexKeyConfigComplete(data.codex_key_config)) {
 				return true;
 			}
 			// Zed authenticates from its login pair (user_id + access_token);
