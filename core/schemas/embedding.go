@@ -43,6 +43,7 @@ type EmbeddingInput struct {
 	Texts      []string
 	Embedding  []int
 	Embeddings [][]int
+	Objects    []map[string]interface{}
 }
 
 func (e *EmbeddingInput) MarshalJSON() ([]byte, error) {
@@ -60,11 +61,14 @@ func (e *EmbeddingInput) MarshalJSON() ([]byte, error) {
 	if e.Embeddings != nil {
 		set++
 	}
+	if e.Objects != nil {
+		set++
+	}
 	if set == 0 {
 		return nil, fmt.Errorf("embedding input is empty")
 	}
 	if set > 1 {
-		return nil, fmt.Errorf("embedding input must set exactly one of: text, texts, embedding, embeddings")
+		return nil, fmt.Errorf("embedding input must set exactly one of: text, texts, embedding, embeddings, objects")
 	}
 
 	if e.Text != nil {
@@ -79,6 +83,9 @@ func (e *EmbeddingInput) MarshalJSON() ([]byte, error) {
 	if e.Embeddings != nil {
 		return MarshalSorted(e.Embeddings)
 	}
+	if e.Objects != nil {
+		return MarshalSorted(e.Objects)
+	}
 
 	return nil, fmt.Errorf("invalid embedding input")
 }
@@ -88,6 +95,7 @@ func (e *EmbeddingInput) UnmarshalJSON(data []byte) error {
 	e.Texts = nil
 	e.Embedding = nil
 	e.Embeddings = nil
+	e.Objects = nil
 	// Try string
 	var s string
 	if err := Unmarshal(data, &s); err == nil {
@@ -110,6 +118,12 @@ func (e *EmbeddingInput) UnmarshalJSON(data []byte) error {
 	var i2 [][]int
 	if err := Unmarshal(data, &i2); err == nil {
 		e.Embeddings = i2
+		return nil
+	}
+	// Try []map[string]interface{} (for multimodal embeddings such as [{"text": "..."}, {"image": "..."}])
+	var objects []map[string]interface{}
+	if err := Unmarshal(data, &objects); err == nil {
+		e.Objects = objects
 		return nil
 	}
 

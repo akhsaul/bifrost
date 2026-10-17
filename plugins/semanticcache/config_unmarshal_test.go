@@ -6,6 +6,7 @@ import (
 	"time"
 
 	bifrost "github.com/maximhq/bifrost/core"
+	"github.com/maximhq/bifrost/core/schemas"
 )
 
 func TestUnmarshalJSON_DefaultCacheKey(t *testing.T) {
@@ -51,7 +52,9 @@ func TestUnmarshalJSON_AllFields(t *testing.T) {
 		"conversation_history_threshold": 5,
 		"cache_by_model": false,
 		"cache_by_provider": false,
-		"exclude_system_prompt": true
+		"exclude_system_prompt": true,
+		"allowed_request_types": ["embedding"],
+		"cache_type": "direct"
 	}`
 
 	var config Config
@@ -91,6 +94,44 @@ func TestUnmarshalJSON_AllFields(t *testing.T) {
 	}
 	if config.ExcludeSystemPrompt == nil || *config.ExcludeSystemPrompt != true {
 		t.Errorf("ExcludeSystemPrompt: expected true, got %v", config.ExcludeSystemPrompt)
+	}
+	if len(config.AllowedRequestTypes) != 1 || config.AllowedRequestTypes[0] != "embedding" {
+		t.Errorf("AllowedRequestTypes: expected ['embedding'], got %v", config.AllowedRequestTypes)
+	}
+	if config.CacheType != "direct" {
+		t.Errorf("CacheType: expected 'direct', got %q", config.CacheType)
+	}
+}
+
+func TestIsRequestTypeAllowed(t *testing.T) {
+	// When AllowedRequestTypes is empty, all types are allowed
+	pluginEmpty := &Plugin{config: &Config{}}
+	if !pluginEmpty.isRequestTypeAllowed("embedding") {
+		t.Error("expected embedding to be allowed when list is empty")
+	}
+	if !pluginEmpty.isRequestTypeAllowed("chat_completion") {
+		t.Error("expected chat_completion to be allowed when list is empty")
+	}
+
+	// When AllowedRequestTypes is set to ["embedding"]
+	pluginEmbeddingOnly := &Plugin{config: &Config{AllowedRequestTypes: []string{"embedding"}}}
+	if !pluginEmbeddingOnly.isRequestTypeAllowed("embedding") {
+		t.Error("expected embedding to be allowed")
+	}
+	if pluginEmbeddingOnly.isRequestTypeAllowed("chat_completion") {
+		t.Error("expected chat_completion to NOT be allowed")
+	}
+	if pluginEmbeddingOnly.isRequestTypeAllowed("text_completion") {
+		t.Error("expected text_completion to NOT be allowed")
+	}
+
+	// Test plural alias ["embeddings"]
+	pluginPlural := &Plugin{config: &Config{AllowedRequestTypes: []string{"embeddings"}}}
+	if !pluginPlural.isRequestTypeAllowed("embedding") {
+		t.Error("expected embedding to be allowed with 'embeddings' alias")
+	}
+	if pluginPlural.isRequestTypeAllowed("chat_completion") {
+		t.Error("expected chat_completion to NOT be allowed")
 	}
 }
 
@@ -185,5 +226,53 @@ func assertBoolPtr(t *testing.T, field string, got, want *bool) {
 	}
 	if *got != *want {
 		t.Errorf("%s: expected %v, got %v", field, *want, *got)
+	}
+}
+
+func TestPreLLMHookAllowedRequestTypes(t *testing.T) {
+	cfg := getDefaultTestConfig()
+	cfg.AllowedRequestTypes = []string{"embedding"}
+
+	plugin := &Plugin{
+		config: cfg,
+		logger: bifrost.NewDefaultLogger(schemas.LogLevelDebug),
+		store:  newDirectFastPathStore(),
+	}
+
+	// 1. ChatCompletionRequest should be bypassed
+	chatReq := &schemas.BifrostRequest{
+		RequestType: schemas.ChatCompletionRequest,
+		ChatRequest: CreateBasicChatRequest("hello", 0, 100),
+	}
+	ctxChat := CreateContextWithCacheKey(t, "chat-test")
+	_, shortCircuitChat, errChat := plugin.PreLLMHook(ctxChat, chatReq)
+	if errChat != nil || shortCircuitChat != nil {
+		t.Fatalf("PreLLMHook for chat unexpected: shortCircuit=%v err=%v", shortCircuitChat, errChat)
+	}
+	reqIDChat, _ := ctxChat.Value(schemas.BifrostContextKeyRequestID).(string)
+	if state := plugin.getCacheState(reqIDChat); state != nil {
+		t.Fatalf("expected state for chat request to be nil because it is not in AllowedRequestTypes")
+	}
+
+	// 2. EmbeddingRequest should be allowed and processed
+	embReq := &schemas.BifrostRequest{
+		RequestType:      schemas.EmbeddingRequest,
+		EmbeddingRequest: CreateEmbeddingRequest([]string{"hello world"}),
+	}
+	ctxEmb := CreateContextWithCacheKey(t, "emb-test")
+	_, shortCircuitEmb, errEmb := plugin.PreLLMHook(ctxEmb, embReq)
+	if errEmb != nil {
+		t.Fatalf("PreLLMHook for embedding error: %v", errEmb)
+	}
+	if shortCircuitEmb != nil {
+		t.Fatalf("unexpected short circuit on first request")
+	}
+	reqIDEmb, _ := ctxEmb.Value(schemas.BifrostContextKeyRequestID).(string)
+	state := plugin.getCacheState(reqIDEmb)
+	if state == nil {
+		t.Fatalf("expected state for embedding request to be populated")
+	}
+	if state.DirectCacheID == "" {
+		t.Fatalf("expected DirectCacheID to be set for embedding request")
 	}
 }

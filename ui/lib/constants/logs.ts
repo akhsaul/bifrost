@@ -24,6 +24,7 @@ export const KnownProvidersNames = [
 	"groq",
 	"huggingface",
 	"inferx",
+	"jina-ai",
 	"longcat",
 	"mistral",
 	"modal",
@@ -88,6 +89,7 @@ export const EmbeddingSupportedProviders: readonly ProviderName[] = [
 	"vertex",
 	"vllm",
 	"databricks",
+	"jina-ai",
 ] as const;
 
 export const Statuses = ["success", "error", "processing", "cancelled"] as const;
@@ -212,6 +214,7 @@ export const ProviderLabels: Record<ProviderName, string> = {
 	neuralwatt: "Neuralwatt",
 	bai: "B.ai",
 	antigravity: "Antigravity",
+	"jina-ai": "Jina AI",
 } as const;
 
 // Helper function to get provider label, supporting custom providers

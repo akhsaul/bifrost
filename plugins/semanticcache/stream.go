@@ -2,23 +2,23 @@ package semanticcache
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"time"
+
+	"github.com/maximhq/bifrost/core/schemas"
 )
 
 // chunkSortKey returns the (Index, ChunkIndex) tuple used to order
 // accumulated stream chunks before flush. Image-generation responses use
 // both fields; every other response shape uses ChunkIndex with Index=0.
-// Nil chunks/responses sort to the end via a max-int sentinel so they're
+// Nil responses sort to the end via a max-int sentinel so they're
 // dropped deterministically by the consumer.
-func chunkSortKey(c *StreamChunk) (int, int) {
+func chunkSortKey(r *schemas.BifrostResponse) (int, int) {
 	const sentinel = int(^uint(0) >> 1) // math.MaxInt without the import
-	if c == nil || c.Response == nil {
+	if r == nil {
 		return sentinel, sentinel
 	}
-	r := c.Response
 	switch {
 	case r.TextCompletionResponse != nil:
 		return 0, r.TextCompletionResponse.ExtraFields.ChunkIndex
@@ -78,7 +78,7 @@ func (plugin *Plugin) addStreamChunk(requestID string, chunk *StreamChunk) error
 	return nil
 }
 
-// processAccumulatedStream serializes and stores the accumulated chunks as a
+// processAccumulatedStream stores the accumulated pre-marshaled chunks as a
 // single cache entry. Called once per stream when the final chunk arrives.
 func (plugin *Plugin) processAccumulatedStream(ctx context.Context, requestID string) error {
 	accumulatorInterface, exists := plugin.streamAccumulators.Load(requestID)
@@ -92,8 +92,8 @@ func (plugin *Plugin) processAccumulatedStream(ctx context.Context, requestID st
 	defer plugin.cleanupStreamAccumulator(requestID)
 
 	sort.SliceStable(accumulator.Chunks, func(i, j int) bool {
-		ai, bi := chunkSortKey(accumulator.Chunks[i])
-		aj, bj := chunkSortKey(accumulator.Chunks[j])
+		ai, bi := accumulator.Chunks[i].Index, accumulator.Chunks[i].ChunkIndex
+		aj, bj := accumulator.Chunks[j].Index, accumulator.Chunks[j].ChunkIndex
 		if ai != aj {
 			return ai < aj
 		}
@@ -101,16 +101,11 @@ func (plugin *Plugin) processAccumulatedStream(ctx context.Context, requestID st
 	})
 
 	streamResponses := make([]string, 0, len(accumulator.Chunks))
-	for i, chunk := range accumulator.Chunks {
-		if chunk.Response == nil {
+	for _, chunk := range accumulator.Chunks {
+		if chunk.Data == "" {
 			continue
 		}
-		chunkData, err := json.Marshal(chunk.Response)
-		if err != nil {
-			plugin.logger.Warn("Failed to marshal stream chunk %d: %v", i, err)
-			continue
-		}
-		streamResponses = append(streamResponses, string(chunkData))
+		streamResponses = append(streamResponses, chunk.Data)
 	}
 
 	if len(streamResponses) == 0 {

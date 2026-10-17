@@ -535,6 +535,9 @@
         "typesafe": {
           "$ref": "#/$defs/provider"
         },
+        "jina-ai": {
+          "$ref": "#/$defs/provider"
+        },
         "vllm": {
           "$ref": "#/$defs/provider_with_vllm_config"
         },
@@ -2812,7 +2815,8 @@
                         "replicate",
                         "sgl",
                         "huggingface",
-                        "databricks"
+                        "databricks",
+                        "jina-ai"
                       ]
                     },
                     "embedding_model": {
@@ -2867,6 +2871,18 @@
                     "exclude_system_prompt": {
                       "type": "boolean",
                       "description": "Exclude system prompt in cache key (default: false)"
+                    },
+                    "allowed_request_types": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Allowed request types for caching (e.g. ['embedding']). Empty or omitted means all supported request types."
+                    },
+                    "cache_type": {
+                      "type": "string",
+                      "enum": ["direct", "semantic"],
+                      "description": "Default cache lookup mode when x-bf-cache-type header is not set ('direct' or 'semantic')"
                     }
                   },
                   "required": ["dimension"],
@@ -9467,7 +9483,8 @@
             "fireworks",
             "sarvam",
             "wafer",
-            "typesafe"
+            "typesafe",
+            "jina-ai"
           ],
           "description": "Base provider type to extend"
         },

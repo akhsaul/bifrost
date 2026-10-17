@@ -87,6 +87,7 @@ export const ModelPlaceholders = {
 	neuralwatt: "e.g. neuralwatt-model-name",
 	bai: "e.g. bai-model-name",
 	antigravity: "e.g. gemini-3.6-flash-medium, claude-sonnet-4-6, gemini-2.5-flash",
+	"jina-ai": "e.g. jina-embeddings-v3, jina-reranker-v2-base-multilingual",
 };
 
 export const isKeyRequiredByProvider: Record<ProviderName, boolean> = {
@@ -141,6 +142,7 @@ export const isKeyRequiredByProvider: Record<ProviderName, boolean> = {
 	neuralwatt: true,
 	bai: true,
 	antigravity: true,
+	"jina-ai": true,
 };
 
 export const DefaultNetworkConfig = {

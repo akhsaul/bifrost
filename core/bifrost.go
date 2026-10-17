@@ -42,6 +42,7 @@ import (
 	"github.com/maximhq/bifrost/core/providers/groq"
 	"github.com/maximhq/bifrost/core/providers/huggingface"
 	"github.com/maximhq/bifrost/core/providers/inferx"
+	"github.com/maximhq/bifrost/core/providers/jinaai"
 	"github.com/maximhq/bifrost/core/providers/longcat"
 	"github.com/maximhq/bifrost/core/providers/mistral"
 	"github.com/maximhq/bifrost/core/providers/modal"
@@ -1369,7 +1370,7 @@ func (bifrost *Bifrost) EmbeddingRequest(ctx *schemas.BifrostContext, req *schem
 	}
 	hasExtraInputs := req.Params != nil && req.Params.ExtraParams != nil &&
 		(req.Params.ExtraParams["inputs"] != nil || req.Params.ExtraParams["images"] != nil)
-	if (req.Input == nil || (req.Input.Text == nil && req.Input.Texts == nil && req.Input.Embedding == nil && req.Input.Embeddings == nil)) && !hasExtraInputs && !isLargePayloadPassthrough(ctx) {
+	if (req.Input == nil || (req.Input.Text == nil && req.Input.Texts == nil && req.Input.Embedding == nil && req.Input.Embeddings == nil && len(req.Input.Objects) == 0)) && !hasExtraInputs && !isLargePayloadPassthrough(ctx) {
 		return nil, &schemas.BifrostError{
 			IsBifrostError: false,
 			Error: &schemas.ErrorField{
@@ -4702,6 +4703,8 @@ func (bifrost *Bifrost) createBaseProvider(providerKey schemas.ModelProvider, co
 		return sarvam.NewSarvamProvider(config, bifrost.logger)
 	case schemas.Databricks:
 		return databricks.NewDatabricksProvider(config, bifrost.logger)
+	case schemas.JinaAI:
+		return jinaai.NewJinaAIProvider(config, bifrost.logger)
 	case schemas.Typesafe:
 		return typesafe.NewTypesafeProvider(config, bifrost.logger)
 	default:

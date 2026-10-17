@@ -38,11 +38,13 @@ type Config struct {
 	Dimension            int           `json:"dimension"`                        // Dimension for vector store (must be > 0 when Provider is set; use 1 for direct-only mode)
 
 	// Advanced caching behavior
-	DefaultCacheKey              string `json:"default_cache_key,omitempty"`              // Default cache key used when no per-request key is provided (optional, caching is disabled when empty and no per-request key is set)
-	ConversationHistoryThreshold int    `json:"conversation_history_threshold,omitempty"` // Skip caching for requests with more than this number of messages in the conversation history (default: 3)
-	CacheByModel                 *bool  `json:"cache_by_model,omitempty"`                 // Include model in cache key (default: true)
-	CacheByProvider              *bool  `json:"cache_by_provider,omitempty"`              // Include provider in cache key (default: true)
-	ExcludeSystemPrompt          *bool  `json:"exclude_system_prompt,omitempty"`          // Exclude system prompt in cache key (default: false)
+	DefaultCacheKey              string    `json:"default_cache_key,omitempty"`              // Default cache key used when no per-request key is provided (optional, caching is disabled when empty and no per-request key is set)
+	ConversationHistoryThreshold int       `json:"conversation_history_threshold,omitempty"` // Skip caching for requests with more than this number of messages in the conversation history (default: 3)
+	CacheByModel                 *bool     `json:"cache_by_model,omitempty"`                 // Include model in cache key (default: true)
+	CacheByProvider              *bool     `json:"cache_by_provider,omitempty"`              // Include provider in cache key (default: true)
+	ExcludeSystemPrompt          *bool     `json:"exclude_system_prompt,omitempty"`          // Exclude system prompt in cache key (default: false)
+	AllowedRequestTypes          []string  `json:"allowed_request_types,omitempty"`          // Restrict caching to specific request types (e.g. ["embedding"]). Empty means all supported types.
+	CacheType                    CacheType `json:"cache_type,omitempty"`                     // Default cache lookup type ("direct" or "semantic"). Optional override when per-request header is unset.
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for Config so TTL accepts
@@ -93,8 +95,11 @@ type StreamChunk struct {
 	// Timestamp records when this chunk arrived at PostLLMHook. Used by the
 	// reaper to drop accumulators stuck without a final chunk.
 	Timestamp time.Time
-	// Response is the chunk payload as delivered by the provider.
-	Response *schemas.BifrostResponse
+	// Index and ChunkIndex order accumulated stream chunks before flush.
+	Index      int
+	ChunkIndex int
+	// Data is the pre-marshaled JSON payload of the chunk.
+	Data string
 }
 
 // StreamAccumulator collects the chunks of a single streaming response so
@@ -371,6 +376,10 @@ func (plugin *Plugin) PreLLMHook(ctx *schemas.BifrostContext, req *schemas.Bifro
 		return req, nil, nil
 	}
 
+	if !plugin.isRequestTypeAllowed(req.RequestType) {
+		return req, nil, nil
+	}
+
 	// Create state up front so a reused/retried request ID never inherits stale fields.
 	state := plugin.createCacheState(requestID)
 
@@ -534,19 +543,23 @@ func (plugin *Plugin) resolveCacheThreshold(ctx *schemas.BifrostContext) float64
 // the context narrows to just one.
 func (plugin *Plugin) resolveCacheTypes(ctx *schemas.BifrostContext) (direct bool, semantic bool) {
 	direct, semantic = true, true
-	ctxVal := ctx.Value(CacheTypeKey)
-	if ctxVal == nil {
-		return
+	var cacheTypeVal CacheType
+	if ctxVal := ctx.Value(CacheTypeKey); ctxVal != nil {
+		if ct, ok := ctxVal.(CacheType); ok {
+			cacheTypeVal = ct
+		} else {
+			msg := fmt.Sprintf("CacheTypeKey is not a CacheType (got %T), using all available cache types", ctxVal)
+			plugin.logger.Warn(msg)
+			ctx.Log(schemas.LogLevelWarn, msg)
+		}
+	} else if plugin.config.CacheType != "" {
+		cacheTypeVal = plugin.config.CacheType
 	}
-	cacheTypeVal, ok := ctxVal.(CacheType)
-	if !ok {
-		msg := fmt.Sprintf("CacheTypeKey is not a CacheType (got %T), using all available cache types", ctxVal)
-		plugin.logger.Warn(msg)
-		ctx.Log(schemas.LogLevelWarn, msg)
-		return
+
+	if cacheTypeVal != "" {
+		direct = cacheTypeVal == CacheTypeDirect
+		semantic = cacheTypeVal == CacheTypeSemantic
 	}
-	direct = cacheTypeVal == CacheTypeDirect
-	semantic = cacheTypeVal == CacheTypeSemantic
 	return
 }
 
@@ -586,6 +599,11 @@ func (plugin *Plugin) PostLLMHook(ctx *schemas.BifrostContext, res *schemas.Bifr
 	extraFields := res.GetExtraFields()
 	requestType := extraFields.RequestType
 	cacheMetadata := extraFields.CacheDebug
+
+	if !plugin.isRequestTypeAllowed(requestType) {
+		plugin.clearCacheState(requestID)
+		return res, nil, nil
+	}
 
 	// Final-chunk signaling for cache replays: stampCacheMetadataForHit only
 	// stamps CacheHit=true on the LAST replay chunk (see search.go).
@@ -680,23 +698,29 @@ func (plugin *Plugin) PostLLMHook(ctx *schemas.BifrostContext, res *schemas.Bifr
 		return res, nil, nil
 	}
 
-	plugin.writersWg.Add(1)
-	go func() {
-		defer plugin.writersWg.Done()
-		cacheCtx, cancel := context.WithTimeout(context.Background(), CacheSetTimeout)
-		defer cancel()
+	unifiedMetadata := plugin.buildUnifiedMetadata(provider, model, paramsHash, cacheKey, cacheTTL)
+	if isStream {
+		if err := plugin.addStreamingResponse(requestID, storageID, res, embeddingToStore, unifiedMetadata, cacheTTL, isFinalChunk); err != nil {
+			plugin.logger.Warn("Failed to cache streaming response (namespace=%s, id=%s): %v. The cache_id stamped on the response will not resolve on subsequent lookups.", plugin.config.VectorStoreNamespace, storageID, err)
+		}
+	} else {
+		responseData, err := json.Marshal(res)
+		if err != nil {
+			plugin.logger.Warn("Failed to marshal single response (namespace=%s, id=%s): %v", plugin.config.VectorStoreNamespace, storageID, err)
+			return res, nil, nil
+		}
 
-		unifiedMetadata := plugin.buildUnifiedMetadata(provider, model, paramsHash, cacheKey, cacheTTL)
-		if isStream {
-			if err := plugin.addStreamingResponse(cacheCtx, requestID, storageID, res, embeddingToStore, unifiedMetadata, cacheTTL, isFinalChunk); err != nil {
-				plugin.logger.Warn("Failed to cache streaming response (namespace=%s, id=%s): %v. The cache_id stamped on the response will not resolve on subsequent lookups.", plugin.config.VectorStoreNamespace, storageID, err)
-			}
-		} else {
-			if err := plugin.addNonStreamingResponse(cacheCtx, storageID, res, embeddingToStore, unifiedMetadata, cacheTTL); err != nil {
+		plugin.writersWg.Add(1)
+		go func() {
+			defer plugin.writersWg.Done()
+			cacheCtx, cancel := context.WithTimeout(context.Background(), CacheSetTimeout)
+			defer cancel()
+
+			if err := plugin.addNonStreamingResponse(cacheCtx, storageID, string(responseData), embeddingToStore, unifiedMetadata); err != nil {
 				plugin.logger.Warn("Failed to cache single response (namespace=%s, id=%s): %v. The cache_id stamped on the response will not resolve on subsequent lookups.", plugin.config.VectorStoreNamespace, storageID, err)
 			}
-		}
-	}()
+		}()
+	}
 
 	return res, nil, nil
 }

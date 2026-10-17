@@ -133,6 +133,10 @@ func ToGeminiEmbeddingResponse(bifrostResp *schemas.BifrostEmbeddingResponse) *G
 		geminiResp.Metadata = &EmbedContentMetadata{
 			BillableCharacterCount: int32(bifrostResp.Usage.PromptTokens),
 		}
+		geminiResp.UsageMetadata = &GenerateContentResponseUsageMetadata{
+			PromptTokenCount: int32(bifrostResp.Usage.PromptTokens),
+			TotalTokenCount:  int32(bifrostResp.Usage.TotalTokens),
+		}
 	}
 
 	return geminiResp
@@ -164,19 +168,61 @@ func ToBifrostEmbeddingResponse(geminiResp *GeminiEmbeddingResponse, model strin
 	}
 
 	// Convert usage metadata if available
-	if geminiResp.Metadata != nil || (len(geminiResp.Embeddings) > 0 && geminiResp.Embeddings[0].Statistics != nil) {
-		bifrostResp.Usage = &schemas.BifrostLLMUsage{}
-
-		// Use statistics from the first embedding if available
-		if geminiResp.Embeddings[0].Statistics != nil {
-			bifrostResp.Usage.PromptTokens = int(geminiResp.Embeddings[0].Statistics.TokenCount)
-		} else if geminiResp.Metadata != nil {
-			// Fall back to metadata if statistics are not available
-			bifrostResp.Usage.PromptTokens = int(geminiResp.Metadata.BillableCharacterCount)
+	// Priority 1: Prioritize EmbedContentMetadata (Metadata.BillableCharacterCount)
+	if geminiResp.Metadata != nil {
+		bifrostResp.Usage = &schemas.BifrostLLMUsage{
+			PromptTokens: int(geminiResp.Metadata.BillableCharacterCount),
+			TotalTokens:  int(geminiResp.Metadata.BillableCharacterCount),
+		}
+	} else if geminiResp.UsageMetadata != nil {
+		// Priority 2: UsageMetadata (UsageMetadata.PromptTokenCount)
+		promptTokens := int(geminiResp.UsageMetadata.PromptTokenCount)
+		totalTokens := int(geminiResp.UsageMetadata.TotalTokenCount)
+		if totalTokens == 0 {
+			totalTokens = promptTokens
+		}
+		usage := &schemas.BifrostLLMUsage{
+			PromptTokens: promptTokens,
+			TotalTokens:  totalTokens,
 		}
 
-		// Set total tokens same as prompt tokens for embeddings
-		bifrostResp.Usage.TotalTokens = bifrostResp.Usage.PromptTokens
+		details := geminiResp.UsageMetadata.PromptTokensDetails
+		if len(details) == 0 {
+			details = geminiResp.UsageMetadata.PromptTokenDetails
+		}
+		if len(details) > 0 || geminiResp.UsageMetadata.CachedContentTokenCount > 0 {
+			usage.PromptTokensDetails = &schemas.ChatPromptTokensDetails{}
+			for _, detail := range details {
+				switch detail.Modality {
+				case ModalityText:
+					usage.PromptTokensDetails.TextTokens = int(detail.TokenCount)
+				case ModalityAudio:
+					usage.PromptTokensDetails.AudioTokens = int(detail.TokenCount)
+				case ModalityImage:
+					usage.PromptTokensDetails.ImageTokens = int(detail.TokenCount)
+				}
+			}
+			if geminiResp.UsageMetadata.CachedContentTokenCount > 0 {
+				usage.PromptTokensDetails.CachedReadTokens = int(geminiResp.UsageMetadata.CachedContentTokenCount)
+			}
+		}
+		bifrostResp.Usage = usage
+	} else if len(geminiResp.Embeddings) > 0 {
+		// Priority 3: Embedding statistics (Statistics.TokenCount)
+		var totalTokens int
+		hasStats := false
+		for _, emb := range geminiResp.Embeddings {
+			if emb.Statistics != nil {
+				hasStats = true
+				totalTokens += int(emb.Statistics.TokenCount)
+			}
+		}
+		if hasStats {
+			bifrostResp.Usage = &schemas.BifrostLLMUsage{
+				PromptTokens: totalTokens,
+				TotalTokens:  totalTokens,
+			}
+		}
 	}
 
 	return bifrostResp

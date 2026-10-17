@@ -2145,8 +2145,9 @@ type FunctionResponse struct {
 
 // GeminiEmbeddingResponse represents a Google GenAI embedding response.
 type GeminiEmbeddingResponse struct {
-	Embeddings []GeminiEmbedding     `json:"embeddings"`
-	Metadata   *EmbedContentMetadata `json:"metadata,omitempty"`
+	Embeddings    []GeminiEmbedding                     `json:"embeddings"`
+	Metadata      *EmbedContentMetadata                 `json:"metadata,omitempty"`
+	UsageMetadata *GenerateContentResponseUsageMetadata `json:"usageMetadata,omitempty"`
 }
 
 // GeminiEmbedContentResponse is the wire format for a single :embedContent response.
@@ -2599,6 +2600,8 @@ type GenerateContentResponseUsageMetadata struct {
 	PromptTokenCount int32 `json:"promptTokenCount,omitempty"`
 	// Output only. List of modalities that were processed in the request input.
 	PromptTokensDetails []*ModalityTokenCount `json:"promptTokensDetails,omitempty"`
+	// Output only. Singular variant returned by some Gemini endpoints (e.g. embedding).
+	PromptTokenDetails []*ModalityTokenCount `json:"promptTokenDetails,omitempty"`
 	// Output only. Number of tokens present in thoughts output.
 	ThoughtsTokenCount int32 `json:"thoughtsTokenCount,omitempty"`
 	// Output only. Number of tokens present in tool-use prompt(s).

@@ -3,11 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ModelMultiselect } from "@/components/ui/modelMultiselect";
+import { MultiSelect } from "@/components/ui/multiSelect";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProviderIconType, RenderProviderIcon } from "@/lib/constants/icons";
-import { EmbeddingSupportedProviders, getProviderLabel } from "@/lib/constants/logs";
+import { EmbeddingSupportedProviders, getProviderLabel, RequestTypeLabels } from "@/lib/constants/logs";
 import {
 	getErrorMessage,
 	useCreatePluginMutation,
@@ -29,6 +30,25 @@ import { toast } from "sonner";
 // embedding-capable provider and the model's real dimension.
 type CacheMode = "direct" | "semantic";
 
+const CacheableRequestTypes = [
+	"embedding",
+	"chat_completion",
+	"text_completion",
+	"responses",
+	"speech",
+	"transcription",
+	"image_generation",
+] as const;
+
+const cacheableRequestTypeOptions = (selected: string[]) => {
+	const known = new Set<string>(CacheableRequestTypes);
+	const extra = selected.filter((rt) => !known.has(rt as any));
+	return [...CacheableRequestTypes, ...extra].map((rt) => ({
+		value: rt,
+		label: RequestTypeLabels[rt as keyof typeof RequestTypeLabels] || rt,
+	}));
+};
+
 // Embedding-capable providers gate the semantic mode. Built-in providers
 // are listed in EmbeddingSupportedProviders; custom providers expose
 // support via custom_provider_config.allowed_requests.embedding.
@@ -47,6 +67,7 @@ const defaultDirectConfig: EditorCacheConfig = {
 	exclude_system_prompt: false,
 	cache_by_model: true,
 	cache_by_provider: true,
+	allowed_request_types: [],
 };
 
 // Configs we treat as "the user has nothing saved": both API responses
@@ -84,9 +105,11 @@ const buildPayload = (config: EditorCacheConfig, mode: CacheMode): CacheConfig =
 		cache_by_provider: config.cache_by_provider,
 		vector_store_namespace: config.vector_store_namespace?.trim() || undefined,
 		default_cache_key: config.default_cache_key?.trim() || undefined,
+		allowed_request_types: config.allowed_request_types && config.allowed_request_types.length > 0 ? config.allowed_request_types : undefined,
+		cache_type: mode === "direct" ? "direct" : undefined,
 	};
 	if (mode === "direct") {
-		return { ...base, dimension: 1 } as CacheConfig;
+		return { ...base, dimension: config.dimension && config.dimension > 1 ? config.dimension : 1 } as CacheConfig;
 	}
 	return {
 		...base,
@@ -187,8 +210,11 @@ export default function CachingView() {
 			"default_cache_key",
 		];
 		const changed = fields.some((k) => (cacheConfig[k] ?? "") !== (serverCacheConfig[k] ?? ""));
+		const arrayChanged =
+			JSON.stringify(cacheConfig.allowed_request_types ?? []) !==
+			JSON.stringify(serverCacheConfig.allowed_request_types ?? []);
 		const modeChanged = inferMode(serverCacheConfig) !== mode;
-		return changed || modeChanged;
+		return changed || arrayChanged || modeChanged;
 	}, [cacheConfig, serverCacheConfig, mode]);
 
 	const updateLocal = (updates: Partial<EditorCacheConfig>) => {
@@ -550,6 +576,28 @@ export default function CachingView() {
 												key ↔ shared cache pool. Leave blank to <b>disable caching</b> for any request that doesn&apos;t send the header.
 											</p>
 										</div>
+									</div>
+								</div>
+
+								{/* Request Type Filtering */}
+								<div className="space-y-4">
+									<h3 className="text-sm font-medium">Request Filtering</h3>
+									<div className="space-y-2">
+										<Label htmlFor="allowed-request-types">Allowed Request Types</Label>
+										<MultiSelect
+											id="allowed-request-types"
+											data-testid="caching-allowed-request-types-select"
+											options={cacheableRequestTypeOptions(cacheConfig.allowed_request_types || [])}
+											defaultValue={cacheConfig.allowed_request_types || []}
+											resetOnDefaultValueChange
+											onValueChange={(values) => updateLocal({ allowed_request_types: values })}
+											placeholder="All supported request types (Embedding, Chat, Text, etc.)"
+											emptyIndicator="No request types found."
+											className="border-input text-foreground hover:bg-accent hover:text-accent-foreground min-h-9 rounded-sm bg-transparent font-normal"
+										/>
+										<p className="text-muted-foreground text-xs">
+											Limit caching to specific request types. For example, select only <b>Embedding</b> to cache embeddings without caching LLM chat responses. Leave empty to allow all request types.
+										</p>
 									</div>
 								</div>
 

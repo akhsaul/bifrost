@@ -823,6 +823,8 @@ interface BaseCacheConfig {
 	cache_by_provider: boolean;
 	vector_store_namespace?: string;
 	default_cache_key?: string;
+	allowed_request_types?: string[];
+	cache_type?: "direct" | "semantic";
 	created_at?: string;
 	updated_at?: string;
 }

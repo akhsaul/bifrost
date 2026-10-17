@@ -48,6 +48,56 @@ func isSemanticCacheSupportedRequestType(requestType schemas.RequestType) bool {
 	}
 }
 
+// isRequestTypeAllowed reports whether the request type is permitted by the plugin's
+// AllowedRequestTypes configuration. If AllowedRequestTypes is empty or nil, all
+// supported request types are allowed.
+func (plugin *Plugin) isRequestTypeAllowed(requestType schemas.RequestType) bool {
+	if len(plugin.config.AllowedRequestTypes) == 0 {
+		return true
+	}
+	reqTypeStr := strings.ToLower(string(requestType))
+	for _, allowed := range plugin.config.AllowedRequestTypes {
+		norm := strings.ToLower(strings.TrimSpace(allowed))
+		if norm == "" {
+			continue
+		}
+		if norm == reqTypeStr {
+			return true
+		}
+		switch norm {
+		case "embedding", "embeddings":
+			if requestType == schemas.EmbeddingRequest {
+				return true
+			}
+		case "chat", "chat_completion", "chat_completions":
+			if requestType == schemas.ChatCompletionRequest || requestType == schemas.ChatCompletionStreamRequest {
+				return true
+			}
+		case "text", "text_completion", "text_completions":
+			if requestType == schemas.TextCompletionRequest || requestType == schemas.TextCompletionStreamRequest {
+				return true
+			}
+		case "responses":
+			if requestType == schemas.ResponsesRequest || requestType == schemas.ResponsesStreamRequest {
+				return true
+			}
+		case "speech":
+			if requestType == schemas.SpeechRequest || requestType == schemas.SpeechStreamRequest {
+				return true
+			}
+		case "transcription", "transcriptions":
+			if requestType == schemas.TranscriptionRequest || requestType == schemas.TranscriptionStreamRequest {
+				return true
+			}
+		case "image", "images", "image_generation":
+			if requestType == schemas.ImageGenerationRequest || requestType == schemas.ImageGenerationStreamRequest {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // hashSortedSet returns a deterministic hex hash for an order-insensitive
 // list of items. Some request fields are semantically sets but JSON-encoded
 // as lists (most notably Tools, where MCP's randomized map iteration would
@@ -452,17 +502,11 @@ func (plugin *Plugin) buildUnifiedMetadata(provider schemas.ModelProvider, model
 	return unifiedMetadata
 }
 
-// addNonStreamingResponse marshals the response and writes it as a single
+// addNonStreamingResponse writes the pre-marshaled response as a single
 // cache entry. The metadata map is mutated (response + stream_chunks added)
-// — safe because the calling goroutine owns it. The ttl parameter is
-// retained for symmetry with addStreamingResponse; the actual expiry is
-// already encoded in metadata["expires_at"] by buildUnifiedMetadata.
-func (plugin *Plugin) addNonStreamingResponse(ctx context.Context, responseID string, res *schemas.BifrostResponse, embedding []float32, metadata map[string]interface{}, ttl time.Duration) error {
-	responseData, err := json.Marshal(res)
-	if err != nil {
-		return fmt.Errorf("failed to marshal response: %w", err)
-	}
-	metadata["response"] = string(responseData)
+// — safe because the calling goroutine owns it.
+func (plugin *Plugin) addNonStreamingResponse(ctx context.Context, responseID string, responseData string, embedding []float32, metadata map[string]interface{}) error {
+	metadata["response"] = responseData
 	metadata["stream_chunks"] = []string{}
 
 	if err := plugin.store.Add(ctx, plugin.config.VectorStoreNamespace, responseID, embedding, metadata); err != nil {
@@ -473,17 +517,27 @@ func (plugin *Plugin) addNonStreamingResponse(ctx context.Context, responseID st
 	return nil
 }
 
-// addStreamingResponse appends one chunk to the per-request accumulator and,
-// when the final chunk arrives, flushes the accumulated stream to the cache.
+// addStreamingResponse appends one pre-marshaled chunk to the per-request
+// accumulator and, when the final chunk arrives, asynchronously flushes the
+// accumulated stream to the cache. Chunk serialization occurs synchronously
+// in PostLLMHook to prevent data races with downstream mutations of the response.
 // Errors never reach this function: PostLLMHook returns early on bifrostErr
 // (errors are always delivered as the final chunk), so an errored stream
 // simply leaves its accumulator behind for the periodic reaper.
-func (plugin *Plugin) addStreamingResponse(ctx context.Context, requestID string, storageID string, res *schemas.BifrostResponse, embedding []float32, metadata map[string]interface{}, ttl time.Duration, isFinalChunk bool) error {
+func (plugin *Plugin) addStreamingResponse(requestID string, storageID string, res *schemas.BifrostResponse, embedding []float32, metadata map[string]interface{}, ttl time.Duration, isFinalChunk bool) error {
+	sortIdx, sortChunkIdx := chunkSortKey(res)
+	chunkData, err := json.Marshal(res)
+	if err != nil {
+		return fmt.Errorf("failed to marshal stream chunk: %w", err)
+	}
+
 	accumulator := plugin.getOrCreateStreamAccumulator(requestID, storageID, embedding, metadata, ttl)
 
 	chunk := &StreamChunk{
-		Timestamp: time.Now(),
-		Response:  res,
+		Timestamp:  time.Now(),
+		Index:      sortIdx,
+		ChunkIndex: sortChunkIdx,
+		Data:       string(chunkData),
 	}
 	if err := plugin.addStreamChunk(requestID, chunk); err != nil {
 		return fmt.Errorf("failed to add stream chunk: %w", err)
@@ -505,9 +559,18 @@ func (plugin *Plugin) addStreamingResponse(ctx context.Context, requestID string
 	if alreadyComplete {
 		return nil
 	}
-	if err := plugin.processAccumulatedStream(ctx, requestID); err != nil {
-		plugin.logger.Warn("Failed to process accumulated stream for request %s: %v", requestID, err)
-	}
+
+	plugin.writersWg.Add(1)
+	go func() {
+		defer plugin.writersWg.Done()
+		cacheCtx, cancel := context.WithTimeout(context.Background(), CacheSetTimeout)
+		defer cancel()
+
+		if err := plugin.processAccumulatedStream(cacheCtx, requestID); err != nil {
+			plugin.logger.Warn("Failed to process accumulated stream for request %s: %v", requestID, err)
+		}
+	}()
+
 	return nil
 }
 

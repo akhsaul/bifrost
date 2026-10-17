@@ -3,6 +3,7 @@ package semanticcache
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"sync"
@@ -798,3 +799,134 @@ func TestPostLLMHook_WritesWhenVectorRequiredAndEmbeddingPresent(t *testing.T) {
 		t.Fatalf("expected one cache write when embedding is present, got %d", len(base.addIDs))
 	}
 }
+
+func TestPostLLMHook_ConcurrentResponseMutationDoesNotPanic(t *testing.T) {
+	store := newObservableStore()
+	plugin := newTestPlugin(t, store)
+
+	ctx := CreateContextWithCacheKey(t, "")
+	req := &schemas.BifrostRequest{
+		RequestType: schemas.ChatCompletionRequest,
+		ChatRequest: CreateBasicChatRequest("test concurrent mutation", 0.7, 50),
+	}
+	if _, _, err := plugin.PreLLMHook(ctx, req); err != nil {
+		t.Fatalf("PreLLMHook failed: %v", err)
+	}
+
+	res := &schemas.BifrostResponse{
+		ChatResponse: &schemas.BifrostChatResponse{
+			ID:    "chat-test-id",
+			Model: "test-model",
+			Choices: []schemas.BifrostResponseChoice{
+				{
+					ChatNonStreamResponseChoice: &schemas.ChatNonStreamResponseChoice{
+						Message: &schemas.ChatMessage{
+							Role: schemas.ChatMessageRoleAssistant,
+							Content: &schemas.ChatMessageContent{
+								ContentStr: schemas.Ptr("test answer"),
+							},
+						},
+					},
+				},
+			},
+			ExtraFields: schemas.BifrostResponseExtraFields{
+				RequestType: schemas.ChatCompletionRequest,
+				RawRequest:  map[string]interface{}{"prompt": "hello"},
+				RawResponse: map[string]interface{}{"response": "world"},
+			},
+		},
+	}
+
+	// In the real gateway, core bifrost.go and other plugins mutate / clear
+	// RawRequest and RawResponse immediately after PostLLMHook returns.
+	returnedResp, _, err := plugin.PostLLMHook(ctx, res, nil)
+	if err != nil {
+		t.Fatalf("PostLLMHook failed: %v", err)
+	}
+
+	// Concurrently mutate the response fields right away
+	go func() {
+		for i := 0; i < 100; i++ {
+			returnedResp.GetExtraFields().RawRequest = nil
+			returnedResp.GetExtraFields().RawResponse = nil
+		}
+	}()
+
+	plugin.WaitForPendingOperations()
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if len(store.addIDs) != 1 {
+		t.Fatalf("expected 1 cached entry, got %d", len(store.addIDs))
+	}
+	cachedProps := store.chunks[store.addIDs[0]].Properties
+	if cachedProps["response"] == "" {
+		t.Fatal("expected cached response string to be non-empty")
+	}
+}
+
+func TestPostLLMHook_ConcurrentStreamResponseMutationDoesNotPanic(t *testing.T) {
+	store := newObservableStore()
+	plugin := newTestPlugin(t, store)
+
+	ctx := CreateContextWithCacheKey(t, "")
+	req := &schemas.BifrostRequest{
+		RequestType: schemas.ChatCompletionStreamRequest,
+		ChatRequest: CreateBasicChatRequest("test streaming concurrent mutation", 0.7, 50),
+	}
+	if _, _, err := plugin.PreLLMHook(ctx, req); err != nil {
+		t.Fatalf("PreLLMHook failed: %v", err)
+	}
+
+	// Send 3 chunks
+	for i := 0; i < 3; i++ {
+		isFinal := i == 2
+		if isFinal {
+			ctx.SetValue(schemas.BifrostContextKeyStreamEndIndicator, true)
+		}
+
+		res := &schemas.BifrostResponse{
+			ChatResponse: &schemas.BifrostChatResponse{
+				ID: "stream-test-id",
+				Choices: []schemas.BifrostResponseChoice{
+					{
+						ChatStreamResponseChoice: &schemas.ChatStreamResponseChoice{
+							Delta: &schemas.ChatStreamResponseChoiceDelta{
+								Content: schemas.Ptr(fmt.Sprintf("chunk %d", i)),
+							},
+						},
+					},
+				},
+				ExtraFields: schemas.BifrostResponseExtraFields{
+					RequestType: schemas.ChatCompletionStreamRequest,
+					ChunkIndex:  i,
+					RawRequest:  map[string]interface{}{"chunk": i},
+					RawResponse: map[string]interface{}{"raw": i},
+				},
+			},
+		}
+
+		returnedResp, _, err := plugin.PostLLMHook(ctx, res, nil)
+		if err != nil {
+			t.Fatalf("PostLLMHook failed on chunk %d: %v", i, err)
+		}
+
+		// Mutate returned chunk immediately
+		returnedResp.GetExtraFields().RawRequest = nil
+		returnedResp.GetExtraFields().RawResponse = nil
+	}
+
+	plugin.WaitForPendingOperations()
+
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if len(store.addIDs) != 1 {
+		t.Fatalf("expected 1 cached stream entry, got %d", len(store.addIDs))
+	}
+	cachedProps := store.chunks[store.addIDs[0]].Properties
+	streamChunks, ok := cachedProps["stream_chunks"].([]string)
+	if !ok || len(streamChunks) != 3 {
+		t.Fatalf("expected 3 cached stream chunks, got %v", cachedProps["stream_chunks"])
+	}
+}
+
