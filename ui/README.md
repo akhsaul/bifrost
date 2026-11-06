@@ -28,10 +28,10 @@ The UI is designed to work with the Bifrost HTTP transport backend. Get started 
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Start development server
-npm run dev
+pnpm run dev
 ```
 
 The development server runs on `http://localhost:3000` and connects to your Bifrost HTTP transport backend (default: `http://localhost:8080`).
