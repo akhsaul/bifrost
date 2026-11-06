@@ -2100,11 +2100,34 @@ func (h *ProviderHandler) exchangeAntigravityAuthCode(ctx *fasthttp.RequestCtx) 
 		return
 	}
 
-	payload.Code = strings.TrimSpace(payload.Code)
-	if payload.Code == "" {
+	rawCode := strings.TrimSpace(payload.Code)
+	if rawCode == "" {
 		SendError(ctx, fasthttp.StatusBadRequest, "Authorization code is required")
 		return
 	}
+
+	// If the user pasted the entire redirect URL, extract code and state
+	if strings.Contains(rawCode, "?") || strings.Contains(rawCode, "code=") {
+		if parsedURL, err := url.Parse(rawCode); err == nil {
+			q := parsedURL.Query()
+			if extractedCode := q.Get("code"); extractedCode != "" {
+				rawCode = extractedCode
+			}
+			if extractedState := q.Get("state"); extractedState != "" && payload.State == "" {
+				payload.State = extractedState
+			}
+		}
+	}
+
+	// Decode URL percent-encoding if the code is URL-encoded (e.g. "4%2F...")
+	if strings.Contains(rawCode, "%") {
+		if unescaped, err := url.QueryUnescape(rawCode); err == nil {
+			rawCode = unescaped
+		}
+	}
+	payload.Code = rawCode
+
+	loginClient := antigravity.LoginFlowClient()
 
 	var creds *antigravity.AntigravityCredentials
 	var err error
@@ -2112,7 +2135,7 @@ func (h *ProviderHandler) exchangeAntigravityAuthCode(ctx *fasthttp.RequestCtx) 
 	if payload.Mode == "legacy" {
 		creds, err = antigravity.ExchangeAuthCode(
 			nil,
-			nil,
+			loginClient,
 			payload.Code,
 			payload.RedirectURI,
 			payload.ClientID,
@@ -2130,7 +2153,7 @@ func (h *ProviderHandler) exchangeAntigravityAuthCode(ctx *fasthttp.RequestCtx) 
 
 		creds, err = antigravity.ExchangeAuthCodePKCE(
 			nil,
-			nil,
+			loginClient,
 			payload.Code,
 			payload.RedirectURI,
 			payload.ClientID,

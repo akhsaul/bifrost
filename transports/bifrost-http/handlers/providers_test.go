@@ -3734,7 +3734,7 @@ func TestExchangeCodexAuthCode_Statuses(t *testing.T) {
 	} {
 		var ctx fasthttp.RequestCtx
 		ctx.Request.Header.SetMethod("POST")
-		ctx.Request.SetBody([]byte(`{"code":"` + tc.code + `"}`))
+		ctx.Request.SetBody([]byte(`{"code":"` + tc.code + `","code_verifier":"good-verifier"}`))
 
 		h.exchangeCodexAuthCode(&ctx)
 
@@ -3753,6 +3753,30 @@ func TestExchangeCodexAuthCode_Statuses(t *testing.T) {
 	h.exchangeCodexAuthCode(&ctx)
 	if ctx.Response.StatusCode() != 400 {
 		t.Errorf("empty code: status = %d, want 400", ctx.Response.StatusCode())
+	}
+}
+
+func TestExchangeAntigravityAuthCode_InputNormalization(t *testing.T) {
+	h := &ProviderHandler{}
+
+	// Test 1: Empty code returns 400
+	var ctx fasthttp.RequestCtx
+	ctx.Request.Header.SetMethod("POST")
+	ctx.Request.SetBody([]byte(`{}`))
+	h.exchangeAntigravityAuthCode(&ctx)
+	if ctx.Response.StatusCode() != 400 {
+		t.Errorf("empty code: status = %d, want 400", ctx.Response.StatusCode())
+	}
+	if !strings.Contains(string(ctx.Response.Body()), "Authorization code is required") {
+		t.Errorf("expected 'Authorization code is required', got: %s", ctx.Response.Body())
+	}
+
+	// Test 2: Invalid JSON returns 400
+	ctx.Response.Reset()
+	ctx.Request.SetBody([]byte(`invalid-json`))
+	h.exchangeAntigravityAuthCode(&ctx)
+	if ctx.Response.StatusCode() != 400 {
+		t.Errorf("invalid json: status = %d, want 400", ctx.Response.StatusCode())
 	}
 }
 
@@ -3778,6 +3802,7 @@ func newCodexOAuthMock(t *testing.T) *httptest.Server {
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 	return server
+}
 
 func TestListModels_UnsearchedListingOmitsDeprecatedModels(t *testing.T) {
 	SetLogger(&mockLogger{})

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/bytedance/sonic"
+	providerUtils "github.com/maximhq/bifrost/core/providers/utils"
 	schemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/valyala/fasthttp"
 )
@@ -163,6 +164,66 @@ func generateCodeChallenge(verifier string) string {
 	return base64.RawURLEncoding.EncodeToString(hash[:])
 }
 
+// LoginFlowClient returns the shared HTTP client for Antigravity OAuth operations.
+func LoginFlowClient() *fasthttp.Client {
+	loginClientOnce.Do(func() {
+		timeout := 30 * time.Second
+		c := &fasthttp.Client{
+			ReadTimeout:         timeout,
+			WriteTimeout:        timeout,
+			MaxConnsPerHost:     20,
+			MaxIdleConnDuration: 30 * time.Second,
+			MaxConnWaitTimeout:  timeout,
+			ConnPoolStrategy:    fasthttp.FIFO,
+		}
+		sharedLoginClient = providerUtils.ConfigureDialer(c, true)
+	})
+	return sharedLoginClient
+}
+
+// doLoginRequestWithRetry executes an HTTP request with retries on transient network/DNS errors.
+func doLoginRequestWithRetry(client *fasthttp.Client, req *fasthttp.Request, resp *fasthttp.Response, maxRetries int) error {
+	if client == nil {
+		client = LoginFlowClient()
+	}
+	var err error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt*300) * time.Millisecond)
+			resp.Reset()
+		}
+		err = client.Do(req, resp)
+		if err == nil {
+			return nil
+		}
+	}
+	return err
+}
+
+// parseGoogleIDToken extracts the email and name from a Google OAuth id_token JWT
+// without signature verification (Google token endpoint already validated and issued it).
+func parseGoogleIDToken(idToken string) (email, name string) {
+	parts := strings.Split(strings.TrimSpace(idToken), ".")
+	if len(parts) != 3 {
+		return "", ""
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		payload, err = base64.URLEncoding.DecodeString(parts[1])
+		if err != nil {
+			return "", ""
+		}
+	}
+	var claims struct {
+		Email string `json:"email"`
+		Name  string `json:"name"`
+	}
+	if err := sonic.Unmarshal(payload, &claims); err != nil {
+		return "", ""
+	}
+	return strings.TrimSpace(claims.Email), strings.TrimSpace(claims.Name)
+}
+
 // FetchUserQuotaSummary queries the user quota.
 func FetchUserQuotaSummary(
 	ctx *schemas.BifrostContext,
@@ -191,14 +252,7 @@ func FetchUserQuotaSummary(
 	req.Header.Set("User-Agent", GetUserAgent(profile))
 	req.SetBody(bodyBytes)
 
-	var err error
-	if client != nil {
-		err = client.Do(req, resp)
-	} else {
-		err = fasthttp.Do(req, resp)
-	}
-
-	if err != nil {
+	if err := doLoginRequestWithRetry(client, req, resp, 2); err != nil {
 		return fmt.Errorf("user quota network error: %w", err)
 	}
 
@@ -209,7 +263,8 @@ func FetchUserQuotaSummary(
 	return nil
 }
 
-// CompleteLoginFlow runs identity, project ID, and quota checks. Returns error if any fail.
+// CompleteLoginFlow runs best-effort identity, project ID, and quota checks.
+// Individual check failures are logged as warnings and do not fail the overall flow.
 func CompleteLoginFlow(
 	ctx *schemas.BifrostContext,
 	client *fasthttp.Client,
@@ -217,31 +272,59 @@ func CompleteLoginFlow(
 	accessToken string,
 	logger schemas.Logger,
 ) error {
-	userInfo, err := FetchGoogleUserInfo(ctx, client, accessToken, logger)
-	if err != nil || userInfo == nil {
-		return fmt.Errorf("failed to fetch user info: %v", err)
+	if client == nil {
+		client = LoginFlowClient()
 	}
-	creds.Email = userInfo.Email
-	creds.Name = userInfo.Name
 
-	projectID, err := EnsureProjectID(ctx, client, accessToken, DefaultRuntimeBaseURL, creds.ClientProfile, logger)
-	if err != nil || projectID == "" {
-		return fmt.Errorf("failed to discover project ID: %v", err)
+	// 1. Fetch user identity if not already populated (e.g. from id_token)
+	if creds.Email == "" || creds.Name == "" {
+		userInfo, err := FetchGoogleUserInfo(ctx, client, accessToken, logger)
+		if err != nil || userInfo == nil {
+			if logger != nil {
+				logger.Warn("Failed to fetch Google userinfo during Antigravity login: %v", err)
+			}
+		} else {
+			if creds.Email == "" {
+				creds.Email = userInfo.Email
+			}
+			if creds.Name == "" {
+				creds.Name = userInfo.Name
+			}
+		}
 	}
-	creds.ProjectID = projectID
 
-	err = FetchUserQuotaSummary(ctx, client, accessToken, projectID, creds.ClientProfile, logger)
-	if err != nil {
-		return fmt.Errorf("failed to fetch user quota: %v", err)
+	// 2. Discover project ID if not already set
+	if creds.ProjectID == "" {
+		projectID, err := EnsureProjectID(ctx, client, accessToken, DefaultRuntimeBaseURL, creds.ClientProfile, logger)
+		if err != nil || projectID == "" {
+			if logger != nil {
+				logger.Warn("Failed to discover Antigravity project ID during login: %v", err)
+			}
+		} else {
+			creds.ProjectID = projectID
+		}
+	}
+
+	// 3. Optional user quota check
+	if creds.ProjectID != "" {
+		if err := FetchUserQuotaSummary(ctx, client, accessToken, creds.ProjectID, creds.ClientProfile, logger); err != nil {
+			if logger != nil {
+				logger.Warn("Antigravity user quota check notice: %v", err)
+			}
+		}
 	}
 
 	return nil
 }
 
 var (
-	tokenCacheMu     sync.RWMutex
-	tokenCache       = make(map[string]*CachedToken)
-	tokenEndpointURL = GoogleOAuthTokenURL
+	tokenCacheMu        sync.RWMutex
+	tokenCache          = make(map[string]*CachedToken)
+	tokenEndpointURL    = GoogleOAuthTokenURL
+	userInfoEndpointURL = GoogleUserInfoURL
+
+	sharedLoginClient *fasthttp.Client
+	loginClientOnce   sync.Once
 )
 
 // ClearTokenCache clears the in-memory token cache (useful for tests).
@@ -513,14 +596,7 @@ func RefreshToken(
 	req.Header.Set("User-Agent", GetUserAgent(creds.ClientProfile))
 	req.SetBodyString(form.Encode())
 
-	var err error
-	if client != nil {
-		err = client.Do(req, resp)
-	} else {
-		err = fasthttp.Do(req, resp)
-	}
-
-	if err != nil {
+	if err := doLoginRequestWithRetry(client, req, resp, 2); err != nil {
 		return "", time.Time{}, fmt.Errorf("network error during token refresh: %w", err)
 	}
 
@@ -584,14 +660,7 @@ func EnsureProjectID(
 	req.Header.Set("User-Agent", GetUserAgent(profile))
 	req.SetBody(bodyBytes)
 
-	var err error
-	if client != nil {
-		err = client.Do(req, resp)
-	} else {
-		err = fasthttp.Do(req, resp)
-	}
-
-	if err != nil {
+	if err := doLoginRequestWithRetry(client, req, resp, 2); err != nil {
 		return "", fmt.Errorf("loadCodeAssist network error: %w", err)
 	}
 
@@ -707,6 +776,13 @@ func ExchangeAuthCode(
 		clientSecret = GetAntigravityClientSecret()
 	}
 
+	cleanCode := strings.TrimSpace(code)
+	if strings.Contains(cleanCode, "%") {
+		if unescaped, err := url.QueryUnescape(cleanCode); err == nil {
+			cleanCode = unescaped
+		}
+	}
+
 	req := fasthttp.AcquireRequest()
 	resp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseRequest(req)
@@ -714,7 +790,7 @@ func ExchangeAuthCode(
 
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
-	form.Set("code", strings.TrimSpace(code))
+	form.Set("code", cleanCode)
 	if redirectURI != "" {
 		form.Set("redirect_uri", strings.TrimSpace(redirectURI))
 	}
@@ -732,14 +808,7 @@ func ExchangeAuthCode(
 	req.Header.Set("User-Agent", GetUserAgent(DefaultClientProfile))
 	req.SetBodyString(form.Encode())
 
-	var err error
-	if client != nil {
-		err = client.Do(req, resp)
-	} else {
-		err = fasthttp.Do(req, resp)
-	}
-
-	if err != nil {
+	if err := doLoginRequestWithRetry(client, req, resp, 2); err != nil {
 		return nil, fmt.Errorf("network error during auth code exchange: %w", err)
 	}
 
@@ -750,6 +819,7 @@ func ExchangeAuthCode(
 	var tokResp struct {
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
+		IDToken      string `json:"id_token,omitempty"`
 		ExpiresIn    int    `json:"expires_in"`
 		TokenType    string `json:"token_type"`
 		Error        string `json:"error,omitempty"`
@@ -763,6 +833,10 @@ func ExchangeAuthCode(
 		return nil, fmt.Errorf("token exchange error: %s (%s)", tokResp.Error, tokResp.ErrorDesc)
 	}
 
+	if tokResp.AccessToken == "" && tokResp.RefreshToken == "" {
+		return nil, fmt.Errorf("token exchange returned empty tokens")
+	}
+
 	creds := &AntigravityCredentials{
 		AccessToken:   tokResp.AccessToken,
 		RefreshToken:  tokResp.RefreshToken,
@@ -771,23 +845,33 @@ func ExchangeAuthCode(
 		ClientProfile: DefaultClientProfile,
 	}
 
+	if tokResp.IDToken != "" {
+		email, name := parseGoogleIDToken(tokResp.IDToken)
+		if email != "" {
+			creds.Email = email
+		}
+		if name != "" {
+			creds.Name = name
+		}
+	}
+
 	// Auto-discover Project ID and fetch userinfo using the newly exchanged access token
 	if tokResp.AccessToken != "" {
 		if projectID, err := EnsureProjectID(ctx, client, tokResp.AccessToken, DefaultRuntimeBaseURL, DefaultClientProfile, logger); err == nil && projectID != "" {
 			creds.ProjectID = projectID
 		}
-		if userInfo, err := FetchGoogleUserInfo(ctx, client, tokResp.AccessToken, logger); err == nil && userInfo != nil {
-			creds.Email = userInfo.Email
-			creds.Name = userInfo.Name
+		if creds.Email == "" {
+			if userInfo, err := FetchGoogleUserInfo(ctx, client, tokResp.AccessToken, logger); err == nil && userInfo != nil {
+				creds.Email = userInfo.Email
+				creds.Name = userInfo.Name
+			}
 		}
-	} else {
-		return nil, fmt.Errorf("token exchange returned empty access token")
 	}
 
 	return creds, nil
 }
 
-// ExchangeAuthCodePKCE exchanges a Google OAuth authorization code using the new PKCE flow with strict validation.
+// ExchangeAuthCodePKCE exchanges a Google OAuth authorization code using the PKCE flow.
 func ExchangeAuthCodePKCE(
 	ctx *schemas.BifrostContext,
 	client *fasthttp.Client,
@@ -816,6 +900,13 @@ func ExchangeAuthCodePKCE(
 		return nil, fmt.Errorf("PKCE code_verifier is required for Antigravity OAuth code exchange. Please re-authenticate to obtain a fresh authorization URL")
 	}
 
+	cleanCode := strings.TrimSpace(code)
+	if strings.Contains(cleanCode, "%") {
+		if unescaped, err := url.QueryUnescape(cleanCode); err == nil {
+			cleanCode = unescaped
+		}
+	}
+
 	req := fasthttp.AcquireRequest()
 	resp := fasthttp.AcquireResponse()
 	defer fasthttp.ReleaseRequest(req)
@@ -823,7 +914,7 @@ func ExchangeAuthCodePKCE(
 
 	form := url.Values{}
 	form.Set("grant_type", "authorization_code")
-	form.Set("code", strings.TrimSpace(code))
+	form.Set("code", cleanCode)
 	if redirectURI != "" {
 		form.Set("redirect_uri", strings.TrimSpace(redirectURI))
 	}
@@ -842,14 +933,7 @@ func ExchangeAuthCodePKCE(
 	req.Header.Set("User-Agent", GetUserAgent(DefaultClientProfile))
 	req.SetBodyString(form.Encode())
 
-	var err error
-	if client != nil {
-		err = client.Do(req, resp)
-	} else {
-		err = fasthttp.Do(req, resp)
-	}
-
-	if err != nil {
+	if err := doLoginRequestWithRetry(client, req, resp, 2); err != nil {
 		return nil, fmt.Errorf("network error during auth code exchange: %w", err)
 	}
 
@@ -860,6 +944,7 @@ func ExchangeAuthCodePKCE(
 	var tokResp struct {
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
+		IDToken      string `json:"id_token,omitempty"`
 		ExpiresIn    int    `json:"expires_in"`
 		TokenType    string `json:"token_type"`
 		Error        string `json:"error,omitempty"`
@@ -873,6 +958,10 @@ func ExchangeAuthCodePKCE(
 		return nil, fmt.Errorf("token exchange error: %s (%s)", tokResp.Error, tokResp.ErrorDesc)
 	}
 
+	if tokResp.AccessToken == "" && tokResp.RefreshToken == "" {
+		return nil, fmt.Errorf("token exchange returned empty tokens")
+	}
+
 	creds := &AntigravityCredentials{
 		AccessToken:   tokResp.AccessToken,
 		RefreshToken:  tokResp.RefreshToken,
@@ -881,13 +970,26 @@ func ExchangeAuthCodePKCE(
 		ClientProfile: DefaultClientProfile,
 	}
 
-	// Validate login strictly: must get info, project, and quota
+	// Extract email and name from id_token if available (fast and immune to network issues)
+	if tokResp.IDToken != "" {
+		email, name := parseGoogleIDToken(tokResp.IDToken)
+		if email != "" {
+			creds.Email = email
+		}
+		if name != "" {
+			creds.Name = name
+		}
+	}
+
+	// Best-effort post-exchange discovery (userinfo, project ID, quota).
+	// Once Google returns access_token and refresh_token, the authorization code
+	// is consumed. Transient post-discovery warnings must never invalidate the tokens.
 	if tokResp.AccessToken != "" {
 		if err := CompleteLoginFlow(ctx, client, creds, tokResp.AccessToken, logger); err != nil {
-			return nil, fmt.Errorf("login validation failed: %w", err)
+			if logger != nil {
+				logger.Warn("Antigravity login post-discovery notice: %v", err)
+			}
 		}
-	} else {
-		return nil, fmt.Errorf("token exchange returned empty access token")
 	}
 
 	return creds, nil
@@ -910,18 +1012,12 @@ func FetchGoogleUserInfo(
 	defer fasthttp.ReleaseResponse(resp)
 
 	req.Header.SetMethod(http.MethodGet)
-	req.SetRequestURI(GoogleUserInfoURL)
+	req.SetRequestURI(userInfoEndpointURL)
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "Go-http-client/1.1")
 
-	var err error
-	if client != nil {
-		err = client.Do(req, resp)
-	} else {
-		err = fasthttp.Do(req, resp)
-	}
-	if err != nil {
+	if err := doLoginRequestWithRetry(client, req, resp, 2); err != nil {
 		return nil, fmt.Errorf("failed to fetch userinfo: %w", err)
 	}
 

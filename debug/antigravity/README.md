@@ -25,7 +25,7 @@ curl --request POST \
  --url https://oauth2.googleapis.com/token \
  --header 'content-type: application/x-www-form-urlencoded' \
  --header 'user-agent: Go-http-client/1.1' \
- --json 'client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET&code=$CODE&code_verifier=$CODE_VERIFIER&grant_type=authorization_code&redirect_uri=https%3A%2F%2Fantigravity.google%2Foauth-callback' > token.json
+ --json "client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET&code=$CODE&code_verifier=$CODE_VERIFIER&grant_type=authorization_code&redirect_uri=https%3A%2F%2Fantigravity.google%2Foauth-callback" > token.json
 
 ## get new access_token using refresh_token
 curl --request POST \

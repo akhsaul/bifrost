@@ -1234,32 +1234,31 @@ func TestExchangeAuthCode_PKCE(t *testing.T) {
 	defer server.Close()
 
 	origTokenURL := tokenEndpointURL
+	origUserInfoURL := userInfoEndpointURL
 	tokenEndpointURL = server.URL + "/token"
-	defer func() { tokenEndpointURL = origTokenURL }()
+	userInfoEndpointURL = server.URL + "/userinfo"
+	defer func() {
+		tokenEndpointURL = origTokenURL
+		userInfoEndpointURL = origUserInfoURL
+	}()
 
-	// Test with explicit code_verifier
-	form := url.Values{}
-	form.Set("grant_type", "authorization_code")
-	form.Set("code", "test-auth-code")
-	form.Set("code_verifier", "my-pkce-verifier-12345")
-	form.Set("redirect_uri", NewAntigravityRedirectURI)
-
-	req := fasthttp.AcquireRequest()
-	resp := fasthttp.AcquireResponse()
-	defer fasthttp.ReleaseRequest(req)
-	defer fasthttp.ReleaseResponse(resp)
-
-	req.Header.SetMethod(http.MethodPost)
-	req.SetRequestURI(tokenEndpointURL)
-	req.Header.SetContentType("application/x-www-form-urlencoded")
-	form.Set("client_id", "my-client-id")
-	req.SetBodyString(form.Encode())
-
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
 	client := &fasthttp.Client{}
-	err := client.Do(req, resp)
+
+	creds, err := ExchangeAuthCodePKCE(
+		ctx,
+		client,
+		"4%2Ftest-auth-code",
+		NewAntigravityRedirectURI,
+		"my-client-id",
+		"my-client-secret",
+		"my-pkce-verifier-12345",
+		nil,
+	)
 	if err != nil {
-		t.Fatalf("token exchange test failed: %v", err)
+		t.Fatalf("PKCE exchange failed: %v", err)
 	}
+
 	if capturedCodeVerifier != "my-pkce-verifier-12345" {
 		t.Errorf("expected captured code_verifier 'my-pkce-verifier-12345', got '%s'", capturedCodeVerifier)
 	}
@@ -1268,6 +1267,87 @@ func TestExchangeAuthCode_PKCE(t *testing.T) {
 	}
 	if capturedRedirectURI != NewAntigravityRedirectURI {
 		t.Errorf("expected redirect URI '%s', got '%s'", NewAntigravityRedirectURI, capturedRedirectURI)
+	}
+	if creds.RefreshToken != "mock-refresh-token" {
+		t.Errorf("expected refresh token 'mock-refresh-token', got '%s'", creds.RefreshToken)
+	}
+	if creds.AccessToken != "mock-access-token" {
+		t.Errorf("expected access token 'mock-access-token', got '%s'", creds.AccessToken)
+	}
+	if creds.Email != "test@example.com" {
+		t.Errorf("expected email 'test@example.com', got '%s'", creds.Email)
+	}
+}
+
+func TestExchangeAuthCodePKCE_EnrichmentFailureDoesNotDiscardTokens(t *testing.T) {
+	// Server returns 200 for token exchange, but 500 for userinfo, project discovery, and quota
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "token") {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{
+				"access_token": "mock-access-token",
+				"refresh_token": "mock-refresh-token-resilient",
+				"expires_in": 3600,
+				"token_type": "Bearer"
+			}`))
+			return
+		}
+		// All subsequent calls fail (simulating network / server failure)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	origTokenURL := tokenEndpointURL
+	origUserInfoURL := userInfoEndpointURL
+	tokenEndpointURL = server.URL + "/token"
+	userInfoEndpointURL = server.URL + "/userinfo"
+	defer func() {
+		tokenEndpointURL = origTokenURL
+		userInfoEndpointURL = origUserInfoURL
+	}()
+
+	ctx := schemas.NewBifrostContext(context.Background(), schemas.NoDeadline)
+	client := &fasthttp.Client{}
+
+	creds, err := ExchangeAuthCodePKCE(
+		ctx,
+		client,
+		"test-auth-code",
+		NewAntigravityRedirectURI,
+		"my-client-id",
+		"",
+		"test-verifier",
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("expected ExchangeAuthCodePKCE to succeed even when enrichment fails, got error: %v", err)
+	}
+	if creds.RefreshToken != "mock-refresh-token-resilient" {
+		t.Errorf("expected refresh token 'mock-refresh-token-resilient', got '%s'", creds.RefreshToken)
+	}
+}
+
+func TestParseGoogleIDToken(t *testing.T) {
+	// Sample payload: {"email": "user@example.com", "name": "Jane Doe"}
+	// Base64url of {"email":"user@example.com","name":"Jane Doe"}
+	// header = eyJhbGciOiJSUzI1NiJ9
+	// payload = eyJlbWFpbCI6InVzZXJAZXhhbXBsZS5jb20iLCJuYW1lIjoiSmFuZSBEb2UifQ
+	// sig = mock-sig
+	mockIDToken := "eyJhbGciOiJSUzI1NiJ9.eyJlbWFpbCI6InVzZXJAZXhhbXBsZS5jb20iLCJuYW1lIjoiSmFuZSBEb2UifQ.mock-sig"
+
+	email, name := parseGoogleIDToken(mockIDToken)
+	if email != "user@example.com" {
+		t.Errorf("expected email 'user@example.com', got '%s'", email)
+	}
+	if name != "Jane Doe" {
+		t.Errorf("expected name 'Jane Doe', got '%s'", name)
+	}
+
+	// Invalid token
+	email, name = parseGoogleIDToken("invalid.token")
+	if email != "" || name != "" {
+		t.Errorf("expected empty strings for invalid token, got email='%s', name='%s'", email, name)
 	}
 }
 

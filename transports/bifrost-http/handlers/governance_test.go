@@ -3920,7 +3920,7 @@ func TestValidateRoutingTargetsWeights(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateRoutingTargets(tt.targets)
+			err := validateRoutingTargets(tt.targets, "weighted")
 			if tt.wantErr == "" {
 				require.NoError(t, err)
 				return
