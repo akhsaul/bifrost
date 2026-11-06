@@ -236,9 +236,9 @@ dev: install-ui install-air setup-workspace $(if $(DEBUG),install-delve) ## Star
 	$(ECHO) "$(YELLOW)Starting UI development server...$(NC)"; \
 	$(USE_NODE); if [ -n "$(DISABLE_PROFILER)" ]; then \
 		$(ECHO) "$(CYAN)DevProfiler disabled for testing$(NC)"; \
-		(cd ui && BIFROST_PORT=$(PORT) BIFROST_DISABLE_PROFILER=1 npm run dev) & \
+		(cd ui && BIFROST_PORT=$(PORT) BIFROST_DISABLE_PROFILER=1 pnpm run dev) & \
 	else \
-		(cd ui && BIFROST_PORT=$(PORT) npm run dev) & \
+		(cd ui && BIFROST_PORT=$(PORT) pnpm run dev) & \
 	fi; \
 	ui_pid="$$!"; \
 	$(ECHO) "$(YELLOW)[make dev] UI dev server started with pid $$ui_pid$(NC)"; \
@@ -322,9 +322,9 @@ dev-pulse: install-ui install-pulse setup-workspace $(if $(DEBUG),install-delve)
 	$(ECHO) "$(YELLOW)Starting UI development server...$(NC)"; \
 	$(USE_NODE); if [ -n "$(DISABLE_PROFILER)" ]; then \
 		$(ECHO) "$(CYAN)DevProfiler disabled for testing$(NC)"; \
-		(cd ui && BIFROST_PORT=$(PORT) BIFROST_DISABLE_PROFILER=1 npm run dev) & \
+		(cd ui && BIFROST_PORT=$(PORT) BIFROST_DISABLE_PROFILER=1 pnpm run dev) & \
 	else \
-		(cd ui && BIFROST_PORT=$(PORT) npm run dev) & \
+		(cd ui && BIFROST_PORT=$(PORT) pnpm run dev) & \
 	fi; \
 	ui_pid="$$!"; \
 	$(ECHO) "$(YELLOW)[make dev-pulse] UI dev server started with pid $$ui_pid$(NC)"; \
@@ -499,7 +499,7 @@ docs: ## Prepare local docs (bundles OpenAPI spec then starts Mintlify dev serve
 	@$(ECHO) "$(GREEN)Bundling OpenAPI spec...$(NC)"
 	@cd docs/openapi && python3 bundle.py
 	@$(ECHO) "$(GREEN)Preparing local docs...$(NC)"
-	@cd docs && npx --yes mintlify@latest dev
+	@cd docs && pnpm dlx mintlify@latest dev
 
 run: build ## Build and run bifrost-http (no hot reload)
 	@$(ECHO) "$(GREEN)Running bifrost-http...$(NC)"
@@ -1737,11 +1737,11 @@ install-playwright: ## Install Playwright test dependencies
 	@which node > /dev/null || ($(ECHO) "$(RED)Error: Node.js is not installed. Please install Node.js first.$(NC)" && exit 1)
 	@which pnpm > /dev/null || ($(ECHO) "$(RED)Error: pnpm is not installed. Please install pnpm first.$(NC)" && exit 1)
 	@$(USE_NODE); cd tests/e2e && pnpm install
-	@cd tests/e2e && if npx playwright install --list 2>/dev/null | grep -q "chromium"; then \
+	@cd tests/e2e && if pnpm exec playwright install --list 2>/dev/null | grep -q "chromium"; then \
 		$(ECHO) "$(CYAN)Chromium is already installed, skipping download$(NC)"; \
 	else \
 		$(ECHO) "$(CYAN)Installing Chromium...$(NC)"; \
-		npx playwright install --with-deps chromium; \
+		pnpm exec playwright install --with-deps chromium; \
 	fi
 	@$(ECHO) "$(GREEN)Playwright is ready$(NC)"
 
@@ -1756,9 +1756,9 @@ run-e2e: run-e2e-ui ## Alias of run-e2e-ui
 
 run-a11y-audit: install-playwright ## Scan every UI route with axe-core and report accessibility coverage (Usage: make run-a11y-audit [ROUTES=logs,providers] [MIN_SCORE=80])
 	@$(ECHO) "$(GREEN)Running accessibility audit...$(NC)"
-	@cd tests/e2e && A11Y_ROUTES="$(ROUTES)" A11Y_MIN_SCORE="$(MIN_SCORE)" npx playwright test --config=playwright.a11y.config.ts
+	@cd tests/e2e && A11Y_ROUTES="$(ROUTES)" A11Y_MIN_SCORE="$(MIN_SCORE)" pnpm exec playwright test --config=playwright.a11y.config.ts
 	@$(ECHO) "$(CYAN)Report: tests/e2e/a11y-report/summary.md$(NC)"
-	@$(ECHO) "$(CYAN)Static JSX checks: cd ui && npm run lint:a11y$(NC)"
+	@$(ECHO) "$(CYAN)Static JSX checks: cd ui && pnpm run lint:a11y$(NC)"
 
 # Flags for tests/e2e/scripts/run-e2e.mjs, built from the make variables below.
 E2E_RUNNER_ARGS = $(if $(WORKERS),--workers $(WORKERS)) $(if $(FLOW),--features $(FLOW)) $(if $(RERUN),--rerun $(RERUN)) $(if $(SKIP_BUILD),--skip-build) $(if $(KEEP),--keep) $(if $(INTERACTIVE),--ui)
