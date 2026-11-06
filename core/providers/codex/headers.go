@@ -18,11 +18,11 @@ import (
 // the wire. Transport-level headers (accept, accept-encoding, connection,
 // content-type, host) are also left out: the openai helpers and fasthttp own
 // those.
-func BuildHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[string]string) map[string]string {
-	headers := map[string]string{
-		"originator": DefaultOriginator,
-		"user-agent": DefaultUserAgent,
-		"version":    DefaultVersion,
+func BuildHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[string]schemas.SecretVar) map[string]schemas.SecretVar {
+	headers := map[string]schemas.SecretVar{
+		"originator": *schemas.NewSecretVar(DefaultOriginator),
+		"user-agent": *schemas.NewSecretVar(DefaultUserAgent),
+		"version":    *schemas.NewSecretVar(DefaultVersion),
 	}
 
 	// Config-level extra headers override defaults (except the credential-owned
@@ -44,7 +44,7 @@ func BuildHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[string]str
 				if isCredentialHeader(k) {
 					continue
 				}
-				setHeaderCaseInsensitive(headers, k, vs[0])
+				setHeaderCaseInsensitive(headers, k, *schemas.NewSecretVar(vs[0]))
 			}
 		}
 	}
@@ -75,7 +75,7 @@ func isCredentialHeader(name string) bool {
 
 // setHeaderCaseInsensitive sets a header, replacing any existing key that
 // matches case-insensitively so defaults cannot linger under another casing.
-func setHeaderCaseInsensitive(headers map[string]string, key, value string) {
+func setHeaderCaseInsensitive(headers map[string]schemas.SecretVar, key string, value schemas.SecretVar) {
 	for existingKey := range headers {
 		if strings.EqualFold(existingKey, key) {
 			delete(headers, existingKey)

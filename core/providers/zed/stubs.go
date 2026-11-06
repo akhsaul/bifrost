@@ -252,6 +252,11 @@ func (provider *ZedProvider) ContainerFileDelete(_ *schemas.BifrostContext, _ []
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.ContainerFileDeleteRequest, provider.GetProviderKey())
 }
 
+// ModelRetrieve is not supported by the Zed provider.
+func (provider *ZedProvider) ModelRetrieve(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostModelRetrieveRequest) (*schemas.BifrostModelRetrieveResponse, *schemas.BifrostError) {
+	return nil, providerUtils.NewUnsupportedOperationError(schemas.ModelRetrieveRequest, provider.GetProviderKey())
+}
+
 // Passthrough is not supported by the Zed provider.
 func (provider *ZedProvider) Passthrough(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostPassthroughRequest) (*schemas.BifrostPassthroughResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.PassthroughRequest, provider.GetProviderKey())

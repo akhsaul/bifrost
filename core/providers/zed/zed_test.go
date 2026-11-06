@@ -43,7 +43,10 @@ func TestBuildHeadersUserAuth(t *testing.T) {
 }
 
 func TestBuildHeadersOverrides(t *testing.T) {
-	headers := zed.BuildHeaders(nil, map[string]string{"User-Agent": "custom/1.0", "authorization": "evil"}, true)
+	headers := zed.BuildHeaders(nil, map[string]schemas.SecretVar{
+		"User-Agent":    *schemas.NewSecretVar("custom/1.0"),
+		"authorization": *schemas.NewSecretVar("evil"),
+	}, true)
 	if headers["User-Agent"] != "custom/1.0" {
 		t.Errorf("config user-agent = %q, want custom/1.0", headers["User-Agent"])
 	}

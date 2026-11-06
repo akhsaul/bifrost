@@ -111,7 +111,7 @@ const affinityHeaderName = "Modal-Routing-Affinity-Key"
 // resolveAffinityKey returns the session id to send as Modal-Routing-Affinity-Key,
 // or "" when the caller has none. An explicit per-request header wins; otherwise
 // Bifrost's session id (x-bf-session-id, incl. harness fallbacks) applies.
-func resolveAffinityKey(ctx *schemas.BifrostContext, extraHeaders map[string]string) string {
+func resolveAffinityKey(ctx *schemas.BifrostContext, extraHeaders map[string]schemas.SecretVar) string {
 	if affinity := providerUtils.ResolveSessionID(ctx, extraHeaders, affinityHeaderName); affinity != nil {
 		return *affinity
 	}
@@ -120,7 +120,7 @@ func resolveAffinityKey(ctx *schemas.BifrostContext, extraHeaders map[string]str
 
 // affinityHeaders returns the auth headers plus Modal-Routing-Affinity-Key when
 // the caller has a session id.
-func affinityHeaders(ctx *schemas.BifrostContext, key schemas.Key, extraHeaders map[string]string) map[string]string {
+func affinityHeaders(ctx *schemas.BifrostContext, key schemas.Key, extraHeaders map[string]schemas.SecretVar) map[string]string {
 	headers := openai.BearerAuthHeader(key)
 	if affinity := resolveAffinityKey(ctx, extraHeaders); affinity != "" {
 		headers[affinityHeaderName] = affinity
@@ -452,6 +452,11 @@ func (provider *Provider) CachedContentUpdate(_ *schemas.BifrostContext, _ []sch
 // CachedContentDelete is not supported by the Modal provider.
 func (provider *Provider) CachedContentDelete(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostCachedContentDeleteRequest) (*schemas.BifrostCachedContentDeleteResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.CachedContentDeleteRequest, provider.GetProviderKey())
+}
+
+// ModelRetrieve is not supported by the Modal provider.
+func (provider *Provider) ModelRetrieve(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostModelRetrieveRequest) (*schemas.BifrostModelRetrieveResponse, *schemas.BifrostError) {
+	return nil, providerUtils.NewUnsupportedOperationError(schemas.ModelRetrieveRequest, provider.GetProviderKey())
 }
 
 // CountTokens is not supported by the Modal provider.

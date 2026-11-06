@@ -7,16 +7,16 @@ import { CustomerSelector } from "@/components/entitySelectors/customerSelector"
 import { TeamSelector } from "@/components/entitySelectors/teamSelector";
 import { VirtualKeySelector } from "@/components/entitySelectors/virtualKeySelector";
 import { Button } from "@/components/ui/button";
-import { ComboboxSelect } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ModelMultiselect } from "@/components/ui/modelMultiselect";
+import { ModelSelector } from "@/components/ui/modelSelector";
+import { ProviderSelector, type ProviderSelectorOption } from "@/components/ui/providerSelector";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { ProviderIconType, RenderProviderIcon } from "@/lib/constants/icons";
+import { resolveProviderIconKey } from "@/lib/constants/icons";
 import { getProviderLabel } from "@/lib/constants/logs";
 import { getUserPicker } from "@/lib/registries/userPicker";
 import { getErrorMessage } from "@/lib/store";
@@ -36,12 +36,20 @@ import {
 	RoutingTargetFormData,
 	TargetModelItem,
 } from "@/lib/types/routingRules";
-import { denormalizeFallback, normalizeFallback } from "@/lib/utils/routingRules";
+import {
+	denormalizeFallback,
+	MAX_TTFT_TIMEOUT_MS,
+	normalizeFallback,
+	parseTTFTTimeoutInput,
+	resolveTargetTTFTMs,
+	summarizeTargetsTTFT,
+	summarizeTTFTDisplay,
+} from "@/lib/utils/routingRules";
 import { validateRateLimitAndBudgetRules, validateRoutingRules } from "@/lib/utils/celConverterRouting";
 import { isValidRuleGroupType, normalizeRoutingRuleGroupQuery } from "@/lib/utils/routingRuleGroupQuery";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
 import { ChevronDown, ChevronUp, Plus, Trash2, X } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { RuleGroupType } from "react-querybuilder";
 import { toast } from "sonner";
@@ -117,6 +125,10 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 		defaultValues: DEFAULT_ROUTING_RULE_FORM_DATA,
 	});
 
+	// The TTFT input text as loaded from the rule; lets submit tell "untouched" from "edited".
+	const loadedTTFTInput = useRef("");
+	const [ttftEdited, setTtftEdited] = useState(false); // set once the user types in the field
+
 	const isEditing = !!editingRule;
 	const isLoading = isCreating || isUpdating;
 	const canCreate = useRbac(RbacResource.RoutingRules, RbacOperation.Create);
@@ -131,23 +143,37 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 	// without a user directory, which hides the "User" scope option.
 	const UserPicker = getUserPicker();
 	const fallbacks = watch("fallbacks");
+	const ttftTimeoutInput = watch("ttft_timeout_ms");
+	const ttftDisplay = summarizeTTFTDisplay(editingRule?.targets, ttftTimeoutInput, ttftEdited);
+	const hasCompleteFallback = (fallbacks || []).some((fb) => (fb.provider ?? "").trim().length > 0);
 
-	// Get available providers from configured providers, plus any provider already
-	// referenced by the current targets, existing rules' targets, or rules' fallbacks
-	// so edited/removed providers are still visible in the dropdown.
-	const availableProviders = Array.from(
-		new Set([
-			...providersData.map((p) => p.name),
-			...(targets.map((t) => t.provider).filter(Boolean) as string[]),
-			...(rules.flatMap((r) => r.targets?.map((t) => t.provider).filter(Boolean) ?? []) as string[]),
-			...rules.flatMap((r) => (r.fallbacks ?? []).map((f) => normalizeFallback(f).provider?.trim()).filter(Boolean) as string[]),
-		]),
+	// The selector lists the configured providers on its own. These are the extras: a
+	// provider the current targets, another rule's targets, or a fallback still names after
+	// it was deleted, so an existing rule keeps rendering what it actually points at.
+	const configuredNames = useMemo(() => new Set<string>(providersData.map((p) => p.name)), [providersData]);
+	const referencedNames = useMemo(
+		() =>
+			new Set<string>([
+				...(targets.map((t) => t.provider).filter(Boolean) as string[]),
+				...(rules.flatMap((r) => r.targets?.map((t) => t.provider).filter(Boolean) ?? []) as string[]),
+				...rules.flatMap((r) => (r.fallbacks ?? []).map((f) => normalizeFallback(f).provider?.trim()).filter(Boolean) as string[]),
+			]),
+		[targets, rules],
 	);
-	const providerOptions = availableProviders.map((prov) => ({
-		label: getProviderLabel(prov),
-		value: prov,
-		icon: <RenderProviderIcon provider={prov as ProviderIconType} size="sm" className="h-4 w-4" />,
-	}));
+	const referencedProviderOptions = useMemo<ProviderSelectorOption[]>(
+		() =>
+			Array.from(referencedNames)
+				.filter((name) => !configuredNames.has(name))
+				.map((name) => ({ value: name, label: getProviderLabel(name), iconKey: resolveProviderIconKey(name) })),
+		[referencedNames, configuredNames],
+	);
+
+	// The CEL builder still needs the flat union: it offers providers as literal values in an
+	// expression, where one a rule already names has to stay offerable.
+	const availableProviders = useMemo(
+		() => Array.from(new Set<string>([...configuredNames, ...referencedNames])),
+		[configuredNames, referencedNames],
+	);
 
 	// Initialize form data when editing rule changes
 	useEffect(() => {
@@ -158,6 +184,9 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 			setValue("cel_expression", editingRule.cel_expression);
 			setValue("strategy", editingRule.strategy ?? "weighted");
 			setValue("fallbacks", (editingRule.fallbacks || []).map(normalizeFallback));
+			loadedTTFTInput.current = summarizeTargetsTTFT(editingRule.targets).ms?.toString() ?? "";
+			setTtftEdited(false);
+			setValue("ttft_timeout_ms", loadedTTFTInput.current);
 			setValue("scope", editingRule.scope);
 			setValue("scope_id", editingRule.scope_id || "");
 			setValue("priority", editingRule.priority);
@@ -185,6 +214,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 								key_id: t.key_id || "",
 								weight: t.weight,
 								priority: prio,
+								ttft_timeout_ms: t.ttft_timeout_ms || undefined,
 							});
 						}
 					}
@@ -199,6 +229,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 							key_id: t.key_id || "",
 							weight: t.weight,
 							priority: t.priority ?? idx + 1,
+							ttft_timeout_ms: t.ttft_timeout_ms || undefined,
 						})),
 					);
 				}
@@ -211,6 +242,8 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 			setBuilderKey((prev) => prev + 1);
 			setCelError(null);
 		} else {
+			loadedTTFTInput.current = "";
+			setTtftEdited(false);
 			reset();
 			setTargets([{ ...DEFAULT_ROUTING_TARGET }]);
 			setQuery(defaultQuery);
@@ -379,34 +412,35 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 		// Filter out incomplete fallbacks (empty provider)
 		const validFallbacks = (data.fallbacks || []).filter((fb) => (fb.provider ?? "").trim().length > 0).map(denormalizeFallback);
 
-		const finalTargets: RoutingTarget[] = targets.flatMap(({ provider, model, models, key_id, weight, priority }): RoutingTarget[] => {
-			if (currentStrategy === "group_adaptive" && models && models.length > 0) {
-				return [
-					{
-						provider: provider || undefined,
-						key_id: key_id || undefined,
-						weight: weight,
-						models: models.map((m) => ({ model: m.model, priority: m.priority })),
-					},
-				];
-			}
-			return [
-				{
-					provider: provider || undefined,
-					model: model || undefined,
-					key_id: key_id || undefined,
-					weight: currentStrategy === "priority" ? 1 : weight,
-					priority: currentStrategy === "priority" ? priority : undefined,
-				},
-			];
-		});
-
 		const payload: CreateRoutingRuleRequest = {
 			name: data.name,
 			description: data.description,
 			cel_expression: data.cel_expression,
 			strategy: data.strategy || "weighted",
-			targets: finalTargets,
+			targets: targets.flatMap(({ provider, model, models, key_id, weight, priority, ttft_timeout_ms }): RoutingTarget[] => {
+				const targetTTFT = resolveTargetTTFTMs(data.ttft_timeout_ms, loadedTTFTInput.current, ttft_timeout_ms, ttftEdited);
+				if (currentStrategy === "group_adaptive" && models && models.length > 0) {
+					return [
+						{
+							provider: provider || undefined,
+							key_id: key_id || undefined,
+							weight: weight,
+							models: models.map((m) => ({ model: m.model, priority: m.priority })),
+							ttft_timeout_ms: targetTTFT,
+						},
+					];
+				}
+				return [
+					{
+						provider: provider || undefined,
+						model: model || undefined,
+						key_id: key_id || undefined,
+						weight: currentStrategy === "priority" ? 1 : weight,
+						priority: currentStrategy === "priority" ? priority : undefined,
+						ttft_timeout_ms: targetTTFT,
+					},
+				];
+			}),
 			fallbacks: validFallbacks,
 			scope: data.scope,
 			scope_id: data.scope === "global" ? undefined : data.scope_id || undefined,
@@ -670,7 +704,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 										target={target}
 										index={index}
 										strategy={watch("strategy") || "weighted"}
-										providerOptions={providerOptions}
+										referencedProviderOptions={referencedProviderOptions}
 										allKeys={allKeysData}
 										showRemove={targets.length > 1}
 										onUpdate={updateTarget}
@@ -739,7 +773,7 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 											key={index}
 											fallback={fallback}
 											index={index}
-											providerOptions={providerOptions}
+											referencedProviderOptions={referencedProviderOptions}
 											allKeys={allKeysData}
 											onUpdate={updateFallback}
 											onRemove={removeFallback}
@@ -748,6 +782,40 @@ export function RoutingRuleSheet({ open, onOpenChange, editingRule, onSuccess }:
 								)}
 							</div>
 							<p className="text-muted-foreground text-xs">Fallbacks will be used in the order they are defined</p>
+						</div>
+
+						{/* TTFT cutoff */}
+						<div className="space-y-3">
+							<Label htmlFor="ttft_timeout_ms">Time to first token cutoff (ms)</Label>
+							<Input
+								id="ttft_timeout_ms"
+								type="text"
+								inputMode="numeric"
+								placeholder={ttftDisplay.mixed ? "Mixed" : "Off"}
+								aria-invalid={errors.ttft_timeout_ms ? true : undefined}
+								aria-describedby={errors.ttft_timeout_ms ? "ttft_timeout_ms-error" : undefined}
+								data-testid="routing-rule-ttft-timeout-input"
+								{...register("ttft_timeout_ms", {
+									onChange: () => {
+										setTtftEdited(true);
+									},
+									validate: (value) =>
+										parseTTFTTimeoutInput(value) !== null || `Enter a whole number from 1 to ${MAX_TTFT_TIMEOUT_MS}, or leave it empty`,
+								})}
+							/>
+							<p className="text-muted-foreground text-xs">
+								Streaming only. If no token arrives in time, Bifrost moves to the next fallback. The last fallback is never cut off.
+							</p>
+							{errors.ttft_timeout_ms && (
+								<p id="ttft_timeout_ms-error" className="text-destructive text-sm" data-testid="routing-rule-ttft-timeout-error">
+									{errors.ttft_timeout_ms.message}
+								</p>
+							)}
+							{!errors.ttft_timeout_ms && ttftDisplay.active && !hasCompleteFallback && (
+								<p className="text-sm text-amber-600 dark:text-amber-500" data-testid="routing-rule-ttft-timeout-no-fallback-warning">
+									This rule has no fallbacks, so the cutoff only applies when the request brings its own.
+								</p>
+							)}
 						</div>
 					</div>
 					{/* Action Buttons */}
@@ -830,41 +898,38 @@ function ProviderKeySelect({ idPrefix, clearLabel, provider, keyId, allKeys, onC
 interface FallbackRowProps {
 	fallback: RoutingFallbackFormData;
 	index: number;
-	providerOptions: Array<{
-		label: string;
-		value: string;
-		icon: React.ReactNode;
-	}>;
+	referencedProviderOptions: ProviderSelectorOption[];
 	allKeys: Array<{ key_id: string; name: string; provider: string }>;
 	onUpdate: (index: number, changes: Partial<RoutingFallbackFormData>) => void;
 	onRemove: (index: number) => void;
 }
 
-function FallbackRow({ fallback, index, providerOptions, allKeys, onUpdate, onRemove }: FallbackRowProps) {
+function FallbackRow({ fallback, index, referencedProviderOptions, allKeys, onUpdate, onRemove }: FallbackRowProps) {
 	const provider = fallback.provider || "";
 
 	return (
 		<div className="space-y-2 rounded-lg border p-3" data-testid={`routing-fallback-${index}`}>
 			<div className="flex items-center gap-2">
 				<div className="flex-1">
-					<ComboboxSelect
-						options={providerOptions}
-						value={provider || null}
+					<ProviderSelector
+						extraOptions={referencedProviderOptions}
+						value={provider}
 						// A key belongs to one provider, so switching providers invalidates the pin.
-						onValueChange={(value) => onUpdate(index, { provider: value ?? "", model: "", key_id: "" })}
+						onChange={(value: string) => onUpdate(index, { provider: value, model: "", key_id: "" })}
 						placeholder="Select provider..."
-						className="h-9"
+						className="!h-9 !min-h-9"
 						data-testid={`routing-fallback-${index}-provider-select`}
 						noPortal
 					/>
 				</div>
 				<div className="flex-1" data-testid={`routing-fallback-${index}-model-select`}>
-					<ModelMultiselect
+					<ModelSelector
 						provider={provider || undefined}
 						value={fallback.model || ""}
 						onChange={(value) => onUpdate(index, { model: value })}
 						placeholder="Incoming (optional)"
-						isSingleSelect
+						allowCustomModel
+						unfiltered={true}
 						disabled={!provider}
 						className="!h-9 !min-h-9 w-full"
 					/>
@@ -898,11 +963,7 @@ interface TargetRowProps {
 	target: RoutingTargetFormData;
 	index: number;
 	strategy: RoutingStrategy;
-	providerOptions: Array<{
-		label: string;
-		value: string;
-		icon: React.ReactNode;
-	}>;
+	referencedProviderOptions: ProviderSelectorOption[];
 	allKeys: Array<{ key_id: string; name: string; provider: string }>;
 	showRemove: boolean;
 	onUpdate: (index: number, field: keyof RoutingTargetFormData, value: string | number | TargetModelItem[] | undefined) => void;
@@ -916,7 +977,7 @@ function TargetRow({
 	target,
 	index,
 	strategy,
-	providerOptions,
+	referencedProviderOptions,
 	allKeys,
 	showRemove,
 	onUpdate,
@@ -988,17 +1049,17 @@ function TargetRow({
 						Provider
 					</Label>
 					<div className="flex gap-1.5">
-						<ComboboxSelect
-							options={providerOptions}
-							value={target.provider || null}
-							onValueChange={(value) => {
-								onUpdate(index, "provider", value ?? "");
+						<ProviderSelector
+							extraOptions={referencedProviderOptions}
+							value={target.provider || ""}
+							onChange={(value: string) => {
+								onUpdate(index, "provider", value);
 								onUpdate(index, "model", "");
 								onUpdate(index, "models", []);
 								onUpdate(index, "key_id", "");
 							}}
 							placeholder="Incoming (optional)"
-							className="h-9 flex-1 text-sm"
+							className="!h-9 !min-h-9 flex-1 text-sm"
 							data-testid={`routing-target-${index}-provider-select`}
 							noPortal
 						/>
@@ -1030,24 +1091,24 @@ function TargetRow({
 					<div className="flex gap-1.5">
 						<div className="flex-1" data-testid={`routing-target-${index}-model-select`}>
 							{isGroupAdaptive ? (
-								<ModelMultiselect
+								<ModelSelector
+									multiple
 									provider={target.provider || undefined}
 									value={target.models?.map((m) => m.model) || (target.model ? [target.model] : [])}
 									onChange={(models) => onUpdateModels?.(index, models)}
 									placeholder="Incoming (optional)"
-									loadModelsOnEmptyProvider
+									allowCustomModel
 									className="!h-9 !min-h-9"
 									inputId={`routing-target-${index}-model-input`}
 									ariaLabelledBy={`routing-target-${index}-model-label`}
 								/>
 							) : (
-								<ModelMultiselect
+								<ModelSelector
 									provider={target.provider || undefined}
 									value={target.model}
 									onChange={(value) => onUpdate(index, "model", value)}
 									placeholder="Incoming (optional)"
-									isSingleSelect
-									loadModelsOnEmptyProvider
+									allowCustomModel
 									className="!h-9 !min-h-9"
 									inputId={`routing-target-${index}-model-input`}
 									ariaLabelledBy={`routing-target-${index}-model-label`}

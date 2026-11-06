@@ -110,6 +110,17 @@ const BEDROCK_VPC_ENDPOINT_SERVICES = [
 	},
 ];
 
+// The one runtime host SageMaker endpoints are invoked on; an interface VPC endpoint, FIPS or
+// dual-stack host can replace it.
+const SAGEMAKER_VPC_ENDPOINT_SERVICES = [
+	{
+		name: "runtime",
+		label: "Runtime",
+		description: "Serves all endpoints and async invocations in this region.",
+		placeholder: "vpce-0abc123-x1y2z3.runtime.sagemaker.us-east-1.vpce.amazonaws.com",
+	},
+];
+
 // VPC endpoint host overrides for AWS PrivateLink. Collapsed by default: most deployments reach
 // Bedrock over the public regional endpoints and never set these.
 function VPCEndpointsFormField({
@@ -167,6 +178,9 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 	const effectiveProvider = baseProviderType ?? providerName;
 	const isBedrock = effectiveProvider === "bedrock";
 	const isBedrockMantle = effectiveProvider === "bedrock_mantle";
+	const isSageMaker = effectiveProvider === "sagemaker";
+	const isCloudflare = effectiveProvider === "cloudflare";
+	const isOpenAICompatible = effectiveProvider === "openai";
 	const isVertex = effectiveProvider === "vertex";
 	const isAzure = effectiveProvider === "azure";
 	const isReplicate = effectiveProvider === "replicate";
@@ -212,6 +226,8 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 
 	// Auth type state for Antigravity: 'oauth' or 'manual'
 	const [antigravityAuthType, setAntigravityAuthType] = useState<"oauth" | "manual">("oauth");
+	// Auth type state for SageMaker: 'iam_role' (default AWS credential chain), 'explicit', or 'api_key' (pre-minted token)
+	const [sageMakerAuthType, setSageMakerAuthType] = useState<"iam_role" | "explicit" | "api_key">("iam_role");
 	// Auth type state for Cline: 'oauth' or 'manual'
 	const [clineAuthType, setClineAuthType] = useState<"oauth" | "manual">("oauth");
 	// Auth type state for Codex: 'oauth' or 'manual'
@@ -280,6 +296,21 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 	// Detect Antigravity auth type
 	useEffect(() => {
 		if (form.formState.isDirty) return;
+		if (isSageMaker) {
+			const accessKey = form.getValues("key.sagemaker_key_config.access_key");
+			const secretKey = form.getValues("key.sagemaker_key_config.secret_key");
+			const apiKey = form.getValues("key.value");
+			const hasExplicitCreds = (accessKey?.value && accessKey.value.length > 0) || (secretKey?.value && secretKey.value.length > 0);
+			const hasApiKey = apiKey?.value && apiKey.value.length > 0;
+			let detected: "iam_role" | "explicit" | "api_key" = "iam_role";
+			if (hasExplicitCreds) {
+				detected = "explicit";
+			} else if (hasApiKey) {
+				detected = "api_key";
+			}
+			setSageMakerAuthType(detected);
+			form.setValue("key.sagemaker_key_config._auth_type", detected);
+		}
 		if (isAntigravity) {
 			const authType = form.getValues("key.antigravity_key_config._auth_type");
 			if (authType) {
@@ -298,7 +329,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 				}
 			}
 		}
-	}, [isAntigravity, form, form.formState.defaultValues]);
+	}, [isSageMaker, isAntigravity, form, form.formState.defaultValues]);
 
 	// Detect Cline auth type
 	useEffect(() => {
@@ -969,7 +1000,7 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 				/>
 			</div>
 			{/* Hide API Key field for providers with dedicated auth tabs */}
-			{!isAzure && !isBedrock && !isBedrockMantle && !isVertex && !isAntigravity && !isDatabricks && !isGithubCopilot && !isZed && !isCline && !isCodex && (
+			{!isAzure && !isBedrock && !isBedrockMantle && !isSageMaker && !isVertex && !isAntigravity && !isDatabricks && !isOpenAICompatible && !isGithubCopilot && !isZed && !isCline && !isCodex && (
 				<FormField
 					control={control}
 					name={`key.value`}
@@ -3014,6 +3045,220 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 					/>
 				</div>
 			)}
+			{isSageMaker && (
+				<div className="space-y-4" data-testid="apikey-sagemaker-section">
+					<Separator className="my-6" />
+					<div className="space-y-2">
+						<FormLabel>Authentication Method</FormLabel>
+						<Tabs
+							value={sageMakerAuthType}
+							onValueChange={(v) => {
+								setSageMakerAuthType(v as "iam_role" | "explicit" | "api_key");
+								form.setValue("key.sagemaker_key_config._auth_type", v, { shouldDirty: true, shouldValidate: true });
+								if (v === "iam_role") {
+									// Clear explicit credentials and the pre-minted token when switching to the default chain (an empty value, not undefined: updates keep omitted fields)
+									form.setValue("key.sagemaker_key_config.access_key", undefined, { shouldDirty: true });
+									form.setValue("key.sagemaker_key_config.secret_key", undefined, { shouldDirty: true });
+									form.setValue("key.sagemaker_key_config.session_token", undefined, { shouldDirty: true });
+									form.setValue("key.value", { value: "", ref: "" }, { shouldDirty: true });
+								} else if (v === "explicit") {
+									form.setValue("key.value", { value: "", ref: "" }, { shouldDirty: true });
+								} else if (v === "api_key") {
+									// A pre-minted token carries its own identity: clear AWS credentials and assume-role fields
+									form.setValue("key.sagemaker_key_config.access_key", undefined, { shouldDirty: true });
+									form.setValue("key.sagemaker_key_config.secret_key", undefined, { shouldDirty: true });
+									form.setValue("key.sagemaker_key_config.session_token", undefined, { shouldDirty: true });
+									form.setValue("key.sagemaker_key_config.role_arn", undefined, { shouldDirty: true });
+									form.setValue("key.sagemaker_key_config.external_id", undefined, { shouldDirty: true });
+									form.setValue("key.sagemaker_key_config.session_name", undefined, { shouldDirty: true });
+								}
+							}}
+						>
+							<TabsList className="flex w-full justify-start">
+								<TabsTrigger data-testid="apikey-sagemaker-iam-role-tab" value="iam_role">
+									IAM Role (Inherited)
+								</TabsTrigger>
+								<TabsTrigger data-testid="apikey-sagemaker-explicit-credentials-tab" value="explicit">
+									Explicit Credentials
+								</TabsTrigger>
+								<TabsTrigger data-testid="apikey-sagemaker-api-key-tab" value="api_key">
+									Bearer Token
+								</TabsTrigger>
+							</TabsList>
+						</Tabs>
+						{sageMakerAuthType === "iam_role" && (
+							<p className="text-muted-foreground text-sm">
+								Uses the default AWS credential chain (IAM role, IRSA, environment). Bifrost mints the SageMaker bearer token from it.
+							</p>
+						)}
+						{sageMakerAuthType === "explicit" && (
+							<p className="text-muted-foreground text-sm">Bifrost mints the SageMaker bearer token from these AWS credentials.</p>
+						)}
+						{sageMakerAuthType === "api_key" && (
+							<p className="text-muted-foreground text-sm">
+								Sends a pre-minted sagemaker-api-key-... token as-is. Such tokens expire within 12 hours.
+							</p>
+						)}
+					</div>
+
+					{sageMakerAuthType === "explicit" && (
+						<>
+							<FormField
+								control={control}
+								name={`key.sagemaker_key_config.access_key`}
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Access Key (Required)</FormLabel>
+										<FormControl>
+											<SecretVarInput
+												data-testid="apikey-sagemaker-access-key-input"
+												placeholder="your-aws-access-key or env.AWS_ACCESS_KEY_ID"
+												{...field}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+							<FormField
+								control={control}
+								name={`key.sagemaker_key_config.secret_key`}
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Secret Key (Required)</FormLabel>
+										<FormControl>
+											<SecretVarInput
+												data-testid="apikey-sagemaker-secret-key-input"
+												placeholder="your-aws-secret-key or env.AWS_SECRET_ACCESS_KEY"
+												{...field}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+							<FormField
+								control={control}
+								name={`key.sagemaker_key_config.session_token`}
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Session Token (Optional)</FormLabel>
+										<FormControl>
+											<SecretVarInput
+												data-testid="apikey-sagemaker-session-token-input"
+												placeholder="your-aws-session-token or env.AWS_SESSION_TOKEN"
+												{...field}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+						</>
+					)}
+
+					{sageMakerAuthType === "api_key" && (
+						<FormField
+							control={control}
+							name={`key.value`}
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>Bearer Token</FormLabel>
+									<FormControl>
+										<SecretVarInput
+											data-testid="apikey-sagemaker-api-key-input"
+											placeholder="sagemaker-api-key-... or env.SAGEMAKER_API_KEY"
+											type="text"
+											{...field}
+										/>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+					)}
+
+					<FormField
+						control={control}
+						name={`key.sagemaker_key_config.region`}
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>Region (Required)</FormLabel>
+								<FormDescription>
+									Region of your endpoints. A model id can override it with a prefix: us-west-2/my-endpoint.
+								</FormDescription>
+								<FormControl>
+									<SecretVarInput data-testid="apikey-sagemaker-region-input" placeholder="us-east-1 or env.AWS_REGION" {...field} />
+								</FormControl>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+
+					{sageMakerAuthType !== "api_key" && (
+						<>
+							<FormField
+								control={control}
+								name={`key.sagemaker_key_config.role_arn`}
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Assume Role ARN (Optional)</FormLabel>
+										<FormDescription>
+											Assume an IAM role before minting tokens. Works with both explicit credentials and the inherited IAM role.
+										</FormDescription>
+										<FormControl>
+											<SecretVarInput
+												data-testid="apikey-sagemaker-role-arn-input"
+												placeholder="arn:aws:iam::123456789:role/MyRole or env.AWS_ROLE_ARN"
+												{...field}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+							<FormField
+								control={control}
+								name={`key.sagemaker_key_config.external_id`}
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>External ID (Optional)</FormLabel>
+										<FormDescription>Required by the role&apos;s trust policy when using cross-account access.</FormDescription>
+										<FormControl>
+											<SecretVarInput
+												data-testid="apikey-sagemaker-external-id-input"
+												placeholder="external-id or env.AWS_EXTERNAL_ID"
+												{...field}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+							<FormField
+								control={control}
+								name={`key.sagemaker_key_config.session_name`}
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Session Name (Optional)</FormLabel>
+										<FormDescription>AssumeRole session name (defaults to bifrost-session).</FormDescription>
+										<FormControl>
+											<SecretVarInput
+												data-testid="apikey-sagemaker-session-name-input"
+												placeholder="bifrost-session or env.AWS_SESSION_NAME"
+												{...field}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+						</>
+					)}
+					<VPCEndpointsFormField control={control} configKey="key.sagemaker_key_config" services={SAGEMAKER_VPC_ENDPOINT_SERVICES} />
+				</div>
+			)}
+
 			{isAntigravity && (
 				<div className="space-y-4">
 					<Separator className="my-6" />

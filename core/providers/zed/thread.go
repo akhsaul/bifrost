@@ -10,7 +10,7 @@ import (
 // session id when the harness or client supplied one, or a fresh UUID v4.
 // A stable thread_id across turns keeps Zed's server-side conversation and
 // prompt-cache affinity; a fresh one isolates the request.
-func resolveThreadID(ctx *schemas.BifrostContext, configExtraHeaders map[string]string) string {
+func resolveThreadID(ctx *schemas.BifrostContext, configExtraHeaders map[string]schemas.SecretVar) string {
 	if sid := providerUtils.ResolveSessionID(ctx, configExtraHeaders); sid != nil {
 		return *sid
 	}
@@ -26,7 +26,7 @@ func resolvePromptID() string {
 
 // buildCompletionsEnvelope wraps a converted inner-family request in Zed's
 // /completions envelope for the given model.
-func buildCompletionsEnvelope(ctx *schemas.BifrostContext, configExtraHeaders map[string]string, innerProvider, model string, providerRequest interface{}) *ZedCompletionsEnvelope {
+func buildCompletionsEnvelope(ctx *schemas.BifrostContext, configExtraHeaders map[string]schemas.SecretVar, innerProvider, model string, providerRequest interface{}) *ZedCompletionsEnvelope {
 	return &ZedCompletionsEnvelope{
 		ThreadID:        resolveThreadID(ctx, configExtraHeaders),
 		PromptID:        resolvePromptID(),

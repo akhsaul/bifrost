@@ -245,6 +245,9 @@ func ensureOpencodeZenFreeDefaults(request *schemas.BifrostResponsesRequest, ses
 	if request == nil {
 		return
 	}
+	if request.Provider == "" {
+		request.Provider = schemas.OpencodeZenFree
+	}
 	if request.Params == nil {
 		request.Params = &schemas.ResponsesParameters{}
 	}
@@ -335,6 +338,11 @@ func (p *opencodeZenFreeProvider) ListModels(ctx *schemas.BifrostContext, keys [
 	)
 }
 
+// ModelRetrieve is not supported by OpencodeZenFree.
+func (p *opencodeZenFreeProvider) ModelRetrieve(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostModelRetrieveRequest) (*schemas.BifrostModelRetrieveResponse, *schemas.BifrostError) {
+	return nil, providerUtils.NewUnsupportedOperationError(schemas.ModelRetrieveRequest, p.GetProviderKey())
+}
+
 // TextCompletion is not supported by OpencodeZenFree.
 func (p *opencodeZenFreeProvider) TextCompletion(ctx *schemas.BifrostContext, key schemas.Key, request *schemas.BifrostTextCompletionRequest) (*schemas.BifrostTextCompletionResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.TextCompletionRequest, p.GetProviderKey())
@@ -385,7 +393,7 @@ func (p *opencodeZenFreeProvider) ChatCompletion(ctx *schemas.BifrostContext, ke
 
 	primary := classifyOpencodeZenFreeModel(ctx, request.Model)
 	if primary == opencodeZenFreeEndpointGemini {
-		return p.doGeminiChatUnary(ctx, request, geminiHeaders(extraHeaders))
+		return p.doGeminiChatUnary(ctx, request, extraHeaders)
 	}
 	var lastErr *schemas.BifrostError
 	for _, endpoint := range opencodeZenFreeFallbackChain(primary) {
@@ -438,7 +446,7 @@ func (p *opencodeZenFreeProvider) ChatCompletion(ctx *schemas.BifrostContext, ke
 // doResponsesUnaryViaChat serves the responses endpoint for a chat-shaped
 // request: convert to Responses shape, apply Responses defaults, and run the
 // unary responses attempt.
-func (p *opencodeZenFreeProvider) doResponsesUnaryViaChat(ctx *schemas.BifrostContext, request *schemas.BifrostChatRequest, sessionID string, extraHeaders map[string]string) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
+func (p *opencodeZenFreeProvider) doResponsesUnaryViaChat(ctx *schemas.BifrostContext, request *schemas.BifrostChatRequest, sessionID string, extraHeaders map[string]schemas.SecretVar) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
 	responsesReq := request.ToResponsesRequest()
 	if responsesReq == nil {
 		return nil, &schemas.BifrostError{
@@ -471,7 +479,7 @@ func (p *opencodeZenFreeProvider) ChatCompletionStream(ctx *schemas.BifrostConte
 
 	primary := classifyOpencodeZenFreeModel(ctx, request.Model)
 	if primary == opencodeZenFreeEndpointGemini {
-		return p.geminiChatStream(ctx, postHookRunner, postHookSpanFinalizer, request, geminiHeaders(extraHeaders))
+		return p.geminiChatStream(ctx, postHookRunner, postHookSpanFinalizer, request, extraHeaders)
 	}
 	chatPostHookRunner := wrapResponsesToChatStreamPostHookRunner(postHookRunner)
 	var lastErr *schemas.BifrostError
@@ -730,7 +738,7 @@ func (p *opencodeZenFreeProvider) Responses(ctx *schemas.BifrostContext, key sch
 
 	primary := classifyOpencodeZenFreeModel(ctx, request.Model)
 	if primary == opencodeZenFreeEndpointGemini {
-		return p.doGeminiResponsesUnary(ctx, request, geminiHeaders(extraHeaders))
+		return p.doGeminiResponsesUnary(ctx, request, extraHeaders)
 	}
 	var lastErr *schemas.BifrostError
 	for _, endpoint := range opencodeZenFreeFallbackChain(primary) {
@@ -782,7 +790,7 @@ func (p *opencodeZenFreeProvider) Responses(ctx *schemas.BifrostContext, key sch
 
 // openResponsesStream opens one streaming /v1/responses attempt with the
 // opencode converter. Streaming paths pass through untouched.
-func (p *opencodeZenFreeProvider) openResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), request *schemas.BifrostResponsesRequest, extraHeaders map[string]string) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+func (p *opencodeZenFreeProvider) openResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), request *schemas.BifrostResponsesRequest, extraHeaders map[string]schemas.SecretVar) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
 	postRequestConverter := func(wireReq *openai.OpenAIResponsesRequest) *openai.OpenAIResponsesRequest {
 		wireReq = preserveOpencodeReasoning(wireReq, request)
 		wireReq = ensureOpencodeReasoningItemSummaries(wireReq)
@@ -822,7 +830,7 @@ func (p *opencodeZenFreeProvider) ResponsesStream(ctx *schemas.BifrostContext, p
 
 	primary := classifyOpencodeZenFreeModel(ctx, request.Model)
 	if primary == opencodeZenFreeEndpointGemini {
-		return p.geminiResponsesStream(ctx, postHookRunner, postHookSpanFinalizer, request, geminiHeaders(extraHeaders))
+		return p.geminiResponsesStream(ctx, postHookRunner, postHookSpanFinalizer, request, extraHeaders)
 	}
 	var lastErr *schemas.BifrostError
 	for _, endpoint := range opencodeZenFreeFallbackChain(primary) {

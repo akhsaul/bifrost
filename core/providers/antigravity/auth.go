@@ -277,10 +277,10 @@ func GetUserAgent(profile string) string {
 
 // resolveUserAgent returns the user-supplied User-Agent from reqHeaders (ctx/config extra headers)
 // if present, otherwise the profile default from GetUserAgent.
-func resolveUserAgent(profile string, reqHeaders map[string]string) string {
+func resolveUserAgent(profile string, reqHeaders map[string]schemas.SecretVar) string {
 	for k, v := range reqHeaders {
-		if strings.EqualFold(k, "User-Agent") && v != "" {
-			return v
+		if strings.EqualFold(k, "User-Agent") && v.GetValue() != "" {
+			return v.GetValue()
 		}
 	}
 	return GetUserAgent(profile)

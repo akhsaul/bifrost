@@ -10,11 +10,25 @@ import (
 )
 
 // chunkSortKey returns the (Index, ChunkIndex) tuple used to order
-// accumulated stream chunks before flush. Image-generation responses use
-// both fields; every other response shape uses ChunkIndex with Index=0.
-// Nil responses sort to the end via a max-int sentinel so they're
-// dropped deterministically by the consumer.
-func chunkSortKey(r *schemas.BifrostResponse) (int, int) {
+// accumulated stream chunks before flush. The keys were captured by
+// responseSortKey at hook time — the chunk no longer holds the response
+// (see StreamChunk). Nil/empty chunks sort to the end via a max-int
+// sentinel so they're dropped deterministically by the consumer.
+func chunkSortKey(c *StreamChunk) (int, int) {
+	const sentinel = int(^uint(0) >> 1) // math.MaxInt without the import
+	if c == nil || c.Serialized == "" {
+		return sentinel, sentinel
+	}
+	return c.Index, c.ChunkIndex
+}
+
+// responseSortKey extracts the (Index, ChunkIndex) flush ordering tuple from
+// a live response. Called synchronously in PostLLMHook, while the response is
+// still safely readable — the keys are then carried on the StreamChunk so the
+// flush never touches the caller's response (issue #7233). Image-generation
+// responses use both fields; every other response shape uses ChunkIndex with
+// Index=0. Nil responses sort to the end via a max-int sentinel.
+func responseSortKey(r *schemas.BifrostResponse) (int, int) {
 	const sentinel = int(^uint(0) >> 1) // math.MaxInt without the import
 	if r == nil {
 		return sentinel, sentinel
@@ -78,7 +92,7 @@ func (plugin *Plugin) addStreamChunk(requestID string, chunk *StreamChunk) error
 	return nil
 }
 
-// processAccumulatedStream stores the accumulated pre-marshaled chunks as a
+// processAccumulatedStream serializes and stores the accumulated chunks as a
 // single cache entry. Called once per stream when the final chunk arrives.
 func (plugin *Plugin) processAccumulatedStream(ctx context.Context, requestID string) error {
 	accumulatorInterface, exists := plugin.streamAccumulators.Load(requestID)
@@ -92,8 +106,8 @@ func (plugin *Plugin) processAccumulatedStream(ctx context.Context, requestID st
 	defer plugin.cleanupStreamAccumulator(requestID)
 
 	sort.SliceStable(accumulator.Chunks, func(i, j int) bool {
-		ai, bi := accumulator.Chunks[i].Index, accumulator.Chunks[i].ChunkIndex
-		aj, bj := accumulator.Chunks[j].Index, accumulator.Chunks[j].ChunkIndex
+		ai, bi := chunkSortKey(accumulator.Chunks[i])
+		aj, bj := chunkSortKey(accumulator.Chunks[j])
 		if ai != aj {
 			return ai < aj
 		}
@@ -102,10 +116,12 @@ func (plugin *Plugin) processAccumulatedStream(ctx context.Context, requestID st
 
 	streamResponses := make([]string, 0, len(accumulator.Chunks))
 	for _, chunk := range accumulator.Chunks {
-		if chunk.Data == "" {
+		// Chunks were serialized at hook time (see StreamChunk); an empty
+		// payload means there was nothing to cache for that chunk.
+		if chunk == nil || chunk.Serialized == "" {
 			continue
 		}
-		streamResponses = append(streamResponses, chunk.Data)
+		streamResponses = append(streamResponses, chunk.Serialized)
 	}
 
 	if len(streamResponses) == 0 {
@@ -125,6 +141,30 @@ func (plugin *Plugin) processAccumulatedStream(ctx context.Context, requestID st
 
 	plugin.logger.Debug("Cached stream with %d chunks, storageID=%s", len(streamResponses), accumulator.StorageID)
 	return nil
+}
+
+// failStreamAccumulator marks the stream for requestID as failed: one of its
+// chunks could not be serialized, and a replay missing even one chunk is
+// wrong, so the stream must never be flushed. addStreamingResponse discards
+// every later chunk. When the failing chunk is the final one, nothing else
+// will arrive to drop the accumulator, so it is dropped here. Returns true
+// on the first failure for the stream so the caller can warn exactly once.
+//
+// The failing chunk is still a chunk arrival, so LastSeenAt is refreshed:
+// the Failed marker has to outlive the reaper for as long as the stream
+// keeps producing chunks, or a later chunk would start a clean accumulator
+// and the final chunk would flush a partial entry.
+func (plugin *Plugin) failStreamAccumulator(requestID string, storageID string, isFinalChunk bool) (first bool) {
+	accumulator := plugin.getOrCreateStreamAccumulator(requestID, storageID, nil, nil, 0)
+	accumulator.mu.Lock()
+	first = !accumulator.Failed
+	accumulator.Failed = true
+	accumulator.LastSeenAt = time.Now()
+	accumulator.mu.Unlock()
+	if isFinalChunk {
+		plugin.cleanupStreamAccumulator(requestID)
+	}
+	return first
 }
 
 // cleanupStreamAccumulator drops the accumulator for requestID. Safe to call

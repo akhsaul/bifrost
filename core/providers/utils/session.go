@@ -22,7 +22,7 @@ import (
 // The return is *string (not string): callers generate their own session ID
 // in the upstream's native format when this returns nil (zed needs a UUID v4,
 // opencode needs ses_<hex><base62>, modal sends nothing at all).
-func ResolveSessionID(ctx *schemas.BifrostContext, configExtraHeaders map[string]string, headerNames ...string) *string {
+func ResolveSessionID(ctx *schemas.BifrostContext, configExtraHeaders map[string]schemas.SecretVar, headerNames ...string) *string {
 	if v := lookupSessionHeader(ctx, configExtraHeaders, headerNames); v != "" {
 		return &v
 	}
@@ -38,7 +38,7 @@ func ResolveSessionID(ctx *schemas.BifrostContext, configExtraHeaders map[string
 // lookupSessionHeader searches headerNames in context extra headers first,
 // then in config extra headers. Matching is case-insensitive. Returns the
 // first non-blank value, or "" when nothing matches.
-func lookupSessionHeader(ctx *schemas.BifrostContext, configExtraHeaders map[string]string, headerNames []string) string {
+func lookupSessionHeader(ctx *schemas.BifrostContext, configExtraHeaders map[string]schemas.SecretVar, headerNames []string) string {
 	if len(headerNames) == 0 {
 		return ""
 	}
@@ -55,8 +55,9 @@ func lookupSessionHeader(ctx *schemas.BifrostContext, configExtraHeaders map[str
 	}
 	for k, v := range configExtraHeaders {
 		for _, name := range headerNames {
-			if strings.EqualFold(k, name) && strings.TrimSpace(v) != "" {
-				return strings.TrimSpace(v)
+			val := v.GetValue()
+			if strings.EqualFold(k, name) && strings.TrimSpace(val) != "" {
+				return strings.TrimSpace(val)
 			}
 		}
 	}

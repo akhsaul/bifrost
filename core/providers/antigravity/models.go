@@ -94,7 +94,7 @@ func FetchRawAvailableModelsFromAPI(
 	accessToken string,
 	projectID string,
 	baseURL string,
-	extraHeaders map[string]string,
+	extraHeaders map[string]schemas.SecretVar,
 	logger schemas.Logger,
 ) (*AntigravityFetchModelsResponse, error) {
 	if baseURL == "" {
@@ -121,7 +121,7 @@ func FetchRawAvailableModelsFromAPI(
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("User-Agent", GetUserAgent("cli"))
 	for k, v := range extraHeaders {
-		req.Header.Set(k, v)
+		req.Header.Set(k, v.GetValue())
 	}
 	req.SetBody(reqBody)
 
@@ -154,7 +154,7 @@ func RetrieveUserQuotaSummaryFromAPI(
 	accessToken string,
 	projectID string,
 	baseURL string,
-	extraHeaders map[string]string,
+	extraHeaders map[string]schemas.SecretVar,
 	logger schemas.Logger,
 ) (*AntigravityUserQuotaSummaryResponse, error) {
 	if baseURL == "" {
@@ -181,7 +181,7 @@ func RetrieveUserQuotaSummaryFromAPI(
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("User-Agent", GetUserAgent("cli"))
 	for k, v := range extraHeaders {
-		req.Header.Set(k, v)
+		req.Header.Set(k, v.GetValue())
 	}
 	req.SetBody(reqBody)
 
@@ -214,7 +214,7 @@ func FetchAvailableModelsFromAPI(
 	accessToken string,
 	projectID string,
 	baseURL string,
-	extraHeaders map[string]string,
+	extraHeaders map[string]schemas.SecretVar,
 	logger schemas.Logger,
 ) ([]schemas.Model, error) {
 	fetchResp, err := FetchRawAvailableModelsFromAPI(ctx, client, accessToken, projectID, baseURL, extraHeaders, logger)

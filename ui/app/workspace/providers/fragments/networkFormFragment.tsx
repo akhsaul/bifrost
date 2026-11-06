@@ -9,74 +9,37 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DefaultNetworkConfig } from "@/lib/constants/config";
 import { getErrorMessage, setProviderFormDirtyState, useAppDispatch } from "@/lib/store";
 import { useUpdateProviderMutation } from "@/lib/store/apis/providersApi";
-import { ModelProvider, isKnownProvider } from "@/lib/types/config";
+import { ModelProvider, NetworkConfig, isKnownProvider } from "@/lib/types/config";
 import { networkOnlyFormSchema, type SecretVar, type NetworkOnlyFormSchema } from "@/lib/types/schemas";
-import { toEnvRefString, toHeaderStringMap, toSecretVarFormValue, toOptionalSecretVarPayload } from "@/lib/utils/secretVarForm";
+import {
+	clearUnrestorableMaskedHeaders,
+	headerSecretVarsEqual,
+	toExtraHeadersPayload,
+	toOptionalSecretVarPayload,
+	toSecretVarFormValue,
+	toSecretVarMapFormValue,
+} from "@/lib/utils/secretVarForm";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { toast } from "sonner";
+import { secondsToHumanReadable } from "@/lib/utils/strings";
 import { buildProviderUpdatePayload } from "../views/utils";
 
 interface NetworkFormFragmentProps {
 	provider: ModelProvider;
 }
 
-const toMaskedEnvFormValue = (value?: string, ref?: string): string | SecretVar => {
-	if (!ref) return value || "";
-	return { value: value || "", ref, type: "env" };
-};
-
-const toMaskedEnvHeaderFormValue = (headers?: Record<string, string>, refs?: Record<string, string>) => {
-	if (!headers) return undefined;
-	return Object.fromEntries(Object.entries(headers).map(([key, value]) => [key, toMaskedEnvFormValue(value, refs?.[key])]));
-};
-
-// seconds to human readable time
-const secondsToHumanReadable = (seconds: number) => {
-	// Handle edge cases
-	if (!seconds || seconds < 0 || isNaN(seconds)) {
-		return "0 seconds";
-	}
-	seconds = Math.floor(seconds);
-	if (seconds < 60) {
-		return `${seconds} ${seconds === 1 ? "second" : "seconds"}`;
-	}
-	if (seconds < 3600) {
-		const minutes = Math.floor(seconds / 60);
-		const remainingSeconds = seconds % 60;
-		const parts: string[] = [`${minutes} ${minutes === 1 ? "minute" : "minutes"}`];
-		if (remainingSeconds > 0) parts.push(`${remainingSeconds} ${remainingSeconds === 1 ? "second" : "seconds"}`);
-		return parts.join(" ");
-	}
-	if (seconds < 86400) {
-		const hours = Math.floor(seconds / 3600);
-		const minutes = Math.floor((seconds % 3600) / 60);
-		const remainingSeconds = seconds % 60;
-		const parts: string[] = [`${hours} ${hours === 1 ? "hour" : "hours"}`];
-		if (minutes > 0) parts.push(`${minutes} ${minutes === 1 ? "minute" : "minutes"}`);
-		if (remainingSeconds > 0) parts.push(`${remainingSeconds} ${remainingSeconds === 1 ? "second" : "seconds"}`);
-		return parts.join(" ");
-	}
-	// For >= 1 day, only show non-zero components
-	const days = Math.floor(seconds / 86400);
-	const hours = Math.floor((seconds % 86400) / 3600);
-	const minutes = Math.floor((seconds % 3600) / 60);
-	const remainingSeconds = seconds % 60;
-	const parts: string[] = [];
-	parts.push(`${days} ${days === 1 ? "day" : "days"}`);
-	if (hours > 0) parts.push(`${hours} ${hours === 1 ? "hour" : "hours"}`);
-	if (minutes > 0) parts.push(`${minutes} ${minutes === 1 ? "minute" : "minutes"}`);
-	if (remainingSeconds > 0) parts.push(`${remainingSeconds} ${remainingSeconds === 1 ? "second" : "seconds"}`);
-	return parts.join(" ");
-};
-
 export function NetworkFormFragment({ provider }: NetworkFormFragmentProps) {
 	const dispatch = useAppDispatch();
 	const hasUpdateProviderAccess = useRbac(RbacResource.ModelProvider, RbacOperation.Update);
 	const [updateProvider, { isLoading: isUpdatingProvider }] = useUpdateProviderMutation();
 	const isCustomProvider = !isKnownProvider(provider.name as string);
+	const storedHeaderNames = useMemo(
+		() => new Set(Object.keys(provider.network_config?.extra_headers ?? {})),
+		[provider.network_config?.extra_headers],
+	);
 
 	const form = useForm<NetworkOnlyFormSchema, any, NetworkOnlyFormSchema>({
 		resolver: zodResolver(networkOnlyFormSchema) as Resolver<NetworkOnlyFormSchema, any, NetworkOnlyFormSchema>,
@@ -84,8 +47,10 @@ export function NetworkFormFragment({ provider }: NetworkFormFragmentProps) {
 		reValidateMode: "onChange",
 		defaultValues: {
 			network_config: {
-				base_url: toMaskedEnvFormValue(provider.network_config?.base_url, provider.network_config?.base_url_ref),
-				extra_headers: toMaskedEnvHeaderFormValue(provider.network_config?.extra_headers, provider.network_config?.extra_header_refs),
+				base_url: provider.network_config?.base_url || undefined,
+				extra_headers: toSecretVarMapFormValue(
+					provider.network_config?.extra_headers_secret_vars ?? provider.network_config?.extra_headers,
+				),
 				default_request_timeout_in_seconds:
 					provider.network_config?.default_request_timeout_in_seconds ?? DefaultNetworkConfig.default_request_timeout_in_seconds,
 				max_retries: provider.network_config?.max_retries ?? DefaultNetworkConfig.max_retries,
@@ -106,14 +71,17 @@ export function NetworkFormFragment({ provider }: NetworkFormFragmentProps) {
 		},
 	});
 
+	const watchedHeaders = form.watch("network_config.extra_headers");
+	const defaultHeaders = form.formState.defaultValues?.network_config?.extra_headers as Record<string, SecretVar> | undefined;
+	const isDirty = form.formState.isDirty || !headerSecretVarsEqual(watchedHeaders, defaultHeaders);
+
 	useEffect(() => {
-		dispatch(setProviderFormDirtyState(form.formState.isDirty));
-	}, [form.formState.isDirty, dispatch]);
+		dispatch(setProviderFormDirtyState(isDirty));
+	}, [isDirty, dispatch]);
 
 	const onSubmit = (data: NetworkOnlyFormSchema) => {
 		const requiresBaseUrl = isCustomProvider;
-		const submittedBaseURL = toEnvRefString(data.network_config?.base_url as SecretVar | string | undefined);
-		if (requiresBaseUrl && submittedBaseURL.trim() === "") {
+		if (requiresBaseUrl && (data.network_config?.base_url ?? "").trim() === "") {
 			if ((provider.network_config?.base_url ?? "").trim() !== "") {
 				toast.error("You can't remove network configuration for this provider.");
 			} else {
@@ -121,14 +89,21 @@ export function NetworkFormFragment({ provider }: NetworkFormFragmentProps) {
 			}
 			return;
 		}
+		const extraHeaders = data.network_config?.extra_headers
+			? toExtraHeadersPayload(data.network_config.extra_headers, storedHeaderNames)
+			: undefined;
+		if (extraHeaders && extraHeaders.missingValues.length > 0) {
+			toast.error(`Enter a value for extra header ${extraHeaders.missingValues.join(", ")}`);
+			return;
+		}
+		// extra_headers_secret_vars is response-only, so it is not sent back
+		const { extra_headers_secret_vars: _headerSecretVars, ...storedNetworkConfig }: Partial<NetworkConfig> = provider.network_config ?? {};
 		// Create updated provider configuration
 		const updatedProvider = buildProviderUpdatePayload(provider, {
 			network_config: {
-				...provider.network_config,
-				base_url_ref: undefined,
-				extra_header_refs: undefined,
-				base_url: submittedBaseURL || undefined,
-				extra_headers: toHeaderStringMap(data.network_config?.extra_headers as Record<string, SecretVar> | undefined),
+				...storedNetworkConfig,
+				base_url: data.network_config?.base_url || undefined,
+				extra_headers: extraHeaders?.headers,
 				default_request_timeout_in_seconds:
 					data.network_config?.default_request_timeout_in_seconds ?? DefaultNetworkConfig.default_request_timeout_in_seconds,
 				max_retries: data.network_config?.max_retries ?? 0,
@@ -164,8 +139,10 @@ export function NetworkFormFragment({ provider }: NetworkFormFragmentProps) {
 		// Reset form with new provider's network_config when provider.name changes
 		form.reset({
 			network_config: {
-				base_url: toMaskedEnvFormValue(provider.network_config?.base_url, provider.network_config?.base_url_ref),
-				extra_headers: toMaskedEnvHeaderFormValue(provider.network_config?.extra_headers, provider.network_config?.extra_header_refs),
+				base_url: provider.network_config?.base_url || undefined,
+				extra_headers: toSecretVarMapFormValue(
+					provider.network_config?.extra_headers_secret_vars ?? provider.network_config?.extra_headers,
+				),
 				default_request_timeout_in_seconds:
 					provider.network_config?.default_request_timeout_in_seconds ?? DefaultNetworkConfig.default_request_timeout_in_seconds,
 				max_retries: provider.network_config?.max_retries ?? DefaultNetworkConfig.max_retries,
@@ -206,14 +183,10 @@ export function NetworkFormFragment({ provider }: NetworkFormFragmentProps) {
 									<FormItem>
 										<FormLabel>Base URL {baseURLRequired ? "(Required)" : "(Optional)"}</FormLabel>
 										<FormControl>
-											<SecretVarInput
-												placeholder={
-													isCustomProvider
-														? "https://api.your-provider.com or env.PROVIDER_URL"
-														: "https://api.example.com or env.PROVIDER_URL"
-												}
-												value={typeof field.value === "string" ? toSecretVarFormValue(field.value) : field.value}
-												onChange={field.onChange}
+											<Input
+												placeholder={isCustomProvider ? "https://api.your-provider.com" : "https://api.example.com"}
+												{...field}
+												value={field.value || ""}
 												disabled={!hasUpdateProviderAccess}
 											/>
 										</FormControl>
@@ -543,13 +516,18 @@ export function NetworkFormFragment({ provider }: NetworkFormFragmentProps) {
 									<FormControl>
 										<HeadersTable
 											value={field.value || {}}
-											onChange={field.onChange}
+											onChange={(headers) => field.onChange(clearUnrestorableMaskedHeaders(headers, storedHeaderNames))}
 											keyPlaceholder="Header name"
 											valuePlaceholder="Header value"
 											label="Extra Headers"
 											disabled={!hasUpdateProviderAccess}
+											useSecretVarInput
 										/>
 									</FormControl>
+									<FormDescription>
+										Values are masked once saved; leave a masked value unchanged to keep it, and re-enter it when renaming a header. Use{" "}
+										<code>env.VAR_NAME</code> or <code>vault.path</code> to reference a secret instead of storing it.
+									</FormDescription>
 									<FormMessage />
 								</FormItem>
 							)}
@@ -645,16 +623,16 @@ export function NetworkFormFragment({ provider }: NetworkFormFragmentProps) {
 					<TooltipProvider>
 						<Tooltip>
 							<TooltipTrigger asChild>
-								<Button type="submit" disabled={!form.formState.isDirty || !hasUpdateProviderAccess} isLoading={isUpdatingProvider}>
+								<Button type="submit" disabled={!isDirty || !hasUpdateProviderAccess} isLoading={isUpdatingProvider}>
 									Save Network Configuration
 								</Button>
 							</TooltipTrigger>
-							{(!form.formState.isDirty || !form.formState.isValid) && (
+							{(!isDirty || !form.formState.isValid) && (
 								<TooltipContent>
 									<p>
-										{!form.formState.isDirty && !form.formState.isValid
+										{!isDirty && !form.formState.isValid
 											? "No changes made and validation errors present"
-											: !form.formState.isDirty
+											: !isDirty
 												? "No changes made"
 												: "Please fix validation errors"}
 									</p>

@@ -50,7 +50,7 @@ func TestBuildHeadersDefaults(t *testing.T) {
 		"x-client-type", "x-client-version", "x-core-version", "x-is-multiroot",
 		"x-platform", "x-platform-version", "x-task-id", "x-title",
 	} {
-		if headers[k] == "" {
+		if headers[k].Val == "" {
 			t.Errorf("missing default header %q", k)
 		}
 	}
@@ -68,24 +68,24 @@ func TestBuildHeadersDefaults(t *testing.T) {
 }
 
 func TestBuildHeadersOverrides(t *testing.T) {
-	configExtra := map[string]string{"x-title": "Custom", "x-task-id": "config-task"}
+	configExtra := map[string]schemas.SecretVar{"x-title": *schemas.NewSecretVar("Custom"), "x-task-id": *schemas.NewSecretVar("config-task")}
 	ctx := testContext()
 	ctx.SetValue(schemas.BifrostContextKeyExtraHeaders, map[string][]string{
 		"x-title": {"CtxTitle"},
 	})
 	headers := cline.BuildHeaders(ctx, configExtra, testChatRequest())
-	if headers["x-title"] != "CtxTitle" {
-		t.Errorf("ctx extra header should win, got %q", headers["x-title"])
+	if headers["x-title"].Val != "CtxTitle" {
+		t.Errorf("ctx extra header should win, got %q", headers["x-title"].Val)
 	}
 	// x-task-id resolves from ctx/body/config before generation; config value
 	// is the only source here.
-	if headers["x-task-id"] != "config-task" {
-		t.Errorf("x-task-id should come from config, got %q", headers["x-task-id"])
+	if headers["x-task-id"].Val != "config-task" {
+		t.Errorf("x-task-id should come from config, got %q", headers["x-task-id"].Val)
 	}
 }
 
 func TestResolveTaskIDPriority(t *testing.T) {
-	configExtra := map[string]string{"x-task-id": "config-task"}
+	configExtra := map[string]schemas.SecretVar{"x-task-id": *schemas.NewSecretVar("config-task")}
 	req := testChatRequest()
 	req.Params = &schemas.ChatParameters{ExtraParams: map[string]interface{}{"task_id": "body-task"}}
 

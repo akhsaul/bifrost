@@ -152,13 +152,13 @@ func ResolveNetworkConfig(config NetworkConfig) (NetworkConfig, error) {
 		return NetworkConfig{}, fmt.Errorf("base_url: %w", err)
 	}
 	if config.ExtraHeaders != nil {
-		resolved.ExtraHeaders = make(map[string]string, len(config.ExtraHeaders))
+		resolved.ExtraHeaders = make(map[string]SecretVar, len(config.ExtraHeaders))
 		for key, value := range config.ExtraHeaders {
-			resolvedValue, resolveErr := ResolveEnvString(value)
+			resolvedValue, resolveErr := ResolveEnvString(value.GetValue())
 			if resolveErr != nil {
 				return NetworkConfig{}, fmt.Errorf("extra_headers[%q]: %w", key, resolveErr)
 			}
-			resolved.ExtraHeaders[key] = resolvedValue
+			resolved.ExtraHeaders[key] = *NewSecretVar(resolvedValue)
 		}
 	}
 

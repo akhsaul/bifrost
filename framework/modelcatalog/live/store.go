@@ -38,6 +38,7 @@ type Key struct {
 type Entry struct {
 	Models  []string
 	Details map[string]*datasheet.Entry
+	Created map[string]int64 // provider-reported creation time in Unix seconds; untimed models are absent
 }
 
 type Store struct {
@@ -75,12 +76,14 @@ func New(logger schemas.Logger) *Store {
 // Upsert stores a successful fetch unconditionally. Use it for writes with no
 // in-flight window to lose a race in (seeding, tests); anything that fetches
 // from an upstream first should go through Generation + UpsertIfCurrent.
-func (s *Store) Upsert(provider schemas.ModelProvider, keyID string, unfiltered bool, models []string) {
-	s.UpsertWithDetails(provider, keyID, unfiltered, models, nil)
+// models is copied; the store takes ownership of created, so callers must not
+// modify it after the call.
+func (s *Store) Upsert(provider schemas.ModelProvider, keyID string, unfiltered bool, models []string, created map[string]int64) {
+	s.UpsertWithDetails(provider, keyID, unfiltered, models, nil, created)
 }
 
-// UpsertWithDetails stores models along with capability details for each model.
-func (s *Store) UpsertWithDetails(provider schemas.ModelProvider, keyID string, unfiltered bool, models []string, details map[string]*datasheet.Entry) {
+// UpsertWithDetails stores models along with capability details and created timestamps for each model.
+func (s *Store) UpsertWithDetails(provider schemas.ModelProvider, keyID string, unfiltered bool, models []string, details map[string]*datasheet.Entry, created map[string]int64) {
 	cp := make([]string, len(models))
 	copy(cp, models)
 	var detailsCp map[string]*datasheet.Entry
@@ -104,7 +107,7 @@ func (s *Store) UpsertWithDetails(provider schemas.ModelProvider, keyID string, 
 	}
 	k := Key{Provider: provider, KeyID: keyID, Unfiltered: unfiltered}
 	s.mu.Lock()
-	s.entries[k] = Entry{Models: cp, Details: detailsCp}
+	s.entries[k] = Entry{Models: cp, Details: detailsCp, Created: created}
 	s.mu.Unlock()
 	s.writeGen.Add(1)
 }
@@ -123,7 +126,8 @@ func (s *Store) Generation(provider schemas.ModelProvider) uint64 {
 }
 
 // UpsertIfCurrent stores a fetch only if nothing invalidated the provider
-// since gen was read, and reports whether it wrote.
+// since gen was read, and reports whether it wrote. Like Upsert, it copies
+// models and takes ownership of created.
 //
 // This is what keeps a deleted or disabled key's models from being resurrected
 // by a fetch that outlived it. The background refresher works from a key
@@ -131,12 +135,12 @@ func (s *Store) Generation(provider schemas.ModelProvider) uint64 {
 // may be gone. Its Invalidate already ran, and no later pass re-fetches or
 // prunes a key that is no longer configured, so an unguarded commit would
 // advertise that key's models until the process restarted.
-func (s *Store) UpsertIfCurrent(provider schemas.ModelProvider, keyID string, unfiltered bool, models []string, gen uint64) bool {
-	return s.UpsertIfCurrentWithDetails(provider, keyID, unfiltered, models, nil, gen)
+func (s *Store) UpsertIfCurrent(provider schemas.ModelProvider, keyID string, unfiltered bool, models []string, created map[string]int64, gen uint64) bool {
+	return s.UpsertIfCurrentWithDetails(provider, keyID, unfiltered, models, nil, created, gen)
 }
 
 // UpsertIfCurrentWithDetails stores a fetch and details with the generation guard.
-func (s *Store) UpsertIfCurrentWithDetails(provider schemas.ModelProvider, keyID string, unfiltered bool, models []string, details map[string]*datasheet.Entry, gen uint64) bool {
+func (s *Store) UpsertIfCurrentWithDetails(provider schemas.ModelProvider, keyID string, unfiltered bool, models []string, details map[string]*datasheet.Entry, created map[string]int64, gen uint64) bool {
 	cp := make([]string, len(models))
 	copy(cp, models)
 	var detailsCp map[string]*datasheet.Entry
@@ -164,7 +168,7 @@ func (s *Store) UpsertIfCurrentWithDetails(provider schemas.ModelProvider, keyID
 	if s.gen[provider] != gen {
 		return false
 	}
-	s.entries[k] = Entry{Models: cp, Details: detailsCp}
+	s.entries[k] = Entry{Models: cp, Details: detailsCp, Created: created}
 	s.writeGen.Add(1)
 	return true
 }
@@ -294,6 +298,27 @@ func (s *Store) Snapshot() map[Key]Entry {
 			}
 		}
 		out[k] = Entry{Models: cp, Details: detailsCp}
+	}
+	return out
+}
+
+// CreatedForProvider returns the provider creation time of each model across
+// the provider's entries in the given mode, in Unix seconds. When keys report
+// different times for one model, the latest wins. Models without a reported
+// time are absent. The returned map is owned by the caller.
+func (s *Store) CreatedForProvider(provider schemas.ModelProvider, unfiltered bool) map[string]int64 {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make(map[string]int64)
+	for k, e := range s.entries {
+		if k.Provider != provider || k.Unfiltered != unfiltered {
+			continue
+		}
+		for model, created := range e.Created {
+			if created > out[model] {
+				out[model] = created
+			}
+		}
 	}
 	return out
 }

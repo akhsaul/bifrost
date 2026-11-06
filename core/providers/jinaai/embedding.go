@@ -21,13 +21,48 @@ func ToJinaEmbeddingRequest(bifrostReq *schemas.BifrostEmbeddingRequest) *JinaEm
 	}
 
 	// Set input
-	if bifrostReq.Input != nil {
-		if len(bifrostReq.Input.Objects) > 0 {
-			jinaReq.Input = bifrostReq.Input.Objects
-		} else if len(bifrostReq.Input.Texts) > 0 {
-			jinaReq.Input = bifrostReq.Input.Texts
-		} else if bifrostReq.Input.Text != nil {
-			jinaReq.Input = *bifrostReq.Input.Text
+	if len(bifrostReq.Input) > 0 {
+		var hasNonText bool
+		for _, item := range bifrostReq.Input {
+			for _, part := range item.Content {
+				if part.Type != schemas.EmbeddingContentPartTypeText {
+					hasNonText = true
+					break
+				}
+			}
+			if hasNonText {
+				break
+			}
+		}
+
+		if hasNonText {
+			objects := make([]map[string]interface{}, 0, len(bifrostReq.Input))
+			for _, item := range bifrostReq.Input {
+				for _, part := range item.Content {
+					obj := make(map[string]interface{})
+					if part.Text != nil {
+						obj["text"] = *part.Text
+					}
+					if part.Image != nil {
+						if part.Image.URL != nil {
+							obj["image"] = *part.Image.URL
+						} else if part.Image.Data != nil {
+							obj["image"] = *part.Image.Data
+						}
+					}
+					if len(obj) > 0 {
+						objects = append(objects, obj)
+					}
+				}
+			}
+			jinaReq.Input = objects
+		} else {
+			texts := schemas.EmbeddingInput(bifrostReq.Input).Texts()
+			if len(texts) == 1 {
+				jinaReq.Input = texts[0]
+			} else {
+				jinaReq.Input = texts
+			}
 		}
 	}
 

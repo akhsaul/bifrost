@@ -13,7 +13,7 @@ import (
 
 // UpsertLive caches one (provider, keyID, unfiltered) list-models response.
 func (mc *ModelCatalog) UpsertLive(provider schemas.ModelProvider, keyID string, unfiltered bool, models []string) {
-	mc.live.Upsert(provider, keyID, unfiltered, models)
+	mc.live.Upsert(provider, keyID, unfiltered, models, nil)
 }
 
 // UpsertLiveFromResponse extracts model IDs and capability details from a BifrostListModelsResponse
@@ -25,8 +25,8 @@ func (mc *ModelCatalog) UpsertLiveFromResponse(provider schemas.ModelProvider, k
 	if resp == nil {
 		return
 	}
-	modelIDs, details := extractModelIDsAndDetails(resp, provider)
-	mc.live.UpsertWithDetails(provider, keyID, unfiltered, modelIDs, details)
+	modelIDs, details, created := extractModelIDsAndDetails(resp, provider)
+	mc.live.UpsertWithDetails(provider, keyID, unfiltered, modelIDs, details, created)
 }
 
 // LiveGeneration returns the live cache's invalidation counter for the
@@ -46,8 +46,8 @@ func (mc *ModelCatalog) UpsertLiveFromResponseIfCurrent(provider schemas.ModelPr
 	if resp == nil {
 		return false
 	}
-	modelIDs, details := extractModelIDsAndDetails(resp, provider)
-	return mc.live.UpsertIfCurrentWithDetails(provider, keyID, unfiltered, modelIDs, details, gen)
+	modelIDs, details, created := extractModelIDsAndDetails(resp, provider)
+	return mc.live.UpsertIfCurrentWithDetails(provider, keyID, unfiltered, modelIDs, details, created, gen)
 }
 
 // InvalidateLive drops both filtered + unfiltered live entries for one key.
@@ -68,13 +68,21 @@ func (mc *ModelCatalog) RetainLiveKeys(provider schemas.ModelProvider, keep map[
 }
 
 // SetKeyConfigForProvider replaces the keyconfig snapshot for one provider.
+// A provider left with no routable key serves no model.
 func (mc *ModelCatalog) SetKeyConfigForProvider(provider schemas.ModelProvider, keys []schemas.Key) {
 	mc.keyconf.SetProvider(provider, keys)
 }
 
+// SetKeyConfigForKeylessProvider is SetKeyConfigForProvider for a custom
+// provider configured as keyless (is_key_less): with no keys it serves any model.
+func (mc *ModelCatalog) SetKeyConfigForKeylessProvider(provider schemas.ModelProvider, keys []schemas.Key) {
+	mc.keyconf.SetKeylessProvider(provider, keys)
+}
+
 // ReplaceKeyConfig atomically resets the keyconfig snapshot for all providers.
-func (mc *ModelCatalog) ReplaceKeyConfig(snapshot map[schemas.ModelProvider][]schemas.Key) {
-	mc.keyconf.Replace(snapshot)
+// keyless names the custom providers configured as keyless (is_key_less).
+func (mc *ModelCatalog) ReplaceKeyConfig(snapshot map[schemas.ModelProvider][]schemas.Key, keyless ...schemas.ModelProvider) {
+	mc.keyconf.Replace(snapshot, keyless...)
 }
 
 // RemoveKeyConfigForProvider drops keyconfig state for the provider.
@@ -123,30 +131,39 @@ func (mc *ModelCatalog) ConfiguredProviders() []schemas.ModelProvider {
 
 // extractModelIDs flattens a list-models response into bare model
 // identifiers, filtering entries whose ID prefix doesn't match the
-// requested provider.
-func extractModelIDs(resp *schemas.BifrostListModelsResponse, provider schemas.ModelProvider) []string {
-	models, _ := extractModelIDsAndDetails(resp, provider)
-	return models
+// requested provider. It also returns the creation time each model reports,
+// in Unix seconds; models without one are absent.
+func extractModelIDs(resp *schemas.BifrostListModelsResponse, provider schemas.ModelProvider) ([]string, map[string]int64) {
+	models, _, created := extractModelIDsAndDetails(resp, provider)
+	return models, created
 }
 
 // extractModelIDsAndDetails flattens a list-models response into bare model
-// identifiers and extracts capability metadata for each model.
-func extractModelIDsAndDetails(resp *schemas.BifrostListModelsResponse, provider schemas.ModelProvider) ([]string, map[string]*datasheet.Entry) {
+// identifiers, extracts capability metadata, and tracks creation times for each model.
+func extractModelIDsAndDetails(resp *schemas.BifrostListModelsResponse, provider schemas.ModelProvider) ([]string, map[string]*datasheet.Entry, map[string]int64) {
 	if resp == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	seen := make(map[string]struct{}, len(resp.Data))
 	out := make([]string, 0, len(resp.Data))
 	details := make(map[string]*datasheet.Entry, len(resp.Data))
+	var created map[string]int64
 	for _, m := range resp.Data {
 		parsedProvider, parsedModel := schemas.ParseModelString(m.ID, "")
 		if parsedProvider != "" && parsedProvider != provider {
 			continue
 		}
-		if _, ok := seen[parsedModel]; !ok {
-			seen[parsedModel] = struct{}{}
-			out = append(out, parsedModel)
+		if m.Created != nil && *m.Created > created[parsedModel] {
+			if created == nil {
+				created = make(map[string]int64)
+			}
+			created[parsedModel] = *m.Created
 		}
+		if _, ok := seen[parsedModel]; ok {
+			continue
+		}
+		seen[parsedModel] = struct{}{}
+		out = append(out, parsedModel)
 		entry := &datasheet.Entry{
 			BaseModel:       parsedModel,
 			Provider:        string(provider),
@@ -170,5 +187,5 @@ func extractModelIDsAndDetails(resp *schemas.BifrostListModelsResponse, provider
 		}
 		details[parsedModel] = entry
 	}
-	return out, details
+	return out, details, created
 }

@@ -551,6 +551,11 @@ func (provider *AntigravityProvider) ResponsesStream(
 	return stream, bErr
 }
 
+// ModelRetrieve is not supported by the Antigravity provider.
+func (provider *AntigravityProvider) ModelRetrieve(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostModelRetrieveRequest) (*schemas.BifrostModelRetrieveResponse, *schemas.BifrostError) {
+	return nil, providerUtils.NewUnsupportedOperationError(schemas.ModelRetrieveRequest, provider.GetProviderKey())
+}
+
 // CountTokens is not supported directly by the Antigravity provider.
 func (provider *AntigravityProvider) CountTokens(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostResponsesRequest) (*schemas.BifrostCountTokensResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.CountTokensRequest, provider.GetProviderKey())

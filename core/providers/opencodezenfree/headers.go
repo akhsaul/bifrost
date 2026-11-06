@@ -118,7 +118,7 @@ func GenerateProjectID(host, path string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func lookupHeader(ctx *schemas.BifrostContext, configExtraHeaders map[string]string, names ...string) string {
+func lookupHeader(ctx *schemas.BifrostContext, configExtraHeaders map[string]schemas.SecretVar, names ...string) string {
 	if ctx != nil {
 		if ctxHeaders, ok := ctx.Value(schemas.BifrostContextKeyExtraHeaders).(map[string][]string); ok {
 			for k, vs := range ctxHeaders {
@@ -132,8 +132,9 @@ func lookupHeader(ctx *schemas.BifrostContext, configExtraHeaders map[string]str
 	}
 	for k, v := range configExtraHeaders {
 		for _, name := range names {
-			if strings.EqualFold(k, name) && v != "" {
-				return v
+			val := v.GetValue()
+			if strings.EqualFold(k, name) && val != "" {
+				return val
 			}
 		}
 	}
@@ -145,7 +146,7 @@ func lookupHeader(ctx *schemas.BifrostContext, configExtraHeaders map[string]str
 // 2. Config extra headers (same names)
 // 3. Bifrost context session ID (session stickiness)
 // 4. Dynamic session ID generation (ses_<12hex><14base62>)
-func ResolveSessionID(ctx *schemas.BifrostContext, configExtraHeaders map[string]string) string {
+func ResolveSessionID(ctx *schemas.BifrostContext, configExtraHeaders map[string]schemas.SecretVar) string {
 	if v := lookupHeader(ctx, configExtraHeaders, "x-opencode-session", "x-session-affinity", "x-session-id"); v != "" {
 		return v
 	}
@@ -158,7 +159,7 @@ func ResolveSessionID(ctx *schemas.BifrostContext, configExtraHeaders map[string
 // ResolveProjectID resolves x-opencode-project with the following priority:
 // 1. Context/config extra headers (x-opencode-project and common client variants)
 // 2. Generated sha1 fallback per opencode-generate-headers.md
-func ResolveProjectID(ctx *schemas.BifrostContext, configExtraHeaders map[string]string) string {
+func ResolveProjectID(ctx *schemas.BifrostContext, configExtraHeaders map[string]schemas.SecretVar) string {
 	if v := lookupHeader(ctx, configExtraHeaders,
 		"x-opencode-project", "x-opencode-project-id", "x-project-id", "x-project",
 	); v != "" {
@@ -178,7 +179,7 @@ type ResolvedHeaders struct {
 
 // ResolveOpencodeHeaders resolves (or generates) the session, project, and
 // trace values once per request so headers and body defaults stay consistent.
-func ResolveOpencodeHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[string]string) ResolvedHeaders {
+func ResolveOpencodeHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[string]schemas.SecretVar) ResolvedHeaders {
 	sessionID := ResolveSessionID(ctx, configExtraHeaders)
 	projectID := ResolveProjectID(ctx, configExtraHeaders)
 
@@ -205,25 +206,25 @@ func ResolveOpencodeHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[
 // headersFromResolved builds headers from an already-resolved session/project/
 // trace triple, so callers that also need the session ID (prompt_cache_key)
 // don't resolve twice and generate divergent random sessions.
-func headersFromResolved(ctx *schemas.BifrostContext, configExtraHeaders map[string]string, resolved ResolvedHeaders, isStreaming bool) map[string]string {
+func headersFromResolved(ctx *schemas.BifrostContext, configExtraHeaders map[string]schemas.SecretVar, resolved ResolvedHeaders, isStreaming bool) map[string]schemas.SecretVar {
 	_ = isStreaming
-	headers := map[string]string{
-		"authorization":      DefaultAuth,
-		"x-opencode-client":  DefaultClient,
-		"user-agent":         DefaultUserAgent,
-		"b3":                 resolved.B3,
-		"traceparent":        resolved.Traceparent,
-		"x-opencode-project": resolved.ProjectID,
-		"x-opencode-session": resolved.SessionID,
-		"x-session-affinity": resolved.SessionID,
-		"x-session-id":       resolved.SessionID,
+	headers := map[string]schemas.SecretVar{
+		"authorization":      *schemas.NewSecretVar(DefaultAuth),
+		"x-opencode-client":  *schemas.NewSecretVar(DefaultClient),
+		"user-agent":         *schemas.NewSecretVar(DefaultUserAgent),
+		"b3":                 *schemas.NewSecretVar(resolved.B3),
+		"traceparent":        *schemas.NewSecretVar(resolved.Traceparent),
+		"x-opencode-project": *schemas.NewSecretVar(resolved.ProjectID),
+		"x-opencode-session": *schemas.NewSecretVar(resolved.SessionID),
+		"x-session-affinity": *schemas.NewSecretVar(resolved.SessionID),
+		"x-session-id":       *schemas.NewSecretVar(resolved.SessionID),
 	}
 	applyHeaderOverrides(headers, configExtraHeaders)
 	applyContextHeaderOverrides(ctx, headers)
 	return headers
 }
 
-func applyHeaderOverrides(headers map[string]string, configExtraHeaders map[string]string) {
+func applyHeaderOverrides(headers map[string]schemas.SecretVar, configExtraHeaders map[string]schemas.SecretVar) {
 	// Config-level extra headers override defaults
 	for k, v := range configExtraHeaders {
 		// Case-insensitive key match: remove existing default key if casing differs
@@ -237,7 +238,7 @@ func applyHeaderOverrides(headers map[string]string, configExtraHeaders map[stri
 	}
 }
 
-func applyContextHeaderOverrides(ctx *schemas.BifrostContext, headers map[string]string) {
+func applyContextHeaderOverrides(ctx *schemas.BifrostContext, headers map[string]schemas.SecretVar) {
 	// Per-request context extra headers have highest priority
 	if ctx != nil {
 		if ctxHeaders, ok := ctx.Value(schemas.BifrostContextKeyExtraHeaders).(map[string][]string); ok {
@@ -249,7 +250,7 @@ func applyContextHeaderOverrides(ctx *schemas.BifrostContext, headers map[string
 							break
 						}
 					}
-					headers[k] = vs[0]
+					headers[k] = *schemas.NewSecretVar(vs[0])
 				}
 			}
 		}
@@ -271,6 +272,6 @@ func applyContextHeaderOverrides(ctx *schemas.BifrostContext, headers map[string
 // live: without accept-encoding the server returns plain JSON 200.
 // content-type is still set by the openai helpers themselves, and
 // host/connection are managed by fasthttp.
-func BuildHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[string]string, isStreaming bool) map[string]string {
+func BuildHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[string]schemas.SecretVar, isStreaming bool) map[string]schemas.SecretVar {
 	return headersFromResolved(ctx, configExtraHeaders, ResolveOpencodeHeaders(ctx, configExtraHeaders), isStreaming)
 }

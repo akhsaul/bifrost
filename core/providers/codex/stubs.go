@@ -138,6 +138,11 @@ func accumulateResponsesStream(stream chan *schemas.BifrostStreamChunk, model st
 	return out, nil
 }
 
+// ModelRetrieve is not supported by the Codex provider.
+func (provider *CodexProvider) ModelRetrieve(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostModelRetrieveRequest) (*schemas.BifrostModelRetrieveResponse, *schemas.BifrostError) {
+	return nil, providerUtils.NewUnsupportedOperationError(schemas.ModelRetrieveRequest, provider.GetProviderKey())
+}
+
 // TextCompletion is not supported by the Codex provider.
 func (provider *CodexProvider) TextCompletion(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostTextCompletionRequest) (*schemas.BifrostTextCompletionResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.TextCompletionRequest, provider.GetProviderKey())

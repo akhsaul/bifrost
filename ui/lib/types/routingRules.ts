@@ -37,6 +37,8 @@ export interface RoutingTarget {
 	weight: number;
 	/** Integer rank >= 1 (lower = higher precedence); used when rule strategy is "priority". */
 	priority?: number;
+	/** Time-to-first-token deadline (ms) for streaming requests; unset when off. 0 clears it on update. */
+	ttft_timeout_ms?: number | null;
 }
 
 export interface RoutingRule {
@@ -101,6 +103,8 @@ export interface RoutingTargetFormData {
 	weight: number;
 	/** Integer rank >= 1 (lower = higher precedence); used when rule strategy is "priority". */
 	priority?: number;
+	/** Deadline loaded from the stored rule; kept so mixed values survive a save. */
+	ttft_timeout_ms?: number;
 }
 
 export interface RoutingRuleFormData {
@@ -111,6 +115,8 @@ export interface RoutingRuleFormData {
 	strategy?: RoutingStrategy;
 	targets: RoutingTargetFormData[];
 	fallbacks: RoutingFallbackFormData[];
+	/** Raw input; empty means no TTFT deadline. */
+	ttft_timeout_ms: string;
 	scope: string;
 	scope_id: string;
 	priority: number;
@@ -158,6 +164,7 @@ export const DEFAULT_ROUTING_RULE_FORM_DATA: RoutingRuleFormData = {
 	strategy: "weighted",
 	targets: [DEFAULT_ROUTING_TARGET],
 	fallbacks: [],
+	ttft_timeout_ms: "",
 	scope: RoutingRuleScope.Global,
 	scope_id: "",
 	priority: 0,

@@ -57,32 +57,32 @@ func TestGenerateProjectID(t *testing.T) {
 func TestBuildHeadersMatchesWorkingCapture(t *testing.T) {
 	headers := BuildHeaders(nil, nil, false)
 
-	if headers["authorization"] != DefaultAuth {
-		t.Errorf("authorization = %q, want %q", headers["authorization"], DefaultAuth)
+	if headers["authorization"].Val != DefaultAuth {
+		t.Errorf("authorization = %q, want %q", headers["authorization"].Val, DefaultAuth)
 	}
-	if headers["x-opencode-client"] != "cli" {
-		t.Errorf("x-opencode-client = %q, want cli", headers["x-opencode-client"])
+	if headers["x-opencode-client"].Val != "cli" {
+		t.Errorf("x-opencode-client = %q, want cli", headers["x-opencode-client"].Val)
 	}
-	if headers["user-agent"] != DefaultUserAgent {
-		t.Errorf("user-agent = %q, want %q", headers["user-agent"], DefaultUserAgent)
+	if headers["user-agent"].Val != DefaultUserAgent {
+		t.Errorf("user-agent = %q, want %q", headers["user-agent"].Val, DefaultUserAgent)
 	}
 
 	// Session trio must carry the same value.
-	sid := headers["x-opencode-session"]
+	sid := headers["x-opencode-session"].Val
 	if sid == "" {
 		t.Fatal("x-opencode-session header must always be present")
 	}
-	if headers["x-session-affinity"] != sid || headers["x-session-id"] != sid {
-		t.Errorf("session trio diverged: session=%q affinity=%q id=%q", sid, headers["x-session-affinity"], headers["x-session-id"])
+	if headers["x-session-affinity"].Val != sid || headers["x-session-id"].Val != sid {
+		t.Errorf("session trio diverged: session=%q affinity=%q id=%q", sid, headers["x-session-affinity"].Val, headers["x-session-id"].Val)
 	}
 	if matched, _ := regexp.MatchString(`^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$`, sid); !matched {
 		t.Errorf("x-opencode-session = %q, want ses_<12hex><14base62>", sid)
 	}
 
-	if headers["x-opencode-project"] == "" {
+	if headers["x-opencode-project"].Val == "" {
 		t.Error("x-opencode-project header must always be present")
 	}
-	if headers["traceparent"] == "" || headers["b3"] == "" {
+	if headers["traceparent"].Val == "" || headers["b3"].Val == "" {
 		t.Error("traceparent and b3 headers must always be present")
 	}
 
@@ -109,21 +109,21 @@ func TestBuildHeadersStreamingAccept(t *testing.T) {
 }
 
 func TestBuildHeadersConfigOverrides(t *testing.T) {
-	config := map[string]string{
-		"X-Opencode-Session": "my-custom-session",
-		"user-agent":         "MyCustomAgent/1.0",
-		"authorization":      "Bearer custom",
+	config := map[string]schemas.SecretVar{
+		"X-Opencode-Session": *schemas.NewSecretVar("my-custom-session"),
+		"user-agent":         *schemas.NewSecretVar("MyCustomAgent/1.0"),
+		"authorization":      *schemas.NewSecretVar("Bearer custom"),
 	}
 	headers := BuildHeaders(nil, config, false)
 
-	if headers["X-Opencode-Session"] != "my-custom-session" {
-		t.Fatalf("config-provided x-opencode-session = %q, want %q", headers["X-Opencode-Session"], "my-custom-session")
+	if headers["X-Opencode-Session"].Val != "my-custom-session" {
+		t.Fatalf("config-provided x-opencode-session = %q, want %q", headers["X-Opencode-Session"].Val, "my-custom-session")
 	}
-	if headers["user-agent"] != "MyCustomAgent/1.0" {
-		t.Fatalf("config-provided user-agent = %q, want %q", headers["user-agent"], "MyCustomAgent/1.0")
+	if headers["user-agent"].Val != "MyCustomAgent/1.0" {
+		t.Fatalf("config-provided user-agent = %q, want %q", headers["user-agent"].Val, "MyCustomAgent/1.0")
 	}
-	if headers["authorization"] != "Bearer custom" {
-		t.Fatalf("config-provided authorization = %q, want Bearer custom", headers["authorization"])
+	if headers["authorization"].Val != "Bearer custom" {
+		t.Fatalf("config-provided authorization = %q, want Bearer custom", headers["authorization"].Val)
 	}
 }
 
@@ -134,12 +134,12 @@ func TestBuildHeadersContextOverrides(t *testing.T) {
 		"x-opencode-project": {"ctx-project-abc"},
 	})
 
-	headers := BuildHeaders(ctx, map[string]string{"x-opencode-session": "config-session"}, false)
-	if headers["x-opencode-session"] != "ctx-session-123" {
-		t.Fatalf("context-provided x-opencode-session = %q, want %q (context must win)", headers["x-opencode-session"], "ctx-session-123")
+	headers := BuildHeaders(ctx, map[string]schemas.SecretVar{"x-opencode-session": *schemas.NewSecretVar("config-session")}, false)
+	if headers["x-opencode-session"].Val != "ctx-session-123" {
+		t.Fatalf("context-provided x-opencode-session = %q, want %q (context must win)", headers["x-opencode-session"].Val, "ctx-session-123")
 	}
-	if headers["x-opencode-project"] != "ctx-project-abc" {
-		t.Fatalf("context-provided x-opencode-project = %q, want ctx-project-abc", headers["x-opencode-project"])
+	if headers["x-opencode-project"].Val != "ctx-project-abc" {
+		t.Fatalf("context-provided x-opencode-project = %q, want ctx-project-abc", headers["x-opencode-project"].Val)
 	}
 }
 
@@ -151,7 +151,7 @@ func TestResolveSessionIDAcceptsAffinityAliases(t *testing.T) {
 	if sid := ResolveSessionID(ctx, nil); sid != "alias-session" {
 		t.Fatalf("ResolveSessionID = %q, want alias-session", sid)
 	}
-	if pid := ResolveProjectID(nil, map[string]string{"X-Project": "proj-1"}); pid != "proj-1" {
+	if pid := ResolveProjectID(nil, map[string]schemas.SecretVar{"X-Project": *schemas.NewSecretVar("proj-1")}); pid != "proj-1" {
 		t.Fatalf("ResolveProjectID = %q, want proj-1", pid)
 	}
 }

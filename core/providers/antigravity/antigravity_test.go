@@ -832,7 +832,7 @@ func TestAntigravityProvider_ChatCompletion_UserAgentPrecedence(t *testing.T) {
 	config := &schemas.ProviderConfig{
 		NetworkConfig: schemas.NetworkConfig{
 			BaseURL:      server.URL,
-			ExtraHeaders: map[string]string{"User-Agent": "my-custom-ua/2.0"},
+			ExtraHeaders: map[string]schemas.SecretVar{"User-Agent": *schemas.NewSecretVar("my-custom-ua/2.0")},
 		},
 	}
 	provider, err := NewAntigravityProvider(config, nil)

@@ -13,7 +13,7 @@ import (
 
 // geminiChatStream streams one chat-shaped request over the Google
 // Generative Language path.
-func (p *opencodeZenFreeProvider) geminiChatStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), request *schemas.BifrostChatRequest, extraHeaders map[string]string) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+func (p *opencodeZenFreeProvider) geminiChatStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), request *schemas.BifrostChatRequest, extraHeaders map[string]schemas.SecretVar) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
 	genReq, err := gemini.ToGeminiChatCompletionRequest(ctx, request)
 	if err != nil {
 		return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderRequestMarshal, err)
@@ -46,7 +46,7 @@ func (p *opencodeZenFreeProvider) geminiChatStream(ctx *schemas.BifrostContext, 
 
 // geminiResponsesStream streams one responses-shaped request over the Google
 // Generative Language path.
-func (p *opencodeZenFreeProvider) geminiResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), request *schemas.BifrostResponsesRequest, extraHeaders map[string]string) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
+func (p *opencodeZenFreeProvider) geminiResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), request *schemas.BifrostResponsesRequest, extraHeaders map[string]schemas.SecretVar) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
 	genReq, err := gemini.ToGeminiResponsesRequest(ctx, request)
 	if err != nil {
 		return nil, providerUtils.NewBifrostOperationError(schemas.ErrProviderRequestMarshal, err)
@@ -97,19 +97,19 @@ func marshalGeminiBody(body providerUtils.RequestBodyWithExtraParams) ([]byte, *
 
 // doGeminiChatUnary sends one unary Gemini attempt for a chat-shaped request
 // via stream fan-in (same stream:true forcing as the other endpoints).
-func (p *opencodeZenFreeProvider) doGeminiChatUnary(ctx *schemas.BifrostContext, request *schemas.BifrostChatRequest, extraHeaders map[string]string) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
+func (p *opencodeZenFreeProvider) doGeminiChatUnary(ctx *schemas.BifrostContext, request *schemas.BifrostChatRequest, extraHeaders map[string]schemas.SecretVar) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
 	return p.geminiStreamUnary(ctx, request, extraHeaders)
 }
 
 // doGeminiResponsesUnary sends one unary Gemini attempt for a
 // responses-shaped request via stream fan-in.
-func (p *opencodeZenFreeProvider) doGeminiResponsesUnary(ctx *schemas.BifrostContext, request *schemas.BifrostResponsesRequest, extraHeaders map[string]string) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
+func (p *opencodeZenFreeProvider) doGeminiResponsesUnary(ctx *schemas.BifrostContext, request *schemas.BifrostResponsesRequest, extraHeaders map[string]schemas.SecretVar) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
 	return p.geminiStreamResponsesUnary(ctx, request, extraHeaders)
 }
 
 // geminiStreamUnary drains one Gemini streaming attempt into a unary chat
 // response for stream:true forcing on the Gemini path.
-func (p *opencodeZenFreeProvider) geminiStreamUnary(ctx *schemas.BifrostContext, request *schemas.BifrostChatRequest, extraHeaders map[string]string) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
+func (p *opencodeZenFreeProvider) geminiStreamUnary(ctx *schemas.BifrostContext, request *schemas.BifrostChatRequest, extraHeaders map[string]schemas.SecretVar) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
 	stream, bifrostErr := p.geminiChatStream(ctx, identityPostHookRunner, nil, request, extraHeaders)
 	if bifrostErr != nil {
 		return nil, bifrostErr
@@ -119,7 +119,7 @@ func (p *opencodeZenFreeProvider) geminiStreamUnary(ctx *schemas.BifrostContext,
 
 // geminiStreamResponsesUnary drains one Gemini streaming attempt into a unary
 // responses response for stream:true forcing on the Gemini path.
-func (p *opencodeZenFreeProvider) geminiStreamResponsesUnary(ctx *schemas.BifrostContext, request *schemas.BifrostResponsesRequest, extraHeaders map[string]string) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
+func (p *opencodeZenFreeProvider) geminiStreamResponsesUnary(ctx *schemas.BifrostContext, request *schemas.BifrostResponsesRequest, extraHeaders map[string]schemas.SecretVar) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
 	stream, bifrostErr := p.geminiResponsesStream(ctx, identityPostHookRunner, nil, request, extraHeaders)
 	if bifrostErr != nil {
 		return nil, bifrostErr

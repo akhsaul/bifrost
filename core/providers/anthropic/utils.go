@@ -137,6 +137,14 @@ func ProviderRequiresSyntheticStructuredOutput(provider schemas.ModelProvider) b
 // matching ValidateToolsForProvider. The per-type gating mirrors
 // ValidateToolsForProvider exactly — only the control flow differs (partition
 // instead of erroring).
+// SupportsToolSearch reports whether provider serves the Claude model with
+// Anthropic's tool search, the same gate ValidateResponsesToolsForProvider applies
+// to a tool_search tool.
+func SupportsToolSearch(provider schemas.ModelProvider, model string) bool {
+	features, ok := ProviderFeatures[provider]
+	return ok && schemas.ResolveModelCaps(provider, model).SupportsToolSearch(features.ToolSearch)
+}
+
 func ValidateResponsesToolsForProvider(tools []schemas.ResponsesTool, caps schemas.ModelCaps) (keep []schemas.ResponsesTool, dropped []string) {
 	features, ok := ProviderFeatures[caps.Provider()]
 	if !ok {
@@ -155,6 +163,9 @@ func ValidateResponsesToolsForProvider(tools []schemas.ResponsesTool, caps schem
 			supported = caps.SupportsCodeExecution(features.CodeExecution || features.CodeExecNova)
 		case schemas.ResponsesToolTypeComputerUsePreview:
 			supported = features.ComputerUse
+		case schemas.ResponsesToolTypeComputer:
+			supported = features.ComputerUse &&
+				(ComputerUseGeneration(caps) == ComputerUseGenToolset20260801 || AcceptsComputerToolset(caps))
 		case schemas.ResponsesToolTypeMCP:
 			supported = caps.SupportsMCP(features.MCP)
 		case schemas.ResponsesToolTypeLocalShell:
@@ -220,7 +231,21 @@ var (
 	cacheControlScopeKeyToken = []byte(`"scope"`)
 	// fallbackBlockTypeToken is how the server-side fallback block type value is spelled.
 	fallbackBlockTypeToken = []byte(`"` + string(AnthropicContentBlockTypeFallback) + `"`)
+	// toolAdditionTypeToken and toolRemovalTypeToken are the tail of the tool-change block type
+	// values through the closing quote. They skip the leading "tool": a needle starting on '_'
+	// scans ~2.7x faster than one starting on '"', which is on nearly every JSON byte pair.
+	toolAdditionTypeToken = []byte(`_addition"`)
+	toolRemovalTypeToken  = []byte(`_removal"`)
 )
+
+// mayCarryToolChangeBlocks is a conservative byte prefilter for tool_addition / tool_removal
+// blocks, in a message's content or in a compaction block's tool_changes. A body with neither
+// token has nothing to strip and skips the message walk; a body that matches by coincidence
+// (any string ending in "_addition") just falls through to the walk. A type spelled with a
+// unicode escape for the underscore is not matched and reaches the provider as sent.
+func mayCarryToolChangeBlocks(jsonBody []byte) bool {
+	return bytes.Contains(jsonBody, toolAdditionTypeToken) || bytes.Contains(jsonBody, toolRemovalTypeToken)
+}
 
 // mayCarryPerMessageOutputConfig is a conservative byte prefilter for messages[].output_config.
 // A JSON key is written with unescaped quotes, and inside a string value those quotes are
@@ -316,6 +341,21 @@ func stripUnsupportedAnthropicFields(req *AnthropicMessageRequest, provider sche
 			req.OutputConfig = nil
 		}
 	}
+	// Pre-adaptive Claude (Haiku 4.5, Sonnet 4.5, Opus 4.5) 400s on adaptive thinking; rewrite to extended thinking.
+	// Runs before the effort strip below, which removes the effort the budget is derived from.
+	if req.Thinking != nil && req.Thinking.Type == "adaptive" && schemas.IsAnthropicModel(caps.Model()) &&
+		!caps.SupportsAdaptiveThinking(DefaultSupportsAdaptiveThinking(caps.Model())) {
+		var effort *string
+		if req.OutputConfig != nil {
+			effort = req.OutputConfig.Effort
+		}
+		if budget, ok := fitThinkingBudget(req.Thinking.BudgetTokens, effort, req.MaxTokens); ok {
+			req.Thinking.Type = "enabled"
+			req.Thinking.BudgetTokens = &budget
+		} else {
+			req.Thinking = nil
+		}
+	}
 	// output_config.effort — model-gated per
 	// https://platform.claude.com/docs/en/build-with-claude/effort. Models
 	// outside the supported set return: "This model does not support the
@@ -325,6 +365,10 @@ func stripUnsupportedAnthropicFields(req *AnthropicMessageRequest, provider sche
 		if req.OutputConfig.Format == nil && req.OutputConfig.TaskBudget == nil {
 			req.OutputConfig = nil
 		}
+	}
+	// A kept effort snaps onto the model's ladder (xhigh/max on Opus 4.5, xhigh on 4.6 400 otherwise).
+	if req.OutputConfig != nil && req.OutputConfig.Effort != nil && schemas.IsAnthropicModel(caps.Model()) {
+		req.OutputConfig.Effort = new(caps.NormalizeReasoningEffort(*req.OutputConfig.Effort, DefaultEffortControl(caps.Model())))
 	}
 	// thinking.type — model-gated. Adaptive-only models (Opus 4.7+, Sonnet 5+,
 	// Fable/Mythos) removed extended thinking and reject the legacy shape with:
@@ -376,6 +420,12 @@ func stripUnsupportedAnthropicFields(req *AnthropicMessageRequest, provider sche
 			req.Thinking.Type = "adaptive"
 			req.Thinking.BudgetTokens = nil
 		}
+	}
+	// thinking.display:"updates" is a beta value, taken per model. Where it is not taken it 400s like an
+	// unknown value ("Input should be 'summarized', 'omitted'"), so it degrades to "omitted", the nearest one.
+	if req.Thinking != nil && req.Thinking.Display != nil && *req.Thinking.Display == AnthropicThinkingDisplayUpdates &&
+		!SupportsThinkingDisplayUpdates(caps) {
+		req.Thinking.Display = new("omitted")
 	}
 	if req.InferenceGeo != nil && !caps.SupportsInferenceGeo(features.InferenceGeo) {
 		req.InferenceGeo = nil
@@ -705,6 +755,77 @@ func StripUnsupportedFieldsFromRawBody(jsonBody []byte, provider schemas.ModelPr
 		}
 	}
 
+	// tool_addition / tool_removal blocks — mid-conversation tool changes (beta
+	// mid-conversation-tool-changes). Claude Code sends them in role:"system" messages, and a
+	// surface without the beta rejects the unknown content block (Vertex: "Input tag
+	// 'tool_addition' found using 'type' does not match any of the expected tags"). They are
+	// removed, as is a replayed compaction block's tool_changes; the text next to them stays,
+	// and a message left with no content is dropped whole rather than sent empty.
+	//
+	// The typed path needs no twin: inlineMidConversationSystem keeps only the text blocks.
+	if !features.MidConvToolChanges && mayCarryToolChangeBlocks(jsonBody) {
+		if msgs := providerUtils.GetJSONField(jsonBody, "messages"); msgs.IsArray() {
+			type edit struct {
+				index   int
+				content []byte // rewritten content array; nil drops the message
+			}
+			var edits []edit
+			mi := -1
+			msgs.ForEach(func(_, msg gjson.Result) bool {
+				mi++
+				content := msg.Get("content")
+				if !content.IsArray() {
+					return true
+				}
+				changed := false
+				var kept []string
+				content.ForEach(func(_, block gjson.Result) bool {
+					blockType := AnthropicContentBlockType(block.Get("type").String())
+					if isToolChangeBlock(blockType) {
+						changed = true
+						return true
+					}
+					raw := block.Raw
+					if blockType == AnthropicContentBlockTypeCompaction && block.Get("tool_changes").Exists() {
+						var delErr error
+						if raw, delErr = sjson.Delete(raw, "tool_changes"); delErr != nil {
+							err = delErr
+							return false
+						}
+						changed = true
+					}
+					kept = append(kept, raw)
+					return true
+				})
+				if err != nil {
+					return false
+				}
+				if changed {
+					e := edit{index: mi}
+					if len(kept) > 0 {
+						e.content = []byte("[" + strings.Join(kept, ",") + "]")
+					}
+					edits = append(edits, e)
+				}
+				return true
+			})
+			if err != nil {
+				return nil, fmt.Errorf("strip raw tool-change blocks: %w", err)
+			}
+			// Last first: dropping a whole message shifts every later index.
+			for j := len(edits) - 1; j >= 0; j-- {
+				if edits[j].content == nil {
+					jsonBody, err = providerUtils.DeleteJSONField(jsonBody, fmt.Sprintf("messages.%d", edits[j].index))
+				} else {
+					jsonBody, err = sjson.SetRawBytes(jsonBody, fmt.Sprintf("messages.%d.content", edits[j].index), edits[j].content)
+				}
+				if err != nil {
+					return nil, fmt.Errorf("strip raw tool-change blocks: %w", err)
+				}
+			}
+		}
+	}
+
 	// mcp_servers
 	if !caps.SupportsMCP(features.MCP) && providerUtils.JSONFieldExists(jsonBody, "mcp_servers") {
 		jsonBody, err = providerUtils.DeleteJSONField(jsonBody, "mcp_servers")
@@ -768,6 +889,38 @@ func StripUnsupportedFieldsFromRawBody(jsonBody []byte, provider schemas.ModelPr
 		}
 	}
 
+	// thinking.type:"adaptive" on pre-adaptive Claude — mirrors the typed path, before the effort strip below.
+	if providerUtils.GetJSONField(jsonBody, "thinking.type").String() == "adaptive" && schemas.IsAnthropicModel(caps.Model()) &&
+		!caps.SupportsAdaptiveThinking(DefaultSupportsAdaptiveThinking(caps.Model())) {
+		var budget *int
+		if b := providerUtils.GetJSONField(jsonBody, "thinking.budget_tokens"); b.Exists() {
+			budget = new(int(b.Int()))
+		}
+		var effort *string
+		if e := providerUtils.GetJSONField(jsonBody, "output_config.effort"); e.Exists() {
+			effort = new(e.String())
+		}
+		maxTokens := providerUtils.GetMaxOutputTokensOrDefault(provider, caps.Model(), AnthropicDefaultMaxTokens)
+		if m := providerUtils.GetJSONField(jsonBody, "max_tokens"); m.Exists() {
+			maxTokens = int(m.Int())
+		}
+		if b, ok := fitThinkingBudget(budget, effort, maxTokens); ok {
+			jsonBody, err = providerUtils.SetJSONField(jsonBody, "thinking.type", "enabled")
+			if err != nil {
+				return nil, fmt.Errorf("rewrite raw thinking.type to enabled: %w", err)
+			}
+			jsonBody, err = providerUtils.SetJSONField(jsonBody, "thinking.budget_tokens", b)
+			if err != nil {
+				return nil, fmt.Errorf("set raw thinking.budget_tokens: %w", err)
+			}
+		} else {
+			jsonBody, err = providerUtils.DeleteJSONField(jsonBody, "thinking")
+			if err != nil {
+				return nil, fmt.Errorf("strip raw thinking: %w", err)
+			}
+		}
+	}
+
 	// output_config.effort — model-gated per
 	// https://platform.claude.com/docs/en/build-with-claude/effort.
 	// Mirrors the typed path; same cleanup of an empty parent.
@@ -784,6 +937,15 @@ func StripUnsupportedFieldsFromRawBody(jsonBody []byte, provider schemas.ModelPr
 			}
 		}
 	}
+	// A kept effort snaps onto the model's ladder — mirrors the typed path.
+	if e := providerUtils.GetJSONField(jsonBody, "output_config.effort"); e.Exists() && schemas.IsAnthropicModel(caps.Model()) {
+		if normalized := caps.NormalizeReasoningEffort(e.String(), DefaultEffortControl(caps.Model())); normalized != e.String() {
+			jsonBody, err = providerUtils.SetJSONField(jsonBody, "output_config.effort", normalized)
+			if err != nil {
+				return nil, fmt.Errorf("normalize raw output_config.effort: %w", err)
+			}
+		}
+	}
 
 	// thinking.type — model-gated. Mirrors the typed path in
 	// stripUnsupportedAnthropicFields; see there for why the legacy
@@ -792,7 +954,17 @@ func StripUnsupportedFieldsFromRawBody(jsonBody []byte, provider schemas.ModelPr
 	if caps.AdaptiveOnlyThinking(DefaultAdaptiveOnlyThinking(model)) {
 		// See the typed path for why this is gated on RejectsEnabledThinking
 		// rather than the enclosing predicate (Mythos Preview keeps "enabled").
-		if RejectsEnabledThinking(caps) &&
+		//
+		// PreservesCallerRequestSurface models are exempt one step further: the
+		// rewrite is driven by a family inference, and the caller is entitled to
+		// the provider's own answer to the request they actually sent. Unlike
+		// the typed strip, this helper is reached only with a body that already
+		// IS a native Anthropic Messages request (the raw/passthrough path and
+		// Vertex's publisher endpoint), so the model predicate alone is the same
+		// scope the typed path gets from its ingress witness -- and the point of
+		// exempting both together is that the raw and typed paths must agree
+		// about what the caller asked for.
+		if RejectsEnabledThinking(caps) && !PreservesCallerRequestSurface(model) &&
 			providerUtils.GetJSONField(jsonBody, "thinking.type").String() == "enabled" {
 			jsonBody, err = providerUtils.SetJSONField(jsonBody, "thinking.type", "adaptive")
 			if err != nil {
@@ -838,6 +1010,14 @@ func StripUnsupportedFieldsFromRawBody(jsonBody []byte, provider schemas.ModelPr
 					return nil, fmt.Errorf("strip raw thinking.budget_tokens: %w", err)
 				}
 			}
+		}
+	}
+
+	// thinking.display:"updates" — mirrors the typed path's downgrade.
+	if !SupportsThinkingDisplayUpdates(caps) && providerUtils.GetJSONField(jsonBody, "thinking.display").String() == AnthropicThinkingDisplayUpdates {
+		jsonBody, err = providerUtils.SetJSONField(jsonBody, "thinking.display", "omitted")
+		if err != nil {
+			return nil, fmt.Errorf("rewrite raw thinking.display to omitted: %w", err)
 		}
 	}
 
@@ -1356,6 +1536,62 @@ func DefaultSupportsAdaptiveThinking(model string) bool {
 	return strings.Contains(m, "opus") || strings.Contains(m, "sonnet")
 }
 
+// DefaultEffortControl: the output_config.effort ladder per family, for rows that publish none.
+// Opus 4.5 takes low/medium/high, Opus/Sonnet 4.6 add max, Opus 4.7+/Sonnet 5+/Fable add xhigh.
+func DefaultEffortControl(model string) *schemas.EffortControl {
+	levels := []string{schemas.ReasoningEffortLow, schemas.ReasoningEffortMedium, schemas.ReasoningEffortHigh}
+	switch {
+	case IsOpus47Plus(model) || IsSonnet5Plus(model) || IsFableFamily(model):
+		levels = append(levels, schemas.ReasoningEffortXHigh, schemas.ReasoningEffortMax)
+	case DefaultSupportsAdaptiveThinking(model):
+		levels = append(levels, schemas.ReasoningEffortMax)
+	}
+	return &schemas.EffortControl{Levels: levels}
+}
+
+// fitThinkingBudget returns an enabled-thinking budget_tokens valid under maxTokens:
+// the caller's budget if it fits [1024, maxTokens), else one from effort (default "high"); false when maxTokens leaves no room.
+func fitThinkingBudget(budget *int, effort *string, maxTokens int) (int, bool) {
+	if budget != nil && *budget >= MinimumReasoningMaxTokens && *budget < maxTokens {
+		return *budget, true
+	}
+	if maxTokens <= MinimumReasoningMaxTokens {
+		return 0, false
+	}
+	level := "high"
+	if effort != nil {
+		level = MapBifrostEffortToAnthropic(*effort)
+	}
+	b, err := providerUtils.GetBudgetTokensFromReasoningEffort(level, MinimumReasoningMaxTokens, maxTokens)
+	return b, err == nil
+}
+
+// fitRawThinkingBudget refits an enabled thinking budget that a just-clamped max_tokens no longer covers.
+func fitRawThinkingBudget(jsonBody []byte, maxTokens int) ([]byte, error) {
+	if providerUtils.GetJSONField(jsonBody, "thinking.type").String() != "enabled" {
+		return jsonBody, nil
+	}
+	b := providerUtils.GetJSONField(jsonBody, "thinking.budget_tokens")
+	if !b.Exists() || b.Int() < int64(maxTokens) {
+		return jsonBody, nil
+	}
+	var effort *string
+	if e := providerUtils.GetJSONField(jsonBody, "output_config.effort"); e.Exists() {
+		effort = new(e.String())
+	}
+	fitted, ok := fitThinkingBudget(nil, effort, maxTokens)
+	if !ok {
+		// The lowered max_tokens leaves no room for any budget, so there is no
+		// valid "enabled" object to send. Leaving the caller's budget in place
+		// forwards one the provider rejects -- and this is reached only when the
+		// clamp above actually LOWERED max_tokens, so the invalid pair is ours,
+		// not the caller's. Dropping thinking is what the typed restore does and
+		// what stripUnsupportedAnthropicFields does for the pre-adaptive family.
+		return providerUtils.DeleteJSONField(jsonBody, "thinking")
+	}
+	return providerUtils.SetJSONField(jsonBody, "thinking.budget_tokens", fitted)
+}
+
 // DefaultAdaptiveOnlyThinking: models where budget_tokens thinking is removed
 // and temperature/top_p/top_k are rejected — adaptive is the only thinking mode.
 func DefaultAdaptiveOnlyThinking(model string) bool {
@@ -1369,11 +1605,56 @@ func DefaultCanDisableReasoning(model string) bool {
 	return !IsFableFamily(model) && !schemas.IsOpus55Plus(model) && !IsSonnet55Plus(model)
 }
 
+// DefaultSupportsThinkingDisplayUpdates: the adaptive-only generation takes thinking.display:"updates"
+// with its beta on every surface that ships it, and is where it does anything (only those models
+// write progress updates). Bedrock rejects it on Opus 4.6 and the 4.5 generation even with the beta,
+// and on the models that write no updates it returns what "omitted" does.
+func DefaultSupportsThinkingDisplayUpdates(model string) bool {
+	return DefaultAdaptiveOnlyThinking(model)
+}
+
+// SupportsThinkingDisplayUpdates reports whether thinking.display:"updates" may be sent for the
+// (provider, model) pair. The datasheet's supports_thinking_display_updates wins when set, so a
+// model or surface can be enabled without a release; without a row it needs the surface to ship
+// the beta (ProviderFeatures.ThinkingDisplayUpdates) and a model that takes it.
+func SupportsThinkingDisplayUpdates(caps schemas.ModelCaps) bool {
+	return caps.SupportsThinkingDisplayUpdates(
+		ProviderFeatures[caps.Provider()].ThinkingDisplayUpdates &&
+			DefaultSupportsThinkingDisplayUpdates(caps.Model()))
+}
+
 // DefaultSupportsBetweenToolsThinking: Sonnet 5.5 accepts thinking:{type:"between_tools"}
 // as its lowest setting (it rejects "disabled").
 //
 // Source: https://platform.claude.com/docs/en/build-with-claude/thinking
 func DefaultSupportsBetweenToolsThinking(model string) bool {
+	return IsSonnet55Plus(model)
+}
+
+// PreservesCallerRequestSurface reports whether this provider forwards the
+// caller's reasoning and sampling surface verbatim instead of rewriting it into
+// the shape a model-family substring predicate infers.
+//
+// The family predicates above are inferences from published request surfaces,
+// and where they fire the converter substitutes a different configuration than
+// the caller sent: AdaptiveOnlyThinking rewrites
+// thinking:{"type":"enabled",budget_tokens:N} to adaptive and discards the
+// budget, and drops temperature / top_p / top_k outright. For a model whose
+// surface this build has not characterised, an inference is not a good enough
+// reason to answer a different request: the caller's own values are forwarded
+// and the PROVIDER's typed answer is what the caller sees. That is also what
+// the raw/passthrough path already does for all three sampling parameters, so
+// preserving them removes a divergence where one client got a silent 200 and
+// another got the provider's 400 for the same body.
+//
+// Deliberately narrow: Sonnet 5.5 only, so every older model keeps the existing
+// behaviour byte for byte. This predicate answers only the model question;
+// narrowing to a NATIVE Anthropic Messages request is the caller's job, and
+// both callers do it -- the typed egress requires a recorded
+// anthropicNativeRequestSurface, and StripUnsupportedFieldsFromRawBody is only
+// ever reached with a body that already is one. So an OpenAI-shaped inbound
+// dialect routed to this same model is unaffected either way.
+func PreservesCallerRequestSurface(model string) bool {
 	return IsSonnet55Plus(model)
 }
 
@@ -1888,6 +2169,14 @@ type anthropicMessageBetaSignals struct {
 	scopedCacheControl bool
 	// fileSource: some content block has a source of type "file" (Files API).
 	fileSource bool
+	// midConversationToolChanges: some block is a tool_addition / tool_removal (mid-conversation tool changes).
+	midConversationToolChanges bool
+	// inlineToolDefinition: some tool_addition (or compaction tool_changes entry) defines its tool by value.
+	inlineToolDefinition bool
+	// inlineMCPToolset: some by-value definition is an mcp_toolset (needs the MCP client beta).
+	inlineMCPToolset bool
+	// inlineDefinitions: every tool defined by value, so it gets the same per-tool betas as tools[].
+	inlineDefinitions []*AnthropicTool
 
 	// --- derived from messages[] themselves ---
 
@@ -1895,42 +2184,102 @@ type anthropicMessageBetaSignals struct {
 	midConversationOutputConfig bool
 }
 
-// complete reports whether every signal is already set, so a scan can stop early.
-func (s anthropicMessageBetaSignals) complete() bool {
-	return s.blocksDone() && s.midConversationOutputConfig
+// The scans never stop early: every tool defined by value has to be collected, because each
+// one may need beta headers of its own (a strict tool, a deferred tool, an mcp_toolset).
+
+// noteToolChangeBlock records the tool-change signals a decoded block carries: a
+// tool_addition / tool_removal block itself (or a compaction tool_changes entry, which has
+// the same shape and the same beta needs on replay), and every tool defined by value.
+func (s *anthropicMessageBetaSignals) noteToolChangeBlock(block *AnthropicContentBlock) {
+	if isToolChangeBlock(block.Type) {
+		s.midConversationToolChanges = true
+		if block.Tool != nil {
+			s.noteToolChangeTarget(block.Tool)
+		}
+	}
+	for i := range block.ToolChanges {
+		change := &block.ToolChanges[i]
+		if isToolChangeBlock(change.Type) {
+			s.midConversationToolChanges = true
+		}
+		if change.Tool != nil {
+			s.noteToolChangeTarget(change.Tool)
+		}
+	}
 }
 
-// blocksDone reports whether both block-level signals are set, so content blocks need no
-// further scanning even while the message-level effort signal is still being looked for.
-func (s anthropicMessageBetaSignals) blocksDone() bool {
-	return s.scopedCacheControl && s.fileSource
+// noteToolChangeTarget records a by-value definition on one tool_addition target.
+func (s *anthropicMessageBetaSignals) noteToolChangeTarget(target *AnthropicToolChangeTarget) {
+	if target.Type != AnthropicToolChangeTargetTypeToolDefinition {
+		return
+	}
+	s.inlineToolDefinition = true
+	if target.Definition == nil {
+		return
+	}
+	if target.Definition.MCPToolset != nil {
+		s.inlineMCPToolset = true
+	}
+	s.inlineDefinitions = append(s.inlineDefinitions, target.Definition)
+}
+
+// noteRawToolChangeBlock is noteToolChangeBlock over the raw JSON block.
+func (s *anthropicMessageBetaSignals) noteRawToolChangeBlock(block gjson.Result) {
+	if isToolChangeBlock(AnthropicContentBlockType(block.Get("type").String())) {
+		s.midConversationToolChanges = true
+		s.noteRawToolChangeTarget(block.Get("tool"))
+	}
+	if changes := block.Get("tool_changes"); changes.IsArray() {
+		changes.ForEach(func(_, change gjson.Result) bool {
+			if isToolChangeBlock(AnthropicContentBlockType(change.Get("type").String())) {
+				s.midConversationToolChanges = true
+			}
+			s.noteRawToolChangeTarget(change.Get("tool"))
+			return true
+		})
+	}
+}
+
+// noteRawToolChangeTarget is noteToolChangeTarget over the raw `tool` object. The definition
+// is the one sub-object worth decoding: it is a single tools[] entry, not conversation bulk.
+func (s *anthropicMessageBetaSignals) noteRawToolChangeTarget(target gjson.Result) {
+	if target.Get("type").String() != AnthropicToolChangeTargetTypeToolDefinition {
+		return
+	}
+	s.inlineToolDefinition = true
+	definition := target.Get("definition")
+	if !definition.IsObject() {
+		return
+	}
+	var tool AnthropicTool
+	if err := schemas.Unmarshal([]byte(definition.Raw), &tool); err != nil {
+		return
+	}
+	if tool.MCPToolset != nil {
+		s.inlineMCPToolset = true
+	}
+	s.inlineDefinitions = append(s.inlineDefinitions, &tool)
 }
 
 // scanMessagesForBetaSignals derives the signals from decoded messages.
 func scanMessagesForBetaSignals(messages []AnthropicMessage) anthropicMessageBetaSignals {
 	var signals anthropicMessageBetaSignals
 	for _, message := range messages {
-		if signals.complete() {
-			return signals
-		}
 		if message.OutputConfig != nil && message.OutputConfig.Effort != nil {
 			signals.midConversationOutputConfig = true
 		}
-		// Block scanning stops once both block-level signals are known; only the
-		// message-level effort check keeps walking the (potentially huge) array.
-		if signals.blocksDone() || message.Content.ContentBlocks == nil {
+		if message.Content.ContentBlocks == nil {
 			continue
 		}
-		for _, block := range message.Content.ContentBlocks {
+		for i := range message.Content.ContentBlocks {
+			block := &message.Content.ContentBlocks[i]
 			if block.CacheControl != nil && block.CacheControl.Scope != nil {
 				signals.scopedCacheControl = true
 			}
 			if block.Source != nil && block.Source.SourceObj != nil && block.Source.SourceObj.Type == "file" {
 				signals.fileSource = true
 			}
-			if signals.blocksDone() {
-				break
-			}
+			signals.noteToolChangeBlock(block)
 		}
 	}
 	return signals
@@ -1947,18 +2296,12 @@ func scanRawMessagesForBetaSignals(jsonBody []byte) anthropicMessageBetaSignals 
 	}
 	// ForEach walks the array in place; Array() would materialise every element first.
 	messages.ForEach(func(_, message gjson.Result) bool {
-		if signals.complete() {
-			return false
-		}
 		// A message-level sibling of content, so it is read before the content gate below:
 		// the effort-only form carries an empty content array and a string-content system
 		// message may carry it too. Type-checked for the same present-but-null reason as
 		// cache_control.scope.
 		if effort := message.Get("output_config.effort"); effort.Type == gjson.String {
 			signals.midConversationOutputConfig = true
-		}
-		if signals.blocksDone() {
-			return true
 		}
 		content := message.Get("content")
 		if !content.Exists() || !content.IsArray() {
@@ -1975,7 +2318,8 @@ func scanRawMessagesForBetaSignals(jsonBody []byte) anthropicMessageBetaSignals 
 			if block.Get("source.type").String() == "file" {
 				signals.fileSource = true
 			}
-			return !signals.blocksDone()
+			signals.noteRawToolChangeBlock(block)
+			return true
 		})
 		return true
 	})
@@ -2071,6 +2415,89 @@ func AddMissingBetaHeadersToContext(ctx *schemas.BifrostContext, req *AnthropicM
 	return addMissingBetaHeadersToContext(ctx, req, provider, scanMessagesForBetaSignals(req.Messages))
 }
 
+// appendAnthropicToolBetaHeaders adds the beta headers one tool definition requires: dated
+// tool types, strict, defer_loading, input_examples, allowed_callers, eager_input_streaming
+// and a scoped cache_control. It runs over every tools[] entry and over every tool defined
+// by value inside a tool_addition block or a compaction tool_changes entry, so an inline
+// definition gets exactly the headers its tools[] twin would.
+func appendAnthropicToolBetaHeaders(headers []string, tool *AnthropicTool, caps schemas.ModelCaps, features ProviderFeatureSupport, hasProvider bool, hasCachingScope *bool) []string {
+	if tool == nil {
+		return headers
+	}
+	// Check for version-specific beta headers based on tool type
+	if tool.Type != nil {
+		switch *tool.Type {
+		case AnthropicToolTypeComputer20251124:
+			if !hasProvider || features.ComputerUse {
+				headers = appendUniqueHeader(headers, AnthropicComputerUseBetaHeader20251124)
+			}
+		case AnthropicToolTypeComputer20250124:
+			if !hasProvider || features.ComputerUse {
+				headers = appendUniqueHeader(headers, AnthropicComputerUseBetaHeader20250124)
+			}
+		case AnthropicToolTypeAdvisor20260301:
+			if !hasProvider || caps.SupportsAdvisorTool(features.AdvisorTool) {
+				headers = appendUniqueHeader(headers, AnthropicAdvisorBetaHeader)
+			}
+		}
+	}
+	// Check for strict (structured-outputs)
+	if tool.Strict != nil && *tool.Strict {
+		if !hasProvider || features.StructuredOutputs {
+			headers = appendUniqueHeader(headers, AnthropicStructuredOutputsBetaHeader)
+		}
+	}
+	// defer_loading has its own beta (tool-search-tool-2025-10-19) as of
+	// current docs — it's no longer part of the AdvancedToolUse bundle.
+	// allowed_callers is still bundle-only.
+	if tool.DeferLoading != nil && *tool.DeferLoading {
+		if !hasProvider || caps.SupportsToolSearch(features.ToolSearch) {
+			headers = appendUniqueHeader(headers, AnthropicToolSearchBetaHeader)
+		}
+	}
+	if len(tool.InputExamples) > 0 {
+		if !hasProvider || caps.SupportsAdvancedToolUse(features.AdvancedToolUse) {
+			// Bundle header covers input_examples transitively.
+			headers = appendUniqueHeader(headers, AnthropicAdvancedToolUseBetaHeader)
+		} else if caps.SupportsInputExamples(features.InputExamples) {
+			// Narrow standalone header (e.g. Bedrock).
+			headers = appendUniqueHeader(headers, AnthropicToolExamplesBetaHeader)
+		}
+	}
+	if len(tool.AllowedCallers) > 0 {
+		if !hasProvider || caps.SupportsAdvancedToolUse(features.AdvancedToolUse) {
+			headers = appendUniqueHeader(headers, AnthropicAdvancedToolUseBetaHeader)
+		}
+	}
+	// input_examples has both bundle coverage AND a standalone header.
+	// Prefer the bundle header when the provider accepts the bundle
+	// (covers input_examples transitively); fall back to the narrow
+	// standalone header (Bedrock) when only InputExamples is set.
+	if len(tool.InputExamples) > 0 {
+		if !hasProvider || caps.SupportsAdvancedToolUse(features.AdvancedToolUse) {
+			headers = appendUniqueHeader(headers, AnthropicAdvancedToolUseBetaHeader)
+		} else if caps.SupportsInputExamples(features.InputExamples) {
+			headers = appendUniqueHeader(headers, AnthropicToolExamplesBetaHeader)
+		}
+	}
+	// Check for fine-grained tool streaming (eager_input_streaming).
+	// Beta fine-grained-tool-streaming-2025-05-14 — required for
+	// input_json_delta streaming on custom tools.
+	if tool.EagerInputStreaming != nil && *tool.EagerInputStreaming {
+		if !hasProvider || caps.SupportsEagerInputStreaming(features.EagerInputStreaming) {
+			headers = appendUniqueHeader(headers, AnthropicEagerInputStreamingBetaHeader)
+		}
+	}
+	// Check for cache control with scope
+	if !*hasCachingScope && tool.CacheControl != nil && tool.CacheControl.Scope != nil {
+		if !hasProvider || features.PromptCachingScope {
+			headers = appendUniqueHeader(headers, AnthropicPromptCachingScopeBetaHeader)
+			*hasCachingScope = true
+		}
+	}
+	return headers
+}
+
 // addMissingBetaHeadersToContext holds the gating itself. It never touches req.Messages —
 // the caller supplies those signals — so the typed and raw-body entry points above stay
 // in lockstep by construction.
@@ -2082,80 +2509,13 @@ func addMissingBetaHeadersToContext(ctx *schemas.BifrostContext, req *AnthropicM
 		headers = appendUniqueHeader(headers, AnthropicDangerousToolUseBetaHeader)
 	}
 	hasCachingScope := false
-	if req.Tools != nil {
-		for _, tool := range req.Tools {
-			// Check for version-specific beta headers based on tool type
-			if tool.Type != nil {
-				switch *tool.Type {
-				case AnthropicToolTypeComputer20251124:
-					if !hasProvider || features.ComputerUse {
-						headers = appendUniqueHeader(headers, AnthropicComputerUseBetaHeader20251124)
-					}
-				case AnthropicToolTypeComputer20250124:
-					if !hasProvider || features.ComputerUse {
-						headers = appendUniqueHeader(headers, AnthropicComputerUseBetaHeader20250124)
-					}
-				case AnthropicToolTypeAdvisor20260301:
-					if !hasProvider || caps.SupportsAdvisorTool(features.AdvisorTool) {
-						headers = appendUniqueHeader(headers, AnthropicAdvisorBetaHeader)
-					}
-				}
-			}
-			// Check for strict (structured-outputs)
-			if tool.Strict != nil && *tool.Strict {
-				if !hasProvider || features.StructuredOutputs {
-					headers = appendUniqueHeader(headers, AnthropicStructuredOutputsBetaHeader)
-				}
-			}
-			// defer_loading has its own beta (tool-search-tool-2025-10-19) as of
-			// current docs — it's no longer part of the AdvancedToolUse bundle.
-			// allowed_callers is still bundle-only.
-			if tool.DeferLoading != nil && *tool.DeferLoading {
-				if !hasProvider || caps.SupportsToolSearch(features.ToolSearch) {
-					headers = appendUniqueHeader(headers, AnthropicToolSearchBetaHeader)
-				}
-			}
-			if len(tool.InputExamples) > 0 {
-				if !hasProvider || caps.SupportsAdvancedToolUse(features.AdvancedToolUse) {
-					// Bundle header covers input_examples transitively.
-					headers = appendUniqueHeader(headers, AnthropicAdvancedToolUseBetaHeader)
-				} else if caps.SupportsInputExamples(features.InputExamples) {
-					// Narrow standalone header (e.g. Bedrock).
-					headers = appendUniqueHeader(headers, AnthropicToolExamplesBetaHeader)
-				}
-			}
-			if len(tool.AllowedCallers) > 0 {
-				if !hasProvider || caps.SupportsAdvancedToolUse(features.AdvancedToolUse) {
-					headers = appendUniqueHeader(headers, AnthropicAdvancedToolUseBetaHeader)
-				}
-			}
-			// input_examples has both bundle coverage AND a standalone header.
-			// Prefer the bundle header when the provider accepts the bundle
-			// (covers input_examples transitively); fall back to the narrow
-			// standalone header (Bedrock) when only InputExamples is set.
-			if len(tool.InputExamples) > 0 {
-				if !hasProvider || caps.SupportsAdvancedToolUse(features.AdvancedToolUse) {
-					headers = appendUniqueHeader(headers, AnthropicAdvancedToolUseBetaHeader)
-				} else if caps.SupportsInputExamples(features.InputExamples) {
-					headers = appendUniqueHeader(headers, AnthropicToolExamplesBetaHeader)
-				}
-			}
-			// Check for fine-grained tool streaming (eager_input_streaming).
-			// Beta fine-grained-tool-streaming-2025-05-14 — required for
-			// input_json_delta streaming on custom tools.
-			if tool.EagerInputStreaming != nil && *tool.EagerInputStreaming {
-				if !hasProvider || caps.SupportsEagerInputStreaming(features.EagerInputStreaming) {
-					headers = appendUniqueHeader(headers, AnthropicEagerInputStreamingBetaHeader)
-				}
-			}
-			// Check for cache control with scope
-			if !hasCachingScope && tool.CacheControl != nil && tool.CacheControl.Scope != nil {
-				if !hasProvider || features.PromptCachingScope {
-					headers = appendUniqueHeader(headers, AnthropicPromptCachingScopeBetaHeader)
-					hasCachingScope = true
-				}
-			}
-		}
+	for i := range req.Tools {
+		headers = appendAnthropicToolBetaHeaders(headers, &req.Tools[i], caps, features, hasProvider, &hasCachingScope)
+	}
+	// Tools defined by value inside messages (tool_addition blocks, compaction tool_changes)
+	// arrive through the signals, never through req.Messages, which the raw path drops.
+	for _, tool := range signals.inlineDefinitions {
+		headers = appendAnthropicToolBetaHeaders(headers, tool, caps, features, hasProvider, &hasCachingScope)
 	}
 	// Check for cache control with scope at the top level of the request
 	// (mirrors the tool/system/message checks below).
@@ -2180,16 +2540,29 @@ func addMissingBetaHeadersToContext(ctx *schemas.BifrostContext, req *AnthropicM
 			}
 		}
 	}
-	// Check for MCP servers
-	if len(req.MCPServers) > 0 {
+	// Check for MCP servers. One mcp-client-* date only: an mcp_toolset defined by value
+	// needs the inline-tools-era date, which also covers mcp_servers, so it replaces the
+	// regular one instead of being sent alongside it.
+	if len(req.MCPServers) > 0 || signals.inlineMCPToolset {
 		if !hasProvider || caps.SupportsMCP(features.MCP) {
-			headers = appendUniqueHeader(headers, AnthropicMCPClientBetaHeader)
+			mcpBeta := AnthropicMCPClientBetaHeader
+			if signals.inlineMCPToolset {
+				mcpBeta = AnthropicMCPClientInlineToolsBetaHeader
+			}
+			headers = appendUniqueHeader(headers, mcpBeta)
 		}
 	}
 	// Check for interleaved thinking (required for older Claude 4 models with thinking enabled)
 	if req.Thinking != nil && req.Thinking.Type == "enabled" {
 		if !hasProvider || caps.SupportsInterleavedThinking(features.InterleavedThinking) {
 			headers = appendUniqueHeader(headers, AnthropicInterleavedThinkingBetaHeader)
+		}
+	}
+	// thinking.display:"updates" needs its beta; the value means nothing with thinking off.
+	if req.Thinking != nil && (req.Thinking.Type == "adaptive" || req.Thinking.Type == "enabled") &&
+		req.Thinking.Display != nil && *req.Thinking.Display == AnthropicThinkingDisplayUpdates {
+		if !hasProvider || SupportsThinkingDisplayUpdates(caps) {
+			headers = appendUniqueHeader(headers, AnthropicThinkingDisplayUpdatesBetaHeader)
 		}
 	}
 	// Check for fast mode. Only add the beta header when both the provider
@@ -2243,8 +2616,7 @@ func addMissingBetaHeadersToContext(ctx *schemas.BifrostContext, req *AnthropicM
 		}
 	}
 	// Check for fallback credit redemption (fallback_credit_token present). The
-	// canonical date is added here; FilterBetaHeadersForProvider rewrites it to the
-	// AWS date on Bedrock/Mantle.
+	// same date is used on every provider, Bedrock/Mantle included.
 	if req.FallbackCreditToken != nil {
 		if !hasProvider || features.FallbackCredit {
 			headers = appendUniqueHeader(headers, AnthropicFallbackCreditBetaHeader)
@@ -2287,6 +2659,20 @@ func addMissingBetaHeadersToContext(ctx *schemas.BifrostContext, req *AnthropicM
 	if signals.midConversationOutputConfig {
 		if !hasProvider || supportsPerMessageOutputConfig(caps) {
 			headers = appendUniqueHeader(headers, AnthropicMidConversationOutputConfigBetaHeader)
+		}
+	}
+	// Mid-conversation tool changes: tool_addition / tool_removal blocks on a role:"system"
+	// message need the beta, and a by-value tool_definition additionally needs inline-tools
+	// (which also covers the by-reference blocks). Both gate on the same provider feature;
+	// the model gate is enforced upstream (unsupported models 400 on the block itself).
+	if signals.midConversationToolChanges {
+		if !hasProvider || features.MidConvToolChanges {
+			headers = appendUniqueHeader(headers, AnthropicMidConversationToolChangesBetaHeader)
+		}
+	}
+	if signals.inlineToolDefinition {
+		if !hasProvider || features.MidConvToolChanges {
+			headers = appendUniqueHeader(headers, AnthropicInlineToolsBetaHeader)
 		}
 	}
 	if len(headers) == 0 {
@@ -2352,17 +2738,8 @@ var betaHeaderPrefixKnown = []string{
 	AnthropicFallbackCreditBetaHeaderPrefix,
 	AnthropicMidConversationToolChangesBetaHeaderPrefix,
 	AnthropicMidConversationOutputConfigBetaHeaderPrefix,
-}
-
-// betaHeaderProviderVersion rewrites a beta header's version date on providers
-// that ship the same feature under a different date. Keyed by provider, then by
-// the known prefix the token matched. Applied in FilterBetaHeadersForProvider
-// after the support check, so it covers both transports (HTTP header and the
-// body-side anthropic_beta array).
-var betaHeaderProviderVersion = map[schemas.ModelProvider]map[string]string{
-	// AWS-operated surfaces trail the Claude API on fallback credit.
-	schemas.Bedrock:       {AnthropicFallbackCreditBetaHeaderPrefix: AnthropicFallbackCreditBetaHeaderAWS},
-	schemas.BedrockMantle: {AnthropicFallbackCreditBetaHeaderPrefix: AnthropicFallbackCreditBetaHeaderAWS},
+	AnthropicInlineToolsBetaHeaderPrefix,
+	AnthropicThinkingDisplayUpdatesBetaHeaderPrefix,
 }
 
 // stripBifrostFallbacksFromBody removes Bifrost cross-provider fallback entries
@@ -2515,6 +2892,79 @@ func doesWebSearchOrFetchAutoInjectCodeExecution(toolType string) bool {
 
 	// Keeping it for backward compatibility as this always used to be true
 	return true
+}
+
+// resolveAnthropicProgrammaticCaller decides what OpenAI's "programmatic" caller becomes for this request.
+func resolveAnthropicProgrammaticCaller(declaredVersion string, hasCodeExecutionTool bool) (caller string, emitVersion string) {
+	switch AnthropicToolType(declaredVersion) {
+	case AnthropicToolTypeCodeExecution, AnthropicToolTypeCodeExecution20260120, AnthropicToolTypeCodeExecution20260521:
+		return declaredVersion, ""
+	case AnthropicToolTypeCodeExecution20250522:
+		// Legacy Python-only: allowed_callers rejects it, and naming any other version
+		// makes the auto-injected code_execution tool collide with the declared one.
+		return "", ""
+	}
+	if hasCodeExecutionTool {
+		if declaredVersion != "" {
+			return declaredVersion, ""
+		}
+		// A version-less code_interpreter (the OpenAI shape) would default to
+		// code_execution_20250825, which has no programmatic tool calling — emit
+		// 20260120 instead so the caller restriction is reachable.
+		return string(AnthropicToolTypeCodeExecution20260120), string(AnthropicToolTypeCodeExecution20260120)
+	}
+	// No code execution tool declared: Anthropic auto-injects the version named here.
+	return string(AnthropicToolTypeCodeExecution20260120), ""
+}
+
+// anthropicAllowedCallers rewrites OpenAI's "programmatic" caller into Anthropic's
+// versioned vocabulary, dropping it when the request's code execution version has no
+// caller value. Anthropic's own values pass through untouched.
+func anthropicAllowedCallers(callers []string, programmaticCaller string) []string {
+	if len(callers) == 0 {
+		return callers
+	}
+	mapped := make([]string, 0, len(callers))
+	seen := make(map[string]bool, len(callers))
+	for _, caller := range callers {
+		if caller == schemas.ResponsesToolCallerProgrammatic {
+			if programmaticCaller == "" {
+				continue
+			}
+			caller = programmaticCaller
+		}
+		if seen[caller] {
+			continue
+		}
+		seen[caller] = true
+		mapped = append(mapped, caller)
+	}
+	if len(mapped) == 0 {
+		return nil
+	}
+	return mapped
+}
+
+// declaredChatCodeExecutionVersion is declaredCodeExecutionVersion for the Chat
+// shape, where the code execution tool carries its version in Type.
+func declaredChatCodeExecutionVersion(tools []schemas.ChatTool) (string, bool) {
+	for _, tool := range tools {
+		if strings.HasPrefix(string(tool.Type), string(AnthropicToolNameCodeExecution)+"_") {
+			return string(tool.Type), true
+		}
+	}
+	return "", false
+}
+
+// hasProgrammaticCaller reports whether any caller list asks for OpenAI's
+// "programmatic" context, which is the only value needing translation.
+func hasProgrammaticCaller(callers []string) bool {
+	for _, caller := range callers {
+		if caller == schemas.ResponsesToolCallerProgrammatic {
+			return true
+		}
+	}
+	return false
 }
 
 // StripEmptyThinkingBlocks removes thinking content blocks that would be
@@ -2897,11 +3347,13 @@ var betaHeaderPrefixToFeature = map[string]func(ProviderFeatureSupport) bool{
 	// Long key kept in its own group so gofmt doesn't realign the block above.
 	AnthropicMidConversationToolChangesBetaHeaderPrefix:  func(f ProviderFeatureSupport) bool { return f.MidConvToolChanges },
 	AnthropicMidConversationOutputConfigBetaHeaderPrefix: func(f ProviderFeatureSupport) bool { return f.MidConvOutputConfig },
+	AnthropicInlineToolsBetaHeaderPrefix:                 func(f ProviderFeatureSupport) bool { return f.MidConvToolChanges },
+	AnthropicThinkingDisplayUpdatesBetaHeaderPrefix:      func(f ProviderFeatureSupport) bool { return f.ThinkingDisplayUpdates },
 }
 
 // MergeBetaHeaders collects anthropic-beta values from provider ExtraHeaders and
 // per-request context headers, deduplicating them.
-func MergeBetaHeaders(ctx context.Context, providerExtraHeaders map[string]string) []string {
+func MergeBetaHeaders(ctx context.Context, providerExtraHeaders map[string]schemas.SecretVar) []string {
 	seen := make(map[string]bool)
 	var all []string
 	add := func(v string) {
@@ -2913,8 +3365,8 @@ func MergeBetaHeaders(ctx context.Context, providerExtraHeaders map[string]strin
 		}
 	}
 	for k, v := range providerExtraHeaders {
-		if strings.EqualFold(k, AnthropicBetaHeader) && v != "" {
-			add(v)
+		if strings.EqualFold(k, AnthropicBetaHeader) && v.GetValue() != "" {
+			add(v.GetValue())
 		}
 	}
 
@@ -2936,6 +3388,14 @@ func MergeBetaHeaders(ctx context.Context, providerExtraHeaders map[string]strin
 		}
 	}
 	return all
+}
+
+// clampToModelOutputCeiling lowers maxTokens to the target model's max_output_tokens: the datasheet row, else the static Claude table.
+func clampToModelOutputCeiling(caps schemas.ModelCaps, maxTokens int) int {
+	if ceiling := caps.MaxOutputTokens(providerUtils.KnownClaudeMaxOutputTokens(caps.Model())); ceiling > 0 && maxTokens > ceiling {
+		return ceiling
+	}
+	return maxTokens
 }
 
 // FilterBetaHeadersForProvider validates that all beta headers are supported by the given provider.
@@ -3013,11 +3473,6 @@ func FilterBetaHeadersForProvider(headers []string, provider schemas.ModelProvid
 
 			if !supported {
 				continue
-			}
-			if rewrites, ok := betaHeaderProviderVersion[provider]; ok {
-				if replacement, ok := rewrites[matchedPrefix]; ok {
-					token = replacement
-				}
 			}
 			filtered = append(filtered, token)
 		}
@@ -3446,6 +3901,16 @@ func ConvertBifrostFinishReasonToAnthropic(bifrostReason string) AnthropicStopRe
 		return providerReason
 	}
 	return AnthropicStopReason(bifrostReason)
+}
+
+// anthropicStopReasonWithSequence restores Anthropic's stop_sequence stop reason, which
+// Bifrost folds into "stop". Only a matched sequence reported by an Anthropic upstream
+// upgrades end_turn; without one (e.g. an OpenAI-style "stop") end_turn is kept.
+func anthropicStopReasonWithSequence(reason AnthropicStopReason, stopSequence *string) (AnthropicStopReason, *string) {
+	if reason == AnthropicStopReasonEndTurn && stopSequence != nil {
+		return AnthropicStopReasonStopSequence, stopSequence
+	}
+	return reason, nil
 }
 
 // anthropicResponsesStatus derives the Responses status and incomplete_details from a

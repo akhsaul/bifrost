@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ModelMultiselect } from "@/components/ui/modelMultiselect";
+import { ModelSelector } from "@/components/ui/modelSelector";
 import { Label } from "@/components/ui/label";
 import { ModelProvider } from "@/lib/types/config";
 import { RbacOperation, RbacResource, useRbac } from "@enterprise/lib";
@@ -93,14 +93,13 @@ function TestProviderDialog({ provider, isKeyless, children }: { provider: Model
 						<>
 							<div className="flex flex-col gap-2">
 								<Label>Model</Label>
-								<ModelMultiselect
+								<ModelSelector
 									provider={provider.name}
 									value={selectedModel}
 									onChange={(v) => setSelectedModel(v)}
-									isSingleSelect
+									allowCustomModel
 									placeholder="Select or type a model"
 									unfiltered={true}
-									menuPortalTarget={document.body}
 								/>
 							</div>
 							<div className="flex flex-col gap-2">
@@ -177,15 +176,15 @@ export default function ModelProviderConfig({ provider, onRequestDelete }: Props
 				<TooltipTrigger asChild>
 					<Button
 						variant="outline"
-						className="size-9 px-0 xl:h-9 xl:w-auto xl:px-4"
+						className="size-9 px-0 @3xl/card-header:h-9 @3xl/card-header:w-auto @3xl/card-header:px-4"
 						onClick={() => setShowConfigSheet(true)}
 						aria-label={hasUpdateProviderAccess ? "Edit provider configuration" : "View provider configuration"}
 					>
 						<SettingsIcon className="h-4 w-4" />
-						<span className="hidden xl:inline ml-2">{hasUpdateProviderAccess ? "Edit Provider Config" : "View Provider Config"}</span>
+						<span className="hidden @3xl/card-header:inline">{hasUpdateProviderAccess ? "Edit Provider Config" : "View Provider Config"}</span>
 					</Button>
 				</TooltipTrigger>
-				<TooltipContent className="xl:hidden">{hasUpdateProviderAccess ? "Edit Provider Config" : "View Provider Config"}</TooltipContent>
+				<TooltipContent>{hasUpdateProviderAccess ? "Edit Provider Config" : "View Provider Config"}</TooltipContent>
 			</Tooltip>
 		</div>
 	);

@@ -16,7 +16,7 @@ import (
 // wire. Transport-level headers (accept, accept-encoding, connection,
 // content-type, host) are also left out: the request helpers and fasthttp
 // own those.
-func BuildHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[string]string, forCompletions bool) map[string]string {
+func BuildHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[string]schemas.SecretVar, forCompletions bool) map[string]string {
 	headers := map[string]string{
 		"user-agent": DefaultUserAgent,
 	}
@@ -33,7 +33,7 @@ func BuildHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[string]str
 		if strings.EqualFold(k, "authorization") {
 			continue
 		}
-		setHeaderCaseInsensitive(headers, k, v)
+		setHeaderCaseInsensitive(headers, k, v.GetValue())
 	}
 
 	// Per-request context extra headers have the highest priority.
@@ -56,7 +56,7 @@ func BuildHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[string]str
 
 // modelsHeaders builds the headers for GET /models: identity headers plus
 // the x-ai capability flag observed in the live capture.
-func modelsHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[string]string, bearerToken string) map[string]string {
+func modelsHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[string]schemas.SecretVar, bearerToken string) map[string]string {
 	headers := BuildHeaders(ctx, configExtraHeaders, true)
 	headers["x-zed-client-supports-x-ai"] = "true"
 	headers["Authorization"] = "Bearer " + bearerToken

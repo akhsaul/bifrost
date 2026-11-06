@@ -19,7 +19,7 @@ func GenerateTaskID() string {
 // 2. Request body extra params (task_id or x-task-id)
 // 3. Config-level extra headers (network_config.extra_headers)
 // 4. Generated task ID in the native shape
-func ResolveTaskID(ctx *schemas.BifrostContext, configExtraHeaders map[string]string, request *schemas.BifrostChatRequest) string {
+func ResolveTaskID(ctx *schemas.BifrostContext, configExtraHeaders map[string]schemas.SecretVar, request *schemas.BifrostChatRequest) string {
 	if ctx != nil {
 		if ctxHeaders, ok := ctx.Value(schemas.BifrostContextKeyExtraHeaders).(map[string][]string); ok {
 			for k, vs := range ctxHeaders {
@@ -39,8 +39,8 @@ func ResolveTaskID(ctx *schemas.BifrostContext, configExtraHeaders map[string]st
 		}
 	}
 	for k, v := range configExtraHeaders {
-		if strings.EqualFold(k, "x-task-id") && strings.TrimSpace(v) != "" {
-			return v
+		if strings.EqualFold(k, "x-task-id") && strings.TrimSpace(v.GetValue()) != "" {
+			return v.GetValue()
 		}
 	}
 	return GenerateTaskID()
@@ -48,7 +48,7 @@ func ResolveTaskID(ctx *schemas.BifrostContext, configExtraHeaders map[string]st
 
 // setHeaderCaseInsensitive sets a header, replacing any existing key that
 // matches case-insensitively so defaults cannot linger under another casing.
-func setHeaderCaseInsensitive(headers map[string]string, key, value string) {
+func setHeaderCaseInsensitive(headers map[string]schemas.SecretVar, key string, value schemas.SecretVar) {
 	for existingKey := range headers {
 		if strings.EqualFold(existingKey, key) {
 			delete(headers, existingKey)
@@ -67,19 +67,19 @@ func setHeaderCaseInsensitive(headers map[string]string, key, value string) {
 // stale or foreign Authorization value can never leak onto the wire.
 // Transport-level headers (accept, accept-encoding, connection, content-type,
 // host) are also left out: the openai helpers and fasthttp own those.
-func BuildHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[string]string, request *schemas.BifrostChatRequest) map[string]string {
-	headers := map[string]string{
-		"http-referer":       DefaultHTTPReferer,
-		"user-agent":         DefaultUserAgent,
-		"sec-fetch-mode":     "cors",
-		"x-client-type":      DefaultClientType,
-		"x-client-version":   DefaultClientVers,
-		"x-core-version":     DefaultCoreVers,
-		"x-is-multiroot":     DefaultIsMultiroot,
-		"x-platform":         DefaultPlatform,
-		"x-platform-version": DefaultPlatVers,
-		"x-task-id":          ResolveTaskID(ctx, configExtraHeaders, request),
-		"x-title":            DefaultTitle,
+func BuildHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[string]schemas.SecretVar, request *schemas.BifrostChatRequest) map[string]schemas.SecretVar {
+	headers := map[string]schemas.SecretVar{
+		"http-referer":       *schemas.NewSecretVar(DefaultHTTPReferer),
+		"user-agent":         *schemas.NewSecretVar(DefaultUserAgent),
+		"sec-fetch-mode":     *schemas.NewSecretVar("cors"),
+		"x-client-type":      *schemas.NewSecretVar(DefaultClientType),
+		"x-client-version":   *schemas.NewSecretVar(DefaultClientVers),
+		"x-core-version":     *schemas.NewSecretVar(DefaultCoreVers),
+		"x-is-multiroot":     *schemas.NewSecretVar(DefaultIsMultiroot),
+		"x-platform":         *schemas.NewSecretVar(DefaultPlatform),
+		"x-platform-version": *schemas.NewSecretVar(DefaultPlatVers),
+		"x-task-id":          *schemas.NewSecretVar(ResolveTaskID(ctx, configExtraHeaders, request)),
+		"x-title":            *schemas.NewSecretVar(DefaultTitle),
 	}
 
 	// Config-level extra headers override defaults (except authorization,
@@ -102,7 +102,7 @@ func BuildHeaders(ctx *schemas.BifrostContext, configExtraHeaders map[string]str
 				if strings.EqualFold(k, "authorization") || strings.EqualFold(k, "x-task-id") {
 					continue
 				}
-				setHeaderCaseInsensitive(headers, k, vs[0])
+				setHeaderCaseInsensitive(headers, k, *schemas.NewSecretVar(vs[0]))
 			}
 		}
 	}

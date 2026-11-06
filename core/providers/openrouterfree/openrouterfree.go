@@ -71,9 +71,9 @@ func NewProvider(config *schemas.ProviderConfig, logger schemas.Logger) *Provide
 	config.NetworkConfig.BaseURL = strings.TrimRight(config.NetworkConfig.BaseURL, "/")
 
 	// Apply openrouter-free default request headers (user spec).
-	mergedExtraHeaders := make(map[string]string)
+	mergedExtraHeaders := make(map[string]schemas.SecretVar)
 	for k, v := range DefaultHeaders {
-		mergedExtraHeaders[k] = v
+		mergedExtraHeaders[k] = *schemas.NewSecretVar(v)
 	}
 	for k, v := range config.NetworkConfig.ExtraHeaders {
 		mergedExtraHeaders[k] = v
@@ -752,6 +752,11 @@ func (provider *Provider) ContainerFileContent(_ *schemas.BifrostContext, _ []sc
 // ContainerFileDelete is not supported by the OpenRouter provider.
 func (provider *Provider) ContainerFileDelete(_ *schemas.BifrostContext, _ []schemas.Key, _ *schemas.BifrostContainerFileDeleteRequest) (*schemas.BifrostContainerFileDeleteResponse, *schemas.BifrostError) {
 	return nil, providerUtils.NewUnsupportedOperationError(schemas.ContainerFileDeleteRequest, provider.GetProviderKey())
+}
+
+// ModelRetrieve is not supported by the OpenRouter provider.
+func (provider *Provider) ModelRetrieve(_ *schemas.BifrostContext, _ schemas.Key, _ *schemas.BifrostModelRetrieveRequest) (*schemas.BifrostModelRetrieveResponse, *schemas.BifrostError) {
+	return nil, providerUtils.NewUnsupportedOperationError(schemas.ModelRetrieveRequest, provider.GetProviderKey())
 }
 
 // Passthrough is not supported by the OpenRouter provider.

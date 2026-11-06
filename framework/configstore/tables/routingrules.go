@@ -190,6 +190,7 @@ type TableRoutingTarget struct {
 	ProviderKeyName *string `gorm:"-" json:"provider_key_name,omitempty"`                                              // config-only alias; resolved to key_id during load
 	Weight          float64 `gorm:"not null;default:1" json:"weight"`                                                  // probability weight; must sum to 1 across all targets in a rule (weighted/adaptive)
 	Priority        *int    `gorm:"type:integer" json:"priority,omitempty"`                                            // integer rank >= 1 (lower = higher precedence) for the "priority" strategy
+	TTFTTimeoutMs   *int    `gorm:"column:ttft_timeout_ms" json:"ttft_timeout_ms,omitempty"`                           // streaming first-token deadline; nil = off
 }
 
 // TableName for TableRoutingTarget

@@ -41,7 +41,7 @@ func TestResolveSessionIDProviderHeaderNames(t *testing.T) {
 	}
 
 	// Config extra headers are the fallback when ctx has neither session nor header.
-	sid = ResolveSessionID(nil, map[string]string{"X-Custom-Session": "config-session"}, "x-custom-session")
+	sid = ResolveSessionID(nil, map[string]schemas.SecretVar{"X-Custom-Session": *schemas.NewSecretVar("config-session")}, "x-custom-session")
 	if sid == nil || *sid != "config-session" {
 		t.Fatalf("ResolveSessionID = %v, want config-session", sid)
 	}
@@ -51,7 +51,7 @@ func TestResolveSessionIDProviderHeaderNames(t *testing.T) {
 	ctx2.SetValue(schemas.BifrostContextKeyExtraHeaders, map[string][]string{
 		"x-custom-session": {"ctx-wins"},
 	})
-	sid = ResolveSessionID(ctx2, map[string]string{"x-custom-session": "config-loses"}, "x-custom-session")
+	sid = ResolveSessionID(ctx2, map[string]schemas.SecretVar{"x-custom-session": *schemas.NewSecretVar("config-loses")}, "x-custom-session")
 	if sid == nil || *sid != "ctx-wins" {
 		t.Fatalf("ResolveSessionID = %v, want ctx-wins", sid)
 	}
@@ -69,7 +69,7 @@ func TestResolveSessionIDNilWhenAbsent(t *testing.T) {
 	ctx.SetValue(schemas.BifrostContextKeyExtraHeaders, map[string][]string{
 		"x-other": {"something"},
 	})
-	if sid := ResolveSessionID(ctx, map[string]string{"x-another": "else"}, "x-custom-session"); sid != nil {
+	if sid := ResolveSessionID(ctx, map[string]schemas.SecretVar{"x-another": *schemas.NewSecretVar("else")}, "x-custom-session"); sid != nil {
 		t.Fatalf("ResolveSessionID = %v, want nil", *sid)
 	}
 }

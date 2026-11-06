@@ -65,7 +65,7 @@ func geminiHeaders(extraHeaders map[string]string) map[string]string {
 // doResponsesUnary sends one unary /v1/responses attempt, forcing
 // stream:true on the wire (a unary stream:false call fails with a free-tier
 // error live) and accumulating the SSE stream into one responses response.
-func (p *opencodeZenFreeProvider) doResponsesUnary(ctx *schemas.BifrostContext, request *schemas.BifrostResponsesRequest, extraHeaders map[string]string) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
+func (p *opencodeZenFreeProvider) doResponsesUnary(ctx *schemas.BifrostContext, request *schemas.BifrostResponsesRequest, extraHeaders map[string]schemas.SecretVar) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
 	postRequestConverter := func(wireReq *openai.OpenAIResponsesRequest) *openai.OpenAIResponsesRequest {
 		wireReq = preserveOpencodeReasoning(wireReq, request)
 		wireReq = ensureOpencodeReasoningItemSummaries(wireReq)
@@ -103,7 +103,7 @@ func (p *opencodeZenFreeProvider) doResponsesUnary(ctx *schemas.BifrostContext, 
 // stream:true on the wire (the free tier requires it) and accumulating the
 // SSE stream into one chat response. The stream is drained and closed here,
 // so no goroutine or connection outlives the call.
-func (p *opencodeZenFreeProvider) doChatUnary(ctx *schemas.BifrostContext, request *schemas.BifrostChatRequest, extraHeaders map[string]string) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
+func (p *opencodeZenFreeProvider) doChatUnary(ctx *schemas.BifrostContext, request *schemas.BifrostChatRequest, extraHeaders map[string]schemas.SecretVar) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
 	forced, release := forceStreamTrueChat(request)
 	defer release()
 	stream, bifrostErr := openai.HandleOpenAIChatCompletionStreaming(
@@ -135,7 +135,7 @@ func (p *opencodeZenFreeProvider) doChatUnary(ctx *schemas.BifrostContext, reque
 
 // doMessagesChatUnary sends one unary /v1/messages attempt for a chat-shaped
 // request, forcing stream:true on the wire and accumulating the SSE stream.
-func (p *opencodeZenFreeProvider) doMessagesChatUnary(ctx *schemas.BifrostContext, request *schemas.BifrostChatRequest, extraHeaders map[string]string) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
+func (p *opencodeZenFreeProvider) doMessagesChatUnary(ctx *schemas.BifrostContext, request *schemas.BifrostChatRequest, extraHeaders map[string]schemas.SecretVar) (*schemas.BifrostChatResponse, *schemas.BifrostError) {
 	forced, release := forceStreamTrueChat(request)
 	defer release()
 	jsonBody, bifrostErr := anthropic.BuildAnthropicChatRequestBody(ctx, forced, anthropic.AnthropicRequestBuildConfig{
@@ -174,7 +174,7 @@ func (p *opencodeZenFreeProvider) doMessagesChatUnary(ctx *schemas.BifrostContex
 // doMessagesResponsesUnary sends one unary /v1/messages attempt for a
 // responses-shaped request, forcing stream:true on the wire and accumulating
 // the SSE stream.
-func (p *opencodeZenFreeProvider) doMessagesResponsesUnary(ctx *schemas.BifrostContext, request *schemas.BifrostResponsesRequest, extraHeaders map[string]string) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
+func (p *opencodeZenFreeProvider) doMessagesResponsesUnary(ctx *schemas.BifrostContext, request *schemas.BifrostResponsesRequest, extraHeaders map[string]schemas.SecretVar) (*schemas.BifrostResponsesResponse, *schemas.BifrostError) {
 	forced, release := forceStreamTrueResponses(request)
 	defer release()
 	jsonBody, bifrostErr := anthropic.BuildAnthropicResponsesRequestBody(ctx, forced, anthropic.AnthropicRequestBuildConfig{

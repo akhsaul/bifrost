@@ -58,12 +58,12 @@ func newTestProvider(t *testing.T, baseURL string) *codex.CodexProvider {
 func TestBuildHeadersDefaults(t *testing.T) {
 	headers := codex.BuildHeaders(testContext(), nil)
 	for _, k := range []string{"originator", "user-agent", "version"} {
-		if headers[k] == "" {
+		if headers[k].Val == "" {
 			t.Errorf("missing default header %q", k)
 		}
 	}
-	if headers["originator"] != "codex-tui" {
-		t.Errorf("originator = %q, want codex-tui", headers["originator"])
+	if headers["originator"].Val != "codex-tui" {
+		t.Errorf("originator = %q, want codex-tui", headers["originator"].Val)
 	}
 	for _, k := range []string{"authorization", "chatgpt-account-id"} {
 		for hk := range headers {
@@ -75,14 +75,14 @@ func TestBuildHeadersDefaults(t *testing.T) {
 }
 
 func TestBuildHeadersOverrides(t *testing.T) {
-	configExtra := map[string]string{"version": "9.9.9", "authorization": "Bearer foreign"}
+	configExtra := map[string]schemas.SecretVar{"version": *schemas.NewSecretVar("9.9.9"), "authorization": *schemas.NewSecretVar("Bearer foreign")}
 	ctx := testContext()
 	ctx.SetValue(schemas.BifrostContextKeyExtraHeaders, map[string][]string{
 		"version": {"1.2.3"},
 	})
 	headers := codex.BuildHeaders(ctx, configExtra)
-	if headers["version"] != "1.2.3" {
-		t.Errorf("ctx extra header should win, got %q", headers["version"])
+	if headers["version"].Val != "1.2.3" {
+		t.Errorf("ctx extra header should win, got %q", headers["version"].Val)
 	}
 	if _, ok := headers["authorization"]; ok {
 		t.Error("authorization from config must be dropped, it is credential-owned")

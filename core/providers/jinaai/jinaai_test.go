@@ -58,8 +58,8 @@ func TestEmbedding_SingleTextAndPrefixStripping(t *testing.T) {
 	req := &schemas.BifrostEmbeddingRequest{
 		Provider: schemas.JinaAI,
 		Model:    "jina-ai/jina-embeddings-v3",
-		Input: &schemas.EmbeddingInput{
-			Text: schemas.Ptr("Hello world"),
+		Input: []schemas.EmbeddingInputItem{
+			{Content: schemas.EmbeddingContent{{Type: schemas.EmbeddingContentPartTypeText, Text: schemas.Ptr("Hello world")}}},
 		},
 	}
 
@@ -120,8 +120,8 @@ func TestEmbedding_PreservesPromptTokensWhenPresent(t *testing.T) {
 	req := &schemas.BifrostEmbeddingRequest{
 		Provider: schemas.JinaAI,
 		Model:    "jina-embeddings-v5-omni-small",
-		Input: &schemas.EmbeddingInput{
-			Texts: []string{"test"},
+		Input: []schemas.EmbeddingInputItem{
+			{Content: schemas.EmbeddingContent{{Type: schemas.EmbeddingContentPartTypeText, Text: schemas.Ptr("test")}}},
 		},
 	}
 
@@ -179,11 +179,9 @@ func TestEmbedding_MultimodalObjects(t *testing.T) {
 	req := &schemas.BifrostEmbeddingRequest{
 		Provider: schemas.JinaAI,
 		Model:    "jina-ai/jina-embeddings-v5-omni-small",
-		Input: &schemas.EmbeddingInput{
-			Objects: []map[string]interface{}{
-				{"text": "A beautiful sunset"},
-				{"image": "https://example.com/img.png"},
-			},
+		Input: []schemas.EmbeddingInputItem{
+			{Content: schemas.EmbeddingContent{{Type: schemas.EmbeddingContentPartTypeText, Text: schemas.Ptr("A beautiful sunset")}}},
+			{Content: schemas.EmbeddingContent{{Type: schemas.EmbeddingContentPartTypeImage, Image: &schemas.EmbeddingMediaPart{URL: schemas.Ptr("https://example.com/img.png")}}}},
 		},
 		Params: &schemas.EmbeddingParameters{
 			ExtraParams: map[string]interface{}{
