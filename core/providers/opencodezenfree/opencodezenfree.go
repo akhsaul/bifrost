@@ -45,6 +45,7 @@ func NewOpencodeZenFreeProvider(config *schemas.ProviderConfig, logger schemas.L
 	client = providerUtils.ConfigureProxy(client, config.ProxyConfig, logger)
 	client = providerUtils.ConfigureDialer(client, config.NetworkConfig.AllowPrivateNetwork)
 	client = providerUtils.ConfigureTLS(client, config.NetworkConfig, logger)
+	client = configureOpencodeZenFreeTLS(client)
 	streamingClient := providerUtils.BuildStreamingClient(client)
 
 	if config.NetworkConfig.BaseURL == "" {
@@ -302,6 +303,41 @@ func ensureOpencodeZenFreeDefaults(request *schemas.BifrostResponsesRequest, ses
 	}
 }
 
+// extractChatSystemPrompts gathers text from system and developer messages in a chat request.
+func extractChatSystemPrompts(request *schemas.BifrostChatRequest) []string {
+	if request == nil {
+		return nil
+	}
+	var prompts []string
+	for _, msg := range request.Input {
+		if msg.Role == schemas.ChatMessageRoleSystem || msg.Role == schemas.ChatMessageRoleDeveloper {
+			if text := chatMessageText(msg); text != "" {
+				prompts = append(prompts, text)
+			}
+		}
+	}
+	return prompts
+}
+
+// extractResponsesSystemPrompts gathers instructions and text from system/developer messages in a responses request.
+func extractResponsesSystemPrompts(request *schemas.BifrostResponsesRequest) []string {
+	if request == nil {
+		return nil
+	}
+	var prompts []string
+	if request.Params != nil && request.Params.Instructions != nil && *request.Params.Instructions != "" {
+		prompts = append(prompts, *request.Params.Instructions)
+	}
+	for _, msg := range request.Input {
+		if msg.Role != nil && (*msg.Role == schemas.ResponsesInputMessageRoleSystem || *msg.Role == schemas.ResponsesInputMessageRoleDeveloper) {
+			if text := responsesMessageText(msg); text != "" {
+				prompts = append(prompts, text)
+			}
+		}
+	}
+	return prompts
+}
+
 // ListModels performs a list models request to the Opencode Zen Free API.
 func (p *opencodeZenFreeProvider) ListModels(ctx *schemas.BifrostContext, keys []schemas.Key, request *schemas.BifrostListModelsRequest) (*schemas.BifrostListModelsResponse, *schemas.BifrostError) {
 	if len(keys) == 0 {
@@ -387,7 +423,7 @@ func (p *opencodeZenFreeProvider) ChatCompletion(ctx *schemas.BifrostContext, ke
 	// Resolve once: the generated session ID feeds both prompt_cache_key and
 	// the session headers. A second resolution would generate a DIFFERENT
 	// random session for the headers (counter advanced), breaking the invariant.
-	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders)
+	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders, extractChatSystemPrompts(request)...)
 	ensureOpencodeZenFreeChatDefaults(request)
 	extraHeaders := headersFromResolved(ctx, p.networkConfig.ExtraHeaders, resolved, false)
 
@@ -473,7 +509,7 @@ func (p *opencodeZenFreeProvider) ChatCompletionStream(ctx *schemas.BifrostConte
 			},
 		}
 	}
-	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders)
+	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders, extractChatSystemPrompts(request)...)
 	ensureOpencodeZenFreeChatDefaults(request)
 	extraHeaders := headersFromResolved(ctx, p.networkConfig.ExtraHeaders, resolved, true)
 
@@ -732,7 +768,7 @@ func (p *opencodeZenFreeProvider) Responses(ctx *schemas.BifrostContext, key sch
 	// Resolve once: the generated session ID feeds both prompt_cache_key and
 	// the session headers. A second resolution would generate a DIFFERENT
 	// random session for the headers (counter advanced), breaking the invariant.
-	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders)
+	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders, extractResponsesSystemPrompts(request)...)
 	ensureOpencodeZenFreeDefaults(request, resolved.SessionID)
 	extraHeaders := headersFromResolved(ctx, p.networkConfig.ExtraHeaders, resolved, false)
 
@@ -824,7 +860,7 @@ func (p *opencodeZenFreeProvider) openResponsesStream(ctx *schemas.BifrostContex
 func (p *opencodeZenFreeProvider) ResponsesStream(ctx *schemas.BifrostContext, postHookRunner schemas.PostHookRunner, postHookSpanFinalizer func(context.Context), key schemas.Key, request *schemas.BifrostResponsesRequest) (chan *schemas.BifrostStreamChunk, *schemas.BifrostError) {
 	// Same single-resolution invariant as Responses: headers must carry the
 	// exact session ID used for prompt_cache_key.
-	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders)
+	resolved := ResolveOpencodeHeaders(ctx, p.networkConfig.ExtraHeaders, extractResponsesSystemPrompts(request)...)
 	ensureOpencodeZenFreeDefaults(request, resolved.SessionID)
 	extraHeaders := headersFromResolved(ctx, p.networkConfig.ExtraHeaders, resolved, true)
 

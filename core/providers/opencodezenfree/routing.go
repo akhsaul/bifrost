@@ -12,9 +12,9 @@ import (
 //   - /v1/messages: Anthropic wire format
 //   - /v1/models/<model>: Google Generative Language format (@ai-sdk/google)
 const (
-	opencodeZenFreeChatPath      = "/v1/chat/completions"
-	opencodeZenFreeResponsesPath = "/v1/responses"
-	opencodeZenFreeMessagesPath  = "/v1/messages"
+	opencodeZenFreeChatPath      = "/openai/v1/chat/completions"
+	opencodeZenFreeResponsesPath = "/openai/v1/responses"
+	opencodeZenFreeMessagesPath  = "/anthropic/v1/messages"
 	// opencodeZenFreeGeminiModelsPrefix prefixes the per-model Google
 	// Generative Language path (/v1/models/<model>).
 	opencodeZenFreeGeminiModelsPrefix = "/v1/models/"
@@ -77,10 +77,14 @@ func classifyOpencodeZenFreeModel(ctx *schemas.BifrostContext, model string) ope
 		return opencodeZenFreeEndpointGemini
 	}
 	caps := schemas.ResolveModelCaps(schemas.OpencodeZenFree, schemas.ResolveCanonicalModel(ctx, model))
-	if caps.SupportsEndpoint(opencodeZenFreeMessagesPath, false) {
+	if caps.SupportsEndpoint(opencodeZenFreeMessagesPath, false) || caps.SupportsEndpoint("/v1/messages", false) {
 		return opencodeZenFreeEndpointMessages
 	}
-	if caps.SupportsEndpoint(opencodeZenFreeChatPath, false) {
+	if caps.SupportsEndpoint(opencodeZenFreeChatPath, false) || caps.SupportsEndpoint("/v1/chat/completions", false) {
+		return opencodeZenFreeEndpointChat
+	}
+	lower := strings.ToLower(bare)
+	if strings.Contains(lower, "nemotron") || strings.Contains(lower, "space-bunny") {
 		return opencodeZenFreeEndpointChat
 	}
 	return opencodeZenFreeEndpointResponses

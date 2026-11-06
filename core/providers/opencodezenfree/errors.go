@@ -43,6 +43,19 @@ func parseOpencodeZenFreeError(resp *fasthttp.Response) *schemas.BifrostError {
 			if parsed.Error.Type != "" {
 				bifrostErr.Error.Type = &parsed.Error.Type
 			}
+		} else {
+			var standardErr struct {
+				Error struct {
+					Code    string `json:"code"`
+					Message string `json:"message"`
+				} `json:"error"`
+			}
+			if err := sonic.Unmarshal(body, &standardErr); err == nil && standardErr.Error.Message != "" {
+				bifrostErr.Error.Message = standardErr.Error.Message
+				if standardErr.Error.Code != "" {
+					bifrostErr.Error.Type = &standardErr.Error.Code
+				}
+			}
 		}
 	}
 

@@ -25,6 +25,7 @@ require (
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/klauspost/compress v1.20.0
 	github.com/mark3labs/mcp-go v1.3.0
+	github.com/refraction-networking/utls v1.8.2
 	github.com/rs/zerolog v1.34.0
 	github.com/stretchr/testify v1.12.1
 	github.com/tidwall/gjson v1.18.0

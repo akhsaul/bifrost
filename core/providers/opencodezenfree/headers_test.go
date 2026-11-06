@@ -54,6 +54,97 @@ func TestGenerateProjectID(t *testing.T) {
 	}
 }
 
+func TestGenerateOpencodeOrgIDFormat(t *testing.T) {
+	re := regexp.MustCompile(`^org_01[0-9A-HJKMNP-TV-Z]{24}$`)
+	for range 10 {
+		orgID := GenerateOpencodeOrgID()
+		if !re.MatchString(orgID) {
+			t.Fatalf("GenerateOpencodeOrgID() = %q, want format org_01<24 Crockford base32>", orgID)
+		}
+	}
+	if a, b := GenerateOpencodeOrgID(), GenerateOpencodeOrgID(); a == b {
+		t.Fatalf("consecutive org IDs must differ, got %q twice", a)
+	}
+}
+
+func TestExtractWorkingDirectory(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{"working directory: /tmp/opencode-tls-test\n", "/tmp/opencode-tls-test"},
+		{"Working directory: /mnt/data/Projects/bifrost\n", "/mnt/data/Projects/bifrost"},
+		{"<env>Working directory: /tmp/my-project</env>", "/tmp/my-project"},
+		{"<env>\nWorking directory: /tmp/nested\n</env>", "/tmp/nested"},
+		{"You are helpful.\nworking directory: /home/user/app\nDo this...", "/home/user/app"},
+		{"<env>Working directory: ?</env>", ""},
+		{"no working directory here", ""},
+	}
+	for _, tc := range cases {
+		got := ExtractWorkingDirectory(tc.input)
+		if got != tc.want {
+			t.Errorf("ExtractWorkingDirectory(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
+func TestResolveProjectIDGateway(t *testing.T) {
+	// Fallback to sha1("global")
+	fallback := ResolveProjectID(nil, nil)
+	if want := SHA1String("global"); fallback != want {
+		t.Errorf("ResolveProjectID fallback = %q, want %q", fallback, want)
+	}
+
+	// Working directory in system prompt -> sha1(/mnt/data/Projects/bifrost)
+	prompt := "You are a helpful assistant.\nWorking directory: /mnt/data/Projects/bifrost\n"
+	fromPrompt := ResolveProjectID(nil, nil, prompt)
+	if want := SHA1String("/mnt/data/Projects/bifrost"); fromPrompt != want {
+		t.Errorf("ResolveProjectID fromPrompt = %q, want %q", fromPrompt, want)
+	}
+
+	// Placeholder ? in system prompt must fall back to global sha1
+	placeholderPrompt := "<env>Working directory: ?</env>"
+	fromPlaceholder := ResolveProjectID(nil, nil, placeholderPrompt)
+	if want := SHA1String("global"); fromPlaceholder != want {
+		t.Errorf("ResolveProjectID fromPlaceholder = %q, want %q", fromPlaceholder, want)
+	}
+
+	// Client header takes top priority
+	clientHeader := map[string]schemas.SecretVar{
+		"x-opencode-project": *schemas.NewSecretVar("4594fe459c9129c1eb163e2ab9f8917f4b9cf758"),
+	}
+	fromHeader := ResolveProjectID(nil, clientHeader, prompt)
+	if want := "4594fe459c9129c1eb163e2ab9f8917f4b9cf758"; fromHeader != want {
+		t.Errorf("ResolveProjectID fromHeader = %q, want %q", fromHeader, want)
+	}
+}
+
+func TestResolveOrgID(t *testing.T) {
+	// Default dynamic generated
+	re := regexp.MustCompile(`^org_01[0-9A-HJKMNP-TV-Z]{24}$`)
+	def := ResolveOrgID(nil, nil)
+	if !re.MatchString(def) {
+		t.Errorf("default ResolveOrgID = %q, want format org_01...", def)
+	}
+
+	// Config override
+	cfg := map[string]schemas.SecretVar{
+		"x-opencode-org-id": *schemas.NewSecretVar("org_custom_123"),
+	}
+	if got := ResolveOrgID(nil, cfg); got != "org_custom_123" {
+		t.Errorf("ResolveOrgID config override = %q, want org_custom_123", got)
+	}
+
+	// Context override
+	ctx := schemas.NewBifrostContext(nil, time.Time{})
+	ctx.SetValue(schemas.BifrostContextKeyExtraHeaders, map[string][]string{
+		"x-org-id": {"org_context_456"},
+	})
+	if got := ResolveOrgID(ctx, cfg); got != "org_context_456" {
+		t.Errorf("ResolveOrgID context override = %q, want org_context_456", got)
+	}
+}
+
 func TestBuildHeadersMatchesWorkingCapture(t *testing.T) {
 	headers := BuildHeaders(nil, nil, false)
 
@@ -67,21 +158,32 @@ func TestBuildHeadersMatchesWorkingCapture(t *testing.T) {
 		t.Errorf("user-agent = %q, want %q", headers["user-agent"].Val, DefaultUserAgent)
 	}
 
-	// Session trio must carry the same value.
+	// Session quartet must carry the same value.
 	sid := headers["x-opencode-session"].Val
 	if sid == "" {
 		t.Fatal("x-opencode-session header must always be present")
 	}
-	if headers["x-session-affinity"].Val != sid || headers["x-session-id"].Val != sid {
-		t.Errorf("session trio diverged: session=%q affinity=%q id=%q", sid, headers["x-session-affinity"].Val, headers["x-session-id"].Val)
+	for _, hdr := range []string{"x-opencode-session-id", "x-session-affinity", "x-session-id"} {
+		if headers[hdr].Val != sid {
+			t.Errorf("session quartet diverged: session=%q %s=%q", sid, hdr, headers[hdr].Val)
+		}
 	}
 	if matched, _ := regexp.MatchString(`^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$`, sid); !matched {
 		t.Errorf("x-opencode-session = %q, want ses_<12hex><14base62>", sid)
 	}
 
-	if headers["x-opencode-project"].Val == "" {
-		t.Error("x-opencode-project header must always be present")
+	// Org ID must be present and valid ULID Crockford Base32
+	orgID := headers["x-opencode-org-id"].Val
+	if matched, _ := regexp.MatchString(`^org_01[0-9A-HJKMNP-TV-Z]{24}$`, orgID); !matched {
+		t.Errorf("x-opencode-org-id = %q, want org_01<24 Crockford base32>", orgID)
 	}
+
+	// Project ID must be 40 hex char SHA-1
+	pid := headers["x-opencode-project"].Val
+	if matched, _ := regexp.MatchString(`^[0-9a-f]{40}$`, pid); !matched {
+		t.Errorf("x-opencode-project = %q, want 40 hex char SHA-1", pid)
+	}
+
 	if headers["traceparent"].Val == "" || headers["b3"].Val == "" {
 		t.Error("traceparent and b3 headers must always be present")
 	}

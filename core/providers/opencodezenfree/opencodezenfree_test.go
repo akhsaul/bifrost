@@ -118,8 +118,8 @@ func TestOpencodeZenFreeMandatoryHeadersAndReasoning(t *testing.T) {
 	}
 
 	capReq := captures[0]
-	if capReq.path != "/v1/responses" {
-		t.Errorf("expected path /v1/responses, got %s", capReq.path)
+	if capReq.path != opencodeZenFreeResponsesPath {
+		t.Errorf("expected path %s, got %s", opencodeZenFreeResponsesPath, capReq.path)
 	}
 
 	// Verify headers match the working opencode capture
@@ -144,7 +144,7 @@ func TestOpencodeZenFreeMandatoryHeadersAndReasoning(t *testing.T) {
 		}
 	}
 
-	// Dynamic x-opencode-session header: ses_<12hex><14base62>; the trio must agree.
+	// Dynamic x-opencode-session header: ses_<12hex><14base62>; the quartet must agree.
 	sessionHdr, hasSession := capReq.headers["X-Opencode-Session"]
 	if !hasSession {
 		t.Errorf("missing x-opencode-session header")
@@ -153,13 +153,29 @@ func TestOpencodeZenFreeMandatoryHeadersAndReasoning(t *testing.T) {
 		if !re.MatchString(sessionHdr) {
 			t.Errorf("x-opencode-session %q does not match regex %s", sessionHdr, re.String())
 		}
-		if capReq.headers["X-Session-Affinity"] != sessionHdr || capReq.headers["X-Session-Id"] != sessionHdr {
-			t.Errorf("session trio diverged: session=%q affinity=%q id=%q",
-				sessionHdr, capReq.headers["X-Session-Affinity"], capReq.headers["X-Session-Id"])
+		for _, hdr := range []string{"X-Opencode-Session-Id", "X-Session-Affinity", "X-Session-Id"} {
+			if capReq.headers[hdr] != sessionHdr {
+				t.Errorf("session quartet diverged: session=%q %s=%q", sessionHdr, hdr, capReq.headers[hdr])
+			}
 		}
 	}
-	if _, ok := capReq.headers["X-Opencode-Project"]; !ok {
+	orgHdr, hasOrg := capReq.headers["X-Opencode-Org-Id"]
+	if !hasOrg {
+		t.Errorf("missing x-opencode-org-id header")
+	} else {
+		re := regexp.MustCompile(`^org_01[0-9A-HJKMNP-TV-Z]{24}$`)
+		if !re.MatchString(orgHdr) {
+			t.Errorf("x-opencode-org-id %q does not match regex %s", orgHdr, re.String())
+		}
+	}
+	projHdr, hasProj := capReq.headers["X-Opencode-Project"]
+	if !hasProj {
 		t.Errorf("missing x-opencode-project header")
+	} else {
+		re := regexp.MustCompile(`^[0-9a-f]{40}$`)
+		if !re.MatchString(projHdr) {
+			t.Errorf("x-opencode-project %q does not match 40-hex SHA1", projHdr)
+		}
 	}
 	// traceparent/b3 must share trace-id and span-id.
 	traceparent, hasTP := capReq.headers["Traceparent"]
@@ -261,6 +277,61 @@ func TestOpencodeZenFreeStreamingHeaders(t *testing.T) {
 	}
 }
 
+func TestOpencodeZenFreeWorkingDirectorySystemPromptDerivesProjectID(t *testing.T) {
+	var capturedProject string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedProject = r.Header.Get("X-Opencode-Project")
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = fmt.Fprint(w, "data: {\"type\":\"response.completed\",\"sequence_number\":1,\"response\":{\"id\":\"resp_stream\",\"object\":\"response\",\"model\":\"muse-spark-1.3-contributor-free\",\"output\":[]}}\n\n")
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+	}))
+	defer server.Close()
+
+	cfg := &schemas.ProviderConfig{
+		NetworkConfig: schemas.NetworkConfig{
+			BaseURL: server.URL,
+		},
+	}
+	p, err := NewOpencodeZenFreeProvider(cfg, nil)
+	if err != nil {
+		t.Fatalf("unexpected constructor error: %v", err)
+	}
+
+	ctx := schemas.NewBifrostContext(nil, time.Time{})
+	req := &schemas.BifrostResponsesRequest{
+		Model: "muse-spark-1.3-contributor-free",
+		Params: &schemas.ResponsesParameters{
+			Instructions: schemas.Ptr("You are an assistant.\nWorking directory: /mnt/data/Projects/bifrost\n"),
+		},
+		Input: []schemas.ResponsesMessage{
+			{
+				Role: schemas.Ptr(schemas.ResponsesInputMessageRoleUser),
+				Content: &schemas.ResponsesMessageContent{
+					ContentStr: schemas.Ptr("hello"),
+				},
+			},
+		},
+	}
+	postHookRunner := func(_ *schemas.BifrostContext, result *schemas.BifrostResponse, _ *schemas.BifrostError) (*schemas.BifrostResponse, *schemas.BifrostError) {
+		return result, nil
+	}
+	stream, bifrostErr := p.ResponsesStream(ctx, postHookRunner, nil, schemas.Key{}, req)
+	if bifrostErr != nil {
+		t.Fatalf("unexpected responses error: %v", bifrostErr)
+	}
+	if stream != nil {
+		for range stream {
+		}
+	}
+
+	wantProject := SHA1String("/mnt/data/Projects/bifrost")
+	if capturedProject != wantProject {
+		t.Errorf("expected X-Opencode-Project %q, got %q", wantProject, capturedProject)
+	}
+}
+
 func TestOpencodeZenFreeChatCompletionAndReasoning(t *testing.T) {
 	var (
 		mu         sync.Mutex
@@ -321,8 +392,8 @@ func TestOpencodeZenFreeChatCompletionAndReasoning(t *testing.T) {
 
 	mu.Lock()
 	defer mu.Unlock()
-	if calledPath != "/v1/responses" {
-		t.Errorf("expected path /v1/responses, got %s", calledPath)
+	if calledPath != opencodeZenFreeResponsesPath {
+		t.Errorf("expected path %s, got %s", opencodeZenFreeResponsesPath, calledPath)
 	}
 	// Verify input array exists (Responses API format)
 	if _, hasInput := body["input"]; !hasInput {
@@ -412,8 +483,8 @@ func TestOpencodeZenFreeChatCompletionStreaming(t *testing.T) {
 
 	mu.Lock()
 	defer mu.Unlock()
-	if calledPath != "/v1/responses" {
-		t.Errorf("expected path /v1/responses, got %s", calledPath)
+	if calledPath != opencodeZenFreeResponsesPath {
+		t.Errorf("expected path %s, got %s", opencodeZenFreeResponsesPath, calledPath)
 	}
 
 	foundDelta := false
@@ -1530,8 +1601,8 @@ func TestOpencodeZenFreeSpaceBunnyHitsChatCompletions(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if calledPath != "/v1/chat/completions" {
-		t.Errorf("expected path /v1/chat/completions, got %s", calledPath)
+	if calledPath != opencodeZenFreeChatPath {
+		t.Errorf("expected path %s, got %s", opencodeZenFreeChatPath, calledPath)
 	}
 	if _, ok := body["messages"]; !ok {
 		t.Errorf("expected OpenAI chat 'messages' on the wire, got %v", body)
@@ -1562,7 +1633,7 @@ func TestOpencodeZenFreeFallbackChatToResponses(t *testing.T) {
 		mu.Lock()
 		paths = append(paths, r.URL.Path)
 		mu.Unlock()
-		if r.URL.Path == "/v1/chat/completions" {
+		if r.URL.Path == opencodeZenFreeChatPath {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = fmt.Fprint(w, `{"type":"error","error":{"type":"ModelError","message":"Model mystery-model is not supported for format openai"}}`)
@@ -1606,7 +1677,7 @@ func TestOpencodeZenFreeFallbackChatToResponses(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if len(paths) != 2 || paths[0] != "/v1/chat/completions" || paths[1] != "/v1/responses" {
+	if len(paths) != 2 || paths[0] != opencodeZenFreeChatPath || paths[1] != opencodeZenFreeResponsesPath {
 		t.Errorf("expected [chat responses] attempt order, got %v", paths)
 	}
 }
