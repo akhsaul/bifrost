@@ -2,6 +2,7 @@ package cline_test
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,7 @@ import (
 	"github.com/maximhq/bifrost/core"
 	"github.com/maximhq/bifrost/core/internal/llmtests"
 	"github.com/maximhq/bifrost/core/providers/cline"
+	"github.com/maximhq/bifrost/core/providers/openai"
 	"github.com/maximhq/bifrost/core/schemas"
 	"github.com/valyala/fasthttp"
 )
@@ -414,12 +416,12 @@ func TestCline(t *testing.T) {
 
 	testConfig := llmtests.ComprehensiveTestConfig{
 		Provider:  schemas.Cline,
-		ChatModel: "cline-free/deepseek-v4.1-flash",
+		ChatModel: "cline-free/solar-mini4",
 		Fallbacks: []schemas.Fallback{
-			{Provider: schemas.Cline, Model: "cline-free/deepseek-v4.1-flash"},
+			{Provider: schemas.Cline, Model: "cline-free/solar-mini4"},
 		},
-		TextModel:      "cline-free/deepseek-v4.1-flash",
-		ReasoningModel: "cline-free/deepseek-v4.1-flash",
+		TextModel:      "cline-free/solar-mini4",
+		ReasoningModel: "cline-free/solar-mini4",
 		Scenarios: llmtests.TestScenarios{
 			// Cline has no text completions endpoint and no Responses API;
 			// everything goes through chat.
@@ -590,3 +592,53 @@ func TestPollDeviceAuthStatuses(t *testing.T) {
 		t.Error("expected error for empty device_code")
 	}
 }
+
+func TestDebugClineReqConversion(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("..", "..", "..", "debug", "cline", "cline-req.json"))
+	if err != nil {
+		// Fallback path
+		data, err = os.ReadFile("/mnt/data/Projects/bifrost/debug/cline/cline-req.json")
+		if err != nil {
+			t.Skipf("cannot read debug/cline/cline-req.json: %v", err)
+		}
+	}
+
+	var openAIReq openai.OpenAIResponsesRequest
+	if err := json.Unmarshal(data, &openAIReq); err != nil {
+		t.Fatalf("failed to unmarshal debug cline-req.json into OpenAIResponsesRequest: %v", err)
+	}
+
+	respReq := openAIReq.ToBifrostResponsesRequest(testContext())
+	if respReq == nil {
+		t.Fatal("ToBifrostResponsesRequest returned nil")
+	}
+
+	chatReq := respReq.ToChatRequest()
+	if chatReq == nil {
+		t.Fatal("ToChatRequest returned nil")
+	}
+
+	for i, m := range chatReq.Input {
+		t.Logf("msg[%d]: role=%s content=%+v", i, m.Role, m.Content)
+	}
+	if len(chatReq.Input) < 2 {
+		t.Fatalf("expected at least 2 messages, got %d", len(chatReq.Input))
+	}
+	if chatReq.Input[0].Role != schemas.ChatMessageRoleSystem || *chatReq.Input[0].Content.ContentStr != "You are helpfull assistant" {
+		t.Errorf("system message mismatch: %#v", chatReq.Input[0])
+	}
+	if chatReq.Input[1].Role != schemas.ChatMessageRoleUser {
+		t.Errorf("user message mismatch: %#v", chatReq.Input[1])
+	}
+
+	// Verify tools converted
+	if chatReq.Params == nil || len(chatReq.Params.Tools) != 3 {
+		t.Fatalf("expected 3 tools, got %#v", chatReq.Params)
+	}
+
+	// Verify reasoning effort preserved
+	if chatReq.Params.Reasoning == nil || chatReq.Params.Reasoning.Effort == nil || *chatReq.Params.Reasoning.Effort != "low" {
+		t.Errorf("expected reasoning effort 'low', got %#v", chatReq.Params.Reasoning)
+	}
+}
+
