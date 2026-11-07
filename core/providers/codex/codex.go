@@ -21,6 +21,7 @@ type CodexProvider struct {
 	sendBackRawRequest   bool                  // Whether to include raw request in BifrostResponse
 	sendBackRawResponse  bool                  // Whether to include raw response in BifrostResponse
 	customProviderConfig *schemas.CustomProviderConfig
+	keyCredentialUpdater schemas.KeyCredentialUpdater
 	responsesPath        string
 	modelsPath           string
 }
@@ -71,6 +72,7 @@ func NewCodexProvider(config *schemas.ProviderConfig, logger schemas.Logger) (*C
 		sendBackRawRequest:   config.SendBackRawRequest,
 		sendBackRawResponse:  config.SendBackRawResponse,
 		customProviderConfig: config.CustomProviderConfig,
+		keyCredentialUpdater: config.KeyCredentialUpdater,
 		responsesPath:        "/responses",
 		modelsPath:           "/models",
 	}, nil
@@ -84,7 +86,7 @@ func (provider *CodexProvider) GetProviderKey() schemas.ModelProvider {
 // resolveAuth resolves the credentials for one request and reports whether
 // OAuth mode was used (true) or a static token (false).
 func (provider *CodexProvider) resolveAuth(ctx *schemas.BifrostContext, key schemas.Key) (*codexCredentials, bool, *schemas.BifrostError) {
-	return resolveCredentials(ctx, key, provider.exchangeClient)
+	return resolveCredentials(ctx, key, provider.exchangeClient, provider.keyCredentialUpdater)
 }
 
 // doResponses runs one unary Responses attempt with the given credentials.

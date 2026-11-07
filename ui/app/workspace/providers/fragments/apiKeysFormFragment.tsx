@@ -612,6 +612,9 @@ export function ApiKeyFormFragment({ control, providerName, baseProviderType, fo
 			}).unwrap();
 
 			form.setValue("key.codex_key_config.refresh_token", { value: res.refresh_token, ref: "" }, { shouldDirty: true });
+			if (res.access_token) {
+				form.setValue("key.codex_key_config.access_token", { value: res.access_token, ref: "" }, { shouldDirty: true });
+			}
 			if (res.account_id) {
 				form.setValue("key.codex_key_config.account_id", { value: res.account_id, ref: "" }, { shouldDirty: true });
 			}

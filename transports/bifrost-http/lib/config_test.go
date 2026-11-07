@@ -19865,6 +19865,7 @@ var excludedGoFields = map[string]map[string]bool{
 	// ClientConfig - MCP fields are managed at MCP level, not client level
 	"configstore.ClientConfig": {
 		"ConfigHash":                   true,
+		"circuit_breaker":              true,
 		"allowed_headers":              true, // Internal use
 		"mcp_agent_depth":              true, // Managed via MCP config
 		"mcp_code_mode_binding_level":  true,

@@ -3,6 +3,7 @@ package codex
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -81,9 +82,10 @@ type tokenFailure struct {
 // refresh token rides along: Codex rotates it on every refresh, and the
 // rotated value — not the configured one — must mint the next access token.
 type codexTokenEntry struct {
-	mu      sync.Mutex
-	token   *codexToken
-	failure *tokenFailure
+	mu           sync.Mutex
+	token        *codexToken
+	refreshToken string
+	failure      *tokenFailure
 }
 
 // codexTokenPool maps cache key to *codexTokenEntry. Entries are never
@@ -108,6 +110,7 @@ func resolveCredentials(
 	ctx *schemas.BifrostContext,
 	key schemas.Key,
 	client *fasthttp.Client,
+	updater schemas.KeyCredentialUpdater,
 ) (*codexCredentials, bool, *schemas.BifrostError) {
 	if token := strings.TrimSpace(key.Value.GetValue()); token != "" {
 		var accountID string
@@ -124,7 +127,7 @@ func resolveCredentials(
 		)
 	}
 
-	creds, bErr := mintCredentials(ctx, key, client)
+	creds, bErr := mintCredentials(ctx, key, client, updater)
 	if bErr != nil {
 		return nil, false, bErr
 	}
@@ -151,12 +154,39 @@ func codexCacheKey(key schemas.Key) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+// parseJWTExpiryAndAccount extracts the exp claim, optional workspace claim, and plan type from an unverified JWT string.
+func parseJWTExpiryAndAccount(token string) (time.Time, string, string, bool) {
+	parts := strings.Split(strings.TrimSpace(token), ".")
+	if len(parts) != 3 {
+		return time.Time{}, "", "", false
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		payload, err = base64.URLEncoding.DecodeString(parts[1])
+		if err != nil {
+			return time.Time{}, "", "", false
+		}
+	}
+	var claims struct {
+		Exp  int64 `json:"exp"`
+		Auth struct {
+			AccountID string `json:"chatgpt_account_id"`
+			PlanType  string `json:"chatgpt_plan_type"`
+		} `json:"https://api.openai.com/auth"`
+	}
+	if err := sonic.Unmarshal(payload, &claims); err != nil || claims.Exp <= 0 {
+		return time.Time{}, "", "", false
+	}
+	return time.Unix(claims.Exp, 0), strings.TrimSpace(claims.Auth.AccountID), strings.ToLower(strings.TrimSpace(claims.Auth.PlanType)), true
+}
+
 // mintCredentials returns valid OAuth credentials for the key, refreshing and
 // caching as needed.
 func mintCredentials(
 	ctx *schemas.BifrostContext,
 	key schemas.Key,
 	client *fasthttp.Client,
+	updater schemas.KeyCredentialUpdater,
 ) (*codexCredentials, *schemas.BifrostError) {
 	cfg := key.CodexKeyConfig
 	if strings.TrimSpace(cfg.RefreshToken.GetValue()) == "" && strings.TrimSpace(cfg.AccessToken.GetValue()) == "" {
@@ -177,6 +207,26 @@ func mintCredentials(
 		return nil, f.err
 	}
 
+	// Cold-start optimization: check if configured AccessToken is still valid.
+	if entry.token == nil && cfg != nil && cfg.AccessToken.GetValue() != "" {
+		rawToken := strings.TrimSpace(cfg.AccessToken.GetValue())
+		if exp, claimAccount, planType, ok := parseJWTExpiryAndAccount(rawToken); ok && now.Before(exp.Add(-tokenRefreshMargin)) {
+			accountID := resolveAccountID(cfg)
+			if accountID == "" && claimAccount != "" {
+				accountID = claimAccount
+			}
+			entry.token = &codexToken{
+				accessToken:  rawToken,
+				expiresAt:    exp,
+				refreshToken: entry.liveRefreshToken(key),
+				accountID:    accountID,
+				planType:     planType,
+				accountAt:    now,
+			}
+			return entry.token.credentials(), nil
+		}
+	}
+
 	entry.mu.Lock()
 	defer entry.mu.Unlock()
 
@@ -187,6 +237,25 @@ func mintCredentials(
 	}
 	if f := entry.failure; f != nil && now.Before(f.retryAfter) {
 		return nil, f.err
+	}
+
+	if entry.token == nil && cfg != nil && cfg.AccessToken.GetValue() != "" {
+		rawToken := strings.TrimSpace(cfg.AccessToken.GetValue())
+		if exp, claimAccount, planType, ok := parseJWTExpiryAndAccount(rawToken); ok && now.Before(exp.Add(-tokenRefreshMargin)) {
+			accountID := resolveAccountID(cfg)
+			if accountID == "" && claimAccount != "" {
+				accountID = claimAccount
+			}
+			entry.token = &codexToken{
+				accessToken:  rawToken,
+				expiresAt:    exp,
+				refreshToken: entry.liveRefreshToken(key),
+				accountID:    accountID,
+				planType:     planType,
+				accountAt:    now,
+			}
+			return entry.token.credentials(), nil
+		}
 	}
 
 	// WithoutCancel: the caller that happens to trigger a refresh may hang up,
@@ -209,7 +278,18 @@ func mintCredentials(
 		return nil, bErr
 	}
 	entry.token = tok
+	entry.adoptRefreshToken(tok.refreshToken)
 	entry.failure = nil
+
+	if updater != nil && (tok.refreshToken != "" || tok.accessToken != "") {
+		go func(kID, rTok, aTok string) {
+			_ = updater(context.Background(), schemas.Codex, kID, schemas.KeyCredentialUpdate{
+				RefreshToken: rTok,
+				AccessToken:  aTok,
+			})
+		}(key.ID, tok.refreshToken, tok.accessToken)
+	}
+
 	return tok.credentials(), nil
 }
 
@@ -233,9 +313,20 @@ func (t *codexToken) credentials() *codexCredentials {
 	}
 }
 
+// adoptRefreshToken records a rotated refresh token from a successful refresh.
+// Empty means the response carried none; the configured value stays live.
+func (e *codexTokenEntry) adoptRefreshToken(rotated string) {
+	if strings.TrimSpace(rotated) != "" {
+		e.refreshToken = rotated
+	}
+}
+
 // liveRefreshToken returns the refresh token to mint with: the adopted
 // rotated value when one exists, otherwise the configured one.
 func (e *codexTokenEntry) liveRefreshToken(key schemas.Key) string {
+	if e.refreshToken != "" {
+		return e.refreshToken
+	}
 	if e.token != nil && e.token.refreshToken != "" {
 		return e.token.refreshToken
 	}

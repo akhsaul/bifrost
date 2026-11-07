@@ -277,6 +277,7 @@ export interface CodexExchangeRequest {
 
 export interface CodexExchangeResponse {
 	refresh_token: string;
+	access_token?: string;
 	account_id?: string;
 	email?: string;
 }

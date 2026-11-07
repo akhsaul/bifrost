@@ -164,10 +164,10 @@ func LoginFlowClient() *fasthttp.Client {
 }
 
 // CodexExchangeResult is the durable outcome of the PKCE login: the refresh
-// token the UI stores on the key, the discovered workspace, and the account
-// email for the key name. The access token is deliberately NOT returned — it
-// is minted server-side on demand and never persisted (see tables/key.go).
+// token and access token the UI stores on the key, the discovered workspace, and the account
+// email for the key name.
 type CodexExchangeResult struct {
+	AccessToken  string `json:"access_token,omitempty"`
 	RefreshToken string `json:"refresh_token"`
 	AccountID    string `json:"account_id,omitempty"`
 	Email        string `json:"email,omitempty"`
@@ -297,6 +297,7 @@ func ExchangeAuthCodePKCE(ctx context.Context, client *fasthttp.Client, code, re
 	}
 
 	return &CodexExchangeResult{
+		AccessToken:  tok.AccessToken,
 		RefreshToken: tok.RefreshToken,
 		AccountID:    accountID,
 		Email:        email,

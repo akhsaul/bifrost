@@ -3727,10 +3727,10 @@ func TestExchangeCodexAuthCode_Statuses(t *testing.T) {
 	for _, tc := range []struct {
 		code       string
 		wantStatus int
-		wantField  string
+		wantFields []string
 	}{
-		{"good-code", 200, `"refresh_token":"rt-new"`},
-		{"bad-code", 400, ""},
+		{"good-code", 200, []string{`"refresh_token":"rt-new"`, `"access_token":"at-1"`}},
+		{"bad-code", 400, nil},
 	} {
 		var ctx fasthttp.RequestCtx
 		ctx.Request.Header.SetMethod("POST")
@@ -3741,8 +3741,10 @@ func TestExchangeCodexAuthCode_Statuses(t *testing.T) {
 		if ctx.Response.StatusCode() != tc.wantStatus {
 			t.Errorf("%s: status = %d, want %d (body %s)", tc.code, ctx.Response.StatusCode(), tc.wantStatus, ctx.Response.Body())
 		}
-		if tc.wantField != "" && !strings.Contains(string(ctx.Response.Body()), tc.wantField) {
-			t.Errorf("%s: body %s missing %s", tc.code, ctx.Response.Body(), tc.wantField)
+		for _, field := range tc.wantFields {
+			if !strings.Contains(string(ctx.Response.Body()), field) {
+				t.Errorf("%s: body %s missing %s", tc.code, ctx.Response.Body(), field)
+			}
 		}
 	}
 

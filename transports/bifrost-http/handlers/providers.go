@@ -2272,6 +2272,9 @@ func (h *ProviderHandler) exchangeCodexAuthCode(ctx *fasthttp.RequestCtx) {
 	resp := map[string]string{
 		"refresh_token": result.RefreshToken,
 	}
+	if result.AccessToken != "" {
+		resp["access_token"] = result.AccessToken
+	}
 	if result.AccountID != "" {
 		resp["account_id"] = result.AccountID
 	}

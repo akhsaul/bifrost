@@ -177,8 +177,6 @@ func TestComplexityConfigNormalizedProviderCase(t *testing.T) {
 		})
 	}
 }
-	}
-}
 
 func TestComplexitySemanticConfigValidation(t *testing.T) {
 	tests := []struct {

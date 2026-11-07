@@ -9228,6 +9228,50 @@ func (c *Config) UpdateProviderKey(ctx context.Context, provider schemas.ModelPr
 	return nil
 }
 
+// UpdateKeyCredentials updates credential fields (e.g. rotated OAuth tokens) for an existing key.
+// It updates the in-memory cache and persists the change to ConfigStore (if configured).
+func (c *Config) UpdateKeyCredentials(ctx context.Context, provider schemas.ModelProvider, keyID string, updates schemas.KeyCredentialUpdate) error {
+	c.Mu.Lock()
+	defer c.Mu.Unlock()
+
+	existingConfig, exists := c.Providers[provider]
+	if !exists {
+		return ErrNotFound
+	}
+
+	index := slices.IndexFunc(existingConfig.Keys, func(existingKey schemas.Key) bool {
+		return existingKey.ID == keyID
+	})
+	if index == -1 {
+		return ErrNotFound
+	}
+
+	key := existingConfig.Keys[index]
+	if provider == schemas.Codex && key.CodexKeyConfig != nil {
+		if updates.RefreshToken != "" {
+			key.CodexKeyConfig.RefreshToken = *schemas.NewSecretVar(updates.RefreshToken)
+		}
+		if updates.AccessToken != "" {
+			key.CodexKeyConfig.AccessToken = *schemas.NewSecretVar(updates.AccessToken)
+		}
+	}
+
+	updatedConfig := existingConfig
+	updatedConfig.Keys = append([]schemas.Key(nil), existingConfig.Keys...)
+	updatedConfig.Keys[index] = key
+	c.Providers[provider] = updatedConfig
+
+	if c.ConfigStore != nil {
+		if err := c.ConfigStore.UpdateProviderKey(ctx, provider, keyID, key); err != nil {
+			logger.Warn("failed to persist updated credentials for provider %s key %s: %v", provider, keyID, err)
+			return err
+		}
+	}
+
+	logger.Info("Persisted rotated credentials for provider %s key %s", provider, keyID)
+	return nil
+}
+
 // RemoveProviderKey removes a single key from an existing provider configuration.
 func (c *Config) RemoveProviderKey(ctx context.Context, provider schemas.ModelProvider, keyID string) error {
 	c.Mu.Lock()

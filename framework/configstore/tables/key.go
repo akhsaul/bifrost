@@ -751,8 +751,7 @@ func (k *TableKey) BeforeSave(tx *gorm.DB) error {
 		k.ClineRefreshToken = nil
 	}
 	// Codex. Every SecretVar is value-copied before assignment, per the invariant
-	// above. The access token is rotated frequently and kept in memory only;
-	// do not persist it.
+	// above. The access token and refresh token are rotated on OAuth refreshes.
 	if k.CodexKeyConfig != nil {
 		if k.CodexKeyConfig.ClientID.IsSet() {
 			v := k.CodexKeyConfig.ClientID
@@ -766,9 +765,12 @@ func (k *TableKey) BeforeSave(tx *gorm.DB) error {
 		} else {
 			k.CodexRefreshToken = nil
 		}
-		// The access token is minted server-side and rotated on every refresh;
-		// persisting it would freeze a stale token across restarts.
-		k.CodexAccessToken = nil
+		if k.CodexKeyConfig.AccessToken.IsSet() {
+			v := k.CodexKeyConfig.AccessToken
+			k.CodexAccessToken = &v
+		} else {
+			k.CodexAccessToken = nil
+		}
 		if k.CodexKeyConfig.AccountID.IsSet() {
 			v := k.CodexKeyConfig.AccountID
 			k.CodexAccountID = &v

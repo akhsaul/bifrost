@@ -2,6 +2,7 @@ package codex_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -357,3 +358,114 @@ func TestUnsupportedOperations(t *testing.T) {
 		t.Error("CountTokens should be unsupported")
 	}
 }
+
+func testJWTWithExp(t *testing.T, exp int64, accountID string) string {
+	return testJWTWithExpAndPlan(t, exp, accountID, "")
+}
+
+func testJWTWithExpAndPlan(t *testing.T, exp int64, accountID, planType string) string {
+	t.Helper()
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
+	authMap := map[string]interface{}{
+		"chatgpt_account_id": accountID,
+	}
+	if planType != "" {
+		authMap["chatgpt_plan_type"] = planType
+	}
+	payload, err := json.Marshal(map[string]interface{}{
+		"exp": exp,
+		"https://api.openai.com/auth": authMap,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return header + "." + base64.RawURLEncoding.EncodeToString(payload) + ".sig"
+}
+
+func TestCodexKeyConfig_UsesValidAccessTokenWithoutRefresh(t *testing.T) {
+	futureExp := time.Now().Add(24 * time.Hour).Unix()
+	jwt := testJWTWithExp(t, futureExp, "acct-jwt")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+jwt {
+			t.Errorf("expected bearer %s, got %s", jwt, r.Header.Get("Authorization"))
+		}
+		if r.Header.Get("chatgpt-account-id") != "acct-jwt" {
+			t.Errorf("expected chatgpt-account-id acct-jwt, got %s", r.Header.Get("chatgpt-account-id"))
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp-1\",\"object\":\"response\",\"created_at\":1,\"model\":\"gpt-5.5\",\"status\":\"completed\",\"output\":[{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"hi\"}]}]}}\n\n"))
+	}))
+	defer server.Close()
+
+	provider := newTestProvider(t, server.URL)
+	key := schemas.Key{
+		ID: "key-codex-access",
+		CodexKeyConfig: &schemas.CodexKeyConfig{
+			AccessToken:  *schemas.NewSecretVar(jwt),
+			RefreshToken: *schemas.NewSecretVar("rt-should-not-be-used"),
+		},
+	}
+
+	resp, bErr := provider.Responses(testContext(), key, testResponsesRequest())
+	if bErr != nil {
+		t.Fatalf("unexpected error: %v", bErr)
+	}
+	if resp == nil {
+		t.Fatal("expected non-nil response")
+	}
+}
+
+func TestCodexListModels_UsesPlanFromJWT(t *testing.T) {
+	futureExp := time.Now().Add(24 * time.Hour).Unix()
+	jwt := testJWTWithExpAndPlan(t, futureExp, "acct-jwt", "free")
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/models" {
+			t.Errorf("expected path /models, got %s", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer "+jwt {
+			t.Errorf("expected bearer %s, got %s", jwt, r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"models": [
+				{
+					"slug": "gpt-6-luna",
+					"display_name": "GPT-6-Luna",
+					"available_in_plans": ["free", "plus"]
+				},
+				{
+					"slug": "pro-only-model",
+					"display_name": "Pro Model",
+					"available_in_plans": ["pro"]
+				}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	provider := newTestProvider(t, server.URL)
+	key := schemas.Key{
+		ID: "key-codex-free",
+		CodexKeyConfig: &schemas.CodexKeyConfig{
+			AccessToken: *schemas.NewSecretVar(jwt),
+		},
+		Models: schemas.WhiteList{"*"},
+	}
+
+	resp, bErr := provider.ListModels(testContext(), []schemas.Key{key}, &schemas.BifrostListModelsRequest{
+		Provider:   schemas.Codex,
+		Unfiltered: true,
+	})
+	if bErr != nil {
+		t.Fatalf("unexpected error: %v", bErr)
+	}
+	if len(resp.Data) != 1 {
+		t.Fatalf("expected 1 model matching 'free' plan, got %d", len(resp.Data))
+	}
+	if resp.Data[0].ID != "codex/gpt-6-luna" {
+		t.Errorf("expected model ID 'codex/gpt-6-luna', got %s", resp.Data[0].ID)
+	}
+}
+

@@ -120,6 +120,11 @@ func (baseAccount *BaseAccount) GetConfigForProvider(providerKey schemas.ModelPr
 	if config.Passthrough != nil {
 		providerConfig.Passthrough = config.Passthrough
 	}
+	if baseAccount.store != nil {
+		providerConfig.KeyCredentialUpdater = func(ctx context.Context, provider schemas.ModelProvider, keyID string, updates schemas.KeyCredentialUpdate) error {
+			return baseAccount.store.UpdateKeyCredentials(ctx, provider, keyID, updates)
+		}
+	}
 	return providerConfig, nil
 }
 

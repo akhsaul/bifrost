@@ -636,6 +636,15 @@ func (cpc *CustomProviderConfig) IsOperationAllowed(operation RequestType) bool 
 	return cpc.AllowedRequests.IsOperationAllowed(operation)
 }
 
+// KeyCredentialUpdate holds updated credentials for a provider key (e.g. rotated OAuth tokens).
+type KeyCredentialUpdate struct {
+	RefreshToken string
+	AccessToken  string
+}
+
+// KeyCredentialUpdater is a callback to persist rotated credentials to storage.
+type KeyCredentialUpdater func(ctx context.Context, provider ModelProvider, keyID string, updates KeyCredentialUpdate) error
+
 // ProviderConfig represents the complete configuration for a provider.
 // An array of ProviderConfig needs to be provided in GetConfigForProvider
 // in your account interface implementation.
@@ -654,6 +663,7 @@ type ProviderConfig struct {
 	PromptCache             *PromptCacheConfig    `json:"prompt_cache,omitempty"`
 	InjectedTools           []InjectedTool        `json:"injected_tools,omitempty"`
 	Passthrough             *PassthroughPolicy    `json:"passthrough,omitempty"` // Routes the HTTP passthrough endpoints may forward; nil forwards every route
+	KeyCredentialUpdater    KeyCredentialUpdater  `json:"-"`                     // Optional callback to persist rotated credentials (OAuth refresh tokens)
 }
 
 // PromptCacheConfig opts a provider into synthesizing prompt-cache breakpoints for
